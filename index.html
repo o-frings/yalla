@@ -71,7 +71,7 @@
   body{ max-width:540px; margin:0 auto; padding:0 16px calc(80px + env(safe-area-inset-bottom)); min-height:100vh; min-height:100dvh; }
   body::before{ content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
     background:
-      radial-gradient(125% 52% at 50% 9%, var(--accent-soft) 0%, transparent 52%),
+      radial-gradient(140% 60% at 50% 42%, var(--accent-soft) 0%, transparent 68%),
       var(--bg);
     transition:background .25s ease; }
 
@@ -1528,25 +1528,28 @@ function planScores(plan){
 }
 function round1(x){ return Math.round(x*10)/10; }
 // estimated session length. Heavy compounds rest longest; supersetted accessories share one rest per round.
+// rest used by the time ESTIMATE only (not the in-workout timer) — these are realistic elapsed rests, a touch over the prescribed minimum
 function restSecFor(name){
   const n=String(name).toLowerCase();
-  if(/squat|deadlift|bench press|overhead press|push press|weighted pull|weighted dip|romanian|hip thrust|t-bar|bent-over row|rack pull|trap-bar/.test(n)) return 165;
-  if(/\bpress\b|\brow\b|pulldown|pull-?up|chin-?up|\bdip\b|lunge|split squat|leg press|hack|good morning|pull-through|leg curl|leg extension/.test(n)) return 110;
-  if(muscleFor(name)[0]==="Core") return 50;
-  return 75;
+  if(/squat|deadlift|bench press|overhead press|push press|weighted pull|weighted dip|romanian|hip thrust|t-bar|bent-over row|rack pull|trap-bar/.test(n)) return 180;
+  if(/\bpress\b|\brow\b|pulldown|pull-?up|chin-?up|\bdip\b|lunge|split squat|leg press|hack|good morning|pull-through|leg curl|leg extension/.test(n)) return 130;
+  if(muscleFor(name)[0]==="Core") return 60;
+  return 90;
 }
-function exWork(name){ const r=restSecFor(name); return r>=165?50:r>=110?40:38; }
+function exWork(name){ const r=restSecFor(name); return r>=180?55:r>=130?45:40; }
+// per-exercise overhead — changing exercises takes ~3 min: walking to the station, waiting for / adjusting equipment, warm-up ramp sets, loading plates
+function exSetup(name){ const r=restSecFor(name); return r>=180?210:r>=130?180:150; }
 function workoutMinutes(w){
   if(!w || !w.ex || !w.ex.length) return 0;
-  const ex=w.ex; let sec=300; let i=0;       // ~5 min warm-up
+  const ex=w.ex; let sec=360; let i=0;       // ~6 min general warm-up
   while(i<ex.length){
     const ss=ex[i].ss;
     if(ss){ let j=i; const grp=[]; while(j<ex.length && ex[j].ss===ss){ grp.push(ex[j]); j++; }
       const rounds=Math.max.apply(null, grp.map(g=>Math.max(1,parseInt(g.s)||3)));
       const workSum=grp.reduce((a,g)=>a+exWork(g.n),0);
-      sec += 45 + rounds*workSum + Math.max(0,rounds-1)*80; i=j;
+      sec += 150 + rounds*workSum + rounds*Math.max(0,grp.length-1)*20 + Math.max(0,rounds-1)*105; i=j;
     } else { const e=ex[i], s=Math.max(1,parseInt(e.s)||3);
-      sec += 45 + s*exWork(e.n) + Math.max(0,s-1)*restSecFor(e.n); i++; }
+      sec += exSetup(e.n) + s*exWork(e.n) + Math.max(0,s-1)*restSecFor(e.n); i++; }
   }
   return Math.round(sec/60/5)*5;             // nearest 5 min
 }
@@ -3535,6 +3538,9 @@ function allowsAt(name, level){ const l=exLevel(name);
   if(level==="gym") return true;
   if(level==="park") return l!=="gym";
   return l==="none"; }
+// cap exercise technicality by experience — beginners shouldn't be handed advanced lifts (weighted pull-ups, heavy hinges, OHP…)
+function maxDiffFor(exp){ return exp==="beginner" ? 3 : exp==="advanced" ? 5 : 4; }
+function suitsExp(name, exp){ return difficultyFor(name) <= maxDiffFor(exp); }
 function accessLevels(access, n){
   if(access==="park") return Array(n).fill("park");
   if(access==="home") return Array(n).fill("none");
@@ -3631,10 +3637,10 @@ function familyKey(name){
   return n.replace(/[^a-z]/g,'');
 }
 // allocate each day's exercise slots in proportion to the emphasis weights (with contrast), so dragging a spoke really changes volume
-function pickWorkoutWeighted(groups, n, injuries, level, W, offset){
+function pickWorkoutWeighted(groups, n, injuries, level, W, offset, exp){
   offset=offset||0;
   const avail={}, usable=[];
-  groups.forEach(g=>{ const a=(BUILD_POOL[g]||[]).filter(x=>!injuryBlocks(x,injuries)&&allowsAt(x,level)); avail[g]=a; if(a.length) usable.push(g); });
+  groups.forEach(g=>{ const a=(BUILD_POOL[g]||[]).filter(x=>!injuryBlocks(x,injuries)&&allowsAt(x,level)&&suitsExp(x,exp)); avail[g]=a; if(a.length) usable.push(g); });
   if(!usable.length) return [];
   const wt=g=>Math.pow(Math.max(0.06, W[g]!=null?W[g]:0.5), 1.8), cap=g=>Math.min(avail[g].length,3);
   const wsum=usable.reduce((s,g)=>s+wt(g),0), raw={}, target={}; let assigned=0;
@@ -3711,7 +3717,7 @@ function buildPlan(b){
     const sig=groups.slice().sort().join(",")+"|"+lvl, offset=seen[sig]||0; seen[sig]=offset+1;
     // pick a generous candidate list (enough to fill the time even at 2 sets), then trim down to the budget
     // pick exactly the realistic number of moves for the session; the weighted picker spreads them across muscles
-    const picks=pickWorkoutWeighted(groups, base, b.injuries, lvl, W, offset);
+    const picks=pickWorkoutWeighted(groups, base, b.injuries, lvl, W, offset, b.exp);
     // compounds first (train heavy while fresh), then accessories interleaved by muscle within each station
     const comps=picks.filter(p=>p.comp), accs=interleave(picks.filter(p=>!p.comp));
     const ordered=comps.concat(accs);
@@ -3729,7 +3735,7 @@ function buildPlan(b){
     const key=buildKey(m); let bestI=-1, bestLen=99;
     workouts.forEach((wk,i)=>{ if(dayDomain(wk.name).indexOf(key)>=0 && wk.ex.length<bestLen){ bestLen=wk.ex.length; bestI=i; } });
     if(bestI<0) return;
-    const cand=(BUILD_POOL[key]||[]).find(x=>!injuryBlocks(x,b.injuries)&&allowsAt(x,workouts[bestI]._lvl)&&!workouts[bestI].ex.some(e=>e.n===x||familyKey(e.n)===familyKey(x)));
+    const cand=(BUILD_POOL[key]||[]).find(x=>!injuryBlocks(x,b.injuries)&&allowsAt(x,workouts[bestI]._lvl)&&suitsExp(x,b.exp)&&!workouts[bestI].ex.some(e=>e.n===x||familyKey(e.n)===familyKey(x)));
     if(!cand) return;
     workouts[bestI].ex.push({n:cand, t:accSets+" × "+reps.a, s:accSets}); workouts[bestI]._meta.push({comp:false, grp:m});
     const protect=new Set(emphG); protect.add(m);                 // keep the new move; trim a lower-priority one to stay near the limit
