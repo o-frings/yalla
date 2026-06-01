@@ -714,6 +714,10 @@
           <span class="levelcap" style="margin:0;">Share my workouts to the friends feed</span>
           <input type="checkbox" id="shareToggle">
         </label>
+        <label class="row" style="justify-content:space-between; align-items:center; margin-top:12px;">
+          <span class="levelcap" style="margin:0;">Remind me to train after 2 quiet days</span>
+          <input type="checkbox" id="remindToggle">
+        </label>
         <button class="btn tinted wide" id="acctPush" style="margin-top:12px;">Save this device to my account</button>
         <a id="acctDelete" class="levelcap" style="display:inline-block; margin:12px 4px 0; color:var(--bad,#ff375f); cursor:pointer; text-decoration:underline;">Delete my cloud data</a>
       </div>
@@ -1622,7 +1626,9 @@ async function _localSet(k,v){
 // last-write-wins per key via an updated_at timestamp.
 const SUPA = {
   url: "https://sukuuhoglitaeidplhns.supabase.co",
-  key: "sb_publishable_ccEFXkJ3cl8-PNLSzeiOAA_aZo7tc9O"
+  key: "sb_publishable_ccEFXkJ3cl8-PNLSzeiOAA_aZo7tc9O",
+  // paste the VAPID *public* key here after running `npx web-push generate-vapid-keys` (see PUSH-SETUP.md)
+  vapidPublic: ""
 };
 const CLOUD_KEYS = ["plans","lastsets","bodyweight","history","extlog","settings"]; // draft stays device-only
 let sb=null, cloudUser=null, _syncMeta={}, _pushTimers={};
@@ -1765,6 +1771,7 @@ function renderAccount(){
     outB.style.display="none"; inB.style.display="";
     $("acctWho").textContent=cloudUser.email||"Signed in";
     const tog=$("shareToggle"); if(tog) tog.checked = settings.shareActivity===true;
+    const rtog=$("remindToggle"); if(rtog) rtog.checked = settings.remindersOn===true;
     setFeed(true);
     renderFeed();
   } else {
@@ -1783,6 +1790,26 @@ async function cloudPublish(session){
     });
   }catch(e){}
 }
+
+// ---- push reminders (signed-in only; a server cron sends the actual push — see PUSH-SETUP.md) ----
+function urlB64ToUint8(b64){ const pad="=".repeat((4-b64.length%4)%4); const s=(b64+pad).replace(/-/g,"+").replace(/_/g,"/"); const raw=atob(s); const a=new Uint8Array(raw.length); for(let i=0;i<raw.length;i++) a[i]=raw.charCodeAt(i); return a; }
+async function pushSubscribe(){
+  if(!cloudReady()){ toast("Sign in first to get reminders."); return false; }
+  if(!SUPA.vapidPublic){ toast("Reminders aren’t set up on the server yet."); return false; }
+  if(!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)){ toast("Reminders aren’t supported on this device."); return false; }
+  try{
+    if(await Notification.requestPermission()!=="granted"){ toast("Allow notifications to get reminders."); return false; }
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub) sub=await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlB64ToUint8(SUPA.vapidPublic) });
+    await sb.from("push_subscriptions").upsert({ user_id:cloudUser.id, subscription:sub.toJSON(), reminders_on:true,
+      last_workout_at:new Date(lastWorkoutTs()||Date.now()).toISOString(), updated_at:new Date().toISOString() });
+    return true;
+  }catch(e){ toast("Couldn’t enable reminders."); return false; }
+}
+async function pushDisable(){ try{ if(cloudReady()) await sb.from("push_subscriptions").update({ reminders_on:false, updated_at:new Date().toISOString() }).eq("user_id", cloudUser.id); }catch(e){} }
+// keep the server's "last workout" fresh so the 2-day timer is accurate
+async function cloudTouchWorkout(){ try{ if(cloudReady()) await sb.from("push_subscriptions").update({ last_workout_at:new Date().toISOString(), last_reminded_at:null }).eq("user_id", cloudUser.id); }catch(e){} }
 
 function agoStr(ts){ const s=Math.max(0,(Date.now()-ts)/1000);
   if(s<90) return "just now"; const m=s/60; if(m<60) return Math.round(m)+"m ago";
@@ -2526,6 +2553,7 @@ $("saveBtn").onclick=async()=>{
   if(beaten>0){ celebrate(); if(navigator.vibrate) try{ navigator.vibrate([0,60,40,120]); }catch(e){} toast("New best! You beat "+beaten+" lift"+(beaten>1?"s":"")+" — keep climbing.", true); }
   openShareTile(session);
   cloudPublish(session);   // post a summary to the friends feed (no raw weights), if signed in + sharing on
+  cloudTouchWorkout();     // reset the 2-day "train at home" reminder timer
   if(fresh.length) setTimeout(()=>celebrateAch(fresh), beaten>0?1300:1200);
 };
 
@@ -3804,6 +3832,11 @@ if($("acctLogoutBtn")) $("acctLogoutBtn").onclick=cloudLogout;
 if($("acctPush")) $("acctPush").onclick=cloudForcePush;
 if($("acctDelete")) $("acctDelete").onclick=cloudDeleteData;
 if($("shareToggle")) $("shareToggle").onchange=async(e)=>{ settings.shareActivity=!!e.target.checked; await sset("settings",settings); toast(settings.shareActivity?"Sharing on — friends see your workout summaries.":"Sharing off — your workouts stay private."); };
+if($("remindToggle")) $("remindToggle").onchange=async(e)=>{
+  if(e.target.checked){ const ok=await pushSubscribe(); e.target.checked=ok; settings.remindersOn=ok; if(ok) toast("Reminders on — we’ll nudge you after 2 quiet days."); }
+  else { await pushDisable(); settings.remindersOn=false; toast("Reminders off."); }
+  await sset("settings",settings);
+};
 renderAccount();
 $("importFile").onchange=(e)=>{ const f=e.target.files&&e.target.files[0]; if(!f) return;
   const r=new FileReader(); r.onload=()=>{ let obj; try{ obj=JSON.parse(r.result); }catch(_){ toast("Couldn't read that file."); return; } applyRestore(obj); e.target.value=""; };
