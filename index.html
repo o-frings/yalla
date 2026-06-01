@@ -35,14 +35,14 @@
     --bg:#f2f2f7; --bg2:#e9ebf1; --card:#ffffff; --row:#f4f4f8; --field:#eff0f5;
     --ink:#1c1c1e; --l2:#6e6e73; --l3:#a6a6ac;
     --sep:rgba(60,60,67,.11);
-    --accent:#c96810; --accent-soft:rgba(201,104,16,.10);
-    --grad:linear-gradient(135deg,#c96810 0%,#e8820c 100%);
+    --accent:#e8551c; --accent-soft:rgba(232,85,28,.10);
+    --grad:linear-gradient(135deg,#ff7a18 0%,#ff2f3d 100%);
     --segtrack:#e8e8ee; --segthumb:#ffffff;
     --track:#e6e6eb; --grabber:#c7c7cc; --sheetbg:#ffffff; --chartbg:#f4f4f8;
-    --shadow:0 1px 2.5px rgba(17,17,26,.05), 0 12px 30px -18px rgba(17,17,26,.22);
+    --shadow:0 1px 2px rgba(17,17,26,.04), 0 8px 24px -16px rgba(17,17,26,.16);
     --line:rgba(17,17,26,.045);
     --hi:rgba(255,255,255,.65);
-    --accent-glow:rgba(201,104,16,.38);
+    --accent-glow:rgba(255,90,40,.40);
     --red:#ff3b30;
     --r-lg:22px; --r-md:14px; --r-sm:10px;
   }
@@ -51,14 +51,14 @@
     --bg:#000000; --bg2:#0a0a0c; --card:#1c1c1e; --row:#2a2a2c; --field:#2c2c2e;
     --ink:#ffffff; --l2:#98989e; --l3:#636366;
     --sep:rgba(84,84,88,.45);
-    --accent:#f09030; --accent-soft:rgba(240,144,48,.16);
-    --grad:linear-gradient(135deg,#f08020 0%,#f5a040 100%);
+    --accent:#ff7a3a; --accent-soft:rgba(255,122,58,.16);
+    --grad:linear-gradient(135deg,#ff7a18 0%,#ff3450 100%);
     --segtrack:#0e0e10; --segthumb:#3a3a3c;
     --track:#0e0e10; --grabber:#48484a; --sheetbg:#1c1c1e; --chartbg:#222226;
-    --shadow:0 1px 1px rgba(0,0,0,.5), 0 14px 34px -20px rgba(0,0,0,.9);
+    --shadow:0 1px 1px rgba(0,0,0,.4), 0 10px 28px -18px rgba(0,0,0,.85);
     --line:rgba(255,255,255,.06);
     --hi:rgba(255,255,255,.055);
-    --accent-glow:rgba(240,144,48,.34);
+    --accent-glow:rgba(255,122,58,.38);
     --red:#ff453a;
     --r-lg:22px; --r-md:14px; --r-sm:10px;
   }
@@ -402,7 +402,7 @@
   .planrow .info .meta{ font-size:12.5px; color:var(--l2); margin-top:2px; }
   .planrow .edit{ color:var(--accent); font-size:14px; background:none; border:none; cursor:pointer; flex:0 0 auto; }
 
-  .ed-label{ font-size:12.5px; color:var(--l2); font-weight:600; text-transform:uppercase; letter-spacing:.4px; margin:16px 4px 7px; }
+  .ed-label{ font-size:12px; color:var(--l3); font-weight:700; text-transform:uppercase; letter-spacing:.6px; margin:22px 4px 9px; }
   .ed-wk{ background:var(--row); border-radius:12px; padding:12px; margin-bottom:12px; }
   .ed-wk .wkhead{ display:flex; gap:8px; margin-bottom:8px; }
   .ed-ex{ display:block; margin-bottom:11px; padding-left:10px; }
@@ -531,7 +531,7 @@
 </div>
 <div id="exlist"></div>
 
-<div class="foot">Saved on this device only. Train to failure safely — use a spotter or safeties.</div>
+<div class="foot">On-device only · keep a backup · lift safely</div>
 
 <div class="savebar"><button class="btn wide" id="saveBtn">Finish &amp; Save Workout</button></div>
 <div class="toast" id="toast"></div>
@@ -2070,7 +2070,14 @@ function drawSpark(){
 }
 // ---- weekly progress bars (Me sheet) ----
 const PROG_WEEKS=10;
-let progMetric="volume";
+let progMetric="volume", progAnim=1, progRAF=0;
+// grow the bars in from the baseline (called when the Me sheet opens or the metric changes)
+function animateProgBars(){
+  if(typeof requestAnimationFrame!=="function"){ progAnim=1; drawProgBars(); return; }
+  cancelAnimationFrame(progRAF); const start=performance.now(), dur=520;
+  const step=t=>{ const k=Math.min(1,(t-start)/dur); progAnim=1-Math.pow(1-k,3); drawProgBars(); if(k<1){ progRAF=requestAnimationFrame(step); } else { progAnim=1; } };
+  progRAF=requestAnimationFrame(step);
+}
 function progWeeklyData(metric){
   const wkMs=7*86400000, now=Date.now(), N=PROG_WEEKS, out=new Array(N).fill(0);
   const idx=d=>{ const k=Math.floor((now-d)/wkMs); return (k>=0 && k<N) ? (N-1-k) : -1; }; // N-1 = this week
@@ -2156,14 +2163,14 @@ function drawProgBars(){
   data.forEach((v,i)=>{
     const x=pad+i*(barW+gap);
     const norm = hi>lo ? (v-lo)/(hi-lo) : 0;
-    const bh = v>0 ? Math.max(4, norm*(base-10)) : 0, y=base-bh, r=Math.min(7,barW/2);
+    const bh = (v>0 ? Math.max(4, norm*(base-10)) : 0)*progAnim, y=base-bh, r=Math.min(7,barW/2);
     ctx.fillStyle = i===N-1 ? ac : hexAlpha(ac,.40);
     ctx.beginPath(); ctx.moveTo(x,base); ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r); ctx.lineTo(x+barW-r,y); ctx.arcTo(x+barW,y,x+barW,y+r,r); ctx.lineTo(x+barW,base); ctx.closePath(); ctx.fill();
   });
   ctx.strokeStyle=hexAlpha(ac,.18); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad,base+0.5); ctx.lineTo(W-pad,base+0.5); ctx.stroke();
   // trend line (linear fit over weeks with data) — the visual "which way am I heading?" cue
   const pts=[]; data.forEach((v,i)=>{ if(v>0) pts.push([i,v]); });
-  if(pts.length>=2){
+  if(pts.length>=2 && progAnim>=1){
     const k=pts.length, sx=pts.reduce((a,p)=>a+p[0],0), sy=pts.reduce((a,p)=>a+p[1],0),
           sxy=pts.reduce((a,p)=>a+p[0]*p[1],0), sxx=pts.reduce((a,p)=>a+p[0]*p[0],0), den=k*sxx-sx*sx;
     const m=den?(k*sxy-sx*sy)/den:0, b0=(sy-m*sx)/k, i0=pts[0][0], i1=pts[pts.length-1][0];
@@ -2183,7 +2190,7 @@ function drawProgBars(){
 document.querySelectorAll("#progMetric .s").forEach(s=> s.onclick=()=>{
   progMetric=s.dataset.pm;
   document.querySelectorAll("#progMetric .s").forEach(x=> x.classList.toggle("active", x===s));
-  drawProgBars();
+  animateProgBars();
 });
 $("bwBtn").onclick=async()=>{ const v=parseFloat($("bwInput").value);
   if(isNaN(v)||v<30||v>250){ toast("Enter a valid weight"); return; }
@@ -2411,7 +2418,7 @@ $("goalSave").onclick=async()=>{ const s=parseFloat($("goalStart").value),g=pars
 
 // ================= me (personal) sheet =================
 $("openMe").onclick=()=>{ $("goalStart").value=settings.goalStart; $("goalTarget").value=settings.goalTarget;
-  $("heightIn").value=settings.heightCm||""; $("bfIn").value=settings.bodyfatPct||""; renderDash(); renderAccount(); openSheet("Me"); };
+  $("heightIn").value=settings.heightCm||""; $("bfIn").value=settings.bodyfatPct||""; renderDash(); renderAccount(); openSheet("Me"); animateProgBars(); };
 $("meClose").onclick=()=>closeSheet("Me");
 $("scrimMe").onclick=()=>closeSheet("Me");
 $("bodySave").onclick=async()=>{
