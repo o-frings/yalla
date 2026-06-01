@@ -168,6 +168,11 @@ it — same project, no re-architecture. Postgres data is fully exportable, so n
    - **anon / public key** (a long string labeled "anon public")
 4. Send me those two values, or paste them into the config block at the top of
    `index.html` (I'll show you exactly where).
+5. **Authentication → URL Configuration** (required, or magic-link login fails):
+   - **Site URL** = your live app URL, e.g. `https://YOUR-USERNAME.github.io/yalla/`
+   - **Redirect URLs** = add the same URL (plus any local test origin you use).
+   - Note: Supabase's built-in email sender is rate-limited (a few/hour) and may land
+     in spam — fine for testing; add an SMTP provider later for real friend use.
 
 > **Is the anon key a secret?** No. The anon/public key is *designed* to be embedded
 > in client-side code and shipped publicly. Security is enforced by the row-level
