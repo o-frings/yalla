@@ -78,7 +78,7 @@
     background:var(--grad); -webkit-background-clip:text; -webkit-text-fill-color:transparent;
     background-clip:text; display:inline-block; }
   .wordmark::after{ content:"."; color:var(--accent); -webkit-text-fill-color:var(--accent); }
-  .nav{ padding:calc(10px + env(safe-area-inset-top)) 20px 6px; display:flex; align-items:center; justify-content:space-between;
+  .nav{ padding:calc(6px + env(safe-area-inset-top)) 20px 6px; display:flex; align-items:center; justify-content:space-between;
     position:sticky; top:0; z-index:30; margin:0 -16px;
     background:color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); }
   .navleft,.navright{ display:flex; align-items:center; gap:2px; }
@@ -3279,7 +3279,15 @@ init();
 // Offline support: register the service worker when served over HTTPS (e.g. GitHub Pages).
 // Skipped silently on file:// so opening the raw file still works.
 if("serviceWorker" in navigator && location.protocol==="https:"){
-  window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
+  // when a new version takes control, reload once so the update shows without a manual re-add
+  let _swReloaded=false;
+  navigator.serviceWorker.addEventListener("controllerchange", ()=>{ if(_swReloaded) return; _swReloaded=true; location.reload(); });
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("sw.js").then(reg=>{
+      reg.update();                                   // check for a newer worker on every launch
+      setInterval(()=>reg.update(), 60*60*1000);      // and hourly while open
+    }).catch(()=>{});
+  });
 }
 </script>
 </body>
