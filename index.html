@@ -3581,7 +3581,12 @@ function allowsAt(name, level){ const l=exLevel(name);
   return l==="none"; }
 // cap exercise technicality by experience — beginners shouldn't be handed advanced lifts (weighted pull-ups, heavy hinges, OHP…)
 function maxDiffFor(exp){ return exp==="beginner" ? 3 : exp==="advanced" ? 5 : 4; }
-function suitsExp(name, exp){ return difficultyFor(name) <= maxDiffFor(exp); }
+function suitsExp(name, exp){
+  if(difficultyFor(name) > maxDiffFor(exp)) return false;
+  // simple technique but a real strength prerequisite — pull-ups/chin-ups/dips are intermediate, not beginner moves
+  if(exp==="beginner" && /pull-?up|chin-?up|\bdip\b|pistol|muscle-up/.test(name.toLowerCase())) return false;
+  return true;
+}
 function accessLevels(access, n){
   if(access==="park") return Array(n).fill("park");
   if(access==="home") return Array(n).fill("none");
