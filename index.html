@@ -1668,13 +1668,17 @@ async function handleAuth(user){
 }
 
 // Auth actions (magic-link / passwordless).
+let _lastOtpSend=0;
 async function cloudLogin(email){
   if(!sb){ await window.__cloudInit(); }
   if(!sb){ toast("Couldn't reach the cloud — check your connection and try again."); return; }
+  const wait=Math.ceil((60000-(Date.now()-_lastOtpSend))/1000);
+  if(wait>0){ toast("Hold on "+wait+"s before requesting another code."); return; }
   try{
     // Code (not link): a magic link always opens Safari and never reaches an installed PWA.
     const { error } = await sb.auth.signInWithOtp({ email, options:{ shouldCreateUser:true } });
     if(error) throw error;
+    _lastOtpSend=Date.now();
     const cr=$("acctCodeRow"); if(cr){ cr.style.display=""; const ci=$("acctCode"); if(ci){ ci.value=""; ci.focus(); } }
     toast("Check your email for a 6-digit code.", true);
   }catch(e){ toast("Sign-in failed: "+((e&&e.message)||e)); }
