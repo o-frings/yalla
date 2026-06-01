@@ -252,7 +252,7 @@
   .sortbtn svg{ width:15px; height:15px; }
   .sortbtn.on{ color:var(--accent); }
   .chips::-webkit-scrollbar{ display:none; }
-  .chip{ flex:0 0 auto; display:inline-flex; align-items:center; gap:5px; padding:7px 13px; border-radius:20px; font-size:13px; font-weight:600;
+  .chip{ flex:0 0 auto; display:inline-flex; align-items:center; gap:5px; padding:10px 15px; border-radius:20px; font-size:13px; font-weight:600;
     background:var(--row); color:var(--ink); border:.5px solid var(--line); cursor:pointer; white-space:nowrap;
     transition:transform .12s cubic-bezier(.34,1.4,.6,1), background .15s, color .15s, border-color .15s; }
   .chip:active{ transform:scale(.94); }
@@ -331,7 +331,7 @@
   .setrow .vol{ font-size:18px; color:var(--l2); font-weight:700; min-width:56px; flex:0 0 auto; text-align:right; line-height:1; font-variant-numeric:tabular-nums; }
   .setrow .vol.live{ color:var(--ink); }
   .setrow.pr .vol{ color:var(--accent); }
-  .setrow .setdel{ flex:0 0 auto; width:28px; height:28px; margin:-4px -6px -4px 0; border:none; background:none; color:var(--l3);
+  .setrow .setdel{ flex:0 0 auto; width:40px; height:40px; margin:-8px -10px -8px -4px; border:none; background:none; color:var(--l3);
     cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; border-radius:50%; transition:color .15s, background .15s; }
   .setrow .setdel svg{ width:19px; height:19px; }
   .setrow .setdel:active{ color:var(--red); background:var(--accent-soft); }
@@ -341,8 +341,8 @@
   .prspark{ position:fixed; inset:0; pointer-events:none; z-index:250; }
   .prspark i{ position:absolute; width:6px; height:6px; border-radius:50%; transform:translate(-50%,-50%); animation:prspark .65s ease-out forwards; }
   @keyframes prspark{ 0%{transform:translate(-50%,-50%) scale(1);opacity:1;} 100%{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(.3);opacity:0;} }
-  .lnks{ display:flex; align-items:center; flex:0 0 auto; gap:2px; }
-  .lnkic{ color:var(--l2); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; min-width:40px; min-height:40px; margin:-8px 0; }
+  .lnks{ display:flex; align-items:center; flex:0 0 auto; gap:6px; }
+  .lnkic{ color:var(--l2); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; margin:-8px 0; }
   .lnkic svg{ width:18px; height:18px; }
   .lnkic:active{ color:var(--accent); }
   .lnk{ font-size:12.5px; color:var(--l2); text-decoration:none; cursor:pointer; }
@@ -393,16 +393,16 @@
   .ed-ex-l1{ display:flex; gap:6px; align-items:center; margin-bottom:6px; }
   .ed-ex .exa{ font-size:14px; }
   .ed-ex input.exn{ flex:2; } .ed-ex input.ext{ flex:1.3; } .ed-ex input.exs{ flex:0 0 50px; text-align:center; }
-  .ed-ex .del,.ed-wk .del{ color:var(--red); background:none; border:none; font-size:20px; cursor:pointer; flex:0 0 auto; width:24px; }
-  .exgrip{ flex:0 0 auto; width:22px; padding:0; background:none; border:none; cursor:grab; color:var(--l3); font-size:17px; line-height:1; touch-action:none; letter-spacing:-1px; }
+  .ed-ex .del,.ed-wk .del{ color:var(--red); background:none; border:none; font-size:20px; cursor:pointer; flex:0 0 auto; width:30px; height:44px; display:inline-flex; align-items:center; justify-content:center; }
+  .exgrip{ flex:0 0 auto; width:28px; height:44px; padding:0; background:none; border:none; cursor:grab; color:var(--l3); font-size:17px; line-height:1; touch-action:none; letter-spacing:-1px; display:inline-flex; align-items:center; justify-content:center; }
   .exgrip:active{ cursor:grabbing; }
   .ed-ex.dragging{ opacity:.5; }
-  .exlink{ flex:0 0 auto; width:24px; padding:0; background:none; border:none; cursor:pointer; color:var(--l3); display:inline-flex; align-items:center; justify-content:center; }
+  .exlink{ flex:0 0 auto; width:30px; height:44px; padding:0; background:none; border:none; cursor:pointer; color:var(--l3); display:inline-flex; align-items:center; justify-content:center; }
   .exlink svg{ width:15px; height:15px; }
   .exlink.on{ color:var(--accent); }
-  .exlink-sp{ flex:0 0 auto; width:24px; }
+  .exlink-sp{ flex:0 0 auto; width:30px; }
   .ed-wk .wkn{ flex:2; } .ed-wk .wks{ flex:1; }
-  .miniadd{ font-size:14px; color:var(--accent); background:none; border:none; cursor:pointer; padding:4px 2px; font-weight:500; }
+  .miniadd{ font-size:14px; color:var(--accent); background:none; border:none; cursor:pointer; padding:10px 6px; margin:-4px -6px; font-weight:500; }
   .rotwrap{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--l2); margin-top:4px; }
   .rotwrap input{ width:auto; }
   .gset{ display:flex; gap:8px; align-items:center; }
@@ -418,7 +418,10 @@
   .mlab{ width:90px; flex:0 0 auto; font-size:12.5px; font-weight:600; }
   .mbarwrap{ flex:1; background:var(--track); border-radius:8px; height:15px; overflow:hidden; }
   .mbar{ height:100%; border-radius:8px; transition:width .5s cubic-bezier(.2,.8,.2,1); }
-  .mval{ width:34px; flex:0 0 auto; text-align:right; font-size:12.5px; font-weight:700; }
+  .mval{ width:48px; flex:0 0 auto; text-align:right; font-size:12.5px; font-weight:700; }
+  .mrow.under .mval{ color:#e8590c; }
+  .mrow.under .mbar{ opacity:.5; }
+  .hsrc li span{ color:var(--l3); }
   .mdot{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:8px; vertical-align:middle; }
   #musRadar, #buildRadar{ width:100%; max-width:330px; height:auto; aspect-ratio:1/1; display:block; margin:16px auto 20px; }
   .emphradar{ max-width:300px!important; margin:8px auto 10px!important; touch-action:none; cursor:grab; -webkit-user-select:none; user-select:none; }
@@ -434,7 +437,7 @@
   .crow span:last-child{ color:var(--l2); }
   .freehint{ font-size:13px; color:var(--l2); padding:0 4px 14px; line-height:1.45; }
   .freeadd{ padding:9px 16px 13px; border-top:.5px solid var(--sep); }
-  .addset{ cursor:pointer; font-weight:600; }
+  .addset{ cursor:pointer; font-weight:600; display:inline-flex; align-items:center; gap:3px; padding:8px 8px; margin:-6px -8px; min-height:24px; }
   .exhead .freedel{ color:var(--red); background:none; border:none; font-size:22px; line-height:1; cursor:pointer; padding:8px; margin:-8px -4px; }
 
   /* --- polish pass --- */
@@ -898,6 +901,11 @@
     <div id="musBars"></div>
     <div class="ed-label">By exercise</div>
     <div id="musByEx"></div>
+    <details class="hsrc" id="musSrcBox" style="margin-top:14px;">
+      <summary>How this is measured &amp; sources</summary>
+      <p id="musMethod" style="color:var(--l2);font-size:12.5px;line-height:1.5;margin:6px 2px 8px;"></p>
+      <ul id="musSrcList"></ul>
+    </details>
   </div>
 </div>
 
@@ -2214,6 +2222,23 @@ $("importBtn").onclick=async()=>{
 const MGROUPS=["Chest","Back","Front Delts","Side Delts","Rear Delts","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves","Core"];
 const MSHORT={Chest:"Chest",Back:"Back",Shoulders:"Delts",Biceps:"Biceps",Triceps:"Triceps",Quads:"Quads",Hamstrings:"Hams",Glutes:"Glutes",Calves:"Calves",Core:"Core","Front Delts":"F·Delt","Side Delts":"S·Delt","Rear Delts":"R·Delt"};
 let musWindow=7, musMetric="sets", musSrc="log", musVolMode="total";
+// Evidence-based weekly volume targets (fractional sets per muscle per week).
+// Dose-response meta-regressions: benefits accrue across ~10+ hard sets/muscle/wk; ~4–6 is a rough
+// lower bound (MEV) below which most trainees under-stimulate growth. One baseline for all groups —
+// real per-muscle landmarks differ, but a single target keeps the read honest and legible.
+const WEEKLY_SET_TARGET=10, WEEKLY_SET_MIN=6;
+// span of the whole log in weeks (for converting "all time" totals to a weekly rate)
+function histSpanWeeks(){
+  let lo=Infinity, hi=0;
+  Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ if(e.d<lo)lo=e.d; if(e.d>hi)hi=e.d; }));
+  if(!isFinite(lo) || hi<=lo) return 1;
+  return Math.max(1,(hi-lo)/(7*86400000));
+}
+// convert a totals-over-window map into sets/week
+function weeklyEquiv(totals, windowDays){
+  const wks = windowDays ? windowDays/7 : histSpanWeeks();
+  const out={}; Object.keys(totals).forEach(g=> out[g]=totals[g]/wks); return out;
+}
 $("openMuscles").onclick=openMuscles;
 $("musClose").onclick=()=>closeSheet("Mus");
 $("scrimMus").onclick=()=>closeSheet("Mus");
@@ -2229,7 +2254,10 @@ function buildSrc(){
   plans.forEach(p=> mk(p.id, p.name));
 }
 function fmtKg(v){ return v>=1000 ? round1(v/1000)+"t" : Math.round(v)+"kg"; }
-function drawRadar(totals, canvasId){
+// target: if given, a spoke reaching the outer ring means that muscle hit `target` sets/week
+// (so the chart reads "am I training each muscle enough?"); if omitted, spokes scale to the largest
+// muscle (the old "which did I train most?" view).
+function drawRadar(totals, canvasId, target){
   const c=$(canvasId||"musRadar"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const cx=W/2, cy=H/2, R=W*0.33, n=MGROUPS.length;
   const cs=getComputedStyle(document.documentElement);
@@ -2237,13 +2265,16 @@ function drawRadar(totals, canvasId){
   const lab=(cs.getPropertyValue("--l2")||"#888").trim();
   const grid="rgba(128,128,128,.22)";
   const max=Math.max(1, ...MGROUPS.map(g=>totals[g]||0));
+  const norm = target ? (g=>Math.min(1.08,(totals[g]||0)/target)) : (g=>(totals[g]||0)/max);
   const pt=(i,rr)=>{ const a=(-90+i*360/n)*Math.PI/180; return [cx+rr*Math.cos(a), cy+rr*Math.sin(a)]; };
   ctx.strokeStyle=grid; ctx.lineWidth=1.5;
   [0.5,1].forEach(f=>{ ctx.beginPath(); ctx.arc(cx,cy,R*f,0,Math.PI*2); ctx.stroke(); });
+  // in target mode, emphasise the outer ring — it's the "enough volume" line
+  if(target){ ctx.strokeStyle=accent; ctx.globalAlpha=.45; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; }
   for(let i=0;i<n;i++){ const [x,y]=pt(i,R); ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(x,y); ctx.stroke(); }
-  ctx.beginPath(); MGROUPS.forEach((g,i)=>{ const v=(totals[g]||0)/max, [x,y]=pt(i,R*v); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.closePath();
+  ctx.beginPath(); MGROUPS.forEach((g,i)=>{ const v=norm(g), [x,y]=pt(i,R*v); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.closePath();
   ctx.fillStyle=accent; ctx.globalAlpha=.22; ctx.fill(); ctx.globalAlpha=1; ctx.lineWidth=4; ctx.strokeStyle=accent; ctx.stroke();
-  MGROUPS.forEach((g,i)=>{ const v=(totals[g]||0)/max, [x,y]=pt(i,R*v); ctx.beginPath(); ctx.arc(x,y,9,0,Math.PI*2); ctx.fillStyle=MCOLOR[g]||accent; ctx.fill(); ctx.lineWidth=2.5; ctx.strokeStyle="#fff"; ctx.stroke(); });
+  MGROUPS.forEach((g,i)=>{ const v=norm(g), [x,y]=pt(i,R*v); ctx.beginPath(); ctx.arc(x,y,9,0,Math.PI*2); ctx.fillStyle=MCOLOR[g]||accent; ctx.fill(); ctx.lineWidth=2.5; ctx.strokeStyle="#fff"; ctx.stroke(); });
   ctx.fillStyle=lab; ctx.font="600 29px -apple-system,sans-serif"; ctx.textBaseline="middle";
   MGROUPS.forEach((g,i)=>{ const [x,y]=pt(i,R+52), co=Math.cos((-90+i*360/n)*Math.PI/180);
     ctx.textAlign = Math.abs(co)<0.3 ? "center" : (co>0?"left":"right"); ctx.fillText(MSHORT[g], x, y); });
@@ -2259,30 +2290,35 @@ function renderMuscles(){
     document.querySelectorAll("#musMetric .s").forEach(s=> s.classList.toggle("active", s.dataset.m===musMetric));
     document.querySelectorAll("#musVolMode .s").forEach(s=> s.classList.toggle("active", s.dataset.vm===musVolMode));
     ({totals, byEx}=muscleVolume(musWindow||null, musMetric, musVolMode));
-    $("musIntro").textContent="How balanced your training is — a full circle means even coverage, a dent means an undertrained group.";
   } else {
     const plan=plans.find(p=>p.id===musSrc)||activePlan();
     ({totals, byEx}=planVolume(plan));
-    $("musIntro").textContent="Projected balance if you follow “"+plan.name+"” — planned sets across one full cycle.";
   }
-  const showVolMode = isLog && musMetric==="vol";
+  const useTarget = isLog && musMetric==="sets";   // sets/week vs a weekly-volume target
+  const useKg = isLog && musMetric==="vol";
+  if(isLog) $("musIntro").textContent = useTarget
+    ? "Sets per muscle per week vs a ~"+WEEKLY_SET_TARGET+"-set target (the outer ring). Reaching the ring means that muscle is getting enough weekly volume to grow; a dent means it's under-dosed."
+    : "Total load moved per muscle in this window — bigger means more volume, scaled to your top group.";
+  else $("musIntro").textContent="Projected balance if you follow “"+(plans.find(p=>p.id===musSrc)||activePlan()).name+"” — planned sets across one full cycle.";
+  const showVolMode = useKg;
   $("musVolMode").style.display = showVolMode ? "" : "none";
   $("musVolNote").style.display = showVolMode ? "" : "none";
-  drawRadar(totals);
-  const useKg = isLog && musMetric==="vol";
-  const fmt = useKg ? fmtKg : round1;
-  const groups=Object.keys(totals).filter(g=>totals[g]>0).sort((a,b)=>totals[b]-totals[a]);
-  const max=Math.max(1, ...groups.map(g=>totals[g]));
+  const view = useTarget ? weeklyEquiv(totals, musWindow) : totals;
+  drawRadar(view, "musRadar", useTarget ? WEEKLY_SET_TARGET : null);
+  const groups=Object.keys(view).filter(g=>view[g]>0).sort((a,b)=>view[b]-view[a]);
+  const max=Math.max(1, ...groups.map(g=>view[g]));
   const bars=$("musBars");
   if(!groups.length){ bars.innerHTML='<p class="freehint">'+(isLog?'No sets logged in this window yet — finish a workout to see your split.':'This plan has no exercises yet.')+'</p>'; }
   else {
     bars.innerHTML="";
     groups.forEach(g=>{
-      const v=totals[g], pct=Math.round(v/max*100);
-      const row=document.createElement("div"); row.className="mrow";
+      const v=view[g];
+      const pct = useTarget ? Math.min(100, Math.round(v/WEEKLY_SET_TARGET*100)) : Math.round(v/max*100);
+      const valTxt = useTarget ? (round1(v)+"/wk") : (useKg ? fmtKg(v) : round1(v));
+      const row=document.createElement("div"); row.className="mrow"+(useTarget && v<WEEKLY_SET_MIN?" under":"");
       row.innerHTML='<div class="mlab">'+g+'</div>'
         +'<div class="mbarwrap"><div class="mbar" style="width:'+pct+'%;background:'+(MCOLOR[g]||"#888")+'"></div></div>'
-        +'<div class="mval">'+fmt(v)+'</div>';
+        +'<div class="mval">'+valTxt+'</div>';
       bars.appendChild(row);
     });
   }
@@ -2295,6 +2331,14 @@ function renderMuscles(){
     row.innerHTML='<span><span class="mdot" style="background:'+(MCOLOR[g]||"#888")+'"></span>'+esc(n)+'</span><span>'+val+'</span>';
     ex.appendChild(row);
   });
+  // methodology + sources for this view
+  $("musMethod").innerHTML = "Each working set credits its <b>primary</b> muscle in full and each <b>secondary</b> muscle at half (the 0.5 “fractional” method that best predicts growth). "
+    + (useTarget
+        ? "Spokes and bars show <b>sets per muscle per week</b> against a ~"+WEEKLY_SET_TARGET+"-set target; the window is a hard cut-off (no decay), since volume is usually judged weekly."
+        : (useKg ? "Bars show <b>total load</b> (weight × reps, bodyweight-aware), scaled to your biggest group."
+                 : "Switch to <b>Sets</b> to compare against weekly volume targets."));
+  const keys = useTarget ? ["sch17","drr","rpvol","vigotsky","mps"] : ["sch17","drr","vigotsky"];
+  $("musSrcList").innerHTML = keys.map(k=>'<li>'+PROG_SRC[k]+'</li>').join('');
 }
 
 // ================= appearance (auto / light / dark) =================
@@ -2773,7 +2817,11 @@ const PROG_SRC={
  morton:"Morton RW, et al. (2018). A systematic review, meta-analysis and meta-regression of protein supplementation on resistance-trained muscle mass and strength. <i>British Journal of Sports Medicine</i>, 52(6).",
  helms:"Helms ER, et al. (2014). Evidence-based recommendations for natural bodybuilding contest preparation: nutrition and supplementation. <i>J. International Society of Sports Nutrition</i>, 11:20.",
  sch17:"Schoenfeld BJ, et al. (2017). Dose-response relationship between weekly resistance training volume and muscle hypertrophy. <i>Journal of Sports Sciences</i>, 35(11).",
- sch16:"Schoenfeld BJ, et al. (2016). Effects of resistance training frequency on muscle hypertrophy: a meta-analysis. <i>Sports Medicine</i>, 46(11)."
+ sch16:"Schoenfeld BJ, et al. (2016). Effects of resistance training frequency on muscle hypertrophy: a meta-analysis. <i>Sports Medicine</i>, 46(11).",
+ drr:"Pelland JC, Remmert JF, Robinson ZP, Hinson SR, Zourdos MC (2024). The resistance training dose-response: meta-regressions exploring the effects of weekly volume and frequency on muscle hypertrophy and strength gain. <i>SportRxiv</i>. doi:10.51224/SRXIV.460. <span>— Counting indirect (secondary) muscle sets as 0.5 best explained hypertrophy, which is how this app weighs assistance work.</span>",
+ vigotsky:"Vigotsky AD, Trajano GS, Vieira TM (2022). Longing for a longitudinal proxy: acutely measured surface EMG amplitude is not a validated predictor of muscle hypertrophy. <i>Sports Medicine</i>, 52, 193–199. <span>— Why this app weighs whole sets, not per-exercise EMG “activation”.</span>",
+ rpvol:"Israetel M, et al. — Renaissance Periodization. Training volume landmarks for muscle growth (MEV / MAV / MRV). <span>— Basis for the ~"+10+"-set weekly target ring.</span>",
+ mps:"Phillips SM, et al. (1997). Mixed muscle protein synthesis and breakdown after resistance exercise in humans. <i>Am. J. Physiology</i>, 273(1). <span>— Muscle-building signalling is elevated ~24–48 h per session, the basis for tracking volume by the week.</span>"
 };
 function bwSlopePctWk(days){
   const cut=Date.now()-days*86400000;
@@ -2790,6 +2838,11 @@ function progressInsight(){
     return { v:"more", title:"Keep logging to unlock this", text:"Once you've logged weigh-ins across 2–3 weeks and a few sessions, this will weigh your weight trend against your training and flag whether nutrition or training is the more likely brake on progress.", src:[] };
   if(perWk<1.5)
     return { v:"training", title:"Training consistency is the brake", text:"You've averaged under ~1.5 sessions a week this month. Before touching nutrition, the biggest lever is simply training regularly — consistent progressive overload is what drives the adaptation.", src:["sch16","sch17"] };
+  // You're training often enough — but are the muscles actually getting enough weekly volume to grow?
+  const wk28=weeklyEquiv(muscleVolume(28,"sets").totals, 28);
+  const trained=MGROUPS.filter(g=>(wk28[g]||0)>0), under=trained.filter(g=>wk28[g]<WEEKLY_SET_MIN);
+  if(trained.length>=4 && under.length>=Math.ceil(trained.length/2))
+    return { v:"training", title:"Training volume is the brake", text:"You're training regularly, but over the last month "+under.length+" of "+trained.length+" muscle groups are getting fewer than ~"+WEEKLY_SET_MIN+" hard sets a week — under the volume most people need to grow. Adding sets to the under-dosed groups (open Muscle balance to see which) is the most direct lever before changing nutrition.", src:["sch17","drr"] };
   if(dir==="gain"){
     if(slope<0.1) return { v:"nutrition", title:"Likely nutrition", text:"You're training consistently, but your weight has stayed roughly flat over the last month. Building muscle generally needs a small, steady energy surplus — flat weight on a gain goal most often means you're eating a little too little to support growth.", src:["slater","garthe","morton"] };
     if(slope>1.2) return { v:"nutrition", title:"Likely nutrition — ease the surplus", text:"You're gaining fairly fast (over ~1.2%/week). Past roughly 0.25–0.5%/week, the extra tends to be mostly fat rather than muscle. Easing the surplus a little keeps your gains leaner.", src:["garthe","slater"] };
