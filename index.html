@@ -164,6 +164,18 @@
   .ovtodo li{ font-size:14px; color:var(--l2); line-height:1.5; margin:6px 0; }
   .ovtodo li::marker{ color:var(--accent); }
   .ovnudge{ background:var(--accent-soft); border:.5px solid transparent; box-shadow:0 0 0 1px var(--accent-soft) inset; }
+  /* onboarding objective picker */
+  #onboardWrap{ position:fixed; inset:0; z-index:320; display:none; align-items:center; justify-content:center; padding:24px;
+    background:rgba(0,0,0,.5); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+  #onboardWrap.show{ display:flex; }
+  .obcard{ background:var(--sheetbg); border-radius:22px; max-width:380px; width:100%; padding:24px 22px; box-shadow:0 20px 60px rgba(0,0,0,.45); }
+  .obtitle{ font-size:23px; font-weight:750; letter-spacing:-.4px; }
+  .obp{ font-size:14px; color:var(--l2); line-height:1.5; margin:8px 0 18px; }
+  .obopts{ display:flex; flex-direction:column; gap:10px; }
+  .obopt{ text-align:left; background:var(--row); border:.5px solid var(--line); border-radius:14px; padding:14px 16px; cursor:pointer; color:var(--ink); transition:transform .1s, background .15s; }
+  .obopt:active{ transform:scale(.98); background:var(--accent-soft); }
+  .obopt b{ display:block; font-size:16px; font-weight:650; }
+  .obopt span{ display:block; font-size:13px; color:var(--l2); margin-top:2px; }
   #progBars{ width:100%; height:auto; aspect-ratio:11/3; margin-top:12px; }
   .progcap{ font-size:12.5px; color:var(--l2); margin:8px 2px 2px; line-height:1.4; }
   .progcap b{ color:var(--ink); font-weight:700; }
@@ -621,6 +633,12 @@
     <div class="progcap" id="progCap"></div>
     <div class="progverd" id="progVerdict" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div>
 
+    <div class="ed-label">Main objective</div>
+    <div class="chips wrap" id="objChips">
+      <button class="chip" data-v="muscle">Build muscle</button><button class="chip" data-v="strength">Get stronger</button>
+      <button class="chip" data-v="fatloss">Lose fat</button><button class="chip" data-v="fitness">Stay fit</button>
+    </div>
+
     <div class="ed-label">Goal weight</div>
     <div class="gset">
       <input id="goalStart" type="number" inputmode="decimal" placeholder="Start">
@@ -1008,6 +1026,20 @@
   <div class="cbox">
     <div class="cmsg" id="cMsg"></div>
     <div class="cbtns"><button class="cancel" id="cNo">Cancel</button><button class="danger" id="cYes">Delete</button></div>
+  </div>
+</div>
+
+<!-- ONBOARDING: pick your main objective (first run) -->
+<div id="onboardWrap">
+  <div class="obcard">
+    <div class="obtitle">What’s your main goal?</div>
+    <p class="obp">This shapes your coaching — whether “on track” means gaining, leaning out, or getting stronger. You can change it anytime in Me.</p>
+    <div class="obopts">
+      <button class="obopt" data-obj="muscle"><b>Build muscle</b><span>Add size with a slight surplus</span></button>
+      <button class="obopt" data-obj="strength"><b>Get stronger</b><span>Progressive overload on your lifts</span></button>
+      <button class="obopt" data-obj="fatloss"><b>Lose fat</b><span>Lean out while keeping muscle</span></button>
+      <button class="obopt" data-obj="fitness"><b>Stay fit</b><span>Consistency &amp; general health</span></button>
+    </div>
   </div>
 </div>
 
@@ -1989,6 +2021,7 @@ async function init(){
   const ni = nextRotateIndex(activePlan()); curWk = ni>=0?ni:0;
   renderAll();
   showTab("overview");   // open on the coach home
+  if(!settings.objective){ const ob=$("onboardWrap"); if(ob) ob.classList.add("show"); }   // ask the objective up front
   try{ if(location.hash && location.hash.indexOf("LIFTLOG1:")>=0){ openImport(decodeURIComponent(location.hash.slice(1))); } }catch(e){}
   maybeBackupNudge();
 }
@@ -2105,6 +2138,7 @@ function renderDash(){
   renderCalendar();
   renderAchievements();
   renderInsight();
+  renderObjective();
 }
 function renderCalendar(){
   const grid=$("calGrid"); if(!grid) return;
@@ -2216,7 +2250,7 @@ function progVerdict(metric, data){
   const N=data.length, mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
   const recent=mean(data.slice(N-3)), earlier=mean(data.slice(Math.max(0,N-6), N-3));
   if(metric==="weight"){
-    const gs=+settings.goalStart, gt=+settings.goalTarget, dir=(gt>gs+0.5)?"gain":(gt<gs-0.5)?"lose":"maintain";
+    const gs=+settings.goalStart, gt=+settings.goalTarget, dir=settings.objective?objectiveDir():((gt>gs+0.5)?"gain":(gt<gs-0.5)?"lose":"maintain");
     const nz=[]; data.forEach((v,i)=>{ if(v>0) nz.push([i,v]); });
     if(nz.length<2) return {lvl:"more", msg:"Log your weight a few weeks running to track this."};
     const f=nz[0], l=nz[nz.length-1], pctWk=((l[1]-f[1])/f[1])*100/Math.max(1,l[0]-f[0]);
@@ -2520,6 +2554,9 @@ $("scrimPlans").onclick=()=>closeSheet("Plans");
 $("goalSave").onclick=async()=>{ const s=parseFloat($("goalStart").value),g=parseFloat($("goalTarget").value);
   if(isNaN(s)||isNaN(g)||g<=s){ toast("Goal must be above start"); return; }
   settings.goalStart=s; settings.goalTarget=g; await sset("settings",settings); renderDash(); toast("Goal updated"); };
+// objective selector (Me) + first-run onboarding
+document.querySelectorAll("#objChips .chip").forEach(c=> c.onclick=()=>{ setObjective(c.dataset.v); toast("Objective: "+(OBJ_LABELS[c.dataset.v]||c.dataset.v)); });
+document.querySelectorAll("#onboardWrap .obopt").forEach(b=> b.onclick=()=> setObjective(b.dataset.obj));
 
 // ================= pages / bottom tab bar =================
 function showTab(name){
@@ -3374,9 +3411,20 @@ function bwSlopePctWk(days){
   if(wks<1 || !ka) return null;
   return ((kb-ka)/ka)*100/wks;
 }
+const OBJ_LABELS={ muscle:"Build muscle", strength:"Get stronger", fatloss:"Lose fat", fitness:"Stay fit" };
+// what the scale should do for each objective (drives the "on track" read)
+function objectiveDir(){ const o=settings.objective; return o==="fatloss"?"lose":o==="muscle"?"gain":"maintain"; }
+async function setObjective(o){
+  settings.objective=o; await sset("settings",settings);
+  renderObjective();
+  const ob=$("onboardWrap"); if(ob) ob.classList.remove("show");
+  renderDash(); if(typeof renderOverview==="function") renderOverview();
+}
+function renderObjective(){ document.querySelectorAll("#objChips .chip").forEach(c=> c.classList.toggle("on", c.dataset.v===settings.objective)); }
 function progressInsight(){
   const sessions=settings.sessions||0, slope=bwSlopePctWk(28), perWk=trainingDays(28)/4;
-  const gs=+settings.goalStart, gt=+settings.goalTarget, dir=(gt>gs+0.5)?"gain":(gt<gs-0.5)?"lose":"maintain";
+  const obj=settings.objective, gs=+settings.goalStart, gt=+settings.goalTarget;
+  const dir = obj ? objectiveDir() : ((gt>gs+0.5)?"gain":(gt<gs-0.5)?"lose":"maintain");
   if(slope===null || sessions<3)
     return { v:"more", title:"Keep logging to unlock this", text:"Once you've logged weigh-ins across 2–3 weeks and a few sessions, this will weigh your weight trend against your training and flag whether nutrition or training is the more likely brake on progress.", src:[] };
   if(perWk<1.5)
@@ -3396,7 +3444,11 @@ function progressInsight(){
     if(slope<-1.5) return { v:"nutrition", title:"Likely nutrition — slow it down", text:"You're losing quite fast (over ~1.5%/week). Aggressive deficits tend to cost muscle and performance; around 0.5–1%/week with high protein preserves more of what you've built.", src:["helms","garthe"] };
     return { v:"ontrack", title:"On track", text:"You're losing at a sustainable rate while still training — the sweet spot for keeping muscle through a cut. Keep lifting heavy and protein high.", src:["helms"] };
   }
-  return { v:"training", title:"Training is the lever now", text:"Your weight goal is roughly maintenance, so progress now comes from training quality — progressive overload, enough weekly volume per muscle, and recovery.", src:["sch17","sch16"] };
+  if(obj==="strength")
+    return { v:"ontrack", title:"On track for strength", text:"Strength comes from progressive overload, not the scale — and your weight's about steady, which is fine. Keep adding a rep or a little load over time and stay consistent.", src:["sch17","sch16"] };
+  if(obj==="fitness")
+    return { v:"ontrack", title:"On track", text:"For general fitness the win is simply showing up — your weight's steady and you're training regularly. Keep the rhythm going.", src:["sch16"] };
+  return { v:"training", title:"Training is the lever now", text:"Your weight's near maintenance, so progress now comes from training quality — progressive overload, enough weekly volume per muscle, and recovery.", src:["sch17","sch16"] };
 }
 function renderInsight(){
   const box=$("progInsight"); if(!box) return;
