@@ -72,7 +72,7 @@
   body::before{ content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
     background:
       radial-gradient(125% 52% at 50% 9%, var(--accent-soft) 0%, transparent 52%),
-      linear-gradient(180deg, var(--bg) 0%, var(--bg2) 56%);
+      var(--bg);
     transition:background .25s ease; }
 
   .wordmark{ font-size:17px; font-weight:800; letter-spacing:.5px; text-transform:lowercase;
@@ -155,6 +155,14 @@
   .tabitem svg{ width:25px; height:25px; }
   .tabitem.active{ color:var(--accent); }
   .tabitem:active{ transform:scale(.9); }
+  /* overview / coach cards */
+  .ovk{ font-size:12px; color:var(--l3); font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
+  .ovbig{ font-size:24px; font-weight:750; letter-spacing:-.4px; margin-top:3px; line-height:1.1; }
+  .ovmeta{ font-size:13.5px; color:var(--l2); margin-top:5px; font-weight:500; }
+  .ovp{ font-size:14px; color:var(--l2); line-height:1.5; margin:0; }
+  .ovtodo{ margin:0; padding-left:18px; }
+  .ovtodo li{ font-size:14px; color:var(--l2); line-height:1.5; margin:6px 0; }
+  .ovtodo li::marker{ color:var(--accent); }
   #progBars{ width:100%; height:auto; aspect-ratio:11/3; margin-top:12px; }
   .progcap{ font-size:12.5px; color:var(--l2); margin:8px 2px 2px; line-height:1.4; }
   .progcap b{ color:var(--ink); font-weight:700; }
@@ -510,7 +518,7 @@
 <div class="statusbar-bg"></div>
 
 <!-- ===== WORKOUT PAGE ===== -->
-<div class="page active" id="pageWorkout" data-tab="workout">
+<div class="page" id="pageWorkout" data-tab="workout">
 <div class="largeTitle" id="largeTitle">
   <div class="ltmain">
     <span class="titleBtn" id="openPlans"><span id="ltName">Yalla</span><svg class="tchev" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
@@ -574,8 +582,10 @@
 
 <!-- ME SHEET -->
 <!-- ===== FEED PAGE ===== -->
-<div class="page" id="pageFeed" data-tab="feed">
-  <div class="largeTitle"><div class="ltmain"><span class="titleBtn" style="cursor:default;"><span>Feed</span></span></div><small>What your friends are training</small></div>
+<div class="page active" id="pageFeed" data-tab="overview">
+  <div class="largeTitle"><div class="ltmain"><span class="titleBtn" style="cursor:default;"><span id="ovGreet">Overview</span></span></div><small id="ovDate"></small></div>
+  <div id="ovBody"></div>
+  <div class="ed-label" id="ovFeedLabel" style="display:none;">Friends</div>
   <div id="feedCTA" class="group" style="display:none;"><div class="pad"><p style="font-size:14px;color:var(--l2);line-height:1.5;margin:2px 0;">Sign in under <b>Me → Account &amp; sync</b> to share your workouts and see what your friends are training.</p></div></div>
   <div id="feedList"></div>
 </div>
@@ -1003,8 +1013,8 @@
 
 <!-- ===== BOTTOM TAB BAR ===== -->
 <nav class="tabbar">
-  <button class="tabitem" data-tab="feed" aria-label="Feed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.1"/><path d="M2.8 20c0-3.1 2.7-4.9 6.2-4.9s6.2 1.8 6.2 4.9"/><path d="M16.5 5.6a3 3 0 0 1 0 5.8M21.2 20c0-2.5-1.4-4-3.4-4.6"/></svg><span>Feed</span></button>
-  <button class="tabitem active" data-tab="workout" aria-label="Workout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9v6M6 7.5v9M18 7.5v9M21 9v6M6 12h12"/></svg><span>Workout</span></button>
+  <button class="tabitem active" data-tab="overview" aria-label="Overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13h6V4H4zM14 20h6v-9h-6zM14 4v4h6V4zM4 20h6v-4H4z"/></svg><span>Overview</span></button>
+  <button class="tabitem" data-tab="workout" aria-label="Workout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9v6M6 7.5v9M18 7.5v9M21 9v6M6 12h12"/></svg><span>Workout</span></button>
   <button class="tabitem" data-tab="me" aria-label="Me"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.6 3.1-5.6 7-5.6s7 2 7 5.6"/></svg><span>Me</span></button>
 </nav>
 
@@ -1712,8 +1722,9 @@ async function reloadFromStore(){
 
 function renderAccount(){
   const lbl=$("acctLabel"), box=$("acctBox");
-  const cta=$("feedCTA"), list=$("feedList");
+  const cta=$("feedCTA"), list=$("feedList"), flbl=$("ovFeedLabel");
   const setFeed=(signedIn)=>{ if(cta) cta.style.display = signedIn ? "none" : ""; if(list) list.style.display = signedIn ? "" : "none"; };
+  if(flbl) flbl.style.display = cloudConfigured() ? "" : "none";
   if(!lbl||!box) return;
   if(!cloudConfigured()){ lbl.style.display="none"; box.style.display="none"; setFeed(false); return; }
   lbl.style.display=""; box.style.display="";
@@ -1977,6 +1988,7 @@ async function init(){
   if(!settings.activePlanId) settings.activePlanId = plans[0].id;
   const ni = nextRotateIndex(activePlan()); curWk = ni>=0?ni:0;
   renderAll();
+  showTab("overview");   // open on the coach home
   try{ if(location.hash && location.hash.indexOf("LIFTLOG1:")>=0){ openImport(decodeURIComponent(location.hash.slice(1))); } }catch(e){}
   maybeBackupNudge();
 }
@@ -1999,6 +2011,52 @@ function renderNav(){
   $("ltName").textContent = activePlan().name;
   $("planSub").textContent = activePlan().workouts.length + " workouts · rolling cycle";
   $("bwGoalTxt").textContent = settings.goalTarget+" kg";
+}
+// ================= overview (coach home) =================
+function ovGreetWord(){ const h=new Date().getHours(); return h<5?"Still up?":h<12?"Good morning":h<18?"Good afternoon":"Good evening"; }
+function trainedToday(){ const t=new Date().toDateString(); return Object.keys(hist).some(n=>(hist[n]||[]).some(e=>new Date(e.d).toDateString()===t)); }
+function ovUnderMuscles(){ const wk=weeklyEquiv(muscleVolume(28,"sets").totals, 28); return MGROUPS.filter(g=> (wk[g]||0)>0 && wk[g]<WEEKLY_SET_MIN); }
+function renderOverview(){
+  const host=$("ovBody"); if(!host) return;
+  $("ovGreet").textContent=ovGreetWord();
+  try{ $("ovDate").textContent=new Date().toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"}); }catch(e){}
+  const due=(settings.sinceDeload||0)>=DELOAD_AT, p=activePlan(), w=p&&p.workouts[curWk], did=trainedToday();
+  let h="";
+  // --- Today ---
+  h+='<div class="ed-label">Today</div>';
+  if(due){
+    h+='<div class="group"><div class="pad"><div class="ovk">Deload week</div><div class="ovbig">Take it lighter</div><p class="ovp" style="margin-top:6px;">You’ve trained hard for a while. One easier week (~40% less) lets your body catch up — you’ll come back stronger.</p></div></div>';
+  } else if(did){
+    h+='<div class="group"><div class="pad"><div class="ovk">Today</div><div class="ovbig">Done for today 💪</div><p class="ovp" style="margin-top:6px;">You’ve logged a session. Rest and refuel — showing up consistently is what builds it.</p></div></div>';
+  } else if(w){
+    h+='<div class="group"><div class="pad"><div class="ovk">Next session</div><div class="ovbig">'+esc(w.name)+'</div><div class="ovmeta">≈'+workoutMinutes(w)+' min · '+w.ex.length+' exercise'+(w.ex.length===1?'':'s')+'</div><button class="btn wide ovstart" style="margin-top:14px;">Start workout</button></div></div>';
+  } else {
+    h+='<div class="group"><div class="pad"><div class="ovbig">Pick a plan to begin</div><button class="btn wide ovstart" style="margin-top:14px;">Go to workout</button></div></div>';
+  }
+  // --- Am I on track? ---
+  const ins=progressInsight();
+  h+='<div class="ed-label">Am I on track?</div>';
+  h+='<div class="insight v-'+ins.v+'"><div class="ititle">'+esc(ins.title)+'</div><div class="itext">'+esc(ins.text)+'</div></div>';
+  // --- This week + streak ---
+  const f7=trainingDays(7);
+  const motiv = f7>=4?"Strong week — you’re putting in the work." : f7>=2?"Good momentum — keep it rolling." : f7>=1?"You’ve started — one more session lifts the whole week." : "Fresh week. The first session is the hardest — let’s go.";
+  h+='<div class="ed-label">This week</div>';
+  h+='<div class="stats" style="border:.5px solid var(--line); border-radius:12px;">'
+    +'<div class="stat"><div class="n">'+f7+'</div><div class="k">sessions · 7d</div></div>'
+    +'<div class="stat"><div class="n">'+(settings.sessions||0)+'</div><div class="k">total</div></div>'
+    +'<div class="stat"><div class="n">'+(settings.beatTotal||0)+'</div><div class="k">PRs beaten</div></div></div>';
+  h+='<p class="ovp" style="margin:10px 4px 0;">'+motiv+'</p>';
+  // --- Needs attention ---
+  const todo=[], under=ovUnderMuscles();
+  if(under.length) todo.push("Add sets for "+esc(listWords(under.slice(0,3)))+" — under ~"+WEEKLY_SET_MIN+" hard sets a week.");
+  if(!bw.length) todo.push("Log your weight so the coach can track your goal.");
+  else if(daysSince(bw[bw.length-1].d)>10) todo.push("Log your weight — it’s been over " + daysSince(bw[bw.length-1].d) + " days.");
+  if(due) todo.push("Take a deload week to recover.");
+  h+='<div class="ed-label">Needs attention</div>';
+  if(todo.length){ h+='<div class="group"><div class="pad"><ul class="ovtodo">'+todo.map(t=>'<li>'+t+'</li>').join('')+'</ul></div></div>'; }
+  else { h+='<div class="group"><div class="pad"><p class="ovp">Nothing flagged — your training looks balanced. Keep showing up. 👏</p></div></div>'; }
+  host.innerHTML=h;
+  const sb=host.querySelector(".ovstart"); if(sb) sb.onclick=()=>showTab("workout");
 }
 function renderDash(){
   const now = bw.length?bw[bw.length-1].kg:null;
@@ -2451,8 +2509,8 @@ function showTab(name){
     $("goalStart").value=settings.goalStart; $("goalTarget").value=settings.goalTarget;
     $("heightIn").value=settings.heightCm||""; $("bfIn").value=settings.bodyfatPct||"";
     renderDash(); renderAccount(); animateProgBars();
-  } else if(name==="feed"){
-    renderAccount();
+  } else if(name==="overview"){
+    renderOverview(); renderAccount();
   }
 }
 document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.dataset.tab));
