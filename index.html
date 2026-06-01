@@ -68,7 +68,7 @@
     font-family:-apple-system,"SF Pro Text","SF Pro Display","Helvetica Neue",system-ui,sans-serif;
     font-variant-numeric:tabular-nums; }
   html{ background:var(--bg); transition:background .25s ease; }
-  body{ max-width:540px; margin:0 auto; padding:0 16px calc(108px + env(safe-area-inset-bottom)); min-height:100vh; min-height:100dvh; }
+  body{ max-width:540px; margin:0 auto; padding:0 16px calc(80px + env(safe-area-inset-bottom)); min-height:100vh; min-height:100dvh; }
   body::before{ content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
     background:
       radial-gradient(125% 52% at 50% 9%, var(--accent-soft) 0%, transparent 52%),
@@ -143,6 +143,18 @@
   .largeTitle small{ display:block; font-size:14.5px; font-weight:500; color:var(--l2); letter-spacing:0; margin-top:6px; }
   /* invisible backdrop behind the status-bar clock so scrolled content fades out cleanly (no visible bar) */
   .statusbar-bg{ position:fixed; top:0; left:0; right:0; height:env(safe-area-inset-top); background:var(--bg); z-index:40; pointer-events:none; }
+  /* ===== pages + bottom tab bar ===== */
+  .page{ display:none; }
+  .page.active{ display:block; animation:pagein .26s ease; }
+  @keyframes pagein{ from{ opacity:0; transform:translateY(5px); } to{ opacity:1; transform:none; } }
+  .tabbar{ position:fixed; left:0; right:0; bottom:0; z-index:60; display:flex; max-width:540px; margin:0 auto;
+    padding:7px 8px calc(6px + env(safe-area-inset-bottom)); border-top:.5px solid var(--line);
+    background:color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter:blur(20px) saturate(180%); -webkit-backdrop-filter:blur(20px) saturate(180%); }
+  .tabitem{ flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; background:none; border:none; cursor:pointer;
+    color:var(--l3); font-size:11px; font-weight:600; padding:6px 4px; transition:color .15s, transform .1s; -webkit-tap-highlight-color:transparent; }
+  .tabitem svg{ width:25px; height:25px; }
+  .tabitem.active{ color:var(--accent); }
+  .tabitem:active{ transform:scale(.9); }
   #progBars{ width:100%; height:auto; aspect-ratio:11/3; margin-top:12px; }
   .progcap{ font-size:12.5px; color:var(--l2); margin:8px 2px 2px; line-height:1.4; }
   .progcap b{ color:var(--ink); font-weight:700; }
@@ -496,10 +508,12 @@
 <body>
 
 <div class="statusbar-bg"></div>
+
+<!-- ===== WORKOUT PAGE ===== -->
+<div class="page active" id="pageWorkout" data-tab="workout">
 <div class="largeTitle" id="largeTitle">
   <div class="ltmain">
     <span class="titleBtn" id="openPlans"><span id="ltName">Yalla</span><svg class="tchev" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-    <button class="iconbtn" id="openMe" aria-label="Me & more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.6 3.1-5.6 7-5.6s7 2 7 5.6"/></svg></button>
   </div>
   <small id="planSub"></small>
 </div>
@@ -530,10 +544,10 @@
   <span class="restadj"><button id="restMinus">−15</button><button id="restPlus">+15</button></span>
 </div>
 <div id="exlist"></div>
-
+<button class="btn wide" id="saveBtn" style="margin-top:10px;">Finish &amp; Save Workout</button>
 <div class="foot">On-device only · keep a backup · lift safely</div>
+</div><!-- /pageWorkout -->
 
-<div class="savebar"><button class="btn wide" id="saveBtn">Finish &amp; Save Workout</button></div>
 <div class="toast" id="toast"></div>
 
 <!-- PLANS SHEET -->
@@ -559,11 +573,17 @@
 </div>
 
 <!-- ME SHEET -->
-<div class="scrim" id="scrimMe"></div>
-<div class="sheet" id="sheetMe">
-  <div class="grabber"></div>
-  <div class="sheethdr"><span class="t">Me</span><button class="btn plain sm" id="meClose">Done</button></div>
-  <div class="sheetbody">
+<!-- ===== FEED PAGE ===== -->
+<div class="page" id="pageFeed" data-tab="feed">
+  <div class="largeTitle"><div class="ltmain"><span class="titleBtn" style="cursor:default;"><span>Feed</span></span></div><small>What your friends are training</small></div>
+  <div id="feedCTA" class="group" style="display:none;"><div class="pad"><p style="font-size:14px;color:var(--l2);line-height:1.5;margin:2px 0;">Sign in under <b>Me → Account &amp; sync</b> to share your workouts and see what your friends are training.</p></div></div>
+  <div id="feedList"></div>
+</div>
+
+<!-- ===== ME PAGE ===== -->
+<div class="page" id="pageMe" data-tab="me">
+  <div class="largeTitle"><div class="ltmain"><span class="titleBtn" style="cursor:default;"><span>Me</span></span></div></div>
+  <div class="pagebody">
     <div class="row" style="gap:8px; margin-bottom:16px;">
       <button class="btn tinted sm" id="meBalance" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;flex:0 0 auto"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>Muscle balance</button>
       <button class="btn tinted sm" id="meOther" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;flex:0 0 auto"><path d="M3 12h4l2.5-7 4 14 2.5-7H21"/></svg>Other training</button>
@@ -671,10 +691,6 @@
       </div>
     </div>
 
-    <div id="feedWrap" style="display:none;">
-      <div class="ed-label" style="margin-top:18px;">Friends</div>
-      <div id="feedList"></div>
-    </div>
 
     <div class="ed-label" style="margin-top:18px;">Your data</div>
     <p class="levelcap" style="margin:0 4px 10px;">Everything stays on this device. Back up to a file so a lost phone never costs you your history.</p>
@@ -984,6 +1000,13 @@
     <div class="cbtns"><button class="cancel" id="cNo">Cancel</button><button class="danger" id="cYes">Delete</button></div>
   </div>
 </div>
+
+<!-- ===== BOTTOM TAB BAR ===== -->
+<nav class="tabbar">
+  <button class="tabitem" data-tab="feed" aria-label="Feed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.1"/><path d="M2.8 20c0-3.1 2.7-4.9 6.2-4.9s6.2 1.8 6.2 4.9"/><path d="M16.5 5.6a3 3 0 0 1 0 5.8M21.2 20c0-2.5-1.4-4-3.4-4.6"/></svg><span>Feed</span></button>
+  <button class="tabitem active" data-tab="workout" aria-label="Workout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9v6M6 7.5v9M18 7.5v9M21 9v6M6 12h12"/></svg><span>Workout</span></button>
+  <button class="tabitem" data-tab="me" aria-label="Me"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.6 3.1-5.6 7-5.6s7 2 7 5.6"/></svg><span>Me</span></button>
+</nav>
 
 <script>
 // Load the Supabase SDK without blocking app start. If offline or the CDN is blocked,
@@ -1688,19 +1711,22 @@ async function reloadFromStore(){
 }
 
 function renderAccount(){
-  const lbl=$("acctLabel"), box=$("acctBox"); if(!lbl||!box) return;
-  if(!cloudConfigured()){ lbl.style.display="none"; box.style.display="none"; const fw=$("feedWrap"); if(fw) fw.style.display="none"; return; }
+  const lbl=$("acctLabel"), box=$("acctBox");
+  const cta=$("feedCTA"), list=$("feedList");
+  const setFeed=(signedIn)=>{ if(cta) cta.style.display = signedIn ? "none" : ""; if(list) list.style.display = signedIn ? "" : "none"; };
+  if(!lbl||!box) return;
+  if(!cloudConfigured()){ lbl.style.display="none"; box.style.display="none"; setFeed(false); return; }
   lbl.style.display=""; box.style.display="";
-  const inB=$("acctIn"), outB=$("acctOut"), fw=$("feedWrap");
+  const inB=$("acctIn"), outB=$("acctOut");
   if(cloudUser){
     outB.style.display="none"; inB.style.display="";
     $("acctWho").textContent=cloudUser.email||"Signed in";
     const tog=$("shareToggle"); if(tog) tog.checked = settings.shareActivity===true;
-    if(fw) fw.style.display="";
+    setFeed(true);
     renderFeed();
   } else {
     outB.style.display=""; inB.style.display="none";
-    if(fw) fw.style.display="none";
+    setFeed(false);
   }
 }
 
@@ -2416,11 +2442,20 @@ $("goalSave").onclick=async()=>{ const s=parseFloat($("goalStart").value),g=pars
   if(isNaN(s)||isNaN(g)||g<=s){ toast("Goal must be above start"); return; }
   settings.goalStart=s; settings.goalTarget=g; await sset("settings",settings); renderDash(); toast("Goal updated"); };
 
-// ================= me (personal) sheet =================
-$("openMe").onclick=()=>{ $("goalStart").value=settings.goalStart; $("goalTarget").value=settings.goalTarget;
-  $("heightIn").value=settings.heightCm||""; $("bfIn").value=settings.bodyfatPct||""; renderDash(); renderAccount(); openSheet("Me"); animateProgBars(); };
-$("meClose").onclick=()=>closeSheet("Me");
-$("scrimMe").onclick=()=>closeSheet("Me");
+// ================= pages / bottom tab bar =================
+function showTab(name){
+  document.querySelectorAll(".page").forEach(p=> p.classList.toggle("active", p.dataset.tab===name));
+  document.querySelectorAll(".tabitem").forEach(t=> t.classList.toggle("active", t.dataset.tab===name));
+  try{ window.scrollTo(0,0); }catch(e){}
+  if(name==="me"){
+    $("goalStart").value=settings.goalStart; $("goalTarget").value=settings.goalTarget;
+    $("heightIn").value=settings.heightCm||""; $("bfIn").value=settings.bodyfatPct||"";
+    renderDash(); renderAccount(); animateProgBars();
+  } else if(name==="feed"){
+    renderAccount();
+  }
+}
+document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.dataset.tab));
 $("bodySave").onclick=async()=>{
   const h=parseFloat($("heightIn").value), bf=parseFloat($("bfIn").value);
   settings.heightCm = (!isNaN(h)&&h>=100&&h<=250) ? h : null;
@@ -2669,7 +2704,7 @@ function weeklyEquiv(totals, windowDays){
   const wks = windowDays ? windowDays/7 : histSpanWeeks();
   const out={}; Object.keys(totals).forEach(g=> out[g]=totals[g]/wks); return out;
 }
-$("meBalance").onclick=()=>{ closeSheet("Me"); openMuscles(); };
+$("meBalance").onclick=()=>{ openMuscles(); };
 $("musClose").onclick=()=>closeSheet("Mus");
 $("scrimMus").onclick=()=>closeSheet("Mus");
 document.querySelectorAll("#musSeg .s").forEach(s=> s.onclick=()=>{ musWindow=+s.dataset.d; renderMuscles(); });
@@ -3169,7 +3204,7 @@ function renderOtherLog(){
   });
 }
 function openOther(){ renderOtherChips(); updateOtherPreview(); renderOtherLog(); openSheet("Other"); }
-$("meOther").onclick=()=>{ closeSheet("Me"); openOther(); };
+$("meOther").onclick=()=>{ openOther(); };
 $("otherClose").onclick=()=>closeSheet("Other");
 $("scrimOther").onclick=()=>closeSheet("Other");
 document.querySelectorAll("#otherModeSeg .s").forEach(s=> s.onclick=()=>{ otherMode=s.dataset.m;
@@ -3627,7 +3662,7 @@ async function applyRestore(obj){
     if(!plans.length) plans=DEFAULT_PLANS.map(p=>JSON.parse(JSON.stringify(p)));
     if(!plans.find(p=>p.id===settings.activePlanId)) settings.activePlanId=plans[0].id;
     curWk=0; freeMode=false; swaps={}; draft={}; await sset("draft", draft);
-    closeSheet("Me"); renderAll();
+    renderAll();
     toast("Backup restored — welcome back.",true);
   });
 }
