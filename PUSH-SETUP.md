@@ -7,32 +7,16 @@ You'll do it in the Supabase dashboard for project **`sukuuhoglitaeidplhns`**. N
 
 ---
 
-## 1. Make your VAPID keys (one terminal command)
+## 1–2. VAPID keys — ✅ DONE
 
-VAPID keys are the credential that lets your server send web push. In Terminal:
+The keypair has been generated and the **public** key is already wired into the app
+(`SUPA.vapidPublic` in `index.html`) and pushed. You only need the **private** key for step 5 —
+it was given to you in chat (it is intentionally NOT committed to the repo).
 
-```
-npx web-push generate-vapid-keys
-```
+- Public key (in app, safe to share): `BERYQqqs6l7n2w8n51Zol7fTOc4VxFpyqjykiVrxEkF6H4qHT-eB5IDdK7euu_lPHA2YY4N5dP2Fve-YUX6eZyQ`
+- Private key: see chat → paste into the `VAPID_PRIVATE` secret in step 5.
 
-It prints a **Public Key** and a **Private Key**. Keep this window open — you'll paste them below.
-(If you'd rather not use the terminal, tell me and I'll generate a pair for you.)
-
----
-
-## 2. Put the PUBLIC key in the app
-
-1. Open `index.html`, find `const SUPA = {` near the top of the main script.
-2. Set `vapidPublic` to your **Public Key**:
-   ```
-   vapidPublic: "PASTE_PUBLIC_KEY_HERE"
-   ```
-3. Commit & push (or have me do it):
-   ```
-   git add index.html && git commit -m "Add VAPID public key" && git push
-   ```
-
-The **Private Key** stays secret — it only goes into Supabase (step 5).
+> Lost the private key? Just ask me to generate a fresh pair; I'll re-wire the public key and give you the new private key.
 
 ---
 

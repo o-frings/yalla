@@ -1627,8 +1627,8 @@ async function _localSet(k,v){
 const SUPA = {
   url: "https://sukuuhoglitaeidplhns.supabase.co",
   key: "sb_publishable_ccEFXkJ3cl8-PNLSzeiOAA_aZo7tc9O",
-  // paste the VAPID *public* key here after running `npx web-push generate-vapid-keys` (see PUSH-SETUP.md)
-  vapidPublic: ""
+  // VAPID *public* key (safe to embed). The matching private key goes in Supabase secrets — see PUSH-SETUP.md
+  vapidPublic: "BERYQqqs6l7n2w8n51Zol7fTOc4VxFpyqjykiVrxEkF6H4qHT-eB5IDdK7euu_lPHA2YY4N5dP2Fve-YUX6eZyQ"
 };
 const CLOUD_KEYS = ["plans","lastsets","bodyweight","history","extlog","settings"]; // draft stays device-only
 let sb=null, cloudUser=null, _syncMeta={}, _pushTimers={};
