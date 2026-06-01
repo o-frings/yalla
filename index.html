@@ -78,7 +78,7 @@
     background:var(--grad); -webkit-background-clip:text; -webkit-text-fill-color:transparent;
     background-clip:text; display:inline-block; }
   .wordmark::after{ content:"."; color:var(--accent); -webkit-text-fill-color:var(--accent); }
-  .nav{ padding:calc(6px + env(safe-area-inset-top)) 20px 6px; display:flex; align-items:center; justify-content:space-between;
+  .nav{ padding:calc(6px + env(safe-area-inset-top)) 16px 4px; display:flex; align-items:center; justify-content:flex-end;
     position:sticky; top:0; z-index:30; margin:0 -16px;
     background:color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); }
   .navleft,.navright{ display:flex; align-items:center; gap:2px; }
@@ -480,12 +480,7 @@
 <body>
 
 <div class="nav">
-  <div class="wordmark">yalla</div>
-  <div class="navright">
-    <button class="iconbtn" id="openMuscles" aria-label="Balance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg></button>
-    <button class="iconbtn" id="openMe" aria-label="Me"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.6 3.1-5.6 7-5.6s7 2 7 5.6"/></svg></button>
-    <button class="iconbtn" id="openOther" aria-label="Log other training"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-7 4 14 2.5-7H21"/></svg></button>
-  </div>
+  <button class="iconbtn" id="openMe" aria-label="Me & more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.6 3.1-5.6 7-5.6s7 2 7 5.6"/></svg></button>
 </div>
 <div class="largeTitle" id="largeTitle"><span class="titleBtn" id="openPlans"><span id="ltName">Yalla</span><svg class="tchev" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><small id="planSub"></small></div>
 
@@ -549,6 +544,10 @@
   <div class="grabber"></div>
   <div class="sheethdr"><span class="t">Me</span><button class="btn plain sm" id="meClose">Done</button></div>
   <div class="sheetbody">
+    <div class="row" style="gap:8px; margin-bottom:16px;">
+      <button class="btn tinted sm" id="meBalance" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;flex:0 0 auto"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>Muscle balance</button>
+      <button class="btn tinted sm" id="meOther" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;flex:0 0 auto"><path d="M3 12h4l2.5-7 4 14 2.5-7H21"/></svg>Other training</button>
+    </div>
     <div class="row" style="justify-content:space-between; align-items:flex-end;">
       <div class="bwnum"><span id="bwNow">—</span><small>kg</small></div>
       <div class="bwgoal">goal <b id="bwGoalTxt">75 kg</b><br><span id="bwLeft"></span></div>
@@ -2249,7 +2248,7 @@ function weeklyEquiv(totals, windowDays){
   const wks = windowDays ? windowDays/7 : histSpanWeeks();
   const out={}; Object.keys(totals).forEach(g=> out[g]=totals[g]/wks); return out;
 }
-$("openMuscles").onclick=openMuscles;
+$("meBalance").onclick=()=>{ closeSheet("Me"); openMuscles(); };
 $("musClose").onclick=()=>closeSheet("Mus");
 $("scrimMus").onclick=()=>closeSheet("Mus");
 document.querySelectorAll("#musSeg .s").forEach(s=> s.onclick=()=>{ musWindow=+s.dataset.d; renderMuscles(); });
@@ -2750,7 +2749,7 @@ function renderOtherLog(){
   });
 }
 function openOther(){ renderOtherChips(); updateOtherPreview(); renderOtherLog(); openSheet("Other"); }
-$("openOther").onclick=openOther;
+$("meOther").onclick=()=>{ closeSheet("Me"); openOther(); };
 $("otherClose").onclick=()=>closeSheet("Other");
 $("scrimOther").onclick=()=>closeSheet("Other");
 document.querySelectorAll("#otherModeSeg .s").forEach(s=> s.onclick=()=>{ otherMode=s.dataset.m;
