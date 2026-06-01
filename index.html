@@ -1695,7 +1695,7 @@ function renderAccount(){
   if(cloudUser){
     outB.style.display="none"; inB.style.display="";
     $("acctWho").textContent=cloudUser.email||"Signed in";
-    const tog=$("shareToggle"); if(tog) tog.checked = settings.shareActivity!==false;
+    const tog=$("shareToggle"); if(tog) tog.checked = settings.shareActivity===true;
     if(fw) fw.style.display="";
     renderFeed();
   } else {
@@ -1706,7 +1706,7 @@ function renderAccount(){
 
 // Post a workout summary to the shared feed — shape + counts only, never raw weights.
 async function cloudPublish(session){
-  if(!cloudReady() || settings.shareActivity===false) return;
+  if(!cloudReady() || !settings.shareActivity) return;
   try{
     await sb.from("activity").insert({
       user_id: cloudUser.id, kind:"workout",
@@ -1776,7 +1776,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi]||e.n; }
-let settings={ activePlanId:null, pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:68, goalTarget:75, heightCm:null, bodyfatPct:null, sex:"male", theme:"auto", restSec:90, shareActivity:true };
+let settings={ activePlanId:null, pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:68, goalTarget:75, heightCm:null, bodyfatPct:null, sex:"male", theme:"auto", restSec:90, shareActivity:false };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -1941,6 +1941,11 @@ async function init(){
     if(pp){ pp.workouts.forEach(w=>{ if((w.ex||[]).some(e=>exLevel(e.n)==="gym")) regroupSupersets(w); });
       await sset("plans",plans); }
     settings.supersetsByArea=true;
+    await sset("settings",settings);
+  }
+  if(!settings.sharingOptIn){
+    // Feed sharing is now opt-in (off by default). Reset any prior auto-on default to off.
+    settings.shareActivity=false; settings.sharingOptIn=true;
     await sset("settings",settings);
   }
   if(!settings.activePlanId) settings.activePlanId = plans[0].id;
