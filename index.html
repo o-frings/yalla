@@ -2094,15 +2094,59 @@ function progWeeklyData(metric){
   return out;
 }
 const PROG_LABELS={ volume:"Weekly volume", sets:"Weekly hard sets", sessions:"Sessions per week", weight:"Avg body weight", prs:"New PRs per week" };
+// "are we on track?" verdict per metric, from the last few weeks vs the weeks before
+function progVerdict(metric, data){
+  const N=data.length, mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+  const recent=mean(data.slice(N-3)), earlier=mean(data.slice(Math.max(0,N-6), N-3));
+  if(metric==="weight"){
+    const gs=+settings.goalStart, gt=+settings.goalTarget, dir=(gt>gs+0.5)?"gain":(gt<gs-0.5)?"lose":"maintain";
+    const nz=[]; data.forEach((v,i)=>{ if(v>0) nz.push([i,v]); });
+    if(nz.length<2) return {lvl:"more", msg:"Log your weight a few weeks running to track this."};
+    const f=nz[0], l=nz[nz.length-1], pctWk=((l[1]-f[1])/f[1])*100/Math.max(1,l[0]-f[0]);
+    if(dir==="gain"){
+      if(pctWk<0.05) return {lvl:"bad", msg:"Goal is to gain, but weight is flat — likely need to eat a bit more."};
+      if(pctWk>1.2)  return {lvl:"watch", msg:"Gaining fast (~"+round1(pctWk)+"%/wk) — ease the surplus to stay lean."};
+      return {lvl:"good", msg:"On track — gaining ~"+round1(pctWk)+"%/wk, a solid muscle-building pace."};
+    }
+    if(dir==="lose"){
+      if(pctWk>-0.05) return {lvl:"bad", msg:"Goal is to lose, but weight isn't dropping — tighten intake."};
+      if(pctWk<-1.5)  return {lvl:"watch", msg:"Losing fast (~"+round1(pctWk)+"%/wk) — slow down to keep muscle."};
+      return {lvl:"good", msg:"On track — losing ~"+round1(Math.abs(pctWk))+"%/wk while training."};
+    }
+    return Math.abs(pctWk)<0.3 ? {lvl:"good", msg:"Holding steady around your goal."} : {lvl:"watch", msg:"Drifting from maintenance (~"+round1(pctWk)+"%/wk)."};
+  }
+  if(metric==="prs"){
+    const total=data.reduce((a,b)=>a+b,0), last4=data.slice(N-4).reduce((a,b)=>a+b,0);
+    if(total===0) return {lvl:"more", msg:"Log weight × reps and your PRs will show up here."};
+    if(last4>0) return {lvl:"good", msg:last4+" PR"+(last4>1?"s":"")+" in the last 4 weeks — still progressing."};
+    return {lvl:"watch", msg:"No PRs in ~4 weeks — add a rep or a little load, or more volume."};
+  }
+  if(metric==="sessions"){
+    if(recent===0) return {lvl:"bad", msg:"No sessions logged in the last 3 weeks."};
+    if(recent<1.5) return {lvl:"watch", msg:"Under ~1.5 sessions/wk lately — consistency is the main driver."};
+    if(earlier>0 && recent<earlier*0.7) return {lvl:"watch", msg:"Training less often than before (~"+round1(recent)+"/wk vs "+round1(earlier)+")."};
+    return {lvl:"good", msg:"Consistent — ~"+round1(recent)+" sessions/wk."};
+  }
+  const unit = metric==="volume" ? "volume" : "weekly sets";
+  if(recent===0) return {lvl:"bad", msg:"No training logged in the last 3 weeks."};
+  if(earlier===0) return {lvl:"good", msg:"Building your "+unit+" — keep it going."};
+  const ratio=recent/earlier;
+  if(ratio>=1.05) return {lvl:"good", msg:"Trending up — "+unit+" rising vs a month ago."};
+  if(ratio>=0.9)  return {lvl:"good", msg:"On track — holding your "+unit+"."};
+  if(ratio>=0.7)  return {lvl:"watch", msg:"Your "+unit+" is slipping a little — nudge it back up."};
+  return {lvl:"bad", msg:"Your "+unit+" has dropped sharply — easy to lose progress here."};
+}
 function drawProgBars(){
   const c=$("progBars"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const data=progWeeklyData(progMetric), cap=$("progCap"), ac=accentHex();
   const l3=(getComputedStyle(document.documentElement).getPropertyValue('--l3')||'#888').trim();
-  if(!data.some(v=>v>0)){ ctx.fillStyle=l3; ctx.font="13px -apple-system,sans-serif"; ctx.textAlign="center"; ctx.fillText("Log a few workouts to see this build up.", W/2, H/2); if(cap) cap.textContent=""; return; }
+  if(!data.some(v=>v>0)){ ctx.fillStyle=l3; ctx.font="13px -apple-system,sans-serif"; ctx.textAlign="center"; ctx.fillText("Log a few workouts to see this build up.", W/2, H/2); if(cap) cap.textContent=""; const ve0=$("progVerdict"); if(ve0) ve0.style.display="none"; return; }
   // weight uses a zoomed baseline so small changes are visible; others start at 0
   let lo=0, hi=Math.max(...data);
   if(progMetric==="weight"){ const nz=data.filter(v=>v>0); lo=Math.min(...nz); hi=Math.max(...nz); const span=Math.max(1,hi-lo); lo=Math.max(0,lo-span*0.2); hi=hi+span*0.1; }
+  const ink=(getComputedStyle(document.documentElement).getPropertyValue('--ink')||'#000').trim();
   const N=data.length, pad=10, gap=8, base=H-26, barW=(W-pad*2-gap*(N-1))/N;
+  const mapY=v=> base-(hi>lo?(v-lo)/(hi-lo):0)*(base-10), cx=i=> pad+i*(barW+gap)+barW/2;
   ctx.textAlign="center"; ctx.font="600 18px -apple-system,sans-serif"; ctx.fillStyle=l3;
   data.forEach((v,i)=>{
     const x=pad+i*(barW+gap);
@@ -2112,6 +2156,15 @@ function drawProgBars(){
     ctx.beginPath(); ctx.moveTo(x,base); ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r); ctx.lineTo(x+barW-r,y); ctx.arcTo(x+barW,y,x+barW,y+r,r); ctx.lineTo(x+barW,base); ctx.closePath(); ctx.fill();
   });
   ctx.strokeStyle=hexAlpha(ac,.18); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad,base+0.5); ctx.lineTo(W-pad,base+0.5); ctx.stroke();
+  // trend line (linear fit over weeks with data) — the visual "which way am I heading?" cue
+  const pts=[]; data.forEach((v,i)=>{ if(v>0) pts.push([i,v]); });
+  if(pts.length>=2){
+    const k=pts.length, sx=pts.reduce((a,p)=>a+p[0],0), sy=pts.reduce((a,p)=>a+p[1],0),
+          sxy=pts.reduce((a,p)=>a+p[0]*p[1],0), sxx=pts.reduce((a,p)=>a+p[0]*p[0],0), den=k*sxx-sx*sx;
+    const m=den?(k*sxy-sx*sy)/den:0, b0=(sy-m*sx)/k, i0=pts[0][0], i1=pts[pts.length-1][0];
+    ctx.strokeStyle=hexAlpha(ink,.5); ctx.lineWidth=3; ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(cx(i0), mapY(m*i0+b0)); ctx.lineTo(cx(i1), mapY(m*i1+b0)); ctx.stroke();
+  }
   // x labels: oldest / this week
   ctx.fillStyle=l3; ctx.font="600 17px -apple-system,sans-serif";
   ctx.textAlign="left";  ctx.fillText(PROG_WEEKS+"w ago", pad, H-6);
@@ -2119,6 +2172,8 @@ function drawProgBars(){
   const latest=data[N-1];
   const fmt = progMetric==="volume" ? fmtKg(latest) : (progMetric==="weight" ? (latest>0?round1(latest)+" kg":"—") : Math.round(latest));
   if(cap) cap.innerHTML=PROG_LABELS[progMetric]+' · last '+PROG_WEEKS+' weeks · <b>this week: '+(latest>0?fmt:"—")+'</b>';
+  const ve=$("progVerdict");
+  if(ve){ const v=progVerdict(progMetric, data); ve.style.display="flex"; ve.className="progverd v-"+v.lvl; ve.querySelector(".pvtxt").textContent=v.msg; }
 }
 document.querySelectorAll("#progMetric .s").forEach(s=> s.onclick=()=>{
   progMetric=s.dataset.pm;
