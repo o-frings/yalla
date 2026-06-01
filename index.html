@@ -163,6 +163,11 @@
   .ovtodo{ margin:0; padding-left:18px; }
   .ovtodo li{ font-size:14px; color:var(--l2); line-height:1.5; margin:6px 0; }
   .ovtodo li::marker{ color:var(--accent); }
+  .ovtap{ cursor:pointer; transition:opacity .12s; }
+  .ovtap:active{ opacity:.55; }
+  .ovtodo li.ovtap{ padding-right:16px; position:relative; }
+  .ovchev{ color:var(--l3); font-weight:600; margin-left:5px; }
+  .ovtodo li.ovtap .ovchev{ position:absolute; right:0; }
   .ovnudge{ background:var(--accent-soft); border:.5px solid transparent; box-shadow:0 0 0 1px var(--accent-soft) inset; }
   /* onboarding objective picker */
   #onboardWrap{ position:fixed; inset:0; z-index:320; display:none; align-items:center; justify-content:center; padding:24px;
@@ -598,7 +603,7 @@
   <div class="largeTitle"><div class="ltmain"><span class="titleBtn" style="cursor:default;"><span id="ovGreet">Overview</span></span></div><small id="ovDate"></small></div>
   <div id="ovBody"></div>
   <div class="ed-label" id="ovFeedLabel" style="display:none;">Friends</div>
-  <div id="feedCTA" class="group" style="display:none;"><div class="pad"><p style="font-size:14px;color:var(--l2);line-height:1.5;margin:2px 0;">Sign in under <b>Me → Account &amp; sync</b> to share your workouts and see what your friends are training.</p></div></div>
+  <div id="feedCTA" class="group ovtap" style="display:none; cursor:pointer;" onclick="goAccount()"><div class="pad"><p style="font-size:14px;color:var(--l2);line-height:1.5;margin:2px 0;">Tap to sign in under <b>Me → Account &amp; sync</b> to share your workouts and see what your friends are training.<span class="ovchev">›</span></p></div></div>
   <div id="feedList"></div>
 </div>
 
@@ -2156,18 +2161,31 @@ function renderOverview(){
     +'<div class="stat"><div class="n">'+(settings.sessions||0)+'</div><div class="k">total</div></div>'
     +'<div class="stat"><div class="n">'+(settings.beatTotal||0)+'</div><div class="k">PRs beaten</div></div></div>';
   h+='<p class="ovp" style="margin:10px 4px 0;">'+motiv+'</p>';
-  // --- Needs attention ---
+  // --- Needs attention --- (each item links to where you'd act on it)
   const todo=[], under=ovUnderMuscles();
-  if(under.length) todo.push("Add sets for "+esc(listWords(under.slice(0,3)))+" — under ~"+WEEKLY_SET_MIN+" hard sets a week.");
-  if(!bw.length) todo.push("Log your weight so the coach can track your goal.");
-  else if(daysSince(bw[bw.length-1].d)>10) todo.push("Log your weight — it’s been over " + daysSince(bw[bw.length-1].d) + " days.");
-  if(due) todo.push("Take a deload week to recover.");
+  if(under.length) todo.push({t:"Add sets for "+esc(listWords(under.slice(0,3)))+" — under ~"+WEEKLY_SET_MIN+" hard sets a week.", act:"balance"});
+  if(!bw.length) todo.push({t:"Log your weight so the coach can track your goal.", act:"weight"});
+  else if(daysSince(bw[bw.length-1].d)>10) todo.push({t:"Log your weight — it’s been over " + daysSince(bw[bw.length-1].d) + " days.", act:"weight"});
+  if(due) todo.push({t:"Take a deload week to recover.", act:"workout"});
   h+='<div class="ed-label">Needs attention</div>';
-  if(todo.length){ h+='<div class="group"><div class="pad"><ul class="ovtodo">'+todo.map(t=>'<li>'+t+'</li>').join('')+'</ul></div></div>'; }
+  if(todo.length){ h+='<div class="group"><div class="pad"><ul class="ovtodo">'+todo.map(it=>'<li class="ovtap" data-act="'+it.act+'">'+it.t+'<span class="ovchev">›</span></li>').join('')+'</ul></div></div>'; }
   else { h+='<div class="group"><div class="pad"><p class="ovp">Nothing flagged — your training looks balanced. Keep showing up. 👏</p></div></div>'; }
   host.innerHTML=h;
   const sb=host.querySelector(".ovstart"); if(sb) sb.onclick=()=>showTab("workout");
   const hb=host.querySelector(".ovhome"); if(hb) hb.onclick=startHomeWorkout;
+  host.querySelectorAll(".ovtodo .ovtap").forEach(li=> li.onclick=()=>ovAct(li.dataset.act));
+}
+// route a Needs-attention item to where the user acts on it
+function ovAct(act){
+  if(act==="weight"){ showTab("me"); setTimeout(()=>{ const i=$("bwInput"); if(i){ i.scrollIntoView({behavior:"smooth",block:"center"}); i.focus(); } },70); }
+  else if(act==="balance"){ openMuscles(); }
+  else showTab("workout");
+}
+// go to Me and reveal the account / sign-in section
+function goAccount(){
+  showTab("me");
+  setTimeout(()=>{ const b=$("acctBox"); if(b && b.style.display!=="none"){ b.scrollIntoView({behavior:"smooth",block:"center"});
+    const e=$("acctEmail"); if(e && $("acctOut") && $("acctOut").style.display!=="none") e.focus(); } },70);
 }
 function renderDash(){
   const now = bw.length?bw[bw.length-1].kg:null;
@@ -2630,6 +2648,29 @@ function showTab(name){
   }
 }
 document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.dataset.tab));
+// swipe left/right to move through Overview ↔ Workout ↔ Me
+(function(){
+  const ORDER=["overview","workout","me"];
+  let x0=null, y0=null, armed=false;
+  // don't hijack swipes that belong to an input, a canvas, a horizontally-scrollable strip, a draggable handle, or an open sheet
+  const blocked=el=>{ for(let n=el; n && n!==document.body; n=n.parentElement){
+    if(n.matches && n.matches('input,textarea,select,canvas,[data-act="grip"],.seg,.sexseg,.appearance,.chips')) return true;
+    const ox=getComputedStyle(n).overflowX; if((ox==="auto"||ox==="scroll") && n.scrollWidth>n.clientWidth+4) return true;
+  } return false; };
+  document.addEventListener("touchstart",e=>{
+    if(e.touches.length!==1 || document.querySelector(".sheet.show") || blocked(e.target)){ armed=false; return; }
+    x0=e.touches[0].clientX; y0=e.touches[0].clientY; armed=true;
+  },{passive:true});
+  document.addEventListener("touchend",e=>{
+    if(!armed || x0==null){ return; } armed=false;
+    const t=e.changedTouches[0], dx=t.clientX-x0, dy=t.clientY-y0;
+    if(Math.abs(dx)<60 || Math.abs(dx)<Math.abs(dy)*1.7) return;   // needs a clearly horizontal flick
+    const cur=ORDER.find(n=>{ const p=document.querySelector('.page[data-tab="'+n+'"]'); return p && p.classList.contains("active"); });
+    let i=ORDER.indexOf(cur); if(i<0) return;
+    i += dx<0 ? 1 : -1; if(i<0 || i>=ORDER.length) return;          // no wrap-around past the ends
+    showTab(ORDER[i]);
+  },{passive:true});
+})();
 $("bodySave").onclick=async()=>{
   const h=parseFloat($("heightIn").value), bf=parseFloat($("bfIn").value);
   settings.heightCm = (!isNaN(h)&&h>=100&&h<=250) ? h : null;
