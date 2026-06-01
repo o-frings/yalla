@@ -700,10 +700,16 @@
 
     <div class="ed-label" id="acctLabel" style="margin-top:18px; display:none;">Account &amp; sync</div>
     <div id="acctBox" style="display:none;">
-      <p class="levelcap" style="margin:0 4px 10px;" id="acctCap">Sign in to sync your log across your devices. We email you a one-tap link — no password.</p>
-      <div id="acctOut" class="row" style="margin-top:2px;">
-        <input id="acctEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@email.com">
-        <button class="btn sm" id="acctLoginBtn">Send link</button>
+      <p class="levelcap" style="margin:0 4px 10px;" id="acctCap">Sign in to sync your log across your devices. We email you a 6-digit code — no password.</p>
+      <div id="acctOut">
+        <div class="row" style="margin-top:2px;">
+          <input id="acctEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@email.com">
+          <button class="btn sm" id="acctLoginBtn">Send code</button>
+        </div>
+        <div class="row" id="acctCodeRow" style="margin-top:8px; display:none;">
+          <input id="acctCode" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code">
+          <button class="btn sm" id="acctVerifyBtn">Verify</button>
+        </div>
       </div>
       <div id="acctIn" style="display:none;">
         <div class="row" style="justify-content:space-between; align-items:center;">
@@ -1666,10 +1672,23 @@ async function cloudLogin(email){
   if(!sb){ await window.__cloudInit(); }
   if(!sb){ toast("Couldn't reach the cloud — check your connection and try again."); return; }
   try{
-    const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.href.split("#")[0] } });
+    // Code (not link): a magic link always opens Safari and never reaches an installed PWA.
+    const { error } = await sb.auth.signInWithOtp({ email, options:{ shouldCreateUser:true } });
     if(error) throw error;
-    toast("Check your email for a one-tap sign-in link.", true);
+    const cr=$("acctCodeRow"); if(cr){ cr.style.display=""; const ci=$("acctCode"); if(ci){ ci.value=""; ci.focus(); } }
+    toast("Check your email for a 6-digit code.", true);
   }catch(e){ toast("Sign-in failed: "+((e&&e.message)||e)); }
+}
+async function cloudVerify(email, code){
+  if(!sb){ toast("Couldn't reach the cloud — try again."); return; }
+  code=(code||"").replace(/\D/g,"");
+  if(code.length<6){ toast("Enter the 6-digit code from your email."); return; }
+  try{
+    const { error } = await sb.auth.verifyOtp({ email, token:code, type:"email" });
+    if(error) throw error;
+    const cr=$("acctCodeRow"); if(cr) cr.style.display="none";
+    // onAuthStateChange handles the signed-in state from here
+  }catch(e){ toast("That code didn't work — check it or send a new one."); }
 }
 async function cloudLogout(){
   if(sb){ try{ await sb.auth.signOut(); }catch(e){} }
@@ -1796,7 +1815,11 @@ function urlB64ToUint8(b64){ const pad="=".repeat((4-b64.length%4)%4); const s=(
 async function pushSubscribe(){
   if(!cloudReady()){ toast("Sign in first to get reminders."); return false; }
   if(!SUPA.vapidPublic){ toast("Reminders aren’t set up on the server yet."); return false; }
-  if(!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)){ toast("Reminders aren’t supported on this device."); return false; }
+  const standalone = (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone===true;
+  if(!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)){
+    toast(standalone ? "Reminders aren’t supported on this browser." : "On iPhone, add Yalla to your Home Screen first — notifications only work from the installed app.");
+    return false;
+  }
   try{
     if(await Notification.requestPermission()!=="granted"){ toast("Allow notifications to get reminders."); return false; }
     const reg=await navigator.serviceWorker.ready;
@@ -3828,6 +3851,7 @@ async function applyRestore(obj){
 $("exportBtn").onclick=doExport;
 $("importBtn").onclick=()=>$("importFile").click();
 if($("acctLoginBtn")) $("acctLoginBtn").onclick=()=>{ const e=($("acctEmail").value||"").trim(); if(!e||e.indexOf("@")<0){ toast("Enter your email address."); return; } cloudLogin(e); };
+if($("acctVerifyBtn")) $("acctVerifyBtn").onclick=()=>{ const e=($("acctEmail").value||"").trim(); cloudVerify(e, $("acctCode").value); };
 if($("acctLogoutBtn")) $("acctLogoutBtn").onclick=cloudLogout;
 if($("acctPush")) $("acctPush").onclick=cloudForcePush;
 if($("acctDelete")) $("acctDelete").onclick=cloudDeleteData;
