@@ -152,7 +152,7 @@
   #track{ display:flex; height:100%; }
   #track.anim{ transition:transform .3s cubic-bezier(.22,.61,.36,1); }
   #pager .page, #pager .page.active{ display:block; animation:none; flex:0 0 100%; width:100%; height:100%;
-    overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; padding:0 16px calc(80px + env(safe-area-inset-bottom)); }
+    overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; padding:0 16px calc(58px + env(safe-area-inset-bottom)); }
   .tabbar{ position:fixed; left:0; right:0; bottom:0; z-index:60; display:flex; max-width:540px; margin:0 auto;
     padding:7px 8px calc(6px + env(safe-area-inset-bottom)); border-top:.5px solid var(--line);
     background:color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter:blur(20px) saturate(180%); -webkit-backdrop-filter:blur(20px) saturate(180%); }
@@ -863,7 +863,7 @@
 
     <div class="ed-label">Days per week</div>
     <div class="seg appearance bopt" data-k="freq">
-      <div class="s" data-v="2">2</div><div class="s" data-v="3">3</div><div class="s active" data-v="4">4</div><div class="s" data-v="5">5</div><div class="s" data-v="6">6</div>
+      <div class="s" data-v="1">1</div><div class="s" data-v="2">2</div><div class="s" data-v="3">3</div><div class="s active" data-v="4">4</div><div class="s" data-v="5">5</div><div class="s" data-v="6">6</div>
     </div>
 
     <div class="ed-label">Supersets <span class="subhint">— pair moves to save time</span></div>
@@ -2665,10 +2665,29 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
   pages.forEach(p=> track.appendChild(p));               // …then all three move into the track, in tab order
   const W=()=> pager.clientWidth || window.innerWidth;
   const curTab=()=>{ const a=document.querySelector(".page.active"); return a?a.dataset.tab:"overview"; };
+  const clamp=(v,a,b)=> v<a?a:(v>b?b:v);
   let idx=Math.max(0, ORDER.indexOf(curTab()));
-  function place(i, animate, ms){ idx=Math.min(2,Math.max(0,i));
+  let tx=0, ty=0, raf=0;                                          // tracked 2D position of the track
+  const apply=()=>{ track.style.transform="translate("+tx+"px,"+ty+"px)"; };
+  function place(i, animate, ms){ cancelAnimationFrame(raf); idx=Math.min(2,Math.max(0,i));
     track.style.transition = animate ? ("transform "+(ms||320)+"ms cubic-bezier(.22,.61,.36,1)") : "none";
-    track.style.transform="translateX("+(-idx*W())+"px)"; }
+    tx=-idx*W(); ty=0; apply(); }
+  // physical throw: the track flies off along the gesture's 2D velocity, arcs, then settles — non-linear trajectory
+  function fling(target, vx, vy){ cancelAnimationFrame(raf);
+    const W0=W(), fromX=tx, fromY=ty, toX=-target*W0; idx=target;
+    track.style.transition="none";
+    const dur=clamp(Math.abs(toX-fromX)/Math.max(Math.abs(vx),0.45), 240, 460);
+    const yKick=clamp(vy*90, -60, 60);                            // how far it bows in the throw's vertical direction
+    let t0=0;
+    const frame=now=>{ if(!t0) t0=now; let p=(now-t0)/dur; if(p>1)p=1;
+      const eo=1-Math.pow(1-p,3);                                 // ease-out for the horizontal travel
+      tx=fromX+(toX-fromX)*eo;
+      ty=fromY*(1-eo) + yKick*Math.sin(Math.PI*p);                // arc up/down and back to 0 → curved path
+      apply();
+      if(p<1) raf=requestAnimationFrame(frame); else { tx=toX; ty=0; apply(); }
+    };
+    raf=requestAnimationFrame(frame);
+  }
   window.__pageGo=(name)=>{ const i=ORDER.indexOf(name); if(i>=0 && i!==idx) place(i, true); };
   place(idx, false);
   window.addEventListener("resize", ()=>place(idx,false));
@@ -2678,27 +2697,29 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
     if(n.matches && n.matches('input,textarea,select,canvas,button,[data-act="grip"],.seg,.sexseg,.appearance,.chips,.tabbar,.sheet')) return true;
     const ox=getComputedStyle(n).overflowX; if((ox==="auto"||ox==="scroll") && n.scrollWidth>n.clientWidth+4) return true;
   } return false; };
-  let x0=0, y0=0, armed=false, locked=false, dragging=false, lastX=0, lastT=0, vx=0;
+  let x0=0, y0=0, armed=false, locked=false, dragging=false, lastX=0, lastY=0, lastT=0, vx=0, vy=0;
   pager.addEventListener("touchstart",e=>{
     if(e.touches.length!==1 || document.querySelector(".sheet.show, #onboardWrap.show") || blocked(e.target)){ armed=false; return; }
-    x0=lastX=e.touches[0].clientX; y0=e.touches[0].clientY; lastT=Date.now(); vx=0;
+    cancelAnimationFrame(raf);
+    x0=lastX=e.touches[0].clientX; y0=lastY=e.touches[0].clientY; lastT=Date.now(); vx=vy=0;
     armed=true; locked=false; dragging=false; track.style.transition="none";
   },{passive:true});
   pager.addEventListener("touchmove",e=>{
     if(!armed) return;
     const x=e.touches[0].clientX, y=e.touches[0].clientY, dx=x-x0, dy=y-y0;
     if(!locked){
-      if(Math.abs(dx)<10 && Math.abs(dy)<10) return;               // wait for a clear intent before committing the axis
-      if(Math.abs(dx) < Math.abs(dy)*1.4){ armed=false; return; }  // not clearly horizontal → leave it to vertical scroll
-      locked=true; dragging=true;
+      if(Math.abs(dx)<9 && Math.abs(dy)<9) return;                 // small deadzone before we commit to an axis
+      if(Math.abs(dy) > Math.abs(dx)*1.2){ armed=false; return; }  // clearly vertical → leave it to the page's scroll
+      locked=true; dragging=true;                                  // anything more horizontal (incl. diagonals) → we page it
     }
-    e.preventDefault();                                            // own the horizontal gesture
-    const tm=Date.now(), dt=tm-lastT; if(dt>0){ vx=0.8*((x-lastX)/dt)+0.2*vx; lastX=x; lastT=tm; }  // smoothed px/ms
+    e.preventDefault();                                            // own the gesture
+    const tm=Date.now(), dt=tm-lastT;
+    if(dt>0){ vx=0.8*((x-lastX)/dt)+0.2*vx; vy=0.8*((y-lastY)/dt)+0.2*vy; lastX=x; lastY=y; lastT=tm; }  // smoothed px/ms
     let d=dx; if((idx===0 && d>0) || (idx===2 && d<0)) d*=0.32;    // rubber-band past the ends
-    track.style.transform="translateX("+(-idx*W()+d)+"px)";
+    tx=-idx*W()+d; ty=clamp(dy*0.16, -34, 34); apply();            // follow the finger in 2D (Y gently damped)
   },{passive:false});
   const end=e=>{
-    if(!armed) return; armed=false; if(!dragging) return; dragging=false;
+    if(!armed) return; armed=false; if(!dragging){ return; } dragging=false;
     const t=(e.changedTouches&&e.changedTouches[0])||{clientX:x0}, dx=t.clientX-x0, W0=W();
     const FLICK=0.4;                                               // px/ms — past this it's a "throw", not a drag
     let target=idx;
@@ -2707,11 +2728,8 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
     } else {                                                       // dragged — commit only past ~a quarter screen
       if(dx<=-W0*0.22 && idx<2) target=idx+1; else if(dx>=W0*0.22 && idx>0) target=idx-1;
     }
-    if(target===idx){ place(idx, true, 260); return; }             // snap back, gentle
-    const remain=Math.abs(-target*W0 - (-idx*W0 + dx));            // settle time scales with the throw — harder = snappier
-    const ms = Math.abs(vx)>FLICK ? Math.max(150, Math.min(340, Math.round(remain/Math.max(Math.abs(vx),0.7)))) : 300;
-    place(target, true, ms);
-    if(ORDER[target]!==curTab()) showTab(ORDER[target]);           // highlight tab + render (place already moved the track)
+    fling(target, vx, vy);                                         // animate (arcs even on snap-back if there's vertical throw)
+    if(ORDER[target]!==curTab()) showTab(ORDER[target]);           // highlight tab + render (fling owns the visual)
   };
   pager.addEventListener("touchend",end,{passive:true});
   pager.addEventListener("touchcancel",end,{passive:true});
