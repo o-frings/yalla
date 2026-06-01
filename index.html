@@ -163,6 +163,7 @@
   .ovtodo{ margin:0; padding-left:18px; }
   .ovtodo li{ font-size:14px; color:var(--l2); line-height:1.5; margin:6px 0; }
   .ovtodo li::marker{ color:var(--accent); }
+  .ovnudge{ background:var(--accent-soft); border:.5px solid transparent; box-shadow:0 0 0 1px var(--accent-soft) inset; }
   #progBars{ width:100%; height:auto; aspect-ratio:11/3; margin-top:12px; }
   .progcap{ font-size:12.5px; color:var(--l2); margin:8px 2px 2px; line-height:1.4; }
   .progcap b{ color:var(--ink); font-weight:700; }
@@ -404,9 +405,8 @@
   .scrim.show{ opacity:1; pointer-events:auto; }
   .sheet{ position:fixed; left:0; right:0; bottom:0; max-width:540px; margin:0 auto; z-index:100;
     background:var(--sheetbg); border-radius:22px 22px 0 0; transform:translateY(102%);
-    transition:transform .34s cubic-bezier(.2,.8,.2,1); max-height:92vh; max-height:92dvh; display:flex; flex-direction:column;
-    box-shadow:0 -1px 0 var(--hi), 0 -20px 50px -20px rgba(0,0,0,.4); }
-  .sheet.show{ transform:translateY(0); }
+    transition:transform .34s cubic-bezier(.2,.8,.2,1); max-height:92vh; max-height:92dvh; display:flex; flex-direction:column; }
+  .sheet.show{ transform:translateY(0); box-shadow:0 -1px 0 var(--hi), 0 -20px 50px -20px rgba(0,0,0,.4); }
   .sheet{ overflow:hidden; }
   .grabber{ width:36px; height:5px; background:var(--grabber); border-radius:3px; margin:8px auto 2px; flex:0 0 auto; }
   .sheethdr{ display:flex; align-items:center; justify-content:space-between; padding:10px 16px 6px; flex:0 0 auto; }
@@ -2016,12 +2016,32 @@ function renderNav(){
 function ovGreetWord(){ const h=new Date().getHours(); return h<5?"Still up?":h<12?"Good morning":h<18?"Good afternoon":"Good evening"; }
 function trainedToday(){ const t=new Date().toDateString(); return Object.keys(hist).some(n=>(hist[n]||[]).some(e=>new Date(e.d).toDateString()===t)); }
 function ovUnderMuscles(){ const wk=weeklyEquiv(muscleVolume(28,"sets").totals, 28); return MGROUPS.filter(g=> (wk[g]||0)>0 && wk[g]<WEEKLY_SET_MIN); }
+function lastWorkoutTs(){ let m=0; Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ if(e.d>m) m=e.d; })); return m; }
+function daysOff(){ const t=lastWorkoutTs(); return t ? daysSince(t) : -1; }   // -1 = never logged
+// a balanced no-equipment session, started in free mode
+const HOME_MOVES=["Push-Ups","Pike Push-Ups","Reverse Lunge","Glute Bridge","Plank"];
+function startHomeWorkout(){
+  const s={}; HOME_MOVES.forEach(m=> s[m]=[]);
+  draft["free"]={ t:Date.now(), s }; sset("draft", draft);
+  freeMode=true; swaps={};
+  renderSeg(); renderFree();
+  showTab("workout");
+  toast("Home workout ready — no equipment needed. Let's go!");
+}
 function renderOverview(){
   const host=$("ovBody"); if(!host) return;
   $("ovGreet").textContent=ovGreetWord();
   try{ $("ovDate").textContent=new Date().toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"}); }catch(e){}
   const due=(settings.sinceDeload||0)>=DELOAD_AT, p=activePlan(), w=p&&p.workouts[curWk], did=trainedToday();
   let h="";
+  // --- Train-at-home nudge (2+ days since the last workout) ---
+  const off=daysOff();
+  if(off>=2){
+    h+='<div class="group ovnudge"><div class="pad"><div class="ovk" style="color:var(--accent);">'+off+' days off</div>'
+      +'<div class="ovbig">No gym access right now? Train at home!</div>'
+      +'<p class="ovp" style="margin-top:6px;">A quick bodyweight session keeps your streak alive — no equipment needed.</p>'
+      +'<button class="btn wide ovhome" style="margin-top:14px;">Start a home workout</button></div></div>';
+  }
   // --- Today ---
   h+='<div class="ed-label">Today</div>';
   if(due){
@@ -2057,6 +2077,7 @@ function renderOverview(){
   else { h+='<div class="group"><div class="pad"><p class="ovp">Nothing flagged — your training looks balanced. Keep showing up. 👏</p></div></div>'; }
   host.innerHTML=h;
   const sb=host.querySelector(".ovstart"); if(sb) sb.onclick=()=>showTab("workout");
+  const hb=host.querySelector(".ovhome"); if(hb) hb.onclick=startHomeWorkout;
 }
 function renderDash(){
   const now = bw.length?bw[bw.length-1].kg:null;
