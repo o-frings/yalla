@@ -2666,10 +2666,10 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
   const W=()=> pager.clientWidth || window.innerWidth;
   const curTab=()=>{ const a=document.querySelector(".page.active"); return a?a.dataset.tab:"overview"; };
   let idx=Math.max(0, ORDER.indexOf(curTab()));
-  function place(i, animate){ idx=Math.min(2,Math.max(0,i));
-    track.classList.toggle("anim", !!animate);
+  function place(i, animate, ms){ idx=Math.min(2,Math.max(0,i));
+    track.style.transition = animate ? ("transform "+(ms||320)+"ms cubic-bezier(.22,.61,.36,1)") : "none";
     track.style.transform="translateX("+(-idx*W())+"px)"; }
-  window.__pageGo=(name)=>{ const i=ORDER.indexOf(name); if(i>=0) place(i, true); };
+  window.__pageGo=(name)=>{ const i=ORDER.indexOf(name); if(i>=0 && i!==idx) place(i, true); };
   place(idx, false);
   window.addEventListener("resize", ()=>place(idx,false));
 
@@ -2678,31 +2678,40 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
     if(n.matches && n.matches('input,textarea,select,canvas,button,[data-act="grip"],.seg,.sexseg,.appearance,.chips,.tabbar,.sheet')) return true;
     const ox=getComputedStyle(n).overflowX; if((ox==="auto"||ox==="scroll") && n.scrollWidth>n.clientWidth+4) return true;
   } return false; };
-  let x0=0, y0=0, armed=false, locked=false, dragging=false;
+  let x0=0, y0=0, armed=false, locked=false, dragging=false, lastX=0, lastT=0, vx=0;
   pager.addEventListener("touchstart",e=>{
     if(e.touches.length!==1 || document.querySelector(".sheet.show, #onboardWrap.show") || blocked(e.target)){ armed=false; return; }
-    x0=e.touches[0].clientX; y0=e.touches[0].clientY; armed=true; locked=false; dragging=false; track.classList.remove("anim");
+    x0=lastX=e.touches[0].clientX; y0=e.touches[0].clientY; lastT=Date.now(); vx=0;
+    armed=true; locked=false; dragging=false; track.style.transition="none";
   },{passive:true});
   pager.addEventListener("touchmove",e=>{
     if(!armed) return;
-    const dx=e.touches[0].clientX-x0, dy=e.touches[0].clientY-y0;
+    const x=e.touches[0].clientX, y=e.touches[0].clientY, dx=x-x0, dy=y-y0;
     if(!locked){
-      if(Math.abs(dx)<8 && Math.abs(dy)<8) return;
-      if(Math.abs(dx)<=Math.abs(dy)){ armed=false; return; }       // vertical intent → let the page scroll
+      if(Math.abs(dx)<10 && Math.abs(dy)<10) return;               // wait for a clear intent before committing the axis
+      if(Math.abs(dx) < Math.abs(dy)*1.4){ armed=false; return; }  // not clearly horizontal → leave it to vertical scroll
       locked=true; dragging=true;
     }
     e.preventDefault();                                            // own the horizontal gesture
+    const tm=Date.now(), dt=tm-lastT; if(dt>0){ vx=0.8*((x-lastX)/dt)+0.2*vx; lastX=x; lastT=tm; }  // smoothed px/ms
     let d=dx; if((idx===0 && d>0) || (idx===2 && d<0)) d*=0.32;    // rubber-band past the ends
     track.style.transform="translateX("+(-idx*W()+d)+"px)";
   },{passive:false});
   const end=e=>{
     if(!armed) return; armed=false; if(!dragging) return; dragging=false;
-    const t=(e.changedTouches&&e.changedTouches[0])||{clientX:x0}, dx=t.clientX-x0;
+    const t=(e.changedTouches&&e.changedTouches[0])||{clientX:x0}, dx=t.clientX-x0, W0=W();
+    const FLICK=0.4;                                               // px/ms — past this it's a "throw", not a drag
     let target=idx;
-    if(dx<=-W()*0.2 && idx<2) target=idx+1;
-    else if(dx>=W()*0.2 && idx>0) target=idx-1;
-    if(target===idx) place(idx, true);                             // snap back
-    else showTab(ORDER[target]);                                   // commit: highlights tab, renders, animates track
+    if(Math.abs(vx) > FLICK){                                      // thrown — fly in the flick's direction
+      if(vx<0 && idx<2) target=idx+1; else if(vx>0 && idx>0) target=idx-1;
+    } else {                                                       // dragged — commit only past ~a quarter screen
+      if(dx<=-W0*0.22 && idx<2) target=idx+1; else if(dx>=W0*0.22 && idx>0) target=idx-1;
+    }
+    if(target===idx){ place(idx, true, 260); return; }             // snap back, gentle
+    const remain=Math.abs(-target*W0 - (-idx*W0 + dx));            // settle time scales with the throw — harder = snappier
+    const ms = Math.abs(vx)>FLICK ? Math.max(150, Math.min(340, Math.round(remain/Math.max(Math.abs(vx),0.7)))) : 300;
+    place(target, true, ms);
+    if(ORDER[target]!==curTab()) showTab(ORDER[target]);           // highlight tab + render (place already moved the track)
   };
   pager.addEventListener("touchend",end,{passive:true});
   pager.addEventListener("touchcancel",end,{passive:true});
