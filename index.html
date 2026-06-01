@@ -146,6 +146,13 @@
   #progBars{ width:100%; height:auto; aspect-ratio:11/3; margin-top:12px; }
   .progcap{ font-size:12.5px; color:var(--l2); margin:8px 2px 2px; line-height:1.4; }
   .progcap b{ color:var(--ink); font-weight:700; }
+  .progverd{ display:flex; align-items:center; gap:9px; margin:10px 0 2px; padding:11px 13px; border-radius:12px;
+    background:var(--card); border:.5px solid var(--line); border-left-width:3px; font-size:13.5px; font-weight:600; line-height:1.4; }
+  .progverd .pvdot{ width:10px; height:10px; border-radius:50%; flex:0 0 auto; }
+  .progverd.v-good{ border-left-color:#51cf66; } .progverd.v-good .pvdot{ background:#51cf66; }
+  .progverd.v-watch{ border-left-color:#f59f00; } .progverd.v-watch .pvdot{ background:#f59f00; }
+  .progverd.v-bad{ border-left-color:var(--red); } .progverd.v-bad .pvdot{ background:var(--red); }
+  .progverd.v-more{ border-left-color:var(--line); } .progverd.v-more .pvdot{ background:var(--l3); }
 
   .group{ background:var(--card); border:.5px solid var(--line); border-radius:var(--r-lg); overflow:hidden; margin-bottom:20px; box-shadow:var(--shadow), inset 0 .5px 0 var(--hi); }
   .pad{ padding:19px; }
@@ -582,6 +589,7 @@
     </div>
     <canvas id="progBars" width="660" height="180"></canvas>
     <div class="progcap" id="progCap"></div>
+    <div class="progverd" id="progVerdict" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div>
 
     <div class="ed-label">Goal weight</div>
     <div class="gset">
@@ -658,6 +666,7 @@
           <span class="levelcap" style="margin:0;">Share my workouts to the friends feed</span>
           <input type="checkbox" id="shareToggle">
         </label>
+        <button class="btn tinted wide" id="acctPush" style="margin-top:12px;">Save this device to my account</button>
         <a id="acctDelete" class="levelcap" style="display:inline-block; margin:12px 4px 0; color:var(--bad,#ff375f); cursor:pointer; text-decoration:underline;">Delete my cloud data</a>
       </div>
     </div>
@@ -1595,6 +1604,17 @@ async function cloudLogout(){
   if(sb){ try{ await sb.auth.signOut(); }catch(e){} }
   cloudUser=null; renderAccount();
   toast("Signed out. Your data stays on this device.");
+}
+// Make THIS device the source of truth: push every local key up with a fresh timestamp, overwriting the cloud.
+async function cloudForcePush(){
+  if(!cloudReady()){ toast("Sign in first to save to your account."); return; }
+  const now=Date.now(); let n=0;
+  for(const k of CLOUD_KEYS){
+    const v=await sget(k);
+    if(v!=null){ _syncMeta[k]=now; await cloudPush(k, v, now); n++; }
+  }
+  await _persistMeta();
+  toast(n?"Saved this device's data to your account.":"Nothing to save yet.", true);
 }
 // GDPR: wipe everything this user has in the cloud (synced data, feed posts, profile). Local data is untouched.
 async function cloudDeleteData(){
@@ -3548,6 +3568,7 @@ $("exportBtn").onclick=doExport;
 $("importBtn").onclick=()=>$("importFile").click();
 if($("acctLoginBtn")) $("acctLoginBtn").onclick=()=>{ const e=($("acctEmail").value||"").trim(); if(!e||e.indexOf("@")<0){ toast("Enter your email address."); return; } cloudLogin(e); };
 if($("acctLogoutBtn")) $("acctLogoutBtn").onclick=cloudLogout;
+if($("acctPush")) $("acctPush").onclick=cloudForcePush;
 if($("acctDelete")) $("acctDelete").onclick=cloudDeleteData;
 if($("shareToggle")) $("shareToggle").onchange=async(e)=>{ settings.shareActivity=!!e.target.checked; await sset("settings",settings); toast(settings.shareActivity?"Sharing on — friends see your workout summaries.":"Sharing off — your workouts stay private."); };
 renderAccount();
