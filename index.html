@@ -507,15 +507,16 @@
   .coach.show{ display:flex; opacity:1; transform:translate(-50%,0); }
   .coachbody{ flex:1; font-size:13.5px; line-height:1.4; }
   .coachx{ flex:0 0 auto; background:var(--accent); color:#fff; border:none; border-radius:10px; padding:8px 12px; font-size:13px; font-weight:700; cursor:pointer; }
-  /* non-blocking confirm bar (objective/focus changes commit only on Confirm) */
-  .confirmbar{ position:fixed; left:50%; bottom:calc(58px + env(safe-area-inset-bottom)); transform:translate(-50%,16px); z-index:120;
-    width:calc(100% - 32px); max-width:420px; display:none; align-items:center; gap:8px;
-    background:rgba(28,28,30,.96); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); color:#fff;
-    padding:10px 10px 10px 16px; border-radius:16px; box-shadow:0 10px 36px rgba(0,0,0,.4); opacity:0; transition:opacity .3s, transform .3s; }
-  .confirmbar.show{ display:flex; opacity:1; transform:translate(-50%,0); }
-  #confirmBarMsg{ flex:1; font-size:13.5px; line-height:1.4; }
-  .cbcancel{ flex:0 0 auto; background:none; border:none; color:#aaa; font-size:13px; font-weight:600; padding:8px 6px; cursor:pointer; }
-  .cbyes{ flex:0 0 auto; background:var(--accent); color:#fff; border:none; border-radius:10px; padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer; }
+  /* inline confirm — appears right under the control you edited; commits only on Confirm */
+  .inlineconfirm{ display:none; align-items:center; gap:8px; margin:10px 2px 0;
+    background:var(--accent-soft); border-radius:12px; padding:10px 10px 10px 14px;
+    opacity:0; transform:translateY(-4px); transition:opacity .2s, transform .2s; }
+  .inlineconfirm.show{ display:flex; opacity:1; transform:none; }
+  .icmsg{ flex:1; font-size:13.5px; color:var(--ink); line-height:1.35; }
+  .icbtns{ flex:0 0 auto; display:flex; align-items:center; gap:4px; }
+  .iccancel{ background:none; border:none; color:var(--l2); font-size:13px; font-weight:600; padding:8px 8px; cursor:pointer; }
+  .icok{ background:var(--accent); color:#fff; border:none; border-radius:10px; padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer; }
+  .icok:active,.iccancel:active{ opacity:.7; }
   .chip.pending{ box-shadow:0 0 0 2px var(--accent); }
 
   .foot{ text-align:center; font-size:12.5px; color:var(--l3); margin:8px 0 4px; line-height:1.5; }
@@ -678,7 +679,6 @@
 
 <div class="toast" id="toast"></div>
 <div class="coach" id="coach"><div class="coachbody"><span id="coachTxt"></span></div><button class="coachx" id="coachX">Got it</button></div>
-<div class="confirmbar" id="confirmBar"><span id="confirmBarMsg"></span><button class="cbcancel" id="confirmBarNo">Cancel</button><button class="cbyes" id="confirmBarYes">Confirm</button></div>
 
 <!-- PLANS SHEET -->
 <div class="scrim" id="scrimPlans"></div>
@@ -750,6 +750,7 @@
       <button class="chip" data-v="muscle">Build muscle</button><button class="chip" data-v="strength">Get stronger</button>
       <button class="chip" data-v="fatloss">Lose fat</button><button class="chip" data-v="fitness">Stay fit</button>
     </div>
+    <div class="inlineconfirm" id="objConfirm"></div>
 
     <div class="ed-label">Training focus <span class="subhint">— up to two; the builder starts here</span></div>
     <div class="chips wrap" id="focusChips">
@@ -757,6 +758,7 @@
       <button class="chip" data-v="lower">Lower body</button><button class="chip" data-v="glutes">Glutes &amp; legs</button>
       <button class="chip" data-v="arms">Arms</button><button class="chip" data-v="shoulders">Shoulders</button><button class="chip" data-v="chest">Chest</button><button class="chip" data-v="back">Back</button><button class="chip" data-v="posture">Posture fix</button>
     </div>
+    <div class="inlineconfirm" id="focusConfirm"></div>
 
     <div class="ed-label">Goal weight</div>
     <div class="gset">
@@ -3196,18 +3198,21 @@ $("goalSave").onclick=async()=>{ const s=parseFloat($("goalStart").value),g=pars
   if(isNaN(s)||isNaN(g)||g<=s){ toast("Goal must be above start"); return; }
   settings.goalStart=s; settings.goalTarget=g; await sset("settings",settings); renderDash(); toast("Goal updated"); };
 // objective selector (Me) + first-run onboarding
-// --- changes to objective/focus aren't saved until confirmed via a non-blocking bar ---
-let _pend=null, _pendT=0, _pendFocus=null, _pendObj=null;
-function showConfirmBar(msg, apply){ _pend={apply}; $("confirmBarMsg").textContent=msg; $("confirmBar").classList.add("show");
-  clearTimeout(_pendT); _pendT=setTimeout(cancelPending, 9000); }
-function cancelPending(){ _pend=null; _pendFocus=null; _pendObj=null; clearTimeout(_pendT); $("confirmBar").classList.remove("show"); renderObjective(); }
-$("confirmBarNo").onclick=cancelPending;
-$("confirmBarYes").onclick=async()=>{ if(!_pend) return; const a=_pend.apply; _pend=null; clearTimeout(_pendT); $("confirmBar").classList.remove("show"); await a(); };
+// --- changes to objective/focus aren't saved until confirmed via an inline prompt right under the control ---
+let _pendFocus=null, _pendObj=null;
+function showInlineConfirm(boxId, msg, apply){
+  const box=$(boxId); if(!box) return;
+  box.innerHTML='<span class="icmsg">'+esc(msg)+'</span><span class="icbtns"><button class="iccancel">Cancel</button><button class="icok">Confirm</button></span>';
+  box.classList.add("show");
+  box.querySelector(".iccancel").onclick=cancelPending;
+  box.querySelector(".icok").onclick=async()=>{ await apply(); };
+}
+function cancelPending(){ _pendFocus=null; _pendObj=null; ["objConfirm","focusConfirm"].forEach(id=>{ const b=$(id); if(b){ b.classList.remove("show"); b.innerHTML=""; } }); renderObjective(); }
 document.querySelectorAll("#objChips .chip").forEach(c=> c.onclick=()=>{
   if(c.dataset.v===settings.objective && !_pendObj){ return; }
   _pendObj=c.dataset.v;
   document.querySelectorAll("#objChips .chip").forEach(x=>{ const on=x.dataset.v===_pendObj; x.classList.toggle("on",on); x.classList.toggle("pending",on); });
-  showConfirmBar("Set your objective to “"+(OBJ_LABELS[_pendObj]||_pendObj)+"”?", async()=>{ const v=_pendObj; _pendObj=null; await setObjective(v); });
+  showInlineConfirm("objConfirm", "Set your objective to “"+(OBJ_LABELS[_pendObj]||_pendObj)+"”?", async()=>{ const v=_pendObj; _pendObj=null; await setObjective(v); });
 });
 document.querySelectorAll("#onboardWrap .obopt").forEach(b=> b.onclick=()=> setObjective(b.dataset.obj));
 
@@ -4282,7 +4287,7 @@ document.querySelectorAll("#focusChips .chip").forEach(c=> c.onclick=()=>{
   if(!sel.length) sel=["balanced"];
   _pendFocus=sel;
   document.querySelectorAll("#focusChips .chip").forEach(x=>{ const on=sel.indexOf(x.dataset.v)>=0; x.classList.toggle("on",on); x.classList.toggle("pending",on); });
-  showConfirmBar("Update your training focus?", async()=>{ const f=_pendFocus; _pendFocus=null; settings.focusAreas=f; await sset("settings",settings); renderObjective(); });
+  showInlineConfirm("focusConfirm", "Update your training focus?", async()=>{ const f=_pendFocus; _pendFocus=null; settings.focusAreas=f; await sset("settings",settings); renderObjective(); });
 });
 function progressInsight(){
   const sessions=settings.sessions||0, slope=bwSlopePctWk(28), perWk=trainingDays(28)/4;
