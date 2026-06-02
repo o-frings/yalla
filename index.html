@@ -1076,6 +1076,14 @@
   </div>
 </div>
 
+<!-- ABOUT / COACH NOTES SHEET -->
+<div class="scrim" id="scrimAbout"></div>
+<div class="sheet" id="sheetAbout">
+  <div class="grabber"></div>
+  <div class="sheethdr"><span class="t" id="aboutTitle">About this plan</span><button class="btn plain sm" id="aboutClose">Done</button></div>
+  <div class="sheetbody" id="aboutBody"></div>
+</div>
+
 <!-- CONFIRM DIALOG -->
 <div id="confirmWrap">
   <div class="cscrim" id="cScrim"></div>
@@ -1233,11 +1241,12 @@ const DEFAULT_PLANS = [
       {n:"Glute Bridge", t:"3 × 12–20", s:3},
       {n:"Leg Extension", t:"3 × 12–15", s:3},
       {n:"Plank", t:"3 × 30–45s", s:3}]},
-    {name:"Home", sub:"Bodyweight & band", rotate:false, ex:[
+    {name:"Home", sub:"Bodyweight, band & posture", rotate:false, ex:[
       {n:"Glute Bridge", t:"3 × 15–20", s:3},
       {n:"Reverse Lunge", t:"3 × 10–12", s:3},
-      {n:"Single-Leg Glute Bridge", t:"3 × 10–12", s:3},
       {n:"Band Pull-Aparts", t:"3 × 15–20", s:3},
+      {n:"Wall Slides", t:"2 × 10–12", s:2},
+      {n:"Chin Tucks", t:"2 × 10 (slow)", s:2},
       {n:"Plank", t:"3 × 30–45s", s:3}]},
   ]
 }
@@ -1339,6 +1348,10 @@ const MUSCLES = {
   "Reverse Crunch":["Core"],"Cable Crunch":["Core"],"Ab-Machine Crunch":["Core"],"Decline Crunch":["Core"],"Weighted Decline Crunch":["Core"],
   "Ab Wheel Rollout":["Core"],"Weighted Plank":["Core"],"Plank":["Core"],"Hollow Hold (sec)":["Core"],"Hollow Hold":["Core"],
   "Hollow Hold + Leg Raises":["Core"],"Leg Raises":["Core"],"Dead Bug":["Core"],"Pallof Press":["Core"],
+  // posture / corrective
+  "Chin Tuck":["Rear Delts"],"Chin Tucks":["Rear Delts"],"Wall Slide":["Rear Delts","Back"],"Wall Slides":["Rear Delts","Back"],
+  "Scapular Wall Slide":["Rear Delts","Back"],"Wall Angels":["Rear Delts","Back"],"Prone Y-T-W":["Rear Delts","Back"],
+  "Prone T-Raise":["Rear Delts"],"Superman":["Back","Glutes"],"Bird Dog":["Core"],"Cat-Cow":["Core"],
 };
 const MCOLOR={ Chest:"#ff6b6b", Back:"#4dabf7", Shoulders:"#f59f00", Biceps:"#9775fa", Triceps:"#ff8787",
   Quads:"#20c997", Hamstrings:"#51cf66", Glutes:"#f783ac", Calves:"#74c0fc", Core:"#ffd43b", Other:"#adb5bd",
@@ -2293,13 +2306,13 @@ function renderOverview(){
   const obj=planObjective(activePlan()), todo=[], under=ovUnderMuscles();
   // first-things-first setup nudges (lead with signing in, then the bits the coach needs)
   if(cloudAvailable() && !cloudReady()) todo.push({t:"Sign in to save your progress and sync across devices.", act:"account"});
-  if(!settings.objective) todo.push({t:"Set your main goal so the coach knows what “on track” means.", act:"objective"});
+  if(!settings.objective) todo.push({t:"Set your main goal so I know what “on track” means.", act:"objective"});
   if(settings.goalTarget==null || settings.heightCm==null || !settings.sex) todo.push({t:"Add your details — height, sex and a goal weight — to unlock tracking.", act:"body"});
   if(under.length){ const ms=esc(listWords(under.slice(0,3).map(g=>MSHORT[g]||g)));
     todo.push({t:(obj.balanced ? "For balanced growth, add sets for "+ms+" — under ~"+WEEKLY_SET_MIN+" hard sets a week."
                                 : "Your plan targets "+ms+", but they're under ~"+WEEKLY_SET_MIN+" hard sets a week."), act:"balance"}); }
   if((settings.objective==="fatloss"||settings.objective==="muscle") && settings.goalTarget!=null){
-    if(!bw.length) todo.push({t:"Log your weight so the coach can track your goal.", act:"weight"});
+    if(!bw.length) todo.push({t:"Log your weight so I can track your goal.", act:"weight"});
     else if(daysSince(bw[bw.length-1].d)>10) todo.push({t:"Log your weight — it’s been over " + daysSince(bw[bw.length-1].d) + " days.", act:"weight"});
   }
   if(due) todo.push({t:"Take a deload week to recover.", act:"workout"});
@@ -2922,11 +2935,12 @@ function renderPlanList(){
       <div class="info"><div class="nm">${esc(p.name)}</div>
         <div class="meta">${p.workouts.length} workouts</div>
         <div class="pscores"><span class="psc pscbtn" data-bal="1"><b>Balance</b> ${sc.balance}<small>/5</small> ›</span><span class="psc"><b>Hypertrophy</b> ${sc.hyp}<small>/5</small></span></div></div>
-      <button class="edit share">Share</button><button class="edit">Edit</button>`;
+      <button class="edit about">About</button><button class="edit share">Share</button><button class="edit">Edit</button>`;
     row.querySelector(".info").onclick=async(ev)=>{ if(ev.target.closest(".pscbtn")) return;   // let the Balance chip open the radar instead of switching
       settings.activePlanId=p.id; freeMode=false; swaps={}; const ni=nextRotateIndex(p); curWk=ni>=0?ni:0;
       await sset("settings",settings); renderAll(); closeSheet("Plans"); toast("Switched to "+p.name); };
     row.querySelector(".pscbtn").onclick=(ev)=>{ ev.stopPropagation(); openMusclesFor(p.id); };
+    row.querySelector(".about").onclick=()=>openAbout(p);
     row.querySelector(".share").onclick=()=>openShare(p);
     row.querySelector(".edit:not(.share)").onclick=()=>{ closeSheet("Plans"); openEditor(p); };
     wrap.appendChild(row);
@@ -3158,6 +3172,38 @@ function weeklyEquiv(totals, windowDays){
 $("meBalance").onclick=()=>{ openMuscles(); };
 $("musClose").onclick=()=>closeSheet("Mus");
 $("scrimMus").onclick=()=>closeSheet("Mus");
+// ---- per-plan "about" / coach notes ----
+function splitType(plan){
+  const names=plan.workouts.map(w=>(w.name||"").toLowerCase()).join(" ");
+  const n=plan.workouts.filter(w=>w.rotate!==false).length || plan.workouts.length;
+  if(/full body/.test(names)) return {type:"Full Body", why:"Each session trains the whole body, so every muscle gets hit "+n+"× a week. High frequency from few, short sessions — efficient and beginner-friendly."};
+  if(/push|pull|legs/.test(names)) return {type:"Push · Pull · Legs", why:"Movements grouped by pattern so you can pack high weekly volume across "+n+" days. Best when you can train often and recover well."};
+  if(/upper|lower/.test(names)) return {type:"Upper / Lower", why:"Alternating upper and lower days hits each muscle ~2× a week — the frequency/volume sweet spot for most intermediate lifters."};
+  return {type:"Focused split", why:"A "+n+"-day rotation built around its emphasis."};
+}
+function openAbout(plan){
+  const obj=planObjective(plan), sc=planScores(plan), sp=splitType(plan), t=planVolume(plan).totals;
+  const top=MGROUPS.slice().sort((a,b)=>(t[b]||0)-(t[a]||0)).filter(g=>(t[g]||0)>0).slice(0,3).map(g=>MSHORT[g]||g);
+  const missing=["Chest","Back","Quads","Hamstrings","Glutes"].filter(g=>(t[g]||0)<1);   // major movers with ~no direct work
+  const balTxt = sc.balance>=4?"well-rounded coverage" : sc.balance>=3?"a deliberate lean toward its focus" : "a strong, narrow focus";
+  const hypTxt = sc.hyp>=4?"a high growth stimulus" : sc.hyp>=3?"a solid growth stimulus" : "a lighter, technique-friendly stimulus";
+  const look=[];
+  look.push("<b>Progressive overload</b> — when you hit the top of a rep range on all sets, add a rep or a little load next time. Keep ~1–3 reps in reserve.");
+  look.push("<b>Enough volume</b> — aim for ~10+ hard sets a week for any muscle you care about. Tap Muscle balance to see where you stand.");
+  if(missing.length) look.push("<b>Mind the gaps</b> — this plan does little direct "+esc(listWords(missing.map(m=>MSHORT[m]||m)))+". Fine if that's the intent; add a move if it matters to you.");
+  look.push("<b>Recover</b> — take an easier week roughly every 6 weeks; I'll nudge you when you're due.");
+  look.push("<b>Form first</b> — control the lowering phase and use a full range; that's where most of the growth (and safety) lives.");
+  let h='';
+  h+='<div class="ed-label">Focus</div><p class="ovp">Built for <b>'+esc(obj.label)+'</b>'+(top.length?', leaning on '+esc(listWords(top)):'')+'. Run it on a rolling cycle and let the same exercises progress over time.</p>';
+  h+='<div class="ed-label">The split</div><p class="ovp"><b>'+esc(sp.type)+'</b> — '+esc(sp.why)+'</p>';
+  h+='<div class="ed-label">What I weighted it for</div><p class="ovp">Hypertrophy <b>'+sc.hyp+'/5</b> and balance <b>'+sc.balance+'/5</b> — '+hypTxt+' with '+balTxt+'.</p>';
+  h+='<div class="ed-label">Things to look at</div><ul class="ovtodo">'+look.map(x=>'<li>'+x+'</li>').join('')+'</ul>';
+  $("aboutTitle").textContent=plan.name;
+  $("aboutBody").innerHTML=h;
+  openSheet("About");
+}
+$("aboutClose").onclick=()=>closeSheet("About");
+$("scrimAbout").onclick=()=>closeSheet("About");
 document.querySelectorAll("#musSeg .s").forEach(s=> s.onclick=()=>{ musWindow=+s.dataset.d; renderMuscles(); });
 document.querySelectorAll("#musMetric .s").forEach(s=> s.onclick=()=>{ musMetric=s.dataset.m; renderMuscles(); });
 document.querySelectorAll("#musVolMode .s").forEach(s=> s.onclick=()=>{ musVolMode=s.dataset.vm; renderMuscles(); });
