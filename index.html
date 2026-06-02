@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <title>Yalla</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -3164,16 +3164,18 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
   pager.addEventListener("touchend",end,{passive:true});
   pager.addEventListener("touchcancel",end,{passive:true});
 })();
-// hide the tab bar while the keyboard is up — in a standalone PWA the keyboard shrinks the viewport, which otherwise floats a bottom-anchored bar up above it
+// hide the tab bar while a field is focused — the keyboard otherwise floats a bottom-anchored bar up.
+// restore is belt-and-braces: blur, any tap, and viewport changes all bring it back once nothing's focused.
 (function(){
   const isField=el=> el && el.matches && el.matches('input:not([type=checkbox]):not([type=radio]):not([type=file]),textarea,select,[contenteditable="true"]');
   const vv=window.visualViewport;
-  const kbUp=()=> isField(document.activeElement) || (vv && vv.height < window.innerHeight - 90);  // focused OR viewport noticeably shrunk
-  const sync=()=> document.body.classList.toggle("kb", kbUp());
-  document.addEventListener("focusin", e=>{ if(isField(e.target)) document.body.classList.add("kb"); });
-  // only restore the bar once the viewport has actually settled back (avoids it reappearing up high before iOS reflows)
-  document.addEventListener("focusout", ()=> setTimeout(sync, 250));
-  if(vv){ vv.addEventListener("resize", sync); vv.addEventListener("scroll", sync); }
+  const hide=()=> document.body.classList.add("kb");
+  const show=()=>{ if(!isField(document.activeElement)) document.body.classList.remove("kb"); };
+  document.addEventListener("focusin", e=>{ if(isField(e.target)) hide(); }, true);
+  document.addEventListener("focusout", ()=> setTimeout(show, 80), true);
+  document.addEventListener("touchend", ()=> setTimeout(show, 0), {passive:true});   // a tap always restores it if no field is focused
+  window.addEventListener("pageshow", ()=> setTimeout(show, 0));
+  if(vv){ vv.addEventListener("resize", show); vv.addEventListener("scroll", show); }
 })();
 $("bodySave").onclick=async()=>{
   const h=parseFloat($("heightIn").value), bf=parseFloat($("bfIn").value);
