@@ -153,18 +153,23 @@
   .page.active{ display:block; animation:pagein .26s ease; }
   @keyframes pagein{ from{ opacity:0; transform:translateY(5px); } to{ opacity:1; transform:none; } }
   /* horizontal pager: three panels side-by-side that follow the finger, each scrolling vertically on its own */
-  /* fixed full-screen app shell: content fills the top, the tab bar is a flex row at the bottom (no bottom:0 anchoring → immune to the iOS keyboard/viewport quirks) */
-  #shell{ position:fixed; inset:0; max-width:540px; margin:0 auto; display:flex; flex-direction:column; z-index:1; }
-  #pager{ flex:1 1 auto; min-height:0; position:relative; overflow:hidden; }
+  /* Fixed app shell, sized to the *visible* viewport by JS (visualViewport) — the one height iOS
+     standalone PWAs report accurately. This defeats the relaunch "tab bar floats up" bug: the shell
+     can never be stranded shorter than the screen by the safe-area mis-measure. 100dvh is only the
+     pre-JS first-paint fallback. */
+  #shell{ position:fixed; top:0; left:0; right:0; height:100dvh; max-width:540px; margin:0 auto; overflow:hidden; z-index:1; }
+  #pager{ position:absolute; inset:0; overflow:hidden; }
   #track{ display:flex; height:100%; }
   #track.anim{ transition:transform .3s cubic-bezier(.22,.61,.36,1); }
   #pager .page, #pager .page.active{ display:block; animation:none; flex:0 0 100%; width:100%; height:100%;
-    overflow-y:auto; overscroll-behavior-y:contain; padding:0 16px 20px; }
+    overflow-y:auto; overscroll-behavior-y:contain; padding:0 16px calc(64px + env(safe-area-inset-bottom)); }
   /* hide the scrollbar (still scrollable) */
   #pager .page, .sheetbody{ scrollbar-width:none; -ms-overflow-style:none; }
   #pager .page::-webkit-scrollbar, .sheetbody::-webkit-scrollbar{ width:0; height:0; display:none; }
-  /* a flex row at the bottom of #shell — laid out, never bottom:0-anchored, so the keyboard/viewport can't strand it */
-  .tabbar{ flex:0 0 auto; display:flex; align-items:center;
+  /* Tab bar OVERLAYS the scrolling content, anchored to the shell's true bottom — the mirror image of
+     .statusbar-bg at the top: same translucent fill, no blur, so content shows faintly through as it
+     scrolls beneath. Pages reserve bottom padding (above) so nothing hides under it. */
+  .tabbar{ position:absolute; left:0; right:0; bottom:0; z-index:50; display:flex; align-items:center;
     padding:6px 8px calc(6px + env(safe-area-inset-bottom)); border-top:.5px solid var(--sep);
     background:color-mix(in srgb, var(--bg) 88%, transparent); }
   .tabitem{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
@@ -3244,7 +3249,16 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
   pages[0].parentNode.insertBefore(shell, pages[0]);
   shell.appendChild(pager);
   pages.forEach(p=> track.appendChild(p));               // all three pages move into the swipe track, in tab order
-  const tabbar=document.querySelector(".tabbar"); if(tabbar) shell.appendChild(tabbar);  // tab bar = last flex row of the shell
+  const tabbar=document.querySelector(".tabbar"); if(tabbar) shell.appendChild(tabbar);  // overlay tab bar, painted last
+  // Anchor the shell to the visible viewport. visualViewport.height is the only height iOS standalone
+  // reports correctly across cold launch / resume-from-background / rotation, so the bar's bottom:0 is
+  // always the real screen bottom — no gap-below "floated up" bar. CSS 100dvh covers the first paint.
+  const fitShell=()=>{ const vv=window.visualViewport; shell.style.height=Math.round((vv&&vv.height)||window.innerHeight)+"px"; };
+  fitShell();
+  if(window.visualViewport) window.visualViewport.addEventListener("resize", fitShell);
+  window.addEventListener("orientationchange", ()=> setTimeout(fitShell, 120));
+  window.addEventListener("pageshow", ()=> setTimeout(fitShell, 0));
+  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) setTimeout(fitShell, 0); });
   const W=()=> pager.clientWidth || window.innerWidth;
   const curTab=()=>{ const a=document.querySelector(".page.active"); return a?a.dataset.tab:"overview"; };
   const clamp=(v,a,b)=> v<a?a:(v>b?b:v);
@@ -3258,7 +3272,7 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
     tx=-idx*W(); apply(); }
   window.__pageGo=(name)=>{ const i=ORDER.indexOf(name); if(i>=0 && i!==idx) place(i, true); };
   place(idx, false);
-  window.addEventListener("resize", ()=>place(idx,false));
+  window.addEventListener("resize", ()=>{ fitShell(); place(idx,false); });
 
   // don't hijack gestures meant for an input, canvas, button, horizontal strip, drag handle, the tab bar, or an open sheet
   const blocked=el=>{ for(let n=el; n && n!==document.body; n=n.parentElement){
