@@ -164,7 +164,7 @@
   /* anchored INSIDE the fixed #pager; compact — icons sit just above the home indicator */
   .tabbar{ position:absolute; left:0; right:0; bottom:0; z-index:2; display:flex; align-items:center;
     padding:6px 8px calc(6px + env(safe-area-inset-bottom)); overflow:hidden; border-top:.5px solid var(--sep);
-    background:color-mix(in srgb, var(--bg) 88%, transparent); }    /* slight transparency, no backdrop-filter, no transform — keeps it from jittering */
+    background:var(--bg); }    /* solid — no content bleed-through, no blur/transform jitter */
   .tabitem{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
     color:var(--l3); transition:color .15s; -webkit-tap-highlight-color:transparent; }
   .tabitem svg{ width:26px; height:26px; transition:transform .12s; }
@@ -2086,6 +2086,16 @@ async function cloudPublish(session){
     });
   }catch(e){}
 }
+// auto-post when all three weekly rings are closed (once per week; needs sign-in + sharing on)
+function weekKey(d){ d=d?new Date(d):new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-((d.getDay()+6)%7)); return d.toDateString(); }
+async function shareRingsClosed(sets){
+  if(!cloudReady() || !settings.shareActivity) return;
+  const wk=weekKey(); if(settings.ringsSharedWk===wk) return;     // once per week
+  settings.ringsSharedWk=wk; await sset("settings",settings);
+  try{ await sb.from("activity").insert({ user_id:cloudUser.id, kind:"rings",
+    summary:{ name:"Closed all 3 rings this week 🎯", sets:Math.round(sets)||0, mins:0, prs:0, mtot:{} } }); }catch(e){}
+  toast("All rings closed — shared with your crew! 🎯", true);
+}
 
 // ---- push reminders (signed-in only; a server cron sends the actual push — see PUSH-SETUP.md) ----
 function urlB64ToUint8(b64){ const pad="=".repeat((4-b64.length%4)%4); const s=(b64+pad).replace(/-/g,"+").replace(/_/g,"/"); const raw=atob(s); const a=new Uint8Array(raw.length); for(let i=0;i<raw.length;i++) a[i]=raw.charCodeAt(i); return a; }
@@ -2576,6 +2586,7 @@ function renderOverview(){
     ovRings=[ {label:"Sessions", val:f7, target:sessTarget, color:"#ff6b3d"},
               {label:"Hard sets", val:setsWk, target:setsTarget, color:"#4dabf7"},
               {label:"Muscles", val:musWk.size, target:12, color:"#51cf66"} ];
+    if(ovRings.every(r=>r.val>=r.target)) shareRingsClosed(setsWk);   // all rings closed → auto-share (gated inside)
     // month-over-month volume delta
     const vol=(loDays,hiDays)=>{ const lo=Date.now()-loDays*86400000, hi=Date.now()-hiDays*86400000; let v=0; Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ if(e.d>=lo&&e.d<hi) v+=(e.v||0); })); return v; };
     const cur=vol(28,0), prev=vol(56,28), delta = prev>0 ? Math.round((cur-prev)/prev*100) : null;
