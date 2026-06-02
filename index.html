@@ -2370,6 +2370,17 @@ function discoverTips(){
   list.push({t:"Swipe between pages",s:"Swipe left or right to move through Overview, Workout and Me — no need to reach the tab bar."});
   return list.slice(0,6);
 }
+// small weekly-sets sparkline for the overview
+function drawOvSets(id){ const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  const data=progWeeklyData("sets"), ac=accentHex(), hi=Math.max(1,...data), base=H-22, top=16, pad=12;
+  const x=i=>pad+i*((W-pad*2)/(data.length-1)), y=v=>base-(v/hi)*(base-top);
+  ctx.strokeStyle=hexAlpha(ac,.18); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad,base+.5); ctx.lineTo(W-pad,base+.5); ctx.stroke();
+  ctx.strokeStyle=ac; ctx.lineWidth=3; ctx.lineJoin="round"; ctx.lineCap="round"; ctx.beginPath();
+  data.forEach((v,i)=>{ i?ctx.lineTo(x(i),y(v)):ctx.moveTo(x(i),y(v)); }); ctx.stroke();
+  data.forEach((v,i)=>{ ctx.beginPath(); ctx.arc(x(i),y(v), i===data.length-1?5:3, 0, 7); ctx.fillStyle=i===data.length-1?ac:hexAlpha(ac,.5); ctx.fill(); });
+  const l3=(getComputedStyle(document.documentElement).getPropertyValue('--l3')||'#888').trim();
+  ctx.fillStyle=l3; ctx.font="600 17px -apple-system,sans-serif"; ctx.textAlign="left"; ctx.fillText("10w ago",pad,H-5); ctx.textAlign="right"; ctx.fillText("now",W-pad,H-5);
+}
 function lastWorkoutTs(){ let m=0; Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ if(e.d>m) m=e.d; })); return m; }
 function daysOff(){ const t=lastWorkoutTs(); return t ? daysSince(t) : -1; }   // -1 = never logged
 // a balanced no-equipment session, started in free mode
@@ -2420,6 +2431,15 @@ function renderOverview(){
     +'<div class="stat"><div class="n">'+(settings.sessions||0)+'</div><div class="k">total</div></div>'
     +'<div class="stat"><div class="n">'+(settings.beatTotal||0)+'</div><div class="k">PRs beaten</div></div></div>';
   h+='<p class="ovp" style="margin:10px 4px 0;">'+motiv+'</p>';
+  // --- featured chart --- balance radar when something's off, else the weekly-sets trend
+  let ovChart=null;
+  if(Object.keys(hist).length){ ovChart = ovUnderMuscles().length ? "balance" : "volume";
+    h+='<div class="ed-label">'+(ovChart==="balance"?"Muscle balance · this month":"Weekly sets · last 10 weeks")+' <span class="subhint">— tap for detail ›</span></div>';
+    h+='<div class="group ovtap ovchart" data-chart="'+ovChart+'"><div class="pad" style="display:flex; justify-content:center;">'
+      + (ovChart==="balance" ? '<canvas id="ovChartC" width="520" height="520" style="width:100%; max-width:300px; height:auto;"></canvas>'
+                             : '<canvas id="ovChartC" width="660" height="200" style="width:100%; height:auto;"></canvas>')
+      + '</div></div>';
+  }
   // --- Discover --- a swipeable deck of tips / not-yet-used features
   const dt=discoverTips();
   if(dt.length){
@@ -2453,6 +2473,11 @@ function renderOverview(){
   host.innerHTML=h;
   const sb=host.querySelector(".ovstart"); if(sb) sb.onclick=()=>showTab("workout");
   const hb=host.querySelector(".ovhome"); if(hb) hb.onclick=startHomeWorkout;
+  if(ovChart){ const oc=$("ovChartC");
+    if(ovChart==="balance") drawRadar(weeklyEquiv(muscleVolume(28,"sets").totals,28), "ovChartC", WEEKLY_SET_TARGET);
+    else drawOvSets("ovChartC");
+    const card=host.querySelector(".ovchart"); if(card) card.onclick=()=> ovChart==="balance" ? openMuscles() : showTab("me");
+  }
   host.querySelectorAll(".ovdisc").forEach(b=> b.onclick=()=>ovAct(b.dataset.act));
   const dw=$("discWrap"), dots=$("discDots");
   if(dw && dots){ const cards=dw.querySelectorAll(".disccard");
