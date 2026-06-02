@@ -151,7 +151,8 @@
   .largeTitle small{ display:block; font-size:15px; font-weight:500; color:var(--l2); letter-spacing:0; margin-top:8px; }
   /* backdrop behind the status-bar clock — slightly translucent (no blur, to match the tab bar and avoid scroll flicker) */
  .statusbar-bg{ position:fixed; top:0; left:0; right:0; height:env(safe-area-inset-top); z-index:40; pointer-events:none;
-    background:color-mix(in srgb, var(--bg) 88%, transparent); }
+    background:color-mix(in srgb, var(--bg) 80%, transparent);
+    -webkit-backdrop-filter:blur(20px) saturate(1.6); backdrop-filter:blur(20px) saturate(1.6); }
   /* ===== pages + bottom tab bar ===== */
   .page{ display:none; }
   .page.active{ display:block; animation:pagein .26s ease; }
@@ -170,10 +171,15 @@
   /* hide the scrollbar (still scrollable) */
   #pager .page, .sheetbody{ scrollbar-width:none; -ms-overflow-style:none; }
   #pager .page::-webkit-scrollbar, .sheetbody::-webkit-scrollbar{ width:0; height:0; display:none; }
-  /* Tab bar pinned to the viewport bottom, translucent like .statusbar-bg at the top. */
+  /* Tab bar pinned to the viewport bottom, FROSTED (backdrop blur) like a native iOS tab bar. The blur is
+     what makes it read as one uniform translucent surface: without it, a plain-alpha fill renders solid
+     wherever there's only page background behind it (the home-indicator strip below the icons) but
+     translucent over scrolled content — that split is the "solid grey bar under the icons". Matches the
+     frosted .statusbar-bg at the top. */
   .tabbar{ position:fixed; left:0; right:0; bottom:0; max-width:540px; margin:0 auto; z-index:50; display:flex; align-items:center;
  padding:8px 8px calc(6px + env(safe-area-inset-bottom)); border-top:.5px solid var(--sep);
-    background:color-mix(in srgb, var(--bg) 88%, transparent); }
+    background:color-mix(in srgb, var(--bg) 80%, transparent);
+    -webkit-backdrop-filter:blur(20px) saturate(1.6); backdrop-filter:blur(20px) saturate(1.6); }
   .tabitem{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
     color:var(--l3); transition:color .15s; -webkit-tap-highlight-color:transparent; }
   .tabitem svg{ width:29px; height:29px; transition:transform .12s; }
@@ -655,7 +661,6 @@
 <body>
 
 <div class="statusbar-bg"></div>
-<div id="vpdbg" style="position:fixed;top:calc(env(safe-area-inset-top) + 60px);left:50%;transform:translateX(-50%);z-index:99999;font:12px/1.45 ui-monospace,Menlo,monospace;color:#fff;background:rgba(200,0,0,.92);padding:8px 12px;border-radius:10px;text-align:center;pointer-events:none;white-space:pre-wrap;box-shadow:0 4px 16px rgba(0,0,0,.4);"></div>
 
 <!-- ===== WORKOUT PAGE ===== -->
 <div class="page" id="pageWorkout" data-tab="workout">
@@ -3336,23 +3341,6 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
   document.addEventListener("touchend", ()=> setTimeout(show, 0), {passive:true});   // a tap always restores it if no field is focused
   window.addEventListener("pageshow", ()=> setTimeout(show, 0));
   if(vv){ vv.addEventListener("resize", show); }   // resize only — scroll fires constantly and would churn
-})();
-// ===== TEMPORARY bottom-bar diagnostic v2 (remove once solved) =====
-(function(){
-  const el=document.getElementById("vpdbg"); if(!el) return;
-  function upd(){
-    const tb=document.querySelector(".tabbar"); const r=tb?tb.getBoundingClientRect():{top:0,bottom:0};
-    const vv=window.visualViewport, iH=window.innerHeight, sH=window.screen?window.screen.height:0, aH=(window.screen&&window.screen.availHeight)||0;
-    const dark=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches;
-    const barBot=Math.round(r.bottom);
-    el.textContent=(dark?"DARK":"LIGHT")+" sH"+sH+" aH"+aH+" iH"+iH+" vv"+(vv?Math.round(vv.height):"-")
-      +"\nbarTop"+Math.round(r.top)+" barBot"+barBot+" gapToScreen="+(sH-barBot)+" iH-barBot="+(iH-barBot);
-  }
-  upd();
-  ["resize","orientationchange","pageshow","scroll"].forEach(e=> window.addEventListener(e, upd, true));
-  document.addEventListener("visibilitychange", ()=> setTimeout(upd, 60));
-  if(window.visualViewport){ visualViewport.addEventListener("resize", upd); visualViewport.addEventListener("scroll", upd); }
-  setInterval(upd, 400);
 })();
 $("bodySave").onclick=async()=>{
   const h=parseFloat($("heightIn").value), bf=parseFloat($("bfIn").value);
