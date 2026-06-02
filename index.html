@@ -198,6 +198,12 @@
   .mefold > summary::-webkit-details-marker{ display:none; }
   .mefold > summary::after{ content:"⌄"; font-size:17px; line-height:1; color:var(--l3); transform:translateY(-3px); transition:transform .2s; }
   .mefold[open] > summary::after{ transform:translateY(1px) rotate(180deg); }
+  .rglgwrap{ display:flex; flex-direction:column; gap:7px; }
+  .rglg{ display:flex; align-items:center; gap:7px; font-size:13px; color:var(--l2); }
+  .rglg i{ width:9px; height:9px; border-radius:50%; flex:0 0 auto; }
+  .rglg b{ color:var(--ink); font-weight:700; margin-left:auto; }
+  .ovdelta{ font-size:12.5px; font-weight:600; margin-top:10px; }
+  .ovdelta.up{ color:#37b24d; } .ovdelta.down{ color:var(--l2); }
   .ovgoaltop{ display:flex; justify-content:space-between; align-items:baseline; font-size:13px; color:var(--l2); margin-bottom:8px; }
   .ovgoaltop b{ font-size:18px; color:var(--ink); font-weight:750; }
   .ovgoalbar{ height:10px; border-radius:6px; background:var(--track); overflow:hidden; }
@@ -2498,6 +2504,18 @@ function dismissTip(id, card){
   if(!left){ const lbl=wrap.previousElementSibling; if(lbl && lbl.classList.contains("ed-label")) lbl.remove(); if(dots) dots.remove(); wrap.remove(); }
   else if(dots){ dots.innerHTML=Array.from({length:left},(_,i)=>'<span class="discdot'+(i===0?" on":"")+'"></span>').join(""); }
 }
+// Apple-style activity rings — concentric arcs filling toward each weekly target
+function drawRings(id, rings){
+  const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, cx=W/2, cy=W/2; ctx.clearRect(0,0,W,W);
+  const thick=W*0.13, gap=W*0.03; let r=W*0.5-thick/2-2;
+  rings.forEach(rg=>{
+    const pct=Math.max(0, Math.min(1, rg.target? rg.val/rg.target : 0));
+    ctx.lineWidth=thick; ctx.lineCap="round";
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.strokeStyle=hexAlpha(rg.color,.18); ctx.stroke();   // track
+    if(pct>0){ const a0=-Math.PI/2; ctx.beginPath(); ctx.arc(cx,cy,r,a0,a0+Math.PI*2*pct); ctx.strokeStyle=rg.color; ctx.stroke(); }
+    r-=thick+gap;
+  });
+}
 // small weekly-sets sparkline for the overview
 function drawOvSets(id){ const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const data=progWeeklyData("sets"), ac=accentHex(), hi=Math.max(1,...data), base=H-22, top=16, pad=12;
@@ -2550,25 +2568,25 @@ function renderOverview(){
   const f7=trainingDays(7);
   const motiv = f7>=4?"Strong week — you’re putting in the work." : f7>=2?"Good momentum — keep it rolling." : f7>=1?"You’ve started — one more session lifts the whole week." : "Fresh week. The first session is the hardest — let’s go.";
   h+='<p class="ovp" style="margin:10px 4px 0;">'+motiv+'</p>';
-  // --- visual snapshot: this week's days + a muscle-balance radar (graphs, not text) ---
-  let ovSnap=false;
+  // --- visual snapshot: three activity rings to fill this week + a "vs last month" delta ---
+  let ovRings=null;
   if(Object.keys(hist).length){
-    ovSnap=true;
-    const trained=new Set(); Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>trained.add(new Date(e.d).toDateString())));
-    (extlog||[]).forEach(e=>trained.add(new Date(e.d).toDateString()));
-    const today=new Date(); today.setHours(0,0,0,0); let dots="";
-    for(let i=6;i>=0;i--){ const d=new Date(today); d.setDate(d.getDate()-i); const wd=(d.getDay()+6)%7;
-      dots+='<div class="ovd'+(trained.has(d.toDateString())?" on":"")+(i===0?" today":"")+'">'+["M","T","W","T","F","S","S"][wd]+'<i></i></div>'; }
-    // a goal bar to fill toward this week's session target (derived from the plan's training days)
-    const rot=activePlan().workouts.filter(x=>x.rotate!==false).length, target=Math.max(2,Math.min(5,rot||3));
-    const pct=Math.min(100,Math.round(f7/target*100));
-    const subtxt = f7>=target ? "target hit — brilliant 🎉" : (target-f7)+" to go this week";
+    const cut=Date.now()-7*86400000; let setsWk=0; const musWk=new Set();
+    Object.keys(hist).forEach(n=>{ const gs=muscleFor(n); (hist[n]||[]).forEach(e=>{ if(e.d>=cut){ setsWk+=(e.n||0); gs.forEach(g=>{ if(MGROUPS.indexOf(g)>=0) musWk.add(g); }); } }); });
+    const rot=activePlan().workouts.filter(x=>x.rotate!==false).length, sessTarget=Math.max(2,Math.min(5,rot||3)), setsTarget=Math.max(20,sessTarget*18);
+    ovRings=[ {label:"Sessions", val:f7, target:sessTarget, color:"#ff6b3d"},
+              {label:"Hard sets", val:setsWk, target:setsTarget, color:"#4dabf7"},
+              {label:"Muscles", val:musWk.size, target:12, color:"#51cf66"} ];
+    // month-over-month volume delta
+    const vol=(loDays,hiDays)=>{ const lo=Date.now()-loDays*86400000, hi=Date.now()-hiDays*86400000; let v=0; Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ if(e.d>=lo&&e.d<hi) v+=(e.v||0); })); return v; };
+    const cur=vol(28,0), prev=vol(56,28), delta = prev>0 ? Math.round((cur-prev)/prev*100) : null;
+    const legend=ovRings.map(r=>'<span class="rglg"><i style="background:'+r.color+'"></i>'+r.label+' <b>'+Math.round(r.val)+'</b>/'+r.target+'</span>').join('');
+    const deltaLine = delta!=null ? '<div class="ovdelta'+(delta>=0?' up':' down')+'">'+(delta>=0?'▲':'▼')+' Volume '+(delta>=0?'+':'')+delta+'% vs the month before</div>' : '';
     h+='<div class="ed-label">This week <span class="subhint">— tap for detail ›</span></div>';
-    h+='<div class="group ovtap ovsnap"><div class="pad">'
-      +'<div class="ovgoaltop"><b>'+f7+' / '+target+'</b><span>sessions · '+subtxt+'</span></div>'
-      +'<div class="ovgoalbar"><i style="width:'+pct+'%"></i></div>'
-      +'<div class="ovweek" style="margin-top:14px;">'+dots+'</div>'
-      +'<div style="display:flex; justify-content:center; margin-top:10px;"><canvas id="ovSnapC" width="460" height="460" style="width:100%; max-width:250px; height:auto;"></canvas></div></div></div>';
+    h+='<div class="group ovtap ovsnap"><div class="pad" style="display:flex; align-items:center; gap:16px;">'
+      +'<canvas id="ovRingsC" width="320" height="320" style="width:118px; height:118px; flex:0 0 auto;"></canvas>'
+      +'<div style="flex:1; min-width:0;"><div class="rglgwrap">'+legend+'</div>'+deltaLine+'</div>'
+      +'</div></div>';
   }
   // --- Discover --- a swipeable deck of tips / not-yet-used features
   const dt=discoverTips();
@@ -2604,8 +2622,8 @@ function renderOverview(){
   host.innerHTML=h;
   const sb=host.querySelector(".ovstart"); if(sb) sb.onclick=()=>showTab("workout");
   const hb=host.querySelector(".ovhome"); if(hb) hb.onclick=startHomeWorkout;
-  if(ovSnap && $("ovSnapC")){ drawRadar(weeklyEquiv(muscleVolume(28,"sets").totals,28), "ovSnapC", WEEKLY_SET_TARGET, true);
-    const snap=host.querySelector(".ovsnap"); if(snap) snap.onclick=()=>openMuscles(); }
+  if(ovRings && $("ovRingsC")){ drawRings("ovRingsC", ovRings);
+    const snap=host.querySelector(".ovsnap"); if(snap) snap.onclick=()=>showTab("me"); }
   host.querySelectorAll(".discx").forEach(x=> x.onclick=(ev)=>{ ev.stopPropagation(); dismissTip(x.dataset.tip, x.closest(".disccard")); });
   host.querySelectorAll(".ovdisc").forEach(b=> b.onclick=()=>{ if(b.dataset.tip){ settings.discRead=settings.discRead||{}; settings.discRead[b.dataset.tip]=1; sset("settings",settings); } ovAct(b.dataset.act); });
   const dw=$("discWrap"), dots=$("discDots");
