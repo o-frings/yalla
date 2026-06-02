@@ -165,8 +165,7 @@
   .tabbar{ position:absolute; left:0; right:0; bottom:0; z-index:2; display:flex;
     height:calc(52px + env(safe-area-inset-bottom)); padding-bottom:env(safe-area-inset-bottom);  /* fixed height; home-indicator inset only below the icons */
     align-items:stretch; overflow:hidden; border-top:.5px solid var(--sep);
-    background:color-mix(in srgb, var(--bg) 88%, transparent);     /* slight transparency, no backdrop-filter — avoids iOS blur flicker */
-    transform:translateZ(0); }   /* own layer (safe on an absolute el) so it doesn't flicker over the momentum-scrolling page */
+    background:color-mix(in srgb, var(--bg) 88%, transparent); }    /* slight transparency, no backdrop-filter, no transform — keeps it from jittering */
   .tabitem{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
     color:var(--l3); transition:color .15s; -webkit-tap-highlight-color:transparent; }
   .tabitem svg{ width:26px; height:26px; transition:transform .12s; }
@@ -2466,7 +2465,16 @@ function discoverTips(){
   all.push({id:"swipe",t:"Swipe between pages",s:"Swipe left or right to move through Overview, Workout and Me — no need to reach the tab bar."});
   return all.filter(x=> !read[x.id]).slice(0,3);   // only unread, a few at a time
 }
-function dismissTip(id){ settings.discRead=settings.discRead||{}; settings.discRead[id]=1; sset("settings",settings); renderOverview(); }
+// remove a single tip in place (no full re-render — avoids a scroll jump / shake)
+function dismissTip(id, card){
+  settings.discRead=settings.discRead||{}; settings.discRead[id]=1; sset("settings",settings);
+  if(!card){ return; }
+  const wrap=card.parentElement; card.remove();
+  const dots=wrap && wrap.nextElementSibling && wrap.nextElementSibling.classList.contains("discdots") ? wrap.nextElementSibling : null;
+  const left=wrap ? wrap.querySelectorAll(".disccard").length : 0;
+  if(!left){ const lbl=wrap.previousElementSibling; if(lbl && lbl.classList.contains("ed-label")) lbl.remove(); if(dots) dots.remove(); wrap.remove(); }
+  else if(dots){ dots.innerHTML=Array.from({length:left},(_,i)=>'<span class="discdot'+(i===0?" on":"")+'"></span>').join(""); }
+}
 // small weekly-sets sparkline for the overview
 function drawOvSets(id){ const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const data=progWeeklyData("sets"), ac=accentHex(), hi=Math.max(1,...data), base=H-22, top=16, pad=12;
@@ -2554,7 +2562,7 @@ function renderOverview(){
   host.innerHTML=h;
   const sb=host.querySelector(".ovstart"); if(sb) sb.onclick=()=>showTab("workout");
   const hb=host.querySelector(".ovhome"); if(hb) hb.onclick=startHomeWorkout;
-  host.querySelectorAll(".discx").forEach(x=> x.onclick=(ev)=>{ ev.stopPropagation(); dismissTip(x.dataset.tip); });
+  host.querySelectorAll(".discx").forEach(x=> x.onclick=(ev)=>{ ev.stopPropagation(); dismissTip(x.dataset.tip, x.closest(".disccard")); });
   host.querySelectorAll(".ovdisc").forEach(b=> b.onclick=()=>{ if(b.dataset.tip){ settings.discRead=settings.discRead||{}; settings.discRead[b.dataset.tip]=1; sset("settings",settings); } ovAct(b.dataset.act); });
   const dw=$("discWrap"), dots=$("discDots");
   if(dw && dots){ const cards=dw.querySelectorAll(".disccard");
@@ -3182,7 +3190,7 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
   document.addEventListener("focusout", ()=> setTimeout(show, 80), true);
   document.addEventListener("touchend", ()=> setTimeout(show, 0), {passive:true});   // a tap always restores it if no field is focused
   window.addEventListener("pageshow", ()=> setTimeout(show, 0));
-  if(vv){ vv.addEventListener("resize", show); vv.addEventListener("scroll", show); }
+  if(vv){ vv.addEventListener("resize", show); }   // resize only — scroll fires constantly and would churn
 })();
 $("bodySave").onclick=async()=>{
   const h=parseFloat($("heightIn").value), bf=parseFloat($("bfIn").value);
