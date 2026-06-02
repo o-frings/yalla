@@ -1109,7 +1109,7 @@
 <div id="onboardWrap">
   <div class="obcard">
     <div class="obbrand"><span class="wordmark">yalla</span></div>
-    <p class="obtag">Your pocket strength coach — built on the real science of muscle growth, minus the bro-myths.</p>
+    <p class="obtag">I'm your pocket strength coach — I train you on the real science of muscle growth, minus the bro-myths.</p>
     <div class="oblabel">First — what should we call you?</div>
     <input id="obName" placeholder="Your first name" autocomplete="given-name" autocapitalize="words">
     <div class="obtitle" style="margin-top:18px;">And what’s your main goal?</div>
@@ -3000,12 +3000,16 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
   pager.addEventListener("touchend",end,{passive:true});
   pager.addEventListener("touchcancel",end,{passive:true});
 })();
-// hide the tab bar while a text field is focused — in a standalone PWA the keyboard shrinks the viewport, which otherwise floats a bottom-anchored bar up above the keyboard
+// hide the tab bar while the keyboard is up — in a standalone PWA the keyboard shrinks the viewport, which otherwise floats a bottom-anchored bar up above it
 (function(){
   const isField=el=> el && el.matches && el.matches('input:not([type=checkbox]):not([type=radio]):not([type=file]),textarea,select,[contenteditable="true"]');
-  let t=0;
-  document.addEventListener("focusin", e=>{ if(isField(e.target)){ clearTimeout(t); document.body.classList.add("kb"); } });
-  document.addEventListener("focusout", e=>{ if(isField(e.target)){ clearTimeout(t); t=setTimeout(()=>{ if(!isField(document.activeElement)) document.body.classList.remove("kb"); }, 150); } });
+  const vv=window.visualViewport;
+  const kbUp=()=> isField(document.activeElement) || (vv && vv.height < window.innerHeight - 90);  // focused OR viewport noticeably shrunk
+  const sync=()=> document.body.classList.toggle("kb", kbUp());
+  document.addEventListener("focusin", e=>{ if(isField(e.target)) document.body.classList.add("kb"); });
+  // only restore the bar once the viewport has actually settled back (avoids it reappearing up high before iOS reflows)
+  document.addEventListener("focusout", ()=> setTimeout(sync, 250));
+  if(vv){ vv.addEventListener("resize", sync); vv.addEventListener("scroll", sync); }
 })();
 $("bodySave").onclick=async()=>{
   const h=parseFloat($("heightIn").value), bf=parseFloat($("bfIn").value);
