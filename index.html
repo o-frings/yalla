@@ -208,6 +208,12 @@
   .ovgoaltop b{ font-size:18px; color:var(--ink); font-weight:750; }
   .ovgoalbar{ height:10px; border-radius:6px; background:var(--track); overflow:hidden; }
   .ovgoalbar i{ display:block; height:100%; border-radius:6px; background:var(--grad); transition:width .45s ease; }
+  /* muscle-balance coach suggestions */
+  .sgcard{ background:var(--accent-soft); box-shadow:0 0 0 1px var(--accent-soft) inset; }
+  .sgopts{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .sgbtn{ background:var(--card); border:.5px solid var(--line); color:var(--ink); border-radius:12px; padding:9px 13px; font-size:13px; font-weight:600; cursor:pointer; transition:transform .1s; }
+  .sgbtn:active{ transform:scale(.95); }
+  .sgbtn.rm{ color:var(--red); }
   .ovweek{ display:grid; grid-template-columns:repeat(7,1fr); gap:7px; }
   .ovd{ text-align:center; font-size:10px; font-weight:700; color:var(--l3); }
   .ovd i{ display:block; height:28px; border-radius:8px; background:var(--row); margin-top:5px; }
@@ -1153,6 +1159,7 @@
     </div>
     <p class="levelcap" id="musVolNote" style="display:none;">“Lifted only” counts the weight you load; “+ Bodyweight” adds an estimate of your own body load on calisthenics.</p>
     <canvas id="musRadar" width="900" height="900"></canvas>
+    <div id="musSuggest"></div>
     <div id="musBars"></div>
     <div class="ed-label">By exercise</div>
     <div id="musByEx"></div>
@@ -3615,6 +3622,51 @@ function drawRadar(totals, canvasId, target, noLabels){
   MGROUPS.forEach((g,i)=>{ const [x,y]=pt(i,R+52), co=Math.cos((-90+i*360/n)*Math.PI/180);
     ctx.textAlign = Math.abs(co)<0.3 ? "center" : (co>0?"left":"right"); ctx.fillText(MSHORT[g], x, y); });
 }
+// dynamic intervention: when a muscle is over/under-trained, suggest adding or trimming an exercise in the current plan
+const HIGH_SET_CAP=WEEKLY_SET_TARGET*2;   // ~20 sets/wk — beyond what a muscle usefully needs
+function suggestRank(name){ const h=hScore(name).s, d=difficultyFor(name);
+  if(settings.objective==="strength") return d*1.2+h;                 // compound-leaning
+  if(settings.objective==="fatloss"||settings.objective==="fitness") return h-d*0.4;  // simpler/efficient
+  return h;                                                            // muscle / default → growth rating
+}
+function suggestAdd(muscle){
+  const key=buildKey(muscle), inPlan=new Set();
+  activePlan().workouts.forEach(w=>(w.ex||[]).forEach(e=>inPlan.add(familyKey(e.n))));
+  const lvl=activePlan().level, gate = lvl==="beginner"?"beginner":"advanced";
+  return (BUILD_POOL[key]||[]).filter(x=> !injuryBlocks(x,settings.injuries||[]) && suitsExp(x,gate) && !inPlan.has(familyKey(x)))
+    .sort((a,b)=>suggestRank(b)-suggestRank(a)).slice(0,3);
+}
+function suggestRemove(muscle){
+  const out=[]; activePlan().workouts.forEach((w,wi)=>{ if(w.rotate===false) return; (w.ex||[]).forEach((e,ei)=>{ if(muscleFor(e.n)[0]===muscle) out.push({n:e.n,wi,ei,h:hScore(e.n).s}); }); });
+  return out.sort((a,b)=>a.h-b.h).slice(0,3);   // least valuable first
+}
+async function addMoveToPlan(muscle, name){
+  const key=buildKey(muscle); let best=-1, bl=99;
+  activePlan().workouts.forEach((w,i)=>{ if(w.rotate===false) return; if(dayDomain(w.name).indexOf(key)>=0 && w.ex.length<bl){ bl=w.ex.length; best=i; } });
+  if(best<0) best=0;
+  const wk=activePlan().workouts[best]; wk.ex.push({n:name, t:"3 × 8–12", s:3});
+  await sset("plans",plans); renderSeg(); renderWorkout(); renderDash(); renderMuscles(); toast("Added "+name+" to "+wk.name);
+}
+async function removeMoveFromPlan(wi,ei){
+  const wk=activePlan().workouts[wi]; if(!wk||!wk.ex[ei]) return; const nm=wk.ex[ei].n;
+  wk.ex.splice(ei,1); regroupSupersets(wk,"accessory");
+  await sset("plans",plans); renderSeg(); renderWorkout(); renderDash(); renderMuscles(); toast("Removed "+nm);
+}
+function renderMuscleSuggestions(view){
+  const box=$("musSuggest"); if(!box) return; if(!view){ box.innerHTML=""; return; }
+  const scope=planScopeMuscles(activePlan()); let under=null, over=null;
+  MGROUPS.forEach(g=>{ const v=view[g]||0;
+    if(scope.indexOf(g)>=0 && v<WEEKLY_SET_MIN && (!under||v<under.v)) under={g,v};
+    if(v>HIGH_SET_CAP && (!over||v>over.v)) over={g,v}; });
+  let h="";
+  if(under){ const opts=suggestAdd(under.g);
+    if(opts.length) h+='<div class="ed-label">Coach suggestion</div><div class="group sgcard"><div class="pad"><p class="ovp"><b>'+esc(under.g)+'</b> is light (~'+round1(under.v)+' sets/wk). Add one to your plan — picked for your goal:</p><div class="sgopts">'+opts.map(o=>'<button class="sgbtn" data-add="'+esc(o)+'" data-mus="'+esc(under.g)+'">+ '+esc(o)+'</button>').join('')+'</div></div></div>'; }
+  if(over){ const opts=suggestRemove(over.g);
+    if(opts.length) h+='<div class="ed-label">Coach suggestion</div><div class="group sgcard"><div class="pad"><p class="ovp"><b>'+esc(over.g)+'</b> is high (~'+round1(over.v)+' sets/wk) — more than it needs. Trim one:</p><div class="sgopts">'+opts.map(o=>'<button class="sgbtn rm" data-rm="'+o.wi+','+o.ei+'">− '+esc(o.n)+'</button>').join('')+'</div></div></div>'; }
+  box.innerHTML=h;
+  box.querySelectorAll(".sgbtn[data-add]").forEach(b=> b.onclick=()=>addMoveToPlan(b.dataset.mus, b.dataset.add));
+  box.querySelectorAll(".sgbtn[data-rm]").forEach(b=> b.onclick=()=>{ const p=b.dataset.rm.split(",").map(Number); removeMoveFromPlan(p[0],p[1]); });
+}
 function renderMuscles(){
   buildSrc();
   const isLog = musSrc==="log";
@@ -3658,6 +3710,7 @@ function renderMuscles(){
       bars.appendChild(row);
     });
   }
+  renderMuscleSuggestions(useTarget ? view : null);
   const ex=$("musByEx"), names=Object.keys(byEx).sort((a,b)=>byEx[b]-byEx[a]);
   ex.innerHTML = names.length ? "" : '<p class="freehint">—</p>';
   names.forEach(n=>{
