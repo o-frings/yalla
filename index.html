@@ -170,17 +170,15 @@
   /* hide the scrollbar (still scrollable) */
   #pager .page, .sheetbody{ scrollbar-width:none; -ms-overflow-style:none; }
   #pager .page::-webkit-scrollbar, .sheetbody::-webkit-scrollbar{ width:0; height:0; display:none; }
-  /* Tab bar pinned to the viewport bottom, translucent. (backdrop-filter blur is unusable here — it
-     renders solid on iOS fixed elements in the standalone PWA.) */
+  /* Tab bar pinned to the viewport bottom. More transparent (60%) and shorter — icons sit lower with
+     only a half safe-area clearance below them, so the bar doesn't ride high with a tall band beneath.
+     (backdrop-filter blur is unusable here — it renders solid on iOS fixed elements in the PWA.) */
   .tabbar{ position:fixed; left:0; right:0; bottom:0; max-width:540px; margin:0 auto; z-index:50; display:flex; align-items:center;
- padding:8px 8px calc(6px + env(safe-area-inset-bottom)); border-top:.5px solid var(--sep);
-    background:color-mix(in srgb, var(--bg) 88%, transparent); }
-  /* TEMP diagnostic: paint the home-indicator safe-area strip of the bar blue, to confirm where the solid band is */
-  .tabbar::after{ content:""; position:absolute; left:0; right:0; bottom:0; height:env(safe-area-inset-bottom);
-    background:rgba(0,120,255,.6); pointer-events:none; }
+    padding:6px 8px calc(4px + env(safe-area-inset-bottom) * 0.5); border-top:.5px solid var(--sep);
+    background:color-mix(in srgb, var(--bg) 60%, transparent); }
   .tabitem{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
     color:var(--l3); transition:color .15s; -webkit-tap-highlight-color:transparent; }
-  .tabitem svg{ width:29px; height:29px; transition:transform .12s; }
+  .tabitem svg{ width:26px; height:26px; transition:transform .12s; }
   .tabitem span{ display:none; }                 /* icons only — labels hidden (kept as aria-label) */
   .tabitem.active{ color:var(--accent); }
   .tabitem:active svg{ transform:scale(.86); }
@@ -659,7 +657,6 @@
 <body>
 
 <div class="statusbar-bg"></div>
-<div id="botline" style="position:fixed;left:0;right:0;bottom:0;height:3px;background:lime;z-index:100000;pointer-events:none;"></div>
 
 <!-- ===== WORKOUT PAGE ===== -->
 <div class="page" id="pageWorkout" data-tab="workout">
