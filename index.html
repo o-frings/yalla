@@ -97,7 +97,7 @@
   .sexseg .s{ padding:8px 16px; font-size:13px; font-weight:600; color:var(--l2); border-radius:8px; cursor:pointer; transition:background .15s,color .15s; }
   .sexseg .s.active{ background:var(--segthumb); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.12); }
   .calcnote{ font-size:12px; color:var(--l2); line-height:1.5; padding:12px 2px 2px; }
-  .calcap{ font-size:12px; color:var(--l2); line-height:1.45; margin:2px 2px 12px; }
+  .calcap{ font-size:12px; color:var(--l2); line-height:1.45; margin:2px 0 12px; }
   .caldow{ display:grid; grid-template-columns:repeat(7,30px); gap:6px; justify-content:center; margin-bottom:8px; }
   .caldow span{ text-align:center; font-size:11px; font-weight:700; color:var(--l3); }
   .calgrid{ display:grid; grid-template-columns:repeat(7,30px); gap:6px; justify-content:center; }
@@ -112,7 +112,7 @@
   .calcrow .cv small{ font-size:13px; font-weight:500; color:var(--l2); margin-left:8px; }
   .calc .empty{ font-size:13px; color:var(--l2); padding:8px 2px; line-height:1.45; }
   .titleBtn{ cursor:pointer; -webkit-tap-highlight-color:transparent; }
-  .timerbar{ display:flex; align-items:center; gap:10px; padding:2px 2px; margin:-2px 2px 16px; background:transparent; border:none; box-shadow:none; }
+  .timerbar{ display:flex; align-items:center; gap:10px; padding:2px 2px; margin:-2px 0 16px; background:transparent; border:none; box-shadow:none; }
   .tmrbtn{ width:40px; height:40px; flex:0 0 auto; border-radius:50%; border:none; cursor:pointer; background:var(--accent-soft); color:var(--accent); display:inline-flex; align-items:center; justify-content:center; transition:transform .12s; }
   .tmrbtn svg{ width:18px; height:18px; }
   .tmrtime{ font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.5px; min-width:52px; }
@@ -144,7 +144,7 @@
   .addset .ic, .seg .ic{ width:13px; height:13px; vertical-align:-2px; margin-right:4px; }
   .segabout svg{ width:14px; height:14px; vertical-align:-2px; margin-right:4px; }
   .segabout{ color:var(--accent) !important; }
- .largeTitle{ font-size:29px; font-weight:700; letter-spacing:-1px; padding: calc(env(safe-area-inset-top) + 12px) 4px 16px; }
+ .largeTitle{ font-size:29px; font-weight:700; letter-spacing:-1px; padding: calc(env(safe-area-inset-top) + 12px) 0 16px; }
   .largeTitle .ltmain{ display:flex; align-items:center; gap:12px; }
   .largeTitle .ltmain .titleBtn{ flex:1; min-width:0; line-height:1.08; }
   .largeTitle .ltmain .iconbtn{ flex:0 0 auto; align-self:flex-start; margin-top:2px; }
@@ -191,7 +191,7 @@
   .ovbig{ font-size:24px; font-weight:750; letter-spacing:-.4px; margin-top:4px; line-height:1.1; }
   .ovmeta{ font-size:14px; color:var(--l2); margin-top:8px; font-weight:500; }
   .ovp{ font-size:14px; color:var(--l2); line-height:1.5; margin:0; }
-  .ovobj{ font-size:12px; color:var(--l2); margin:-2px 2px 8px; }
+  .ovobj{ font-size:12px; color:var(--l2); margin:-2px 0 8px; }
   .ovobj b{ color:var(--accent); font-weight:600; }
   .ovtodo{ margin:0; padding-left:20px; }
   .ovtodo li{ font-size:14px; color:var(--l2); line-height:1.5; margin:8px 0; }
@@ -272,7 +272,7 @@
   .obopt b{ display:block; font-size:16px; font-weight:650; }
   .obopt span{ display:block; font-size:13px; color:var(--l2); margin-top:2px; }
   #progBars{ width:100%; height:auto; aspect-ratio:11/3; margin-top:12px; }
-  .progcap{ font-size:13px; color:var(--l2); margin:8px 2px 2px; line-height:1.4; }
+  .progcap{ font-size:13px; color:var(--l2); margin:8px 0 2px; line-height:1.4; }
   .proglegend{ display:flex; flex-wrap:wrap; gap:5px 12px; margin-top:8px; }
   .pglg{ display:inline-flex; align-items:center; gap:5px; font-size:12px; color:var(--l2); }
   .pglg i{ width:9px; height:9px; border-radius:3px; flex:0 0 auto; }
@@ -321,7 +321,7 @@
   .stat .n{ font-size:24px; font-weight:600; letter-spacing:-.4px; }
   .stat .n.due{ color:var(--red); }
   .stat .k{ font-size:12px; color:var(--l2); margin-top:4px; font-weight:500; }
-  .achcap{ font-size:14px; color:var(--l2); margin:2px 4px 12px; }
+  .achcap{ font-size:14px; color:var(--l2); margin:2px 0 12px; }
   .pscores{ display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
   .psc{ font-size:13px; color:var(--l2); background:var(--row); border:.5px solid var(--line); border-radius:8px; padding:8px 12px; }
   .psc b{ color:var(--ink); font-weight:600; margin-right:4px; }
@@ -361,10 +361,10 @@
   .seg .s .ndot{ width:6px; height:6px; border-radius:50%; background:var(--grad); display:inline-block; margin-right:8px; vertical-align:middle; }
   .seg .s .wm{ display:block; font-size:12px; font-weight:600; color:var(--l3); margin-top:2px; letter-spacing:0; }
   .seg .s.active .wm{ color:var(--accent); }
-  .wkmeta{ display:flex; align-items:center; gap:8px; font-size:14px; color:var(--l2); font-weight:500; margin:-4px 4px 16px; }
+  .wkmeta{ display:flex; align-items:center; gap:8px; font-size:14px; color:var(--l2); font-weight:500; margin:-4px 0 16px; }
   .wkmeta svg{ width:16px; height:16px; color:var(--l3); flex:0 0 auto; }
   .wkmeta b{ color:var(--ink); font-weight:700; }
-  .sslabel{ display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--accent); margin:2px 4px 8px; }
+  .sslabel{ display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--accent); margin:2px 0 8px; }
   .sslabel svg{ width:13px; height:13px; }
   .group.ss{ border-left:3px solid var(--accent); }
   .group.ss-cont{ margin-top:-12px; }
@@ -385,7 +385,7 @@
   .scoretag{ display:inline-flex; align-items:center; gap:3px; color:var(--accent); font-weight:700; font-size:14px; white-space:nowrap; }
   .scoretag svg{ width:11px; height:11px; }
   .planrow .scoretag{ margin-left:8px; flex:0 0 auto; }
-  .addhdr{ font-size:13px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--l3); margin:16px 2px 8px; }
+  .addhdr{ font-size:13px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--l3); margin:16px 0 8px; }
   .addhdr:first-child{ margin-top:2px; }
   .chips{ display:flex; gap:7px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding:12px 2px 4px; margin:0 -2px; scrollbar-width:none; }
   .chips.wrap{ flex-wrap:wrap; overflow-x:visible; margin:0; padding:8px 0 2px; }
@@ -398,7 +398,7 @@
   .runrow .rfield span{ color:var(--l3); font-size:13px; flex:0 0 auto; }
   .btn.dim{ opacity:.45; }
   #addLevelSeg .s{ padding:12px 8px; font-size:13px; }
-  .levelcap{ font-size:12px; color:var(--l3); line-height:1.4; margin:8px 4px 0; }
+  .levelcap{ font-size:12px; color:var(--l3); line-height:1.4; margin:8px 0 0; }
   .sortbar{ display:flex; justify-content:flex-end; padding:8px 2px 2px; }
   .sortbtn{ display:inline-flex; align-items:center; gap:5px; background:none; border:none; cursor:pointer; color:var(--l2); font-size:13px; font-weight:600; padding:12px 8px; margin:-4px -8px; }
   .sortbtn svg{ width:15px; height:15px; }
@@ -532,7 +532,7 @@
   .coachbody{ flex:1; font-size:14px; line-height:1.4; }
   .coachx{ flex:0 0 auto; background:var(--accent); color:#fff; border:none; border-radius:10px; padding:8px 12px; font-size:13px; font-weight:700; cursor:pointer; }
   /* inline confirm — appears right under the control you edited; commits only on Confirm */
-  .inlineconfirm{ display:none; align-items:center; gap:8px; margin:12px 2px 0;
+  .inlineconfirm{ display:none; align-items:center; gap:8px; margin:12px 0 0;
     background:var(--accent-soft); border-radius:12px; padding:12px 12px 12px 16px;
     opacity:0; transform:translateY(-4px); transition:opacity .2s, transform .2s; }
   .inlineconfirm.show{ display:flex; opacity:1; transform:none; }
@@ -566,7 +566,7 @@
   .planrow .info .meta{ font-size:13px; color:var(--l2); margin-top:2px; }
   .planrow .edit{ color:var(--accent); font-size:14px; background:none; border:none; cursor:pointer; flex:0 0 auto; }
 
-  .ed-label{ font-size:12px; color:var(--l3); font-weight:700; text-transform:uppercase; letter-spacing:.6px; margin:20px 4px 8px; }
+  .ed-label{ font-size:12px; color:var(--l3); font-weight:700; text-transform:uppercase; letter-spacing:.6px; margin:20px 0 8px; }
   .ed-wk{ background:var(--row); border-radius:12px; padding:12px; margin-bottom:12px; }
   .ed-wk .wkhead{ display:flex; gap:8px; margin-bottom:8px; }
   .ed-ex{ display:block; margin-bottom:12px; padding-left:12px; }
@@ -607,7 +607,7 @@
   #musRadar, #buildRadar{ width:100%; max-width:330px; height:auto; aspect-ratio:1/1; display:block; margin:16px auto 20px; }
   .emphradar{ max-width:300px!important; margin:8px auto 12px!important; touch-action:none; cursor:grab; -webkit-user-select:none; user-select:none; }
   .emphradar:active{ cursor:grabbing; }
-  .prevhdr{ display:flex; align-items:center; justify-content:space-between; margin:20px 4px 0; font-size:12px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--l2); }
+  .prevhdr{ display:flex; align-items:center; justify-content:space-between; margin:20px 0 0; font-size:12px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--l2); }
 
   #exChart{ width:100%; height:210px; background:var(--chartbg); border-radius:14px; display:block; }
   .cmeta{ display:flex; gap:10px; margin:16px 0 8px; }
@@ -716,7 +716,7 @@
     <button class="btn tinted wide" id="importPlan" style="margin-top:8px;"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10M8 11l4 4 4-4M5 19h14"/></svg>Import a plan</button>
     <details class="hsrc" style="margin-top:16px;">
       <summary>How the scores work</summary>
-      <p style="font-size:13px;color:var(--l2);line-height:1.5;margin:8px 2px;">Hypertrophy is the set-weighted average of each exercise's growth rating (loaded stretch, full range, loadability). Balance weighs muscle coverage, how evenly volume is spread, and push/pull and quad/posterior-chain symmetry — lopsided programs and gaps lower it.</p>
+      <p style="font-size:13px;color:var(--l2);line-height:1.5;margin:8px 0;">Hypertrophy is the set-weighted average of each exercise's growth rating (loaded stretch, full range, loadability). Balance weighs muscle coverage, how evenly volume is spread, and push/pull and quad/posterior-chain symmetry — lopsided programs and gaps lower it.</p>
       <ul>
         <li>Schoenfeld BJ, Grgic J, et al. (2017). Dose-response relationship between weekly resistance training volume and muscle hypertrophy. <i>Journal of Sports Sciences</i>, 35(11).</li>
         <li>Baz-Valle E, et al. (2022). A systematic review of the effects of training volume on muscle hypertrophy. <i>PLoS ONE</i>, 17(6).</li>
@@ -885,7 +885,7 @@
           <input type="checkbox" id="remindToggle">
         </label>
         <button class="btn tinted wide" id="acctPush" style="margin-top:12px;">Save this device to my account</button>
-        <a id="acctDelete" class="levelcap" style="display:inline-block; margin:12px 4px 0; color:var(--bad,#ff375f); cursor:pointer; text-decoration:underline;">Delete my cloud data</a>
+        <a id="acctDelete" class="levelcap" style="display:inline-block; margin:12px 0 0; color:var(--bad,#ff375f); cursor:pointer; text-decoration:underline;">Delete my cloud data</a>
       </div>
     </div>
 
@@ -996,7 +996,7 @@
     <div class="seg appearance bopt" data-k="bias">
       <div class="s" data-v="intensity">Intensity</div><div class="s active" data-v="balanced">Balanced</div><div class="s" data-v="volume">Volume</div>
     </div>
-    <p class="levelcap" id="biasCap" style="margin:-4px 4px 2px;"></p>
+    <p class="levelcap" id="biasCap" style="margin:-4px 0 2px;"></p>
 
     <div class="ed-label">Emphasis <span class="subhint">— tap a preset, or tap a muscle on the chart</span></div>
     <div class="chips wrap bchips" data-k="focus">
@@ -1203,7 +1203,7 @@
     <div id="musByEx"></div>
     <details class="hsrc" id="musSrcBox" style="margin-top:16px;">
       <summary>How this is measured &amp; sources</summary>
-      <p id="musMethod" style="color:var(--l2);font-size:13px;line-height:1.5;margin:8px 2px 8px;"></p>
+      <p id="musMethod" style="color:var(--l2);font-size:13px;line-height:1.5;margin:8px 0 8px;"></p>
       <ul id="musSrcList"></ul>
     </details>
   </div>
@@ -2636,7 +2636,7 @@ function renderOverview(){
   // a one-line motivator under Today (the full stats live on Me)
   const f7=trainingDays(7);
   const motiv = f7>=4?"Strong week — you’re putting in the work." : f7>=2?"Good momentum — keep it rolling." : f7>=1?"You’ve started — one more session lifts the whole week." : "Fresh week. The first session is the hardest — let’s go.";
-  h+='<p class="ovp" style="margin:12px 4px 0;">'+motiv+'</p>';
+  h+='<p class="ovp" style="margin:12px 0 0;">'+motiv+'</p>';
   // --- visual snapshot: three activity rings to fill this week + a "vs last month" delta ---
   let ovRings=null;
   if(Object.keys(hist).length){
