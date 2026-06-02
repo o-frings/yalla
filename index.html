@@ -174,6 +174,8 @@
   .ovbig{ font-size:24px; font-weight:750; letter-spacing:-.4px; margin-top:3px; line-height:1.1; }
   .ovmeta{ font-size:13.5px; color:var(--l2); margin-top:5px; font-weight:500; }
   .ovp{ font-size:14px; color:var(--l2); line-height:1.5; margin:0; }
+  .ovobj{ font-size:12px; color:var(--l2); margin:-2px 2px 8px; }
+  .ovobj b{ color:var(--accent); font-weight:600; }
   .ovtodo{ margin:0; padding-left:18px; }
   .ovtodo li{ font-size:14px; color:var(--l2); line-height:1.5; margin:6px 0; }
   .ovtodo li::marker{ color:var(--accent); }
@@ -2143,7 +2145,29 @@ function renderNav(){
 // ================= overview (coach home) =================
 function ovGreetWord(){ const h=new Date().getHours(); return h<5?"Still up?":h<12?"Good morning":h<18?"Good afternoon":"Good evening"; }
 function trainedToday(){ const t=new Date().toDateString(); return Object.keys(hist).some(n=>(hist[n]||[]).some(e=>new Date(e.d).toDateString()===t)); }
-function ovUnderMuscles(){ const wk=weeklyEquiv(muscleVolume(28,"sets").totals, 28); return MGROUPS.filter(g=> (wk[g]||0)>0 && wk[g]<WEEKLY_SET_MIN); }
+// muscles the active plan actually intends to train (its objective) — so we flag what the plan targets, not what it deliberately skips
+function planScopeMuscles(plan){
+  if(!plan) return MGROUPS.slice();                                   // no plan → balanced (all muscles in scope)
+  const t=planVolume(plan).totals, max=Math.max(1, ...MGROUPS.map(g=>t[g]||0));
+  const scope=MGROUPS.filter(g=> (t[g]||0) >= max*0.30);              // ≥30% of the top muscle = deliberately trained
+  return scope.length ? scope : MGROUPS.slice();
+}
+// is the active plan a broad/balanced build, or focused on a few areas?
+function planObjective(plan){
+  const general={muscle:"muscle gain",strength:"strength",fatloss:"fat loss",fitness:"general fitness"}[settings.objective]||"balanced muscle build";
+  if(!plan) return {label:general, scope:MGROUPS.slice(), balanced:true};
+  const scope=planScopeMuscles(plan), balanced=scope.length>=8;
+  const t=planVolume(plan).totals;
+  const top=MGROUPS.slice().sort((a,b)=>(t[b]||0)-(t[a]||0)).filter(g=>(t[g]||0)>0).slice(0,3).map(g=>MSHORT[g]||g);
+  const label = balanced ? general : (general+" · "+listWords(top));
+  return {label, scope, balanced};
+}
+function ovUnderMuscles(){
+  if(!Object.keys(hist).length) return [];                            // nothing logged yet — don't nag
+  const scope=planScopeMuscles(activePlan());
+  const wk=weeklyEquiv(muscleVolume(28,"sets").totals, 28);
+  return scope.filter(g=> (wk[g]||0) < WEEKLY_SET_MIN);               // plan targets it, but logs are under the growth threshold
+}
 function lastWorkoutTs(){ let m=0; Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ if(e.d>m) m=e.d; })); return m; }
 function daysOff(){ const t=lastWorkoutTs(); return t ? daysSince(t) : -1; }   // -1 = never logged
 // a balanced no-equipment session, started in free mode
@@ -2194,15 +2218,20 @@ function renderOverview(){
     +'<div class="stat"><div class="n">'+(settings.sessions||0)+'</div><div class="k">total</div></div>'
     +'<div class="stat"><div class="n">'+(settings.beatTotal||0)+'</div><div class="k">PRs beaten</div></div></div>';
   h+='<p class="ovp" style="margin:10px 4px 0;">'+motiv+'</p>';
-  // --- Needs attention --- (each item links to where you'd act on it)
-  const todo=[], under=ovUnderMuscles();
-  if(under.length) todo.push({t:"Add sets for "+esc(listWords(under.slice(0,3)))+" — under ~"+WEEKLY_SET_MIN+" hard sets a week.", act:"balance"});
-  if(!bw.length) todo.push({t:"Log your weight so the coach can track your goal.", act:"weight"});
-  else if(daysSince(bw[bw.length-1].d)>10) todo.push({t:"Log your weight — it’s been over " + daysSince(bw[bw.length-1].d) + " days.", act:"weight"});
+  // --- Needs attention --- maps to your objective: the general goal + what the active plan focuses on
+  const obj=planObjective(activePlan()), todo=[], under=ovUnderMuscles();
+  if(under.length){ const ms=esc(listWords(under.slice(0,3).map(g=>MSHORT[g]||g)));
+    todo.push({t:(obj.balanced ? "For balanced growth, add sets for "+ms+" — under ~"+WEEKLY_SET_MIN+" hard sets a week."
+                                : "Your plan targets "+ms+", but they're under ~"+WEEKLY_SET_MIN+" hard sets a week."), act:"balance"}); }
+  if((settings.objective==="fatloss"||settings.objective==="muscle"||!settings.objective)){
+    if(!bw.length) todo.push({t:"Log your weight so the coach can track your goal.", act:"weight"});
+    else if(daysSince(bw[bw.length-1].d)>10) todo.push({t:"Log your weight — it’s been over " + daysSince(bw[bw.length-1].d) + " days.", act:"weight"});
+  }
   if(due) todo.push({t:"Take a deload week to recover.", act:"workout"});
   h+='<div class="ed-label">Needs attention</div>';
+  h+='<div class="ovobj">Optimising for <b>'+esc(obj.label)+'</b></div>';
   if(todo.length){ h+='<div class="group"><div class="pad"><ul class="ovtodo">'+todo.map(it=>'<li class="ovtap" data-act="'+it.act+'">'+it.t+'<span class="ovchev">›</span></li>').join('')+'</ul></div></div>'; }
-  else { h+='<div class="group"><div class="pad"><p class="ovp">Nothing flagged — your training looks balanced. Keep showing up. 👏</p></div></div>'; }
+  else { h+='<div class="group"><div class="pad"><p class="ovp">On track for '+esc(obj.label)+' — every muscle your plan targets is getting enough volume. Keep showing up. 👏</p></div></div>'; }
   host.innerHTML=h;
   const sb=host.querySelector(".ovstart"); if(sb) sb.onclick=()=>showTab("workout");
   const hb=host.querySelector(".ovhome"); if(hb) hb.onclick=startHomeWorkout;
