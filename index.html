@@ -606,6 +606,7 @@
   <span class="resttime" id="restTime">0:00</span>
   <span class="restadj"><button id="restMinus">−15</button><button id="restPlus">+15</button></span>
 </div>
+<button class="btn tinted wide" id="repeatBtn" style="margin-bottom:14px; display:none;">↻ Log like last time</button>
 <div id="exlist"></div>
 <button class="btn wide" id="saveBtn" style="margin-top:10px;">Finish &amp; Save Workout</button>
 <div class="foot">On-device only · keep a backup · lift safely</div>
@@ -2823,7 +2824,24 @@ function renderWorkout(){
   const addBtn=document.createElement("button"); addBtn.className="btn tinted wide"; addBtn.style.marginTop="2px";
   addBtn.innerHTML=ICON.plus+"Add exercise"; addBtn.onclick=()=>openAdd("plan"); list.appendChild(addBtn);
   applyDraft();
+  updateRepeatBtn();
 }
+// prefill every set with last session's weights/reps — then the user just confirms or tweaks before Finish
+function repeatLastWorkout(){
+  let filled=0;
+  document.querySelectorAll("#exlist .group").forEach(g=>{
+    const name=g.dataset.ex, prev=name&&last[name]; if(!prev||!prev.length) return;
+    g.querySelectorAll(".setrow").forEach((r,i)=>{ const dv=prev[Math.min(i,prev.length-1)]||{}, w=r.querySelector(".w"), rp=r.querySelector(".r");
+      if(w) w.value=(dv.w!=null?dv.w:""); if(rp) rp.value=(dv.r!=null?dv.r:""); if((w&&w.value)||(rp&&rp.value)){ updateSetVol(r,name); filled++; } });
+  });
+  if(filled){ captureDraft(); toast("Filled in last time — tweak any, then Finish"); }
+  else toast("No previous numbers to copy yet");
+}
+function updateRepeatBtn(){ const btn=$("repeatBtn"); if(!btn) return;
+  const any=[...document.querySelectorAll("#exlist .group")].some(g=> g.dataset.ex && last[g.dataset.ex] && last[g.dataset.ex].length);
+  btn.style.display = any ? "" : "none";
+}
+$("repeatBtn").onclick=repeatLastWorkout;
 $("saveBtn").onclick=async()=>{
   const savedSig=draftSig();
   const p=activePlan(); const w = freeMode ? null : p.workouts[curWk]; let logged=0, beaten=0;
@@ -3453,6 +3471,7 @@ function renderFree(){
     Object.keys(fd.s).forEach(name=>{ freeSection(sectionKeyFor(name)).appendChild(buildFreeGroup(name)); });
     applyDraft();
   } else if(fd){ delete draft["free"]; sset("draft", draft); }
+  updateRepeatBtn();
 }
 function freeSection(key){
   const list=$("exlist");
