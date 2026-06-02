@@ -197,6 +197,9 @@
   .obopt span{ display:block; font-size:13px; color:var(--l2); margin-top:2px; }
   #progBars{ width:100%; height:auto; aspect-ratio:11/3; margin-top:12px; }
   .progcap{ font-size:12.5px; color:var(--l2); margin:8px 2px 2px; line-height:1.4; }
+  .proglegend{ display:flex; flex-wrap:wrap; gap:5px 12px; margin-top:8px; }
+  .pglg{ display:inline-flex; align-items:center; gap:5px; font-size:11.5px; color:var(--l2); }
+  .pglg i{ width:9px; height:9px; border-radius:3px; flex:0 0 auto; }
   .progcap b{ color:var(--ink); font-weight:700; }
   .progverd{ display:flex; align-items:center; gap:9px; margin:10px 0 2px; padding:11px 13px; border-radius:12px;
     background:var(--card); border:.5px solid var(--line); border-left-width:3px; font-size:13.5px; font-weight:600; line-height:1.4; }
@@ -2392,44 +2395,76 @@ function progVerdict(metric, data){
   if(ratio>=0.7)  return {lvl:"watch", msg:"Your "+unit+" is slipping a little — nudge it back up."};
   return {lvl:"bad", msg:"Your "+unit+" has dropped sharply — easy to lose progress here."};
 }
+// per-muscle weekly series (sets or volume), attributed like the radar (primary ×1, secondary ×0.5)
+function progMuscleWeekly(metric){
+  const wkMs=7*86400000, now=Date.now(), N=PROG_WEEKS;
+  const idx=d=>{ const k=Math.floor((now-d)/wkMs); return (k>=0 && k<N) ? (N-1-k) : -1; };
+  const series={}; MGROUPS.forEach(g=> series[g]=new Array(N).fill(0));
+  Object.keys(hist).forEach(name=>{ const groups=muscleFor(name);
+    (hist[name]||[]).forEach(e=>{ const i=idx(e.d); if(i<0) return;
+      const amt = metric==="vol" ? effVolume(name,e,"total") : (e.n!=null?e.n:1);
+      groups.forEach((g,gi)=>{ if(series[g]) series[g][i]+= gi===0?amt:amt*0.5; }); });
+  });
+  return series;
+}
 function drawProgBars(){
   const c=$("progBars"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
-  const data=progWeeklyData(progMetric), cap=$("progCap"), ac=accentHex();
+  const cap=$("progCap"), ac=accentHex();
   const l3=(getComputedStyle(document.documentElement).getPropertyValue('--l3')||'#888').trim();
-  if(!data.some(v=>v>0)){ ctx.fillStyle=l3; ctx.font="13px -apple-system,sans-serif"; ctx.textAlign="center"; ctx.fillText("Log a few workouts to see this build up.", W/2, H/2); if(cap) cap.textContent=""; const ve0=$("progVerdict"); if(ve0) ve0.style.display="none"; return; }
-  // weight uses a zoomed baseline so small changes are visible; others start at 0
+  const ink=(getComputedStyle(document.documentElement).getPropertyValue('--ink')||'#000').trim();
+  const N=PROG_WEEKS, pad=12, base=H-26, top=12;
+  const cx=i=> pad + i*((W-pad*2)/(N-1));
+  const empty=()=>{ ctx.fillStyle=l3; ctx.font="13px -apple-system,sans-serif"; ctx.textAlign="center"; ctx.fillText("Log a few workouts to see this build up.", W/2, H/2); if(cap) cap.textContent=""; const v0=$("progVerdict"); if(v0) v0.style.display="none"; };
+  const xLabels=()=>{ ctx.fillStyle=l3; ctx.font="600 17px -apple-system,sans-serif"; ctx.textAlign="left"; ctx.fillText(PROG_WEEKS+"w ago", pad, H-6); ctx.textAlign="right"; ctx.fillText("now", W-pad, H-6); };
+  const baseline=()=>{ ctx.strokeStyle=hexAlpha(ac,.18); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad,base+0.5); ctx.lineTo(W-pad,base+0.5); ctx.stroke(); };
+  const verdict=data=>{ const ve=$("progVerdict"); if(ve){ const v=progVerdict(progMetric, data); ve.style.display="flex"; ve.className="progverd v-"+v.lvl; ve.querySelector(".pvtxt").textContent=v.msg; } };
+
+  // ---- volume / sets → one line per muscle (like the radar, but over time) ----
+  if(progMetric==="volume" || progMetric==="sets"){
+    const series=progMuscleWeekly(progMetric==="volume"?"vol":"sets");
+    const active=MGROUPS.filter(g=> series[g].some(v=>v>0));
+    if(!active.length){ empty(); return; }
+    let hi=0; active.forEach(g=> series[g].forEach(v=>{ if(v>hi) hi=v; })); hi=hi||1;
+    const mapY=v=> base-(v/hi)*(base-top)*progAnim;
+    baseline();
+    ctx.lineJoin="round"; ctx.lineCap="round";
+    active.forEach(g=>{ const col=MCOLOR[g]||l3;
+      ctx.strokeStyle=col; ctx.globalAlpha=.9; ctx.lineWidth=3; ctx.beginPath();
+      series[g].forEach((v,i)=>{ const x=cx(i), y=mapY(v); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.stroke();
+      const li=N-1; ctx.globalAlpha=1; ctx.beginPath(); ctx.arc(cx(li), mapY(series[g][li]), 4.5, 0, Math.PI*2); ctx.fillStyle=col; ctx.fill();
+    });
+    ctx.globalAlpha=1; xLabels();
+    if(cap) cap.innerHTML=(progMetric==="volume"?"Weekly volume":"Weekly sets")+' by muscle · last '+PROG_WEEKS+' weeks'
+      +'<div class="proglegend">'+active.map(g=>'<span class="pglg"><i style="background:'+(MCOLOR[g]||"#888")+'"></i>'+MSHORT[g]+'</span>').join('')+'</div>';
+    verdict(progWeeklyData(progMetric));
+    return;
+  }
+
+  // ---- sessions / weight / PRs → a single trend line ----
+  const data=progWeeklyData(progMetric);
+  if(!data.some(v=>v>0)){ empty(); return; }
   let lo=0, hi=Math.max(...data);
   if(progMetric==="weight"){ const nz=data.filter(v=>v>0); lo=Math.min(...nz); hi=Math.max(...nz); const span=Math.max(1,hi-lo); lo=Math.max(0,lo-span*0.2); hi=hi+span*0.1; }
-  const ink=(getComputedStyle(document.documentElement).getPropertyValue('--ink')||'#000').trim();
-  const N=data.length, pad=10, gap=8, base=H-26, barW=(W-pad*2-gap*(N-1))/N;
-  const mapY=v=> base-(hi>lo?(v-lo)/(hi-lo):0)*(base-10), cx=i=> pad+i*(barW+gap)+barW/2;
-  ctx.textAlign="center"; ctx.font="600 18px -apple-system,sans-serif"; ctx.fillStyle=l3;
-  data.forEach((v,i)=>{
-    const x=pad+i*(barW+gap);
-    const norm = hi>lo ? (v-lo)/(hi-lo) : 0;
-    const bh = (v>0 ? Math.max(4, norm*(base-10)) : 0)*progAnim, y=base-bh, r=Math.min(7,barW/2);
-    ctx.fillStyle = i===N-1 ? ac : hexAlpha(ac,.40);
-    ctx.beginPath(); ctx.moveTo(x,base); ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r); ctx.lineTo(x+barW-r,y); ctx.arcTo(x+barW,y,x+barW,y+r,r); ctx.lineTo(x+barW,base); ctx.closePath(); ctx.fill();
-  });
-  ctx.strokeStyle=hexAlpha(ac,.18); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad,base+0.5); ctx.lineTo(W-pad,base+0.5); ctx.stroke();
-  // trend line (linear fit over weeks with data) — the visual "which way am I heading?" cue
-  const pts=[]; data.forEach((v,i)=>{ if(v>0) pts.push([i,v]); });
-  if(pts.length>=2 && progAnim>=1){
-    const k=pts.length, sx=pts.reduce((a,p)=>a+p[0],0), sy=pts.reduce((a,p)=>a+p[1],0),
-          sxy=pts.reduce((a,p)=>a+p[0]*p[1],0), sxx=pts.reduce((a,p)=>a+p[0]*p[0],0), den=k*sxx-sx*sx;
-    const m=den?(k*sxy-sx*sy)/den:0, b0=(sy-m*sx)/k, i0=pts[0][0], i1=pts[pts.length-1][0];
-    ctx.strokeStyle=hexAlpha(ink,.5); ctx.lineWidth=3; ctx.lineCap="round";
-    ctx.beginPath(); ctx.moveTo(cx(i0), mapY(m*i0+b0)); ctx.lineTo(cx(i1), mapY(m*i1+b0)); ctx.stroke();
+  const mapY=v=> base-(hi>lo?(v-lo)/(hi-lo):0)*(base-top)*progAnim;
+  baseline();
+  // line + dots over the weeks that have data (weight skips gaps; sessions/PRs plot every week incl. zeros)
+  const valid=[]; data.forEach((v,i)=>{ if(progMetric!=="weight" || v>0) valid.push([i,v]); });
+  ctx.strokeStyle=ac; ctx.lineWidth=3; ctx.lineJoin="round"; ctx.lineCap="round";
+  ctx.beginPath(); valid.forEach(([i,v],k)=>{ const x=cx(i), y=mapY(v); k?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.stroke();
+  valid.forEach(([i,v])=>{ ctx.beginPath(); ctx.arc(cx(i), mapY(v), i===N-1?5:3.5, 0, Math.PI*2); ctx.fillStyle = i===N-1?ac:hexAlpha(ac,.55); ctx.fill(); });
+  // trend line
+  const tp=[]; data.forEach((v,i)=>{ if(v>0) tp.push([i,v]); });
+  if(tp.length>=2 && progAnim>=1){
+    const k=tp.length, sx=tp.reduce((a,p)=>a+p[0],0), sy=tp.reduce((a,p)=>a+p[1],0),
+          sxy=tp.reduce((a,p)=>a+p[0]*p[1],0), sxx=tp.reduce((a,p)=>a+p[0]*p[0],0), den=k*sxx-sx*sx;
+    const m=den?(k*sxy-sx*sy)/den:0, b0=(sy-m*sx)/k, i0=tp[0][0], i1=tp[tp.length-1][0];
+    ctx.strokeStyle=hexAlpha(ink,.45); ctx.lineWidth=2.5; ctx.setLineDash([5,5]);
+    ctx.beginPath(); ctx.moveTo(cx(i0), mapY(m*i0+b0)); ctx.lineTo(cx(i1), mapY(m*i1+b0)); ctx.stroke(); ctx.setLineDash([]);
   }
-  // x labels: oldest / this week
-  ctx.fillStyle=l3; ctx.font="600 17px -apple-system,sans-serif";
-  ctx.textAlign="left";  ctx.fillText(PROG_WEEKS+"w ago", pad, H-6);
-  ctx.textAlign="right"; ctx.fillText("now", W-pad, H-6);
-  const latest=data[N-1];
-  const fmt = progMetric==="volume" ? fmtKg(latest) : (progMetric==="weight" ? (latest>0?round1(latest)+" kg":"—") : Math.round(latest));
+  xLabels();
+  const latest=data[N-1], fmt = progMetric==="weight" ? (latest>0?round1(latest)+" kg":"—") : Math.round(latest);
   if(cap) cap.innerHTML=PROG_LABELS[progMetric]+' · last '+PROG_WEEKS+' weeks · <b>this week: '+(latest>0?fmt:"—")+'</b>';
-  const ve=$("progVerdict");
-  if(ve){ const v=progVerdict(progMetric, data); ve.style.display="flex"; ve.className="progverd v-"+v.lvl; ve.querySelector(".pvtxt").textContent=v.msg; }
+  verdict(data);
 }
 document.querySelectorAll("#progMetric .s").forEach(s=> s.onclick=()=>{
   progMetric=s.dataset.pm;
