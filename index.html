@@ -170,10 +170,12 @@
   /* hide the scrollbar (still scrollable) */
   #pager .page, .sheetbody{ scrollbar-width:none; -ms-overflow-style:none; }
   #pager .page::-webkit-scrollbar, .sheetbody::-webkit-scrollbar{ width:0; height:0; display:none; }
-  /* Tab bar OVERLAYS the scrolling content, anchored to the shell's true bottom — the mirror image of
-     .statusbar-bg at the top: same translucent fill, no blur, so content shows faintly through as it
-     scrolls beneath. Pages reserve bottom padding (above) so nothing hides under it. */
-  .tabbar{ position:absolute; left:0; right:0; bottom:0; z-index:50; display:flex; align-items:center;
+  /* Tab bar is pinned to the VIEWPORT bottom (not the shell's) — the exact mirror of .statusbar-bg at the
+     top, which has always been reliable. On the iOS PWA, 100dvh sometimes resolves shorter than the real
+     screen on resume, leaving an opaque background strip below a shell-anchored bar; pinning to the
+     viewport makes the bar always reach the true bottom and cover that strip. Same translucent fill, no
+     blur, so content scrolls faintly beneath. Pages reserve bottom padding so nothing hides under it. */
+  .tabbar{ position:fixed; left:0; right:0; bottom:0; max-width:540px; margin:0 auto; z-index:50; display:flex; align-items:center;
  padding:6px 8px calc(6px + env(safe-area-inset-bottom)); border-top:.5px solid var(--sep);
     background:color-mix(in srgb, var(--bg) 88%, transparent); }
   .tabitem{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
