@@ -203,7 +203,9 @@
   .discwrap{ display:flex; gap:10px; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch;
     scrollbar-width:none; margin:0 -16px; padding:2px 16px; }
   .discwrap::-webkit-scrollbar{ display:none; }
-  .disccard{ scroll-snap-align:center; flex:0 0 87%; margin:0; }
+  .disccard{ scroll-snap-align:center; flex:0 0 87%; margin:0; position:relative; }
+  .discx{ position:absolute; top:8px; right:8px; width:26px; height:26px; border:none; border-radius:50%; background:transparent; color:var(--l3); font-size:13px; cursor:pointer; z-index:2; }
+  .discx:active{ transform:scale(.85); }
   .discdots{ display:flex; gap:6px; justify-content:center; margin-top:10px; }
   .discdot{ width:6px; height:6px; border-radius:50%; background:var(--l3); opacity:.35; transition:opacity .2s, transform .2s, background .2s; }
   .discdot.on{ opacity:1; background:var(--accent); transform:scale(1.25); }
@@ -2180,7 +2182,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi]||e.n; }
-let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false, planStartAt:null };
+let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false, planStartAt:null, discRead:{} };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -2421,18 +2423,20 @@ function ovUnderMuscles(){
   const wk=weeklyEquiv(muscleVolume(28,"sets").totals, 28);
   return scope.filter(g=> (wk[g]||0) < WEEKLY_SET_MIN);               // plan targets it, but logs are under the growth threshold
 }
-// a swipeable deck for the overview — not-yet-used features first, then evergreen tips
+// a small, fading deck for the overview — surfaces only tips you haven't read yet, a few at a time.
+// feature tips drop off automatically once you've used the feature; evergreen ones you dismiss.
 function discoverTips(){
-  const tips=settings.seenTips||{}, builtPlan=plans.some(p=>/^(custom|plan)/.test(p.id)), logged=Object.keys(hist).length>0, list=[];
-  if(!builtPlan) list.push({t:"Build a plan around your goal",s:"Pick your days, time and focus — I choose the split and exercises for you.",btn:"Build a plan",act:"build"});
-  if(!logged) list.push({t:"Log your first session",s:"Tap a set to record weight × reps. I track progress per exercise across plans.",btn:"Go to workout",act:"workout"});
-  if(!tips.muscles) list.push({t:"See your muscle balance",s:"A radar of weekly sets per muscle vs the growth target — spot gaps at a glance.",btn:"Muscle balance",act:"balance"});
-  list.push({t:"Log like last time",s:"On any workout, tap “Log like last time” to prefill last session — then just tweak and finish.",btn:"Go to workout",act:"workout"});
-  list.push({t:"Swap for today or for good",s:"Tap an exercise's swap icon, then choose “Permanently” to change it in the plan itself.",btn:"Go to workout",act:"workout"});
-  list.push({t:"Coach notes per plan",s:"Open “About” at the top-right of the workout list for the plan's focus, split and what to watch.",btn:"Go to workout",act:"workout"});
-  list.push({t:"Swipe between pages",s:"Swipe left or right to move through Overview, Workout and Me — no need to reach the tab bar."});
-  return list.slice(0,6);
+  const tips=settings.seenTips||{}, read=settings.discRead||{}, builtPlan=plans.some(p=>/^(custom|plan)/.test(p.id)), logged=Object.keys(hist).length>0, all=[];
+  if(!builtPlan) all.push({id:"build",t:"Build a plan around your goal",s:"Pick your days, time and focus — I choose the split and exercises for you.",btn:"Build a plan",act:"build"});
+  if(!logged) all.push({id:"log",t:"Log your first session",s:"Tap a set to record weight × reps. I track progress per exercise across plans.",btn:"Go to workout",act:"workout"});
+  if(!tips.muscles) all.push({id:"muscles",t:"See your muscle balance",s:"A radar of weekly sets per muscle vs the growth target — spot gaps at a glance.",btn:"Muscle balance",act:"balance"});
+  all.push({id:"repeat",t:"Log like last time",s:"On any workout, tap “Log like last time” to prefill last session — then just tweak and finish.",btn:"Go to workout",act:"workout"});
+  all.push({id:"swap",t:"Swap for today or for good",s:"Tap an exercise's swap icon, then choose “Permanently” to change it in the plan itself.",btn:"Go to workout",act:"workout"});
+  all.push({id:"about",t:"Coach notes per plan",s:"Open “About” at the top-right of the workout list for the plan's focus, split and what to watch.",btn:"Go to workout",act:"workout"});
+  all.push({id:"swipe",t:"Swipe between pages",s:"Swipe left or right to move through Overview, Workout and Me — no need to reach the tab bar."});
+  return all.filter(x=> !read[x.id]).slice(0,3);   // only unread, a few at a time
 }
+function dismissTip(id){ settings.discRead=settings.discRead||{}; settings.discRead[id]=1; sset("settings",settings); renderOverview(); }
 // small weekly-sets sparkline for the overview
 function drawOvSets(id){ const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const data=progWeeklyData("sets"), ac=accentHex(), hi=Math.max(1,...data), base=H-22, top=16, pad=12;
@@ -2506,8 +2510,8 @@ function renderOverview(){
   // --- Discover --- a swipeable deck of tips / not-yet-used features
   const dt=discoverTips();
   if(dt.length){
-    h+='<div class="ed-label">Discover <span class="subhint">— swipe ›</span></div>';
-    h+='<div class="discwrap" id="discWrap">'+dt.map(d=>'<div class="group ovnudge disccard"><div class="pad"><div class="ovbig" style="font-size:18px;">'+esc(d.t)+'</div><p class="ovp" style="margin-top:6px;">'+esc(d.s)+'</p>'+(d.act?'<button class="btn wide ovdisc" data-act="'+d.act+'" style="margin-top:14px;">'+esc(d.btn)+'</button>':'')+'</div></div>').join('')+'</div>';
+    h+='<div class="ed-label">Discover'+(dt.length>1?' <span class="subhint">— swipe ›</span>':'')+'</div>';
+    h+='<div class="discwrap" id="discWrap">'+dt.map(d=>'<div class="group ovnudge disccard"><div class="pad"><button class="discx" data-tip="'+d.id+'" aria-label="Dismiss">✕</button><div class="ovbig" style="font-size:18px; padding-right:20px;">'+esc(d.t)+'</div><p class="ovp" style="margin-top:6px;">'+esc(d.s)+'</p>'+(d.act?'<button class="btn wide ovdisc" data-act="'+d.act+'" data-tip="'+d.id+'" style="margin-top:14px;">'+esc(d.btn)+'</button>':'')+'</div></div>').join('')+'</div>';
     if(dt.length>1) h+='<div class="discdots" id="discDots">'+dt.map((_,i)=>'<span class="discdot'+(i===0?' on':'')+'"></span>').join('')+'</div>';
   }
   // --- Needs attention --- ordered by urgency (severity first); maps to your objective
@@ -2541,7 +2545,8 @@ function renderOverview(){
     else drawOvSets("ovChartC");
     const card=host.querySelector(".ovchart"); if(card) card.onclick=()=> ovChart==="balance" ? openMuscles() : showTab("me");
   }
-  host.querySelectorAll(".ovdisc").forEach(b=> b.onclick=()=>ovAct(b.dataset.act));
+  host.querySelectorAll(".discx").forEach(x=> x.onclick=(ev)=>{ ev.stopPropagation(); dismissTip(x.dataset.tip); });
+  host.querySelectorAll(".ovdisc").forEach(b=> b.onclick=()=>{ if(b.dataset.tip){ settings.discRead=settings.discRead||{}; settings.discRead[b.dataset.tip]=1; sset("settings",settings); } ovAct(b.dataset.act); });
   const dw=$("discWrap"), dots=$("discDots");
   if(dw && dots){ const cards=dw.querySelectorAll(".disccard");
     dw.addEventListener("scroll", ()=>{ let best=0, bd=1e9; cards.forEach((c,i)=>{ const d=Math.abs(c.offsetLeft-dw.scrollLeft); if(d<bd){bd=d;best=i;} });
