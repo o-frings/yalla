@@ -198,6 +198,10 @@
   .mefold > summary::-webkit-details-marker{ display:none; }
   .mefold > summary::after{ content:"⌄"; font-size:17px; line-height:1; color:var(--l3); transform:translateY(-3px); transition:transform .2s; }
   .mefold[open] > summary::after{ transform:translateY(1px) rotate(180deg); }
+  .ovgoaltop{ display:flex; justify-content:space-between; align-items:baseline; font-size:13px; color:var(--l2); margin-bottom:8px; }
+  .ovgoaltop b{ font-size:18px; color:var(--ink); font-weight:750; }
+  .ovgoalbar{ height:10px; border-radius:6px; background:var(--track); overflow:hidden; }
+  .ovgoalbar i{ display:block; height:100%; border-radius:6px; background:var(--grad); transition:width .45s ease; }
   .ovweek{ display:grid; grid-template-columns:repeat(7,1fr); gap:7px; }
   .ovd{ text-align:center; font-size:10px; font-weight:700; color:var(--l3); }
   .ovd i{ display:block; height:28px; border-radius:8px; background:var(--row); margin-top:5px; }
@@ -2555,8 +2559,15 @@ function renderOverview(){
     const today=new Date(); today.setHours(0,0,0,0); let dots="";
     for(let i=6;i>=0;i--){ const d=new Date(today); d.setDate(d.getDate()-i); const wd=(d.getDay()+6)%7;
       dots+='<div class="ovd'+(trained.has(d.toDateString())?" on":"")+(i===0?" today":"")+'">'+["M","T","W","T","F","S","S"][wd]+'<i></i></div>'; }
+    // a goal bar to fill toward this week's session target (derived from the plan's training days)
+    const rot=activePlan().workouts.filter(x=>x.rotate!==false).length, target=Math.max(2,Math.min(5,rot||3));
+    const pct=Math.min(100,Math.round(f7/target*100));
+    const subtxt = f7>=target ? "target hit — brilliant 🎉" : (target-f7)+" to go this week";
     h+='<div class="ed-label">This week <span class="subhint">— tap for detail ›</span></div>';
-    h+='<div class="group ovtap ovsnap"><div class="pad"><div class="ovweek">'+dots+'</div>'
+    h+='<div class="group ovtap ovsnap"><div class="pad">'
+      +'<div class="ovgoaltop"><b>'+f7+' / '+target+'</b><span>sessions · '+subtxt+'</span></div>'
+      +'<div class="ovgoalbar"><i style="width:'+pct+'%"></i></div>'
+      +'<div class="ovweek" style="margin-top:14px;">'+dots+'</div>'
       +'<div style="display:flex; justify-content:center; margin-top:10px;"><canvas id="ovSnapC" width="460" height="460" style="width:100%; max-width:250px; height:auto;"></canvas></div></div></div>';
   }
   // --- Discover --- a swipeable deck of tips / not-yet-used features
@@ -2569,24 +2580,23 @@ function renderOverview(){
   // --- Needs attention --- ordered by urgency (severity first); maps to your objective
   const obj=planObjective(activePlan()), todo=[], under=ovUnderMuscles();
   const push=(u,t,act)=> todo.push({u,t,act});
-  if(cloudAvailable() && !cloudReady()) push(60,"Sign in to save your progress and sync across devices.","account");
-  if(!settings.objective) push(82,"Set your main goal so I know what “on track” means.","objective");
-  if(settings.goalTarget==null || settings.heightCm==null || !settings.sex) push(55,"Add your details — height, sex and a goal weight — to unlock tracking.","body");
+  if(cloudAvailable() && !cloudReady()) push(60,"Lock in your progress — sign in to sync across devices.","account");
+  if(!settings.objective) push(82,"Tell me your goal and every session starts counting toward it.","objective");
+  if(settings.goalTarget==null || settings.heightCm==null || !settings.sex) push(55,"Add your details to unlock weight & body tracking.","body");
   if(under.length){ const ms=esc(listWords(under.slice(0,3).map(g=>MSHORT[g]||g)));
     const wk=weeklyEquiv(muscleVolume(28,"sets").totals,28);
     const worst=under.reduce((m,g)=>Math.max(m,(WEEKLY_SET_MIN-(wk[g]||0))/WEEKLY_SET_MIN),0);   // 0 (just under) … 1 (untrained)
-    push(45+Math.round(50*worst), (obj.balanced ? "For balanced growth, add sets for "+ms+" — under ~"+WEEKLY_SET_MIN+" hard sets a week."
-                                : "Your plan targets "+ms+", but they're under ~"+WEEKLY_SET_MIN+" hard sets a week."), "balance"); }
+    push(45+Math.round(50*worst), "Easy win: give "+ms+" a couple more sets a week (aim ~"+WEEKLY_SET_MIN+"+) and watch it grow.", "balance"); }
   if((settings.objective==="fatloss"||settings.objective==="muscle") && settings.goalTarget!=null){
-    if(!bw.length) push(40,"Log your weight so I can track your goal.","weight");
-    else if(daysSince(bw[bw.length-1].d)>10) push(35,"Log your weight — it’s been over " + daysSince(bw[bw.length-1].d) + " days.","weight");
+    if(!bw.length) push(40,"Pop in a weigh-in so I can chart your goal.","weight");
+    else if(daysSince(bw[bw.length-1].d)>10) push(35,"Quick weigh-in? It's been "+daysSince(bw[bw.length-1].d)+" days — keeps your trend sharp.","weight");
   }
-  if(due) push(72,"Take a deload week to recover.","workout");
+  if(due) push(72,"You've earned an easy week — a deload now and you'll come back stronger.","workout");
   if(settings.planStartAt && (Date.now()-settings.planStartAt) > 42*86400000 && Object.keys(hist).length)
-    push(30,"You've run this plan ~6 weeks — swap 1–2 accessories to freshen it (long-press swap → Permanently).","workout");
+    push(30,"Six strong weeks on this plan 💪 swap 1–2 accessories to keep the gains coming.","workout");
   todo.sort((a,b)=> b.u-a.u);   // most urgent first
   const shown=todo.slice(0,2), more=todo.length-shown.length;   // keep the start page lean — top 2 only
-  h+='<div class="ed-label">Needs attention</div>';
+  h+='<div class="ed-label">Your next wins</div>';
   h+='<div class="ovobj">Optimising for <b>'+esc(obj.label)+'</b></div>';
   if(shown.length){ h+='<div class="group"><div class="pad"><ul class="ovtodo">'+shown.map(it=>'<li class="ovtap" data-act="'+it.act+'">'+it.t+'<span class="ovchev">›</span></li>').join('')
     +(more>0?'<li class="ovmore">+'+more+' more</li>':'')+'</ul></div></div>'; }
@@ -4146,8 +4156,8 @@ function renderObjective(){ document.querySelectorAll("#objChips .chip").forEach
 // the user's stated training focus — picked in Me, used to pre-fill the builder; up to two, "Balanced" exclusive
 document.querySelectorAll("#focusChips .chip").forEach(c=> c.onclick=async()=>{
   const v=c.dataset.v; let sel=(settings.focusAreas||[]).slice();
-  if(v==="balanced") sel=["balanced"];
-  else { sel=sel.filter(x=>x!=="balanced"); const i=sel.indexOf(v); if(i>=0) sel.splice(i,1); else { sel.push(v); if(sel.length>2) sel.shift(); } }
+  const i=sel.indexOf(v);                                              // plain multi-select, cap 2 — Balanced + an area = a light lean
+  if(i>=0) sel.splice(i,1); else { sel.push(v); if(sel.length>2) sel.shift(); }
   if(!sel.length) sel=["balanced"];
   settings.focusAreas=sel; await sset("settings",settings); renderObjective();
 });
@@ -4439,17 +4449,17 @@ document.querySelectorAll('#sheetBuild .bchips:not(.multi):not([data-k="focus"])
   grp.querySelectorAll(".chip").forEach(x=>x.classList.toggle("on",x===c)); build[k]=c.dataset.v; updateBuildPreview(); }); });
 // focus: pick up to TWO areas — emphasis becomes the union (per-muscle max) of their presets; "Balanced" is exclusive
 function emphasisFromFocuses(focuses){
-  const list=(focuses||[]).filter(f=>f && f!=="balanced");
-  if(!list.length) return emphasisPreset("balanced");
+  const list=(focuses||[]).filter(Boolean), hasBal=list.indexOf("balanced")>=0, foci=list.filter(f=>f!=="balanced");
+  if(!foci.length) return emphasisPreset("balanced");
   const e={}; BUILD_GROUPS.forEach(m=>e[m]=0);
-  list.forEach(f=>{ const p=emphasisPreset(f); BUILD_GROUPS.forEach(m=> e[m]=Math.max(e[m], p[m]!=null?p[m]:0)); });
+  foci.forEach(f=>{ const p=emphasisPreset(f); BUILD_GROUPS.forEach(m=> e[m]=Math.max(e[m], p[m]!=null?p[m]:0)); });
+  if(hasBal) BUILD_GROUPS.forEach(m=>{ e[m]=0.5+(e[m]-0.5)*0.4; });   // "Balanced + X" = a light lean, not a full focus
   return e;
 }
 document.querySelectorAll('#sheetBuild .bchips[data-k="focus"] .chip').forEach(c=> c.onclick=()=>{
   const v=c.dataset.v; let sel=Array.isArray(build.focus)?build.focus.slice():[];
-  if(v==="balanced"){ sel=["balanced"]; }
-  else { sel=sel.filter(x=>x!=="balanced"); const i=sel.indexOf(v);
-    if(i>=0) sel.splice(i,1); else { sel.push(v); if(sel.length>2) sel.shift(); } }   // cap at two; drop the oldest
+  const i=sel.indexOf(v);                                              // plain multi-select, cap 2 — Balanced can pair with one area for a light lean
+  if(i>=0) sel.splice(i,1); else { sel.push(v); if(sel.length>2) sel.shift(); }
   if(!sel.length) sel=["balanced"];
   build.focus=sel; build.emphasis=emphasisFromFocuses(sel); syncEmphasisChips(); updateBuildPreview();
 });
