@@ -908,6 +908,11 @@
       <div class="s active" data-v="on">On</div><div class="s" data-v="off">Off</div>
     </div>
 
+    <div class="ed-label">Variety <span class="subhint">— rotate accessories across A/B days</span></div>
+    <div class="seg appearance bopt" data-k="vary">
+      <div class="s active" data-v="off">Off</div><div class="s" data-v="on">On</div>
+    </div>
+
     <div class="ed-label">Areas to protect <span class="subhint">— optional, select any</span></div>
     <div class="chips wrap bchips multi" data-k="injuries">
       <button class="chip" data-v="lowback">Lower back</button><button class="chip" data-v="knees">Knees</button>
@@ -3976,7 +3981,7 @@ const COMPOUND_GROUPS=["chest","back","quads","hamstrings","shoulders"];
 // the emphasis radar's spokes — identical to the app-wide analytics groups
 const BUILD_GROUPS=MGROUPS;
 function buildKey(m){ return ({"Front Delts":"shoulders","Side Delts":"sidedelts","Rear Delts":"reardelts"}[m]) || m.toLowerCase(); }
-let build={ exp:"intermediate", obj:"muscle", focus:["balanced"], bias:"balanced", time:60, freq:4, injuries:[], access:"gym", supersets:"on",
+let build={ exp:"intermediate", obj:"muscle", focus:["balanced"], bias:"balanced", time:60, freq:4, injuries:[], access:"gym", supersets:"on", vary:"off",
   emphasis:(function(){ const e={}; BUILD_GROUPS.forEach(m=>e[m]=0.5); return e; })() };
 function emphasisPreset(focus){
   const e={}; BUILD_GROUPS.forEach(m=>e[m]=0.5);
@@ -4134,23 +4139,32 @@ function buildPlan(b){
       wk.ex.splice(idx,1); meta.splice(idx,1); regroupSupersets(wk, ssMode);
     }
   };
-  const workouts=dayDefs.map((d)=>{
-    let groups=d.groups, name=d.name, lvl=d.lvl;
-    const dom=dayDomain(name);
+  // build one workout for a day at a given selection offset; fixedComps (optional) keeps the same compounds and only re-picks accessories
+  const buildVariant=(d, offset, name, fixedComps)=>{
+    let groups=d.groups.slice(); const dom=dayDomain(d.name);
     Object.keys(W).forEach(g=>{ if(W[g]>=0.55 && dom.indexOf(g)>=0 && groups.indexOf(g)<0 && BUILD_POOL[g]) groups.push(g); });
-    const sig=groups.slice().sort().join(",")+"|"+lvl, offset=seen[sig]||0; seen[sig]=offset+1;
-    // pick a generous candidate list (enough to fill the time even at 2 sets), then trim down to the budget
-    // pick exactly the realistic number of moves for the session; the weighted picker spreads them across muscles
-    const picks=pickWorkoutWeighted(groups, base, b.injuries, lvl, W, offset, b.exp);
-    // compounds first (train heavy while fresh), then accessories interleaved by muscle within each station
+    let picks=pickWorkoutWeighted(groups, base, b.injuries, d.lvl, W, offset, b.exp);
+    if(fixedComps) picks=fixedComps.concat(picks.filter(p=>!p.comp));   // keep A's compounds, take this offset's accessories
     const comps=picks.filter(p=>p.comp), accs=interleave(picks.filter(p=>!p.comp));
     const ordered=comps.concat(accs);
     const wk={ name, ex: ordered.map(p=>{ const s=p.comp?compSets:accSets, rr=p.comp?reps.c:reps.a; return {n:p.n, t:s+" × "+rr, s}; }) };
     if(d.sub) wk.sub=d.sub; wk.rotate=d.rot;
     wk._meta=ordered.map(p=>({ comp:p.comp, grp:muscleFor(p.n)[0] }));
-    wk._lvl=lvl;
+    wk._lvl=d.lvl;
     trimDay(wk, wk._meta, emphG);
-    return wk;
+    return {wk, comps};
+  };
+  const vary = b.vary==="on";
+  const workouts=[];
+  dayDefs.forEach((d)=>{
+    const sig=d.groups.slice().sort().join(",")+"|"+d.lvl, offset=seen[sig]||0;
+    if(vary && d.rot!==false){
+      const A=buildVariant(d, offset, d.name+" A");
+      const B=buildVariant(d, offset+3, d.name+" B", A.comps);   // same compounds, fresh accessories
+      seen[sig]=offset+2; workouts.push(A.wk, B.wk);
+    } else {
+      seen[sig]=offset+1; workouts.push(buildVariant(d, offset, d.name).wk);
+    }
   });
   // coverage: any muscle the user hasn't dialled to zero should get at least some work somewhere in the plan
   BUILD_GROUPS.forEach(m=>{
