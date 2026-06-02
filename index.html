@@ -164,7 +164,8 @@
   /* anchored INSIDE the fixed #pager; compact — icons sit just above the home indicator */
   .tabbar{ position:absolute; left:0; right:0; bottom:0; z-index:2; display:flex; align-items:center;
     padding:6px 8px calc(6px + env(safe-area-inset-bottom)); overflow:hidden; border-top:.5px solid var(--sep);
-    background:var(--bg); }    /* solid — no content bleed-through, no blur/transform jitter */
+    background:color-mix(in srgb, var(--bg) 72%, transparent);   /* frosted: translucent, but content behind is blurred (no raw bleed-through) */
+    backdrop-filter:blur(20px) saturate(180%); -webkit-backdrop-filter:blur(20px) saturate(180%); }
   .tabitem{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
     color:var(--l3); transition:color .15s; -webkit-tap-highlight-color:transparent; }
   .tabitem svg{ width:26px; height:26px; transition:transform .12s; }
