@@ -119,6 +119,8 @@
   .timerbar.run .tmrtime{ color:var(--accent); }
   .tmrlbl{ font-size:12px; color:var(--l3); flex:1; }
   .tmrreset{ background:none; border:none; color:var(--l3); font-size:13px; font-weight:600; cursor:pointer; padding:9px 8px; margin:-3px -4px; }
+  .tmrrepeat{ background:var(--accent-soft); border:none; color:var(--accent); font-size:12.5px; font-weight:600; cursor:pointer; padding:7px 11px; border-radius:16px; flex:0 0 auto; }
+  .tmrrepeat:active{ opacity:.6; }
   .restbar{ display:none; position:relative; align-items:center; gap:9px; padding:10px 14px; margin:-6px 0 16px; border-radius:14px; overflow:hidden;
     background:var(--accent-soft); border:.5px solid var(--accent-soft); }
   .restbar.show{ display:flex; }
@@ -619,6 +621,7 @@
   <button class="tmrbtn" id="tmrToggle" aria-label="Start timer"></button>
   <span class="tmrtime" id="tmrTime">0:00</span>
   <span class="tmrlbl" id="tmrLbl">session timer</span>
+  <button class="tmrrepeat" id="repeatBtn" title="Fill in last session" style="display:none;">↻ Last time</button>
   <button class="tmrreset" id="tmrReset" title="Reset">reset</button>
 </div>
 <div class="restbar" id="restBar">
@@ -628,7 +631,6 @@
   <span class="resttime" id="restTime">0:00</span>
   <span class="restadj"><button id="restMinus">−15</button><button id="restPlus">+15</button></span>
 </div>
-<button class="btn tinted wide" id="repeatBtn" style="margin-bottom:14px; display:none;">↻ Log like last time</button>
 <div id="exlist"></div>
 <button class="btn wide" id="saveBtn" style="margin-top:10px;">Finish &amp; Save Workout</button>
 <div class="foot">On-device only · keep a backup · lift safely</div>
@@ -2276,6 +2278,12 @@ async function init(){
   draft = (await sget("draft")) || {};
   if(settings.achUnlocked==null) settings.achUnlocked=unlockedIds();
   if(!settings.planStartAt) settings.planStartAt=Date.now();   // start the "freshen" clock for the active plan
+  if(!settings.bodyDefaultsCleared){                            // clear the old shipped body defaults (68/75/male) so untouched profiles read empty
+    if(settings.goalStart===68) settings.goalStart=null;
+    if(settings.goalTarget===75) settings.goalTarget=null;
+    if(settings.sex==="male" && settings.heightCm==null && settings.bodyfatPct==null) settings.sex=null;
+    settings.bodyDefaultsCleared=true; await sset("settings",settings);
+  }
   if(!settings.examplesV4){                          // refresh the built-in example plans (must run before the legacy plan-specific migrations below)
     const oldEx=["pushpull","ppl","fullbody","marie","beginner-glp","advanced-intense","intermediate-balanced"];
     plans = plans.filter(p=> !oldEx.includes(p.id));                       // drop the previous demo plans (user-built plans are kept)
