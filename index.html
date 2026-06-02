@@ -151,8 +151,7 @@
   .largeTitle small{ display:block; font-size:15px; font-weight:500; color:var(--l2); letter-spacing:0; margin-top:8px; }
   /* backdrop behind the status-bar clock — slightly translucent (no blur, to match the tab bar and avoid scroll flicker) */
  .statusbar-bg{ position:fixed; top:0; left:0; right:0; height:env(safe-area-inset-top); z-index:40; pointer-events:none;
-    background:color-mix(in srgb, var(--bg) 80%, transparent);
-    -webkit-backdrop-filter:blur(20px) saturate(1.6); backdrop-filter:blur(20px) saturate(1.6); }
+    background:color-mix(in srgb, var(--bg) 88%, transparent); }
   /* ===== pages + bottom tab bar ===== */
   .page{ display:none; }
   .page.active{ display:block; animation:pagein .26s ease; }
@@ -171,15 +170,14 @@
   /* hide the scrollbar (still scrollable) */
   #pager .page, .sheetbody{ scrollbar-width:none; -ms-overflow-style:none; }
   #pager .page::-webkit-scrollbar, .sheetbody::-webkit-scrollbar{ width:0; height:0; display:none; }
-  /* Tab bar pinned to the viewport bottom, FROSTED (backdrop blur) like a native iOS tab bar. The blur is
-     what makes it read as one uniform translucent surface: without it, a plain-alpha fill renders solid
-     wherever there's only page background behind it (the home-indicator strip below the icons) but
-     translucent over scrolled content — that split is the "solid grey bar under the icons". Matches the
-     frosted .statusbar-bg at the top. */
+  /* Tab bar pinned to the viewport bottom, translucent. (backdrop-filter blur is unusable here — it
+     renders solid on iOS fixed elements in the standalone PWA.) */
   .tabbar{ position:fixed; left:0; right:0; bottom:0; max-width:540px; margin:0 auto; z-index:50; display:flex; align-items:center;
  padding:8px 8px calc(6px + env(safe-area-inset-bottom)); border-top:.5px solid var(--sep);
-    background:color-mix(in srgb, var(--bg) 80%, transparent);
-    -webkit-backdrop-filter:blur(20px) saturate(1.6); backdrop-filter:blur(20px) saturate(1.6); }
+    background:color-mix(in srgb, var(--bg) 88%, transparent); }
+  /* TEMP diagnostic: paint the home-indicator safe-area strip of the bar blue, to confirm where the solid band is */
+  .tabbar::after{ content:""; position:absolute; left:0; right:0; bottom:0; height:env(safe-area-inset-bottom);
+    background:rgba(0,120,255,.6); pointer-events:none; }
   .tabitem{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
     color:var(--l3); transition:color .15s; -webkit-tap-highlight-color:transparent; }
   .tabitem svg{ width:29px; height:29px; transition:transform .12s; }
@@ -661,6 +659,7 @@
 <body>
 
 <div class="statusbar-bg"></div>
+<div id="botline" style="position:fixed;left:0;right:0;bottom:0;height:3px;background:lime;z-index:100000;pointer-events:none;"></div>
 
 <!-- ===== WORKOUT PAGE ===== -->
 <div class="page" id="pageWorkout" data-tab="workout">
