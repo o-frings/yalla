@@ -136,6 +136,8 @@
   .btn .ic{ margin-right:6px; }
   .swapnote .ic{ width:13px; height:13px; vertical-align:-2px; margin-right:3px; }
   .addset .ic, .seg .ic{ width:13px; height:13px; vertical-align:-2px; margin-right:3px; }
+  .segabout svg{ width:14px; height:14px; vertical-align:-2px; margin-right:4px; }
+  .segabout{ color:var(--accent) !important; }
   .largeTitle{ font-size:29px; font-weight:700; letter-spacing:-1px; padding:calc(env(safe-area-inset-top) + 12px) 4px 16px; }
   .largeTitle .ltmain{ display:flex; align-items:center; gap:12px; }
   .largeTitle .ltmain .titleBtn{ flex:1; min-width:0; line-height:1.08; }
@@ -1136,7 +1138,7 @@
 // ================= default plan =================
 const DEFAULT_PLANS = [
 {
-  id:"ex-fullbody", name:"Short & Intense · Full Body",
+  id:"ex-fullbody", name:"Short & Intense · Full Body · 3 days + home · ~30 min",
   workouts:[
     {name:"Full Body A", sub:"Squat-led, ~30 min", rotate:true, ex:[
       {n:"Back Squat", t:"2 × 5–8", s:2},
@@ -1153,10 +1155,16 @@ const DEFAULT_PLANS = [
       {n:"Incline DB Press", t:"2 × 8–12", s:2},
       {n:"One-Arm DB Row", t:"2 × 8–12", s:2, ss:"a"},
       {n:"Incline DB Curl", t:"2 × 10–12", s:2, ss:"a"}]},
+    {name:"Home", sub:"No gym — bodyweight, ~25 min", rotate:false, ex:[
+      {n:"Bulgarian Split Squat", t:"2 × 10–12", s:2},
+      {n:"Push-Ups", t:"2 × max", s:2},
+      {n:"Inverted / Backpack Row", t:"2 × 8–12", s:2, ss:"a"},
+      {n:"Pike Push-Ups", t:"2 × 6–12", s:2, ss:"a"},
+      {n:"Plank", t:"2 × 30–45s", s:2}]},
   ]
 },
 {
-  id:"ex-upperlower", name:"Upper / Lower",
+  id:"ex-upperlower", name:"Balanced · Upper / Lower · 4 days · ~50 min",
   workouts:[
     {name:"Upper A", sub:"Strength-leaning push & pull", rotate:true, ex:[
       {n:"Barbell Bench Press", t:"3 × 6–10", s:3},
@@ -1183,7 +1191,7 @@ const DEFAULT_PLANS = [
   ]
 },
 {
-  id:"ex-ppl", name:"Push · Pull · Legs",
+  id:"ex-ppl", name:"High Volume · Push · Pull · Legs · 6 days · ~50 min",
   workouts:[
     {name:"Push A", sub:"Chest, shoulders & triceps", rotate:true, ex:[
       {n:"Barbell Bench Press", t:"3 × 6–10", s:3},
@@ -1224,7 +1232,7 @@ const DEFAULT_PLANS = [
   ]
 },
 {
-  id:"beginner-glp", name:"Glutes, Legs & Posture",
+  id:"beginner-glp", name:"Beginner · Glutes, Legs & Posture · 3 days + home",
   workouts:[
     {name:"Day 1", sub:"Glutes & hamstrings", rotate:true, ex:[
       {n:"Hip Thrust", t:"3 × 10–15", s:3},
@@ -2098,6 +2106,14 @@ async function init(){
     settings.examplesV5=true;
     await sset("plans",plans); await sset("settings",settings);
   }
+  if(!settings.examplesV6){                          // refresh example plans to the latest (richer titles, home days, posture moves)
+    const exIds=DEFAULT_PLANS.map(d=>d.id);
+    plans = plans.filter(p=> !exIds.includes(p.id));
+    DEFAULT_PLANS.forEach(d=> plans.push(JSON.parse(JSON.stringify(d))));
+    if(!plans.some(p=>p.id===settings.activePlanId)) settings.activePlanId=plans[0].id;
+    settings.examplesV6=true;
+    await sset("plans",plans); await sset("settings",settings);
+  }
   if(!settings.armsSmoothed){
     // Only upgrade the original, untouched Upper/Lower plan — never a customized one.
     const pp=plans.find(p=>p.id==="pushpull");
@@ -2616,6 +2632,10 @@ function renderSeg(){
   fs.innerHTML=ICON.plus+"Free";
   fs.onclick=()=>{ freeMode=true; swaps={}; renderSeg(); renderFree(); };
   seg.appendChild(fs);
+  const ab=document.createElement("div"); ab.className="s segabout";   // coach notes for the active plan, far right
+  ab.innerHTML=ICON.info+"About";
+  ab.onclick=()=> openAbout(activePlan());
+  seg.appendChild(ab);
 }
 function topSet(a){ if(!a||!a.length) return null; let b=a[0]; a.forEach(s=>{ if((parseFloat(s.w)||0)>(parseFloat(b.w)||0)) b=s; }); return b; }
 function daysSince(ts){ return Math.floor((Date.now()-ts)/86400000); }
@@ -2935,12 +2955,11 @@ function renderPlanList(){
       <div class="info"><div class="nm">${esc(p.name)}</div>
         <div class="meta">${p.workouts.length} workouts</div>
         <div class="pscores"><span class="psc pscbtn" data-bal="1"><b>Balance</b> ${sc.balance}<small>/5</small> ›</span><span class="psc"><b>Hypertrophy</b> ${sc.hyp}<small>/5</small></span></div></div>
-      <button class="edit about">About</button><button class="edit share">Share</button><button class="edit">Edit</button>`;
+      <button class="edit share">Share</button><button class="edit">Edit</button>`;
     row.querySelector(".info").onclick=async(ev)=>{ if(ev.target.closest(".pscbtn")) return;   // let the Balance chip open the radar instead of switching
       settings.activePlanId=p.id; freeMode=false; swaps={}; const ni=nextRotateIndex(p); curWk=ni>=0?ni:0;
       await sset("settings",settings); renderAll(); closeSheet("Plans"); toast("Switched to "+p.name); };
     row.querySelector(".pscbtn").onclick=(ev)=>{ ev.stopPropagation(); openMusclesFor(p.id); };
-    row.querySelector(".about").onclick=()=>openAbout(p);
     row.querySelector(".share").onclick=()=>openShare(p);
     row.querySelector(".edit:not(.share)").onclick=()=>{ closeSheet("Plans"); openEditor(p); };
     wrap.appendChild(row);
