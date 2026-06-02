@@ -443,6 +443,14 @@
     opacity:0; pointer-events:none; transition:all .3s; max-width:90%; text-align:center;
     box-shadow:0 8px 30px rgba(0,0,0,.35); }
   .toast.show{ opacity:1; transform:translate(-50%,0); }
+  /* first-open coachmark — a one-time hint that waits to be dismissed */
+  .coach{ position:fixed; left:50%; bottom:calc(64px + env(safe-area-inset-bottom)); transform:translate(-50%,16px); z-index:120;
+    width:calc(100% - 32px); max-width:380px; display:none; align-items:center; gap:10px;
+    background:rgba(28,28,30,.96); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); color:#fff;
+    padding:12px 12px 12px 16px; border-radius:16px; box-shadow:0 10px 36px rgba(0,0,0,.4); opacity:0; transition:opacity .3s, transform .3s; }
+  .coach.show{ display:flex; opacity:1; transform:translate(-50%,0); }
+  .coachbody{ flex:1; font-size:13.5px; line-height:1.4; }
+  .coachx{ flex:0 0 auto; background:var(--accent); color:#fff; border:none; border-radius:10px; padding:8px 12px; font-size:13px; font-weight:700; cursor:pointer; }
 
   .foot{ text-align:center; font-size:12.5px; color:var(--l3); margin:8px 0 4px; line-height:1.5; }
 
@@ -602,6 +610,7 @@
 </div><!-- /pageWorkout -->
 
 <div class="toast" id="toast"></div>
+<div class="coach" id="coach"><div class="coachbody"><span id="coachTxt"></span></div><button class="coachx" id="coachX">Got it</button></div>
 
 <!-- PLANS SHEET -->
 <div class="scrim" id="scrimPlans"></div>
@@ -2242,6 +2251,13 @@ function renderOverview(){
     +'<div class="stat"><div class="n">'+(settings.sessions||0)+'</div><div class="k">total</div></div>'
     +'<div class="stat"><div class="n">'+(settings.beatTotal||0)+'</div><div class="k">PRs beaten</div></div></div>';
   h+='<p class="ovp" style="margin:10px 4px 0;">'+motiv+'</p>';
+  // --- Discover --- surface one feature the user hasn't tried yet
+  const tips=settings.seenTips||{}, builtPlan=plans.some(p=>/^(custom|plan)/.test(p.id));
+  let disc=null;
+  if(!builtPlan) disc={t:"Build a plan around your goal",s:"Pick your days, time and focus — we choose the split and exercises for you.",btn:"Build a plan",act:"build"};
+  else if(!tips.muscles) disc={t:"See your muscle balance",s:"A radar of weekly sets per muscle against the growth target — spot gaps at a glance.",btn:"Open muscle balance",act:"balance"};
+  else if(!Object.keys(hist).length) disc={t:"Log your first session",s:"Tap a set to record weight × reps. Progress is tracked per exercise across plans.",btn:"Go to workout",act:"workout"};
+  if(disc){ h+='<div class="ed-label">Discover</div><div class="group ovnudge"><div class="pad"><div class="ovbig" style="font-size:19px;">'+esc(disc.t)+'</div><p class="ovp" style="margin-top:6px;">'+esc(disc.s)+'</p><button class="btn wide ovdisc" data-act="'+disc.act+'" style="margin-top:14px;">'+esc(disc.btn)+'</button></div></div>'; }
   // --- Needs attention --- maps to your objective: the general goal + what the active plan focuses on
   const obj=planObjective(activePlan()), todo=[], under=ovUnderMuscles();
   // first-things-first setup nudges (lead with signing in, then the bits the coach needs)
@@ -2263,7 +2279,9 @@ function renderOverview(){
   host.innerHTML=h;
   const sb=host.querySelector(".ovstart"); if(sb) sb.onclick=()=>showTab("workout");
   const hb=host.querySelector(".ovhome"); if(hb) hb.onclick=startHomeWorkout;
+  const db=host.querySelector(".ovdisc"); if(db) db.onclick=()=>ovAct(db.dataset.act);
   host.querySelectorAll(".ovtodo .ovtap").forEach(li=> li.onclick=()=>ovAct(li.dataset.act));
+  if(settings.objective && !document.querySelector("#onboardWrap.show")) coach("swipe","Swipe left or right to move between your three pages — Overview, Workout and Me.");
 }
 // route a Needs-attention item to where the user acts on it
 function ovAct(act){
@@ -2273,6 +2291,7 @@ function ovAct(act){
   else if(act==="account") goAccount();
   else if(act==="objective") goto("objChips");
   else if(act==="body") goto("goalStart", true);
+  else if(act==="build"){ showTab("workout"); openSheet("Build"); if(typeof updateBuildPreview==="function") updateBuildPreview(); coach("build","Tap a focus or drag the radar to emphasise muscles — your plan rebuilds around them. Pick your days and time and we choose the split."); }
   else showTab("workout");
 }
 // go to Me and reveal the account / sign-in section
@@ -2771,6 +2790,8 @@ function showTab(name){
     $("goalStart").value=settings.goalStart||""; $("goalTarget").value=settings.goalTarget||"";
     $("heightIn").value=settings.heightCm||""; $("bfIn").value=settings.bodyfatPct||""; $("nameIn").value=settings.name||"";
     renderDash(); renderAccount(); animateProgBars();
+  } else if(name==="workout"){
+    coach("workout","Tap a set to log your weight × reps. The coach tracks each exercise across all your plans, so progress carries over.");
   } else if(name==="overview"){
     renderOverview(); renderAccount();
   }
@@ -2891,6 +2912,7 @@ function openEditor(plan){
   $("edName").value = editing.name;
   $("edDelete").style.display = isNew?"none":"block";
   renderEditor(); openSheet("Ed");
+  coach("editor","Drag the ⠿ handle to reorder moves, tap the flame to superset two exercises, and add alternatives under each.");
 }
 function renderEditor(){
   const wrap=$("edWorkouts"); wrap.innerHTML="";
@@ -3108,8 +3130,9 @@ $("scrimMus").onclick=()=>closeSheet("Mus");
 document.querySelectorAll("#musSeg .s").forEach(s=> s.onclick=()=>{ musWindow=+s.dataset.d; renderMuscles(); });
 document.querySelectorAll("#musMetric .s").forEach(s=> s.onclick=()=>{ musMetric=s.dataset.m; renderMuscles(); });
 document.querySelectorAll("#musVolMode .s").forEach(s=> s.onclick=()=>{ musVolMode=s.dataset.vm; renderMuscles(); });
-function openMuscles(){ if(!plans.some(p=>p.id===musSrc)) musSrc="log"; renderMuscles(); openSheet("Mus"); }
-function openMusclesFor(id){ if(plans.some(p=>p.id===id)){ musSrc=id; renderMuscles(); openSheet("Mus"); } }  // plan-level entry
+const MUS_TIP="This radar shows weekly sets per muscle against the ~10-set growth target. Switch the source to compare your logs and each plan.";
+function openMuscles(){ if(!plans.some(p=>p.id===musSrc)) musSrc="log"; renderMuscles(); openSheet("Mus"); coach("muscles",MUS_TIP); }
+function openMusclesFor(id){ if(plans.some(p=>p.id===id)){ musSrc=id; renderMuscles(); openSheet("Mus"); coach("muscles",MUS_TIP); } }  // plan-level entry
 function buildSrc(){
   const wrap=$("musSrc"); wrap.innerHTML="";
   const mk=(val,label)=>{ const s=document.createElement("div"); s.className="s"+(musSrc===val?" active":"");
@@ -4038,7 +4061,7 @@ function updateBuildPreview(){
     dragging=false; });
   c.addEventListener("pointercancel", ()=>{ dragging=false; });
 })();
-$("buildPlan").onclick=()=>{ closeSheet("Plans"); openSheet("Build"); updateBuildPreview(); };
+$("buildPlan").onclick=()=>{ closeSheet("Plans"); openSheet("Build"); updateBuildPreview(); coach("build","Tap a focus or drag the radar to emphasise muscles — your plan rebuilds around them. Pick your days and time and we choose the split."); };
 $("buildClose").onclick=()=>closeSheet("Build");
 $("scrimBuild").onclick=()=>closeSheet("Build");
 $("buildGo").onclick=async()=>{
@@ -4179,6 +4202,14 @@ $("saveImgBtn").onclick=()=>shareImage(true);
 $("shareClose").onclick=()=>closeSheet("Share");
 
 let tT; function toast(m,big){ const t=$("toast"); t.textContent=m; t.classList.toggle("big",!!big); t.classList.add("show"); clearTimeout(tT); tT=setTimeout(()=>t.classList.remove("show"), big?2800:2300); }
+// first-open coachmark: show a hint once per id (spreads the "how to use" across the app over time)
+function coach(id, msg){
+  if(!settings.seenTips) settings.seenTips={};
+  if(settings.seenTips[id] || $("coach").classList.contains("show")) return;   // once per id; one at a time
+  settings.seenTips[id]=1; sset("settings",settings);
+  $("coachTxt").textContent=msg; $("coach").classList.add("show");
+}
+$("coachX").onclick=()=>$("coach").classList.remove("show");
 
 init();
 
