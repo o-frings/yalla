@@ -177,11 +177,11 @@
      (no visible panel / band), covers scrolled content (no bleed), and reads uniform top-to-bottom. Kept
      short so it doesn't ride high. */
   .tabbar{ position:fixed; left:0; right:0; bottom:0; max-width:540px; margin:0 auto; z-index:50; display:flex; align-items:center;
-    padding:6px 8px calc(4px + env(safe-area-inset-bottom) * 0.5); border-top:.5px solid var(--sep);
+    padding:4px 8px calc(2px + env(safe-area-inset-bottom) * 0.35); border-top:.5px solid var(--sep);
     background:var(--bg); }
   .tabitem{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
     color:var(--l3); transition:color .15s; -webkit-tap-highlight-color:transparent; }
-  .tabitem svg{ width:26px; height:26px; transition:transform .12s; }
+  .tabitem svg{ width:23px; height:23px; transition:transform .12s; }
   .tabitem span{ display:none; }                 /* icons only — labels hidden (kept as aria-label) */
   .tabitem.active{ color:var(--accent); }
   .tabitem:active svg{ transform:scale(.86); }
