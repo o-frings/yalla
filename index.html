@@ -1129,40 +1129,8 @@ const DEFAULT_PLANS = [{
       {n:"Pike Push-Ups", t:"3 × 8–15", s:3},
       {n:"Hollow Hold (sec)", t:"3 × 30–45s", s:3}]},
   ]
-},
-{
-  id:"marie", name:"Marie's Glutes & Legs",
-  workouts:[
-    {name:"Day 1", sub:"Butt & Hamstrings", rotate:true, ex:[
-      {n:"Hip Thrust", t:"3 × 8–12", s:3},
-      {n:"Romanian Deadlift", t:"3 × 8–12", s:3},
-      {n:"Seated Leg Curl", t:"3 × 10–15", s:3},
-      {n:"Hip Abduction", t:"3 × 12–15", s:3},
-      {n:"Seated Row", t:"3 × 10–12", s:3},
-      {n:"Cable Crunch", t:"3 × 12–15", s:3}]},
-    {name:"Day 2", sub:"Front of Legs & Butt", rotate:true, ex:[
-      {n:"Goblet Squat", t:"3 × 8–12", s:3},
-      {n:"Bulgarian Split Squat", t:"3 × 8–10", s:3},
-      {n:"Leg Extension", t:"3 × 10–15", s:3},
-      {n:"Chest Press", t:"3 × 10–12", s:3},
-      {n:"Face Pulls", t:"3 × 12–15", s:3},
-      {n:"Cable Crunch", t:"3 × 12–15", s:3}]},
-    {name:"Day 3", sub:"Mixed Legs, Butt & Posture", rotate:true, ex:[
-      {n:"Walking Lunges", t:"3 × 10 / leg", s:3},
-      {n:"Single-Leg Hip Thrust", t:"3 × 12", s:3},
-      {n:"Seated Leg Curl", t:"3 × 12", s:3},
-      {n:"Calf Raises", t:"3 × 12–15", s:3},
-      {n:"Band Pull-Aparts", t:"3 × 15", s:3},
-      {n:"Hanging Leg Raise", t:"3 × 12", s:3}]},
-    {name:"Home", sub:"No gym — bodyweight & band", rotate:false, ex:[
-      {n:"Glute Bridge", t:"3 × 15–20", s:3},
-      {n:"Bulgarian Split Squat", t:"3 × 10–12", s:3},
-      {n:"Single-Leg Glute Bridge", t:"3 × 10–12", s:3},
-      {n:"Reverse Lunge", t:"3 × 10–12", s:3},
-      {n:"Banded Side Steps", t:"3 × 15–20", s:3},
-      {n:"Calf Raises", t:"3 × 15–20", s:3}]},
-  ]
-}];
+}
+];
 const DELOAD_AT = 24;
 const ICON={
   plus:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg>',
@@ -1991,12 +1959,11 @@ async function init(){
   extlog= (await sget("extlog")) || [];
   draft = (await sget("draft")) || {};
   if(settings.achUnlocked==null) settings.achUnlocked=unlockedIds();
-  if(!settings.mariesSeeded){
-    if(!plans.some(p=>p.id==="marie")){
-      const m=DEFAULT_PLANS.find(p=>p.id==="marie");
-      if(m) plans.push(JSON.parse(JSON.stringify(m)));
-    }
-    settings.mariesSeeded=true;
+  if(!settings.marieRemoved){                       // retire the built-in "Marie's Glutes & Legs" demo plan
+    plans = plans.filter(p=>p.id!=="marie");
+    if(!plans.length) plans=JSON.parse(JSON.stringify(DEFAULT_PLANS));
+    if(settings.activePlanId==="marie") settings.activePlanId = plans.length?plans[0].id:null;
+    settings.marieRemoved=true;
     await sset("plans",plans); await sset("settings",settings);
   }
   if(!settings.armsSmoothed){
