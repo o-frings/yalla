@@ -141,8 +141,9 @@
   .largeTitle .ltmain .titleBtn{ flex:1; min-width:0; line-height:1.08; }
   .largeTitle .ltmain .iconbtn{ flex:0 0 auto; align-self:flex-start; margin-top:2px; }
   .largeTitle small{ display:block; font-size:14.5px; font-weight:500; color:var(--l2); letter-spacing:0; margin-top:6px; }
-  /* invisible backdrop behind the status-bar clock so scrolled content fades out cleanly (no visible bar) */
-  .statusbar-bg{ position:fixed; top:0; left:0; right:0; height:env(safe-area-inset-top); background:var(--bg); z-index:40; pointer-events:none; }
+  /* frosted backdrop behind the status-bar clock — slightly translucent so content blurs through */
+  .statusbar-bg{ position:fixed; top:0; left:0; right:0; height:env(safe-area-inset-top); z-index:40; pointer-events:none;
+    background:color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter:blur(22px) saturate(180%); -webkit-backdrop-filter:blur(22px) saturate(180%); }
   /* ===== pages + bottom tab bar ===== */
   .page{ display:none; }
   .page.active{ display:block; animation:pagein .26s ease; }
@@ -153,11 +154,14 @@
   #track.anim{ transition:transform .3s cubic-bezier(.22,.61,.36,1); }
   #pager .page, #pager .page.active{ display:block; animation:none; flex:0 0 100%; width:100%; height:100%;
     overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; padding:0 16px calc(40px + env(safe-area-inset-bottom)); }
-  .tabbar{ position:fixed; left:0; right:0; bottom:0; z-index:60; display:flex; max-width:540px; margin:0 auto;
-    height:calc(52px + env(safe-area-inset-bottom)); padding-bottom:env(safe-area-inset-bottom);  /* fixed bar; home-indicator inset only below the icons */
+  /* hide the scrollbar (still scrollable) */
+  #pager .page, .sheetbody{ scrollbar-width:none; -ms-overflow-style:none; }
+  #pager .page::-webkit-scrollbar, .sheetbody::-webkit-scrollbar{ width:0; height:0; display:none; }
+  /* anchored INSIDE the fixed #pager (not viewport-fixed) so iOS can't jitter it or float it above the keyboard */
+  .tabbar{ position:absolute; left:0; right:0; bottom:0; z-index:2; display:flex;
+    height:calc(52px + env(safe-area-inset-bottom)); padding-bottom:env(safe-area-inset-bottom);  /* fixed height; home-indicator inset only below the icons */
     align-items:stretch; overflow:hidden; border-top:.5px solid var(--sep);
-    background:color-mix(in srgb, var(--bg) 80%, transparent); backdrop-filter:blur(22px) saturate(180%); -webkit-backdrop-filter:blur(22px) saturate(180%);
-    transform:translateZ(0); }   /* own compositing layer so the blur doesn't shimmer over the moving pager */
+    background:color-mix(in srgb, var(--bg) 68%, transparent); backdrop-filter:blur(22px) saturate(180%); -webkit-backdrop-filter:blur(22px) saturate(180%); }
   .tabitem{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
     color:var(--l3); transition:color .15s; -webkit-tap-highlight-color:transparent; }
   .tabitem svg{ width:26px; height:26px; transition:transform .12s; }
@@ -2666,6 +2670,7 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
   const track=document.createElement("div"); track.id="track"; pager.appendChild(track);
   pages[0].parentNode.insertBefore(pager, pages[0]);     // pager takes the first page's slot…
   pages.forEach(p=> track.appendChild(p));               // …then all three move into the track, in tab order
+  const tabbar=document.querySelector(".tabbar"); if(tabbar) pager.appendChild(tabbar);  // anchor the tab bar inside the stable fixed pager
   const W=()=> pager.clientWidth || window.innerWidth;
   const curTab=()=>{ const a=document.querySelector(".page.active"); return a?a.dataset.tab:"overview"; };
   const clamp=(v,a,b)=> v<a?a:(v>b?b:v);
