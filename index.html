@@ -705,6 +705,13 @@
       <button class="chip" data-v="fatloss">Lose fat</button><button class="chip" data-v="fitness">Stay fit</button>
     </div>
 
+    <div class="ed-label">Training focus <span class="subhint">— up to two; the builder starts here</span></div>
+    <div class="chips wrap" id="focusChips">
+      <button class="chip" data-v="balanced">Balanced</button><button class="chip" data-v="upper">Upper body</button>
+      <button class="chip" data-v="lower">Lower body</button><button class="chip" data-v="glutes">Glutes &amp; legs</button>
+      <button class="chip" data-v="arms">Arms</button><button class="chip" data-v="shoulders">Shoulders</button><button class="chip" data-v="chest">Chest</button><button class="chip" data-v="back">Back</button><button class="chip" data-v="posture">Posture fix</button>
+    </div>
+
     <div class="ed-label">Goal weight</div>
     <div class="gset">
       <input id="goalStart" type="number" inputmode="decimal" placeholder="Start">
@@ -2182,7 +2189,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi]||e.n; }
-let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false, planStartAt:null, discRead:{} };
+let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false, planStartAt:null, discRead:{}, focusAreas:["balanced"] };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -4082,7 +4089,16 @@ async function setObjective(o){
   if(ob) ob.classList.remove("show");
   renderDash(); if(typeof renderOverview==="function") renderOverview();
 }
-function renderObjective(){ document.querySelectorAll("#objChips .chip").forEach(c=> c.classList.toggle("on", c.dataset.v===settings.objective)); }
+function renderObjective(){ document.querySelectorAll("#objChips .chip").forEach(c=> c.classList.toggle("on", c.dataset.v===settings.objective));
+  const fa=settings.focusAreas||["balanced"]; document.querySelectorAll("#focusChips .chip").forEach(c=> c.classList.toggle("on", fa.indexOf(c.dataset.v)>=0)); }
+// the user's stated training focus — picked in Me, used to pre-fill the builder; up to two, "Balanced" exclusive
+document.querySelectorAll("#focusChips .chip").forEach(c=> c.onclick=async()=>{
+  const v=c.dataset.v; let sel=(settings.focusAreas||[]).slice();
+  if(v==="balanced") sel=["balanced"];
+  else { sel=sel.filter(x=>x!=="balanced"); const i=sel.indexOf(v); if(i>=0) sel.splice(i,1); else { sel.push(v); if(sel.length>2) sel.shift(); } }
+  if(!sel.length) sel=["balanced"];
+  settings.focusAreas=sel; await sset("settings",settings); renderObjective();
+});
 function progressInsight(){
   const sessions=settings.sessions||0, slope=bwSlopePctWk(28), perWk=trainingDays(28)/4;
   const obj=settings.objective, gs=+settings.goalStart, gt=+settings.goalTarget;
@@ -4185,6 +4201,7 @@ function injuryBlocks(name, injuries){
   if(injuries.includes("elbows") && /skull|close-grip|\bdip\b/.test(n)) return true;
   return false;
 }
+const FOCUS_LABEL={ balanced:"balanced", upper:"upper body", lower:"lower body", glutes:"glutes & legs", arms:"arms", shoulders:"shoulders", chest:"chest", back:"back", posture:"posture" };
 function focusGroups(focus){ return ({ upper:["chest","back","shoulders"], lower:["quads","hamstrings","glutes"],
   glutes:["glutes","hamstrings"], arms:["biceps","triceps"], chest:["chest"], back:["back"], balanced:[] }[focus])||[]; }
 function buildSplit(freq, exp){
@@ -4424,7 +4441,10 @@ function updateBuildPreview(){
     dragging=false; });
   c.addEventListener("pointercancel", ()=>{ dragging=false; });
 })();
-$("buildPlan").onclick=()=>{ closeSheet("Plans"); openSheet("Build"); updateBuildPreview(); coach("build","Tap a focus or drag the radar to emphasise muscles — your plan rebuilds around them. Pick your days and time and we choose the split."); };
+$("buildPlan").onclick=()=>{ closeSheet("Plans");
+  build.focus=(settings.focusAreas||["balanced"]).slice();        // recommend the focus you stated in Me (you can change it)
+  build.emphasis=emphasisFromFocuses(build.focus);
+  openSheet("Build"); updateBuildPreview(); coach("build","Tap a focus or drag the radar to emphasise muscles — your plan rebuilds around them. Pick your days and time and we choose the split."); };
 $("buildClose").onclick=()=>closeSheet("Build");
 $("scrimBuild").onclick=()=>closeSheet("Build");
 $("buildGo").onclick=async()=>{
@@ -4434,6 +4454,15 @@ $("buildGo").onclick=async()=>{
   curWk=nextRotateIndex(plan); if(curWk<0) curWk=0;
   closeSheet("Build"); renderAll();
   toast("Your plan is ready — first workout loaded.", true);
+  // if this plan's focus diverges from your stated focus, offer to update it (never forced)
+  const bf=(Array.isArray(build.focus)?build.focus:[]).filter(Boolean).slice().sort().join(",");
+  const sf=(settings.focusAreas||["balanced"]).slice().sort().join(",");
+  if(bf && bf!=="balanced" && bf!==sf){
+    const human=listWords((Array.isArray(build.focus)?build.focus:[]).map(f=>FOCUS_LABEL[f]||f));
+    confirmAsk("This plan leans toward "+esc(human)+", different from your stated focus. Make that your overall focus?","Update focus",async()=>{
+      settings.focusAreas=(build.focus||[]).slice(); await sset("settings",settings); renderObjective(); toast("Focus updated to match.");
+    });
+  }
 };
 
 // ================= utils =================
