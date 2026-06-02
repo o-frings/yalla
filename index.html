@@ -182,6 +182,7 @@
   .ovtodo{ margin:0; padding-left:18px; }
   .ovtodo li{ font-size:14px; color:var(--l2); line-height:1.5; margin:6px 0; }
   .ovtodo li::marker{ color:var(--accent); }
+  .ovtodo li.ovmore{ list-style:none; color:var(--l3); font-size:12.5px; margin-left:-18px; }
   .ovtap{ cursor:pointer; transition:opacity .12s; }
   .ovtap:active{ opacity:.55; }
   .ovtodo li.ovtap{ padding-right:16px; position:relative; }
@@ -2492,28 +2493,10 @@ function renderOverview(){
   } else {
     h+='<div class="group"><div class="pad"><div class="ovbig">Pick a plan to begin</div><button class="btn wide ovstart" style="margin-top:14px;">Go to workout</button></div></div>';
   }
-  // --- Am I on track? ---
-  const ins=progressInsight();
-  h+='<div class="ed-label">Am I on track?</div>';
-  h+='<div class="insight v-'+ins.v+'"><div class="ititle">'+esc(ins.title)+'</div><div class="itext">'+esc(ins.text)+'</div></div>';
-  // --- This week + streak ---
+  // a one-line motivator under Today (the full stats, chart and insight live on Me)
   const f7=trainingDays(7);
   const motiv = f7>=4?"Strong week — you’re putting in the work." : f7>=2?"Good momentum — keep it rolling." : f7>=1?"You’ve started — one more session lifts the whole week." : "Fresh week. The first session is the hardest — let’s go.";
-  h+='<div class="ed-label">This week</div>';
-  h+='<div class="stats" style="border:.5px solid var(--line); border-radius:12px;">'
-    +'<div class="stat"><div class="n">'+f7+'</div><div class="k">sessions · 7d</div></div>'
-    +'<div class="stat"><div class="n">'+(settings.sessions||0)+'</div><div class="k">total</div></div>'
-    +'<div class="stat"><div class="n">'+(settings.beatTotal||0)+'</div><div class="k">PRs beaten</div></div></div>';
   h+='<p class="ovp" style="margin:10px 4px 0;">'+motiv+'</p>';
-  // --- featured chart --- balance radar when something's off, else the weekly-sets trend
-  let ovChart=null;
-  if(Object.keys(hist).length){ ovChart = ovUnderMuscles().length ? "balance" : "volume";
-    h+='<div class="ed-label">'+(ovChart==="balance"?"Muscle balance · this month":"Weekly sets · last 10 weeks")+' <span class="subhint">— tap for detail ›</span></div>';
-    h+='<div class="group ovtap ovchart" data-chart="'+ovChart+'"><div class="pad" style="display:flex; justify-content:center;">'
-      + (ovChart==="balance" ? '<canvas id="ovChartC" width="520" height="520" style="width:100%; max-width:300px; height:auto;"></canvas>'
-                             : '<canvas id="ovChartC" width="660" height="200" style="width:100%; height:auto;"></canvas>')
-      + '</div></div>';
-  }
   // --- Discover --- a swipeable deck of tips / not-yet-used features
   const dt=discoverTips();
   if(dt.length){
@@ -2540,18 +2523,15 @@ function renderOverview(){
   if(settings.planStartAt && (Date.now()-settings.planStartAt) > 42*86400000 && Object.keys(hist).length)
     push(30,"You've run this plan ~6 weeks — swap 1–2 accessories to freshen it (long-press swap → Permanently).","workout");
   todo.sort((a,b)=> b.u-a.u);   // most urgent first
+  const shown=todo.slice(0,2), more=todo.length-shown.length;   // keep the start page lean — top 2 only
   h+='<div class="ed-label">Needs attention</div>';
   h+='<div class="ovobj">Optimising for <b>'+esc(obj.label)+'</b></div>';
-  if(todo.length){ h+='<div class="group"><div class="pad"><ul class="ovtodo">'+todo.map(it=>'<li class="ovtap" data-act="'+it.act+'">'+it.t+'<span class="ovchev">›</span></li>').join('')+'</ul></div></div>'; }
+  if(shown.length){ h+='<div class="group"><div class="pad"><ul class="ovtodo">'+shown.map(it=>'<li class="ovtap" data-act="'+it.act+'">'+it.t+'<span class="ovchev">›</span></li>').join('')
+    +(more>0?'<li class="ovmore">+'+more+' more</li>':'')+'</ul></div></div>'; }
   else { h+='<div class="group"><div class="pad"><p class="ovp">On track for '+esc(obj.label)+' — every muscle your plan targets is getting enough volume. Keep showing up. 👏</p></div></div>'; }
   host.innerHTML=h;
   const sb=host.querySelector(".ovstart"); if(sb) sb.onclick=()=>showTab("workout");
   const hb=host.querySelector(".ovhome"); if(hb) hb.onclick=startHomeWorkout;
-  if(ovChart){ const oc=$("ovChartC");
-    if(ovChart==="balance") drawRadar(weeklyEquiv(muscleVolume(28,"sets").totals,28), "ovChartC", WEEKLY_SET_TARGET);
-    else drawOvSets("ovChartC");
-    const card=host.querySelector(".ovchart"); if(card) card.onclick=()=> ovChart==="balance" ? openMuscles() : showTab("me");
-  }
   host.querySelectorAll(".discx").forEach(x=> x.onclick=(ev)=>{ ev.stopPropagation(); dismissTip(x.dataset.tip); });
   host.querySelectorAll(".ovdisc").forEach(b=> b.onclick=()=>{ if(b.dataset.tip){ settings.discRead=settings.discRead||{}; settings.discRead[b.dataset.tip]=1; sset("settings",settings); } ovAct(b.dataset.act); });
   const dw=$("discWrap"), dots=$("discDots");
