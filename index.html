@@ -191,6 +191,13 @@
   .ovtodo li.ovtap .ovchev{ position:absolute; right:0; }
   .ovnudge{ background:var(--accent-soft); border:.5px solid transparent; box-shadow:0 0 0 1px var(--accent-soft) inset; }
   /* overview snapshot — this-week strip */
+  /* collapsible Me sections — keep the page sleek; expand on demand */
+  .mefold{ border-top:.5px solid var(--line); }
+  .mefold > summary{ list-style:none; cursor:pointer; display:flex; align-items:center; justify-content:space-between;
+    font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--l3); padding:15px 2px 13px; }
+  .mefold > summary::-webkit-details-marker{ display:none; }
+  .mefold > summary::after{ content:"⌄"; font-size:17px; line-height:1; color:var(--l3); transform:translateY(-3px); transition:transform .2s; }
+  .mefold[open] > summary::after{ transform:translateY(1px) rotate(180deg); }
   .ovweek{ display:grid; grid-template-columns:repeat(7,1fr); gap:7px; }
   .ovd{ text-align:center; font-size:10px; font-weight:700; color:var(--l3); }
   .ovd i{ display:block; height:28px; border-radius:8px; background:var(--row); margin-top:5px; }
@@ -766,9 +773,11 @@
       <div class="stat"><div class="n" id="stBeat">0</div><div class="k">Beat last</div></div>
     </div>
 
-    <div class="ed-label" style="margin-top:18px;">Achievements</div>
-    <div class="achcap">Lifetime volume moved: <b id="achVol">—</b></div>
-    <div class="achgrid" id="achGrid"></div>
+    <details class="mefold">
+      <summary>Achievements</summary>
+      <div class="achcap">Lifetime volume moved: <b id="achVol">—</b></div>
+      <div class="achgrid" id="achGrid"></div>
+    </details>
 
     <div class="ed-label" style="margin-top:18px;">What's slowing progress?</div>
     <div class="insight" id="progInsight"></div>
@@ -776,10 +785,12 @@
       <summary>Sources</summary>
       <ul id="progSrc"></ul>
     </details>
-    <div class="ed-label" style="margin-top:18px;">Training calendar</div>
-    <div class="calcap" id="calCap"></div>
-    <div class="caldow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
-    <div class="calgrid" id="calGrid"></div>
+    <details class="mefold">
+      <summary>Training calendar</summary>
+      <div class="calcap" id="calCap"></div>
+      <div class="caldow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+      <div class="calgrid" id="calGrid"></div>
+    </details>
 
     <div id="setMisc">
     <div class="ed-label" style="margin-top:18px;">Appearance</div>
