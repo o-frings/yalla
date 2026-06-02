@@ -1138,7 +1138,7 @@
 // ================= default plan =================
 const DEFAULT_PLANS = [
 {
-  id:"ex-fullbody", name:"Short & Intense · Full Body · 3 days + home · ~30 min",
+  id:"ex-fullbody", name:"Short & Intense", level:"all levels",
   workouts:[
     {name:"Full Body A", sub:"Squat-led, ~30 min", rotate:true, ex:[
       {n:"Back Squat", t:"2 × 5–8", s:2},
@@ -1164,7 +1164,7 @@ const DEFAULT_PLANS = [
   ]
 },
 {
-  id:"ex-upperlower", name:"Balanced · Upper / Lower · 4 days · ~50 min",
+  id:"ex-upperlower", name:"Upper / Lower", level:"intermediate",
   workouts:[
     {name:"Upper A", sub:"Strength-leaning push & pull", rotate:true, ex:[
       {n:"Barbell Bench Press", t:"3 × 6–10", s:3},
@@ -1191,7 +1191,7 @@ const DEFAULT_PLANS = [
   ]
 },
 {
-  id:"ex-ppl", name:"High Volume · Push · Pull · Legs · 6 days · ~50 min",
+  id:"ex-ppl", name:"Push · Pull · Legs", level:"advanced",
   workouts:[
     {name:"Push A", sub:"Chest, shoulders & triceps", rotate:true, ex:[
       {n:"Barbell Bench Press", t:"3 × 6–10", s:3},
@@ -1232,7 +1232,7 @@ const DEFAULT_PLANS = [
   ]
 },
 {
-  id:"beginner-glp", name:"Beginner · Glutes, Legs & Posture · 3 days + home",
+  id:"beginner-glp", name:"Glutes, Legs & Posture", level:"beginner",
   workouts:[
     {name:"Day 1", sub:"Glutes & hamstrings", rotate:true, ex:[
       {n:"Hip Thrust", t:"3 × 10–15", s:3},
@@ -2106,12 +2106,12 @@ async function init(){
     settings.examplesV5=true;
     await sset("plans",plans); await sset("settings",settings);
   }
-  if(!settings.examplesV6){                          // refresh example plans to the latest (richer titles, home days, posture moves)
+  if(!settings.examplesV7){                          // refresh example plans to the latest (brief titles + level/attributes, home days, posture moves)
     const exIds=DEFAULT_PLANS.map(d=>d.id);
     plans = plans.filter(p=> !exIds.includes(p.id));
     DEFAULT_PLANS.forEach(d=> plans.push(JSON.parse(JSON.stringify(d))));
     if(!plans.some(p=>p.id===settings.activePlanId)) settings.activePlanId=plans[0].id;
-    settings.examplesV6=true;
+    settings.examplesV7=true;
     await sset("plans",plans); await sset("settings",settings);
   }
   if(!settings.armsSmoothed){
@@ -2232,7 +2232,7 @@ function renderAll(){ renderNav(); renderDash(); renderSeg(); renderWorkout(); }
 // ================= dashboard =================
 function renderNav(){
   $("ltName").textContent = activePlan().name;
-  $("planSub").textContent = activePlan().workouts.length + " workouts · rolling cycle";
+  $("planSub").textContent = planMeta(activePlan());
   $("bwGoalTxt").textContent = settings.goalTarget!=null ? settings.goalTarget+" kg" : "—";
 }
 // ================= overview (coach home) =================
@@ -2723,7 +2723,7 @@ window.addEventListener("pagehide", flushDraft);
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden") flushDraft(); });
 function renderWorkout(){
   const p=activePlan(), w=p.workouts[curWk], list=$("exlist"); list.innerHTML="";
-  $("planSub").textContent = p.workouts.length+" workouts · rolling cycle";
+  $("planSub").textContent = planMeta(p);
   const nSS=workoutSupersets(w);
   $("wkMeta").style.display="";
   $("wkMeta").innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
@@ -2953,7 +2953,7 @@ function renderPlanList(){
     const row=document.createElement("div"); row.className="planrow";
     row.innerHTML=`<div class="check">${active?'✓':''}</div>
       <div class="info"><div class="nm">${esc(p.name)}</div>
-        <div class="meta">${p.workouts.length} workouts</div>
+        <div class="meta">${esc(planMeta(p))}</div>
         <div class="pscores"><span class="psc pscbtn" data-bal="1"><b>Balance</b> ${sc.balance}<small>/5</small> ›</span><span class="psc"><b>Hypertrophy</b> ${sc.hyp}<small>/5</small></span></div></div>
       <button class="edit share">Share</button><button class="edit">Edit</button>`;
     row.querySelector(".info").onclick=async(ev)=>{ if(ev.target.closest(".pscbtn")) return;   // let the Balance chip open the radar instead of switching
@@ -3192,6 +3192,16 @@ $("meBalance").onclick=()=>{ openMuscles(); };
 $("musClose").onclick=()=>closeSheet("Mus");
 $("scrimMus").onclick=()=>closeSheet("Mus");
 // ---- per-plan "about" / coach notes ----
+// consistent attributes line for any plan: days (+home) · duration · level
+function planMeta(plan){
+  if(!plan || !plan.workouts) return "";
+  const main=plan.workouts.filter(w=>w.rotate!==false);
+  const days=main.length||plan.workouts.length;
+  const hasHome=plan.workouts.some(w=>w.rotate===false || /home/i.test(w.name||""));
+  const mins=(main.length?main:plan.workouts).map(workoutMinutes).filter(x=>x>0);
+  const t=mins.length ? "~"+(Math.round(mins.reduce((a,b)=>a+b,0)/mins.length/5)*5)+" min" : "";
+  return [days+" day"+(days===1?"":"s")+(hasHome?" + home":""), t, plan.level||""].filter(Boolean).join(" · ");
+}
 function splitType(plan){
   const names=plan.workouts.map(w=>(w.name||"").toLowerCase()).join(" ");
   const n=plan.workouts.filter(w=>w.rotate!==false).length || plan.workouts.length;
@@ -3213,7 +3223,8 @@ function openAbout(plan){
   look.push("<b>Recover</b> — take an easier week roughly every 6 weeks; I'll nudge you when you're due.");
   look.push("<b>Form first</b> — control the lowering phase and use a full range; that's where most of the growth (and safety) lives.");
   let h='';
-  h+='<div class="ed-label">Focus</div><p class="ovp">Built for <b>'+esc(obj.label)+'</b>'+(top.length?', leaning on '+esc(listWords(top)):'')+'. Run it on a rolling cycle and let the same exercises progress over time.</p>';
+  h+='<p class="ovp" style="margin:0 2px 4px;color:var(--l3);">'+esc(planMeta(plan))+'</p>';
+  h+='<div class="ed-label">Focus</div><p class="ovp">Built for <b>'+esc(obj.label)+'</b>. Run it on a rolling cycle and let the same exercises progress over time.</p>';
   h+='<div class="ed-label">The split</div><p class="ovp"><b>'+esc(sp.type)+'</b> — '+esc(sp.why)+'</p>';
   h+='<div class="ed-label">What I weighted it for</div><p class="ovp">Hypertrophy <b>'+sc.hyp+'/5</b> and balance <b>'+sc.balance+'/5</b> — '+hypTxt+' with '+balTxt+'.</p>';
   h+='<div class="ed-label">Things to look at</div><ul class="ovtodo">'+look.map(x=>'<li>'+x+'</li>').join('')+'</ul>';
@@ -4095,7 +4106,7 @@ function buildPlan(b){
   workouts.forEach(wk=>{ delete wk._meta; delete wk._lvl; });
   const objLbl={muscle:"Hypertrophy",strength:"Strength",fatloss:"Fat-loss",fitness:"Fitness"}[b.obj]||"Custom";
   const accLbl={gym:"",park:" · park",home:" · home",mostly_gym:" · gym+home",mostly_home:" · home+gym"}[access]||"";
-  return { id:"custom-"+Date.now(), name:objLbl+" · "+b.freq+"×/week"+accLbl, workouts };
+  return { id:"custom-"+Date.now(), name:objLbl+accLbl, level:b.exp, workouts };
 }
 document.querySelectorAll("#sheetBuild .bopt").forEach(seg=>{ const k=seg.dataset.k; seg.querySelectorAll(".s").forEach(s=> s.onclick=()=>{
   seg.querySelectorAll(".s").forEach(x=>x.classList.toggle("active",x===s)); const v=s.dataset.v; build[k]=isNaN(+v)?v:+v; updateBuildPreview(); }); });
