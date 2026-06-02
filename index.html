@@ -157,11 +157,11 @@
   .page.active{ display:block; animation:pagein .26s ease; }
   @keyframes pagein{ from{ opacity:0; transform:translateY(5px); } to{ opacity:1; transform:none; } }
   /* horizontal pager: three panels side-by-side that follow the finger, each scrolling vertically on its own */
-  /* Fixed app shell, sized to the *visible* viewport by JS (visualViewport) — the one height iOS
-     standalone PWAs report accurately. This defeats the relaunch "tab bar floats up" bug: the shell
-     can never be stranded shorter than the screen by the safe-area mis-measure. 100dvh is only the
-     pre-JS first-paint fallback. */
-  #shell{ position:fixed; top:0; left:0; right:0; height:100dvh; max-width:540px; margin:0 auto; overflow:hidden; z-index:1; }
+  /* Fixed app shell sized purely by CSS dynamic-viewport height (100dvh) — no JS. On the installed iOS
+     PWA, dvh tracks the real screen across launch/resume/rotation and self-corrects; measuring it in JS
+     and pinning an inline px height is what stranded the tab bar above the bottom on relaunch. 100vh is
+     the fallback for engines without dvh. */
+  #shell{ position:fixed; top:0; left:0; right:0; height:100vh; height:100dvh; max-width:540px; margin:0 auto; overflow:hidden; z-index:1; }
   #pager{ position:absolute; inset:0; overflow:hidden; }
   #track{ display:flex; height:100%; }
   #track.anim{ transition:transform .3s cubic-bezier(.22,.61,.36,1); }
@@ -3263,15 +3263,10 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
   shell.appendChild(pager);
   pages.forEach(p=> track.appendChild(p));               // all three pages move into the swipe track, in tab order
   const tabbar=document.querySelector(".tabbar"); if(tabbar) shell.appendChild(tabbar);  // overlay tab bar, painted last
-  // Anchor the shell to the visible viewport. visualViewport.height is the only height iOS standalone
-  // reports correctly across cold launch / resume-from-background / rotation, so the bar's bottom:0 is
-  // always the real screen bottom — no gap-below "floated up" bar. CSS 100dvh covers the first paint.
-  const fitShell=()=>{ const vv=window.visualViewport; shell.style.height=Math.round((vv&&vv.height)||window.innerHeight)+"px"; };
-  fitShell();
-  if(window.visualViewport) window.visualViewport.addEventListener("resize", fitShell);
-  window.addEventListener("orientationchange", ()=> setTimeout(fitShell, 120));
-  window.addEventListener("pageshow", ()=> setTimeout(fitShell, 0));
-  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) setTimeout(fitShell, 0); });
+  // Shell height is pure CSS 100dvh — NO JS height-setting. On the installed iOS PWA, reading
+  // visualViewport.height at launch/resume can return a stale/short value that then sticks as an inline
+  // px height (the "bar floated up, every second relaunch" bug). 100dvh is the dynamic viewport unit
+  // built for exactly this and self-corrects without a JS race, so we let the browser own it.
   const W=()=> pager.clientWidth || window.innerWidth;
   const curTab=()=>{ const a=document.querySelector(".page.active"); return a?a.dataset.tab:"overview"; };
   const clamp=(v,a,b)=> v<a?a:(v>b?b:v);
@@ -3285,7 +3280,7 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
     tx=-idx*W(); apply(); }
   window.__pageGo=(name)=>{ const i=ORDER.indexOf(name); if(i>=0 && i!==idx) place(i, true); };
   place(idx, false);
-  window.addEventListener("resize", ()=>{ fitShell(); place(idx,false); });
+  window.addEventListener("resize", ()=>place(idx,false));
 
   // don't hijack gestures meant for an input, canvas, button, horizontal strip, drag handle, the tab bar, or an open sheet
   const blocked=el=>{ for(let n=el; n && n!==document.body; n=n.parentElement){
