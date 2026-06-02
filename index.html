@@ -197,9 +197,9 @@
   .discdot{ width:6px; height:6px; border-radius:50%; background:var(--l3); opacity:.35; transition:opacity .2s, transform .2s, background .2s; }
   .discdot.on{ opacity:1; background:var(--accent); transform:scale(1.25); }
   /* onboarding objective picker */
-  #onboardWrap{ position:fixed; inset:0; z-index:320; display:none; align-items:center; justify-content:center; padding:24px;
+  #onboardWrap, #nameWrap{ position:fixed; inset:0; z-index:320; display:none; align-items:center; justify-content:center; padding:24px;
     background:rgba(0,0,0,.5); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
-  #onboardWrap.show{ display:flex; }
+  #onboardWrap.show, #nameWrap.show{ display:flex; }
   .obcard{ background:var(--sheetbg); border-radius:22px; max-width:380px; width:100%; padding:24px 22px; box-shadow:0 20px 60px rgba(0,0,0,.45); }
   .obbrand{ font-size:26px; margin-bottom:6px; }
   .obbrand .wordmark{ font-size:26px; }
@@ -773,6 +773,10 @@
           <div style="min-width:0;"><b id="acctWho" style="display:block; overflow:hidden; text-overflow:ellipsis;">—</b><div class="levelcap" id="acctSync" style="margin:2px 0 0;">Synced across your devices.</div></div>
           <button class="btn tinted sm" id="acctLogoutBtn" style="flex:0 0 auto;">Sign out</button>
         </div>
+        <div class="merow" style="margin-top:10px;">
+          <label for="acctName">What should I call you?</label>
+          <div class="meinput"><input id="acctName" type="text" autocapitalize="words" placeholder="Your name or alias" style="width:140px;text-align:right;"></div>
+        </div>
         <label class="row" style="justify-content:space-between; align-items:center; margin-top:12px;">
           <span class="levelcap" style="margin:0;">Share my workouts to the friends feed</span>
           <input type="checkbox" id="shareToggle">
@@ -1102,6 +1106,16 @@
   <div class="grabber"></div>
   <div class="sheethdr"><span class="t" id="aboutTitle">About this plan</span><button class="btn plain sm" id="aboutClose">Done</button></div>
   <div class="sheetbody" id="aboutBody"></div>
+</div>
+
+<!-- NAME PROMPT (after first login) -->
+<div id="nameWrap">
+  <div class="obcard">
+    <div class="obtitle">What should I call you?</div>
+    <p class="obp">This is how I'll address you here, and how friends see you in the feed.</p>
+    <input id="nameInput2" type="text" placeholder="Your name or alias" autocapitalize="words" autocomplete="nickname">
+    <button class="btn wide" id="nameSave" style="margin-top:14px;">Save</button>
+  </div>
 </div>
 
 <!-- CONFIRM DIALOG -->
@@ -1845,7 +1859,20 @@ async function handleAuth(user){
   if(cloudUser && cloudUser.id !== was){
     await ensureProfile();
     await cloudReconcile();
+    if(!settings.displayName) askDisplayName();   // first thing after signing in: how should I address you?
   }
+}
+function askDisplayName(){
+  const w=$("nameWrap"), i=$("nameInput2"); if(!w||!i) return;
+  i.value=settings.displayName||settings.name||""; w.classList.add("show"); setTimeout(()=>i.focus(),60);
+}
+async function saveDisplayName(){
+  const v=($("nameInput2").value||"").trim().slice(0,24);
+  settings.displayName=v; if(!settings.name) settings.name=v; await sset("settings",settings);
+  if(cloudReady()){ try{ await sb.from("profiles").upsert({ user_id:cloudUser.id, display_name:v||(cloudUser.email||"Lifter").split("@")[0] }); }catch(e){} }
+  $("nameWrap").classList.remove("show");
+  if($("ovGreet")) $("ovGreet").textContent=ovGreetWord()+((settings.displayName||settings.name)?", "+(settings.displayName||settings.name):"");
+  if(typeof renderAccount==="function") renderAccount();
 }
 
 // Auth actions (magic-link / passwordless).
@@ -1974,6 +2001,7 @@ function renderAccount(){
   if(cloudUser){
     outB.style.display="none"; inB.style.display="";
     $("acctWho").textContent=cloudUser.email||"Signed in";
+    const an=$("acctName"); if(an && document.activeElement!==an) an.value=settings.displayName||settings.name||"";
     const tog=$("shareToggle"); if(tog) tog.checked = settings.shareActivity===true;
     const rtog=$("remindToggle"); if(rtog) rtog.checked = settings.remindersOn===true;
     setFeed(true);
@@ -2089,7 +2117,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi]||e.n; }
-let settings={ activePlanId:null, name:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false, planStartAt:null };
+let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false, planStartAt:null };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -2356,7 +2384,7 @@ function startHomeWorkout(){
 }
 function renderOverview(){
   const host=$("ovBody"); if(!host) return;
-  $("ovGreet").textContent=ovGreetWord()+(settings.name?", "+settings.name:"");
+  $("ovGreet").textContent=ovGreetWord()+((settings.displayName||settings.name)?", "+(settings.displayName||settings.name):"");
   try{ $("ovDate").textContent=new Date().toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"}); }catch(e){}
   const due=(settings.sinceDeload||0)>=DELOAD_AT, p=activePlan(), w=p&&p.workouts[curWk], did=trainedToday();
   let h="";
@@ -4376,7 +4404,12 @@ $("importBtn").onclick=()=>$("importFile").click();
 if($("acctLoginBtn")) $("acctLoginBtn").onclick=()=>{ const e=($("acctEmail").value||"").trim(); if(!e||e.indexOf("@")<0){ toast("Enter your email address."); return; } cloudLogin(e); };
 if($("acctVerifyBtn")) $("acctVerifyBtn").onclick=()=>{ const e=($("acctEmail").value||"").trim(); cloudVerify(e, $("acctCode").value); };
 if($("acctLogoutBtn")) $("acctLogoutBtn").onclick=cloudLogout;
+if($("acctName")) $("acctName").onchange=async()=>{ const v=$("acctName").value.trim().slice(0,24);
+  settings.displayName=v; if(!settings.name) settings.name=v; await sset("settings",settings);
+  if(cloudReady()){ try{ await sb.from("profiles").upsert({ user_id:cloudUser.id, display_name:v||cloudUser.email.split("@")[0] }); }catch(e){} }
+  if($("ovGreet")) $("ovGreet").textContent=ovGreetWord()+((settings.displayName||settings.name)?", "+(settings.displayName||settings.name):""); toast("I'll call you "+(v||"by your email")+"."); };
 if($("acctPush")) $("acctPush").onclick=cloudForcePush;
+if($("nameSave")) $("nameSave").onclick=saveDisplayName;
 if($("acctDelete")) $("acctDelete").onclick=cloudDeleteData;
 if($("shareToggle")) $("shareToggle").onchange=async(e)=>{ settings.shareActivity=!!e.target.checked; await sset("settings",settings); toast(settings.shareActivity?"Sharing on — friends see your workout summaries.":"Sharing off — your workouts stay private."); };
 if($("remindToggle")) $("remindToggle").onchange=async(e)=>{
