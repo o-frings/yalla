@@ -153,18 +153,19 @@
   .page.active{ display:block; animation:pagein .26s ease; }
   @keyframes pagein{ from{ opacity:0; transform:translateY(5px); } to{ opacity:1; transform:none; } }
   /* horizontal pager: three panels side-by-side that follow the finger, each scrolling vertically on its own */
-  #pager{ position:fixed; top:0; bottom:0; left:0; right:0; max-width:540px; margin:0 auto; overflow:hidden; z-index:1; }
+  /* fixed full-screen app shell: content fills the top, the tab bar is a flex row at the bottom (no bottom:0 anchoring → immune to the iOS keyboard/viewport quirks) */
+  #shell{ position:fixed; inset:0; max-width:540px; margin:0 auto; display:flex; flex-direction:column; z-index:1; }
+  #pager{ flex:1 1 auto; min-height:0; position:relative; overflow:hidden; }
   #track{ display:flex; height:100%; }
   #track.anim{ transition:transform .3s cubic-bezier(.22,.61,.36,1); }
   #pager .page, #pager .page.active{ display:block; animation:none; flex:0 0 100%; width:100%; height:100%;
-    overflow-y:auto; overscroll-behavior-y:contain; padding:0 16px calc(48px + env(safe-area-inset-bottom)); }
+    overflow-y:auto; overscroll-behavior-y:contain; padding:0 16px 20px; }
   /* hide the scrollbar (still scrollable) */
   #pager .page, .sheetbody{ scrollbar-width:none; -ms-overflow-style:none; }
   #pager .page::-webkit-scrollbar, .sheetbody::-webkit-scrollbar{ width:0; height:0; display:none; }
-  /* anchored INSIDE the fixed #pager; compact — icons sit just above the home indicator */
-  /* fixed to the viewport (like the top status-bar backdrop) so it never drifts on relaunch; same 88% translucency, no blur */
-  .tabbar{ position:fixed; left:0; right:0; bottom:0; max-width:540px; margin:0 auto; z-index:60; display:flex; align-items:center;
-    padding:6px 8px calc(6px + env(safe-area-inset-bottom)); overflow:hidden; border-top:.5px solid var(--sep);
+  /* a flex row at the bottom of #shell — laid out, never bottom:0-anchored, so the keyboard/viewport can't strand it */
+  .tabbar{ flex:0 0 auto; display:flex; align-items:center;
+    padding:6px 8px calc(6px + env(safe-area-inset-bottom)); border-top:.5px solid var(--sep);
     background:color-mix(in srgb, var(--bg) 88%, transparent); }
   .tabitem{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
     color:var(--l3); transition:color .15s; -webkit-tap-highlight-color:transparent; }
@@ -3232,11 +3233,13 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
   const ORDER=["overview","workout","me"];
   const pages=ORDER.map(n=>document.querySelector('.page[data-tab="'+n+'"]'));
   if(pages.some(p=>!p)) return;                          // structure changed — leave tab buttons as the fallback
+  const shell=document.createElement("div"); shell.id="shell";          // fixed flex column: content fills, tab bar is the bottom row
   const pager=document.createElement("div"); pager.id="pager";
   const track=document.createElement("div"); track.id="track"; pager.appendChild(track);
-  pages[0].parentNode.insertBefore(pager, pages[0]);     // pager takes the first page's slot…
-  pages.forEach(p=> track.appendChild(p));               // …then all three move into the track, in tab order
-  const tabbar=document.querySelector(".tabbar"); if(tabbar) pager.appendChild(tabbar);  // anchor the tab bar inside the stable fixed pager
+  pages[0].parentNode.insertBefore(shell, pages[0]);
+  shell.appendChild(pager);
+  pages.forEach(p=> track.appendChild(p));               // all three pages move into the swipe track, in tab order
+  const tabbar=document.querySelector(".tabbar"); if(tabbar) shell.appendChild(tabbar);  // tab bar = last flex row of the shell
   const W=()=> pager.clientWidth || window.innerWidth;
   const curTab=()=>{ const a=document.querySelector(".page.active"); return a?a.dataset.tab:"overview"; };
   const clamp=(v,a,b)=> v<a?a:(v>b?b:v);
