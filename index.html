@@ -2058,6 +2058,15 @@ async function renderFeed(){
     card.appendChild(txt); card.appendChild(cv); list.appendChild(card);
     miniRadar(cv, s.mtot||{});
   });
+  // urgency: a friend who trained in the last day gets surfaced at the top of the overview
+  const host=$("ovBody"); if(host){ const old=host.querySelector(".ovfriend"); if(old) old.remove();
+    const fresh=rows.find(r=> r.user_id!==cloudUser.id && (Date.now()-Date.parse(r.created_at)) < 24*3600*1000);
+    if(fresh){ const who=names[fresh.user_id]||"A friend", s=fresh.summary||{};
+      const c=document.createElement("div"); c.className="group ovnudge ovfriend";
+      c.innerHTML='<div class="pad"><div class="ovk" style="color:var(--accent);">Friends</div><div class="ovbig" style="font-size:19px;">'+esc(who)+' just trained 🔥</div><p class="ovp" style="margin-top:6px;">'+esc(s.name||"A workout")+' · '+esc(agoStr(Date.parse(fresh.created_at)))+' — your move?</p></div>';
+      host.insertBefore(c, host.firstChild);
+    }
+  }
 }
 
 let plans=[], last={}, bw=[], hist={}, extlog=[];
@@ -2370,22 +2379,25 @@ function renderOverview(){
   else if(!tips.muscles) disc={t:"See your muscle balance",s:"A radar of weekly sets per muscle against the growth target — spot gaps at a glance.",btn:"Open muscle balance",act:"balance"};
   else if(!Object.keys(hist).length) disc={t:"Log your first session",s:"Tap a set to record weight × reps. Progress is tracked per exercise across plans.",btn:"Go to workout",act:"workout"};
   if(disc){ h+='<div class="ed-label">Discover</div><div class="group ovnudge"><div class="pad"><div class="ovbig" style="font-size:19px;">'+esc(disc.t)+'</div><p class="ovp" style="margin-top:6px;">'+esc(disc.s)+'</p><button class="btn wide ovdisc" data-act="'+disc.act+'" style="margin-top:14px;">'+esc(disc.btn)+'</button></div></div>'; }
-  // --- Needs attention --- maps to your objective: the general goal + what the active plan focuses on
+  // --- Needs attention --- ordered by urgency (severity first); maps to your objective
   const obj=planObjective(activePlan()), todo=[], under=ovUnderMuscles();
-  // first-things-first setup nudges (lead with signing in, then the bits the coach needs)
-  if(cloudAvailable() && !cloudReady()) todo.push({t:"Sign in to save your progress and sync across devices.", act:"account"});
-  if(!settings.objective) todo.push({t:"Set your main goal so I know what “on track” means.", act:"objective"});
-  if(settings.goalTarget==null || settings.heightCm==null || !settings.sex) todo.push({t:"Add your details — height, sex and a goal weight — to unlock tracking.", act:"body"});
+  const push=(u,t,act)=> todo.push({u,t,act});
+  if(cloudAvailable() && !cloudReady()) push(60,"Sign in to save your progress and sync across devices.","account");
+  if(!settings.objective) push(82,"Set your main goal so I know what “on track” means.","objective");
+  if(settings.goalTarget==null || settings.heightCm==null || !settings.sex) push(55,"Add your details — height, sex and a goal weight — to unlock tracking.","body");
   if(under.length){ const ms=esc(listWords(under.slice(0,3).map(g=>MSHORT[g]||g)));
-    todo.push({t:(obj.balanced ? "For balanced growth, add sets for "+ms+" — under ~"+WEEKLY_SET_MIN+" hard sets a week."
-                                : "Your plan targets "+ms+", but they're under ~"+WEEKLY_SET_MIN+" hard sets a week."), act:"balance"}); }
+    const wk=weeklyEquiv(muscleVolume(28,"sets").totals,28);
+    const worst=under.reduce((m,g)=>Math.max(m,(WEEKLY_SET_MIN-(wk[g]||0))/WEEKLY_SET_MIN),0);   // 0 (just under) … 1 (untrained)
+    push(45+Math.round(50*worst), (obj.balanced ? "For balanced growth, add sets for "+ms+" — under ~"+WEEKLY_SET_MIN+" hard sets a week."
+                                : "Your plan targets "+ms+", but they're under ~"+WEEKLY_SET_MIN+" hard sets a week."), "balance"); }
   if((settings.objective==="fatloss"||settings.objective==="muscle") && settings.goalTarget!=null){
-    if(!bw.length) todo.push({t:"Log your weight so I can track your goal.", act:"weight"});
-    else if(daysSince(bw[bw.length-1].d)>10) todo.push({t:"Log your weight — it’s been over " + daysSince(bw[bw.length-1].d) + " days.", act:"weight"});
+    if(!bw.length) push(40,"Log your weight so I can track your goal.","weight");
+    else if(daysSince(bw[bw.length-1].d)>10) push(35,"Log your weight — it’s been over " + daysSince(bw[bw.length-1].d) + " days.","weight");
   }
-  if(due) todo.push({t:"Take a deload week to recover.", act:"workout"});
+  if(due) push(72,"Take a deload week to recover.","workout");
   if(settings.planStartAt && (Date.now()-settings.planStartAt) > 42*86400000 && Object.keys(hist).length)
-    todo.push({t:"You've run this plan ~6 weeks — swap 1–2 accessories to freshen it (long-press swap → Permanently).", act:"workout"});
+    push(30,"You've run this plan ~6 weeks — swap 1–2 accessories to freshen it (long-press swap → Permanently).","workout");
+  todo.sort((a,b)=> b.u-a.u);   // most urgent first
   h+='<div class="ed-label">Needs attention</div>';
   h+='<div class="ovobj">Optimising for <b>'+esc(obj.label)+'</b></div>';
   if(todo.length){ h+='<div class="group"><div class="pad"><ul class="ovtodo">'+todo.map(it=>'<li class="ovtap" data-act="'+it.act+'">'+it.t+'<span class="ovchev">›</span></li>').join('')+'</ul></div></div>'; }
