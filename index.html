@@ -188,6 +188,14 @@
   .ovchev{ color:var(--l3); font-weight:600; margin-left:5px; }
   .ovtodo li.ovtap .ovchev{ position:absolute; right:0; }
   .ovnudge{ background:var(--accent-soft); border:.5px solid transparent; box-shadow:0 0 0 1px var(--accent-soft) inset; }
+  /* swipeable discover deck — cards snap, the next one peeks so it reads as swipeable */
+  .discwrap{ display:flex; gap:10px; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch;
+    scrollbar-width:none; margin:0 -16px; padding:2px 16px; }
+  .discwrap::-webkit-scrollbar{ display:none; }
+  .disccard{ scroll-snap-align:center; flex:0 0 87%; margin:0; }
+  .discdots{ display:flex; gap:6px; justify-content:center; margin-top:10px; }
+  .discdot{ width:6px; height:6px; border-radius:50%; background:var(--l3); opacity:.35; transition:opacity .2s, transform .2s, background .2s; }
+  .discdot.on{ opacity:1; background:var(--accent); transform:scale(1.25); }
   /* onboarding objective picker */
   #onboardWrap{ position:fixed; inset:0; z-index:320; display:none; align-items:center; justify-content:center; padding:24px;
     background:rgba(0,0,0,.5); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
@@ -2322,6 +2330,18 @@ function ovUnderMuscles(){
   const wk=weeklyEquiv(muscleVolume(28,"sets").totals, 28);
   return scope.filter(g=> (wk[g]||0) < WEEKLY_SET_MIN);               // plan targets it, but logs are under the growth threshold
 }
+// a swipeable deck for the overview — not-yet-used features first, then evergreen tips
+function discoverTips(){
+  const tips=settings.seenTips||{}, builtPlan=plans.some(p=>/^(custom|plan)/.test(p.id)), logged=Object.keys(hist).length>0, list=[];
+  if(!builtPlan) list.push({t:"Build a plan around your goal",s:"Pick your days, time and focus — I choose the split and exercises for you.",btn:"Build a plan",act:"build"});
+  if(!logged) list.push({t:"Log your first session",s:"Tap a set to record weight × reps. I track progress per exercise across plans.",btn:"Go to workout",act:"workout"});
+  if(!tips.muscles) list.push({t:"See your muscle balance",s:"A radar of weekly sets per muscle vs the growth target — spot gaps at a glance.",btn:"Muscle balance",act:"balance"});
+  list.push({t:"Log like last time",s:"On any workout, tap “Log like last time” to prefill last session — then just tweak and finish.",btn:"Go to workout",act:"workout"});
+  list.push({t:"Swap for today or for good",s:"Tap an exercise's swap icon, then choose “Permanently” to change it in the plan itself.",btn:"Go to workout",act:"workout"});
+  list.push({t:"Coach notes per plan",s:"Open “About” at the top-right of the workout list for the plan's focus, split and what to watch.",btn:"Go to workout",act:"workout"});
+  list.push({t:"Swipe between pages",s:"Swipe left or right to move through Overview, Workout and Me — no need to reach the tab bar."});
+  return list.slice(0,6);
+}
 function lastWorkoutTs(){ let m=0; Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ if(e.d>m) m=e.d; })); return m; }
 function daysOff(){ const t=lastWorkoutTs(); return t ? daysSince(t) : -1; }   // -1 = never logged
 // a balanced no-equipment session, started in free mode
@@ -2372,13 +2392,13 @@ function renderOverview(){
     +'<div class="stat"><div class="n">'+(settings.sessions||0)+'</div><div class="k">total</div></div>'
     +'<div class="stat"><div class="n">'+(settings.beatTotal||0)+'</div><div class="k">PRs beaten</div></div></div>';
   h+='<p class="ovp" style="margin:10px 4px 0;">'+motiv+'</p>';
-  // --- Discover --- surface one feature the user hasn't tried yet
-  const tips=settings.seenTips||{}, builtPlan=plans.some(p=>/^(custom|plan)/.test(p.id));
-  let disc=null;
-  if(!builtPlan) disc={t:"Build a plan around your goal",s:"Pick your days, time and focus — we choose the split and exercises for you.",btn:"Build a plan",act:"build"};
-  else if(!tips.muscles) disc={t:"See your muscle balance",s:"A radar of weekly sets per muscle against the growth target — spot gaps at a glance.",btn:"Open muscle balance",act:"balance"};
-  else if(!Object.keys(hist).length) disc={t:"Log your first session",s:"Tap a set to record weight × reps. Progress is tracked per exercise across plans.",btn:"Go to workout",act:"workout"};
-  if(disc){ h+='<div class="ed-label">Discover</div><div class="group ovnudge"><div class="pad"><div class="ovbig" style="font-size:19px;">'+esc(disc.t)+'</div><p class="ovp" style="margin-top:6px;">'+esc(disc.s)+'</p><button class="btn wide ovdisc" data-act="'+disc.act+'" style="margin-top:14px;">'+esc(disc.btn)+'</button></div></div>'; }
+  // --- Discover --- a swipeable deck of tips / not-yet-used features
+  const dt=discoverTips();
+  if(dt.length){
+    h+='<div class="ed-label">Discover <span class="subhint">— swipe ›</span></div>';
+    h+='<div class="discwrap" id="discWrap">'+dt.map(d=>'<div class="group ovnudge disccard"><div class="pad"><div class="ovbig" style="font-size:18px;">'+esc(d.t)+'</div><p class="ovp" style="margin-top:6px;">'+esc(d.s)+'</p>'+(d.act?'<button class="btn wide ovdisc" data-act="'+d.act+'" style="margin-top:14px;">'+esc(d.btn)+'</button>':'')+'</div></div>').join('')+'</div>';
+    if(dt.length>1) h+='<div class="discdots" id="discDots">'+dt.map((_,i)=>'<span class="discdot'+(i===0?' on':'')+'"></span>').join('')+'</div>';
+  }
   // --- Needs attention --- ordered by urgency (severity first); maps to your objective
   const obj=planObjective(activePlan()), todo=[], under=ovUnderMuscles();
   const push=(u,t,act)=> todo.push({u,t,act});
@@ -2405,7 +2425,11 @@ function renderOverview(){
   host.innerHTML=h;
   const sb=host.querySelector(".ovstart"); if(sb) sb.onclick=()=>showTab("workout");
   const hb=host.querySelector(".ovhome"); if(hb) hb.onclick=startHomeWorkout;
-  const db=host.querySelector(".ovdisc"); if(db) db.onclick=()=>ovAct(db.dataset.act);
+  host.querySelectorAll(".ovdisc").forEach(b=> b.onclick=()=>ovAct(b.dataset.act));
+  const dw=$("discWrap"), dots=$("discDots");
+  if(dw && dots){ const cards=dw.querySelectorAll(".disccard");
+    dw.addEventListener("scroll", ()=>{ let best=0, bd=1e9; cards.forEach((c,i)=>{ const d=Math.abs(c.offsetLeft-dw.scrollLeft); if(d<bd){bd=d;best=i;} });
+      dots.querySelectorAll(".discdot").forEach((el,i)=> el.classList.toggle("on", i===best)); }, {passive:true}); }
   host.querySelectorAll(".ovtodo .ovtap").forEach(li=> li.onclick=()=>ovAct(li.dataset.act));
   if(settings.objective && !document.querySelector("#onboardWrap.show")) coach("swipe","Swipe left or right to move between your three pages — Overview, Workout and Me.");
 }
