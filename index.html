@@ -659,6 +659,7 @@
 <body>
 
 <div class="statusbar-bg"></div>
+<div id="vpdbg" style="position:fixed;top:0;left:0;right:0;z-index:9999;font:11px/1.35 ui-monospace,Menlo,monospace;color:#fff;background:rgba(200,0,0,.85);padding:4px 8px;text-align:center;pointer-events:none;white-space:pre-wrap;"></div>
 
 <!-- ===== WORKOUT PAGE ===== -->
 <div class="page" id="pageWorkout" data-tab="workout">
@@ -3339,6 +3340,28 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
   document.addEventListener("touchend", ()=> setTimeout(show, 0), {passive:true});   // a tap always restores it if no field is focused
   window.addEventListener("pageshow", ()=> setTimeout(show, 0));
   if(vv){ vv.addEventListener("resize", show); }   // resize only — scroll fires constantly and would churn
+})();
+// ===== TEMPORARY bottom-bar diagnostic (remove once the iOS strip is solved) =====
+(function(){
+  const el=document.getElementById("vpdbg"); if(!el) return;
+  const probe=document.createElement("div");           // measures the live env(safe-area-inset-bottom)
+  probe.style.cssText="position:fixed;left:0;bottom:0;width:0;height:env(safe-area-inset-bottom);pointer-events:none;";
+  document.body.appendChild(probe);
+  let max=0;
+  function upd(){
+    const tb=document.querySelector(".tabbar"); const r=tb?tb.getBoundingClientRect():{top:0,bottom:0};
+    const vv=window.visualViewport, iH=window.innerHeight, sab=Math.round(probe.getBoundingClientRect().height);
+    const below=iH-Math.round(r.bottom);
+    max=Math.max(max, Math.abs(below));
+    el.textContent="iH"+iH+" vv"+(vv?Math.round(vv.height):"-")+" ch"+document.documentElement.clientHeight+" sab"+sab
+      +"\nbarTop"+Math.round(r.top)+" barBot"+Math.round(r.bottom)+" BELOW="+below+" (max"+max+")"
+      +" vvTop"+(vv?Math.round(vv.offsetTop):"-");
+  }
+  upd();
+  ["resize","orientationchange","pageshow","scroll"].forEach(e=> window.addEventListener(e, upd, true));
+  document.addEventListener("visibilitychange", ()=> setTimeout(upd, 60));
+  if(window.visualViewport){ visualViewport.addEventListener("resize", upd); visualViewport.addEventListener("scroll", upd); }
+  setInterval(upd, 400);
 })();
 $("bodySave").onclick=async()=>{
   const h=parseFloat($("heightIn").value), bf=parseFloat($("bfIn").value);
