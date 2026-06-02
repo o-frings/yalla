@@ -170,14 +170,15 @@
   /* hide the scrollbar (still scrollable) */
   #pager .page, .sheetbody{ scrollbar-width:none; -ms-overflow-style:none; }
   #pager .page::-webkit-scrollbar, .sheetbody::-webkit-scrollbar{ width:0; height:0; display:none; }
-  /* Tab bar is pinned to the VIEWPORT bottom (not the shell's) — the exact mirror of .statusbar-bg at the
-     top, which has always been reliable. On the iOS PWA, 100dvh sometimes resolves shorter than the real
-     screen on resume, leaving an opaque background strip below a shell-anchored bar; pinning to the
-     viewport makes the bar always reach the true bottom and cover that strip. Same translucent fill, no
-     blur, so content scrolls faintly beneath. Pages reserve bottom padding so nothing hides under it. */
+  /* Tab bar pinned to the viewport bottom with a SOLID var(--bg) fill (not translucent). Diagnostics
+     proved the web viewport is internally perfect on resume (bar bottom == innerHeight, no gap) — the
+     grey strip is OUTSIDE the web area: on resume iOS leaves the WebView shorter than the screen and
+     paints the leftover with the page background (== var(--bg)). A translucent bar (88%) reads a hair
+     different from that solid strip, exposing a seam; a solid var(--bg) bar is pixel-identical to it, so
+     the strip becomes invisible in both light and dark whenever the resume bug occurs. */
   .tabbar{ position:fixed; left:0; right:0; bottom:0; max-width:540px; margin:0 auto; z-index:50; display:flex; align-items:center;
  padding:6px 8px calc(6px + env(safe-area-inset-bottom)); border-top:.5px solid var(--sep);
-    background:color-mix(in srgb, var(--bg) 88%, transparent); }
+    background:var(--bg); }
   .tabitem{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
     color:var(--l3); transition:color .15s; -webkit-tap-highlight-color:transparent; }
   .tabitem svg{ width:29px; height:29px; transition:transform .12s; }
@@ -659,7 +660,6 @@
 <body>
 
 <div class="statusbar-bg"></div>
-<div id="vpdbg" style="position:fixed;top:calc(env(safe-area-inset-top) + 60px);left:50%;transform:translateX(-50%);z-index:99999;font:12px/1.4 ui-monospace,Menlo,monospace;color:#fff;background:rgba(200,0,0,.92);padding:7px 11px;border-radius:10px;text-align:center;pointer-events:none;white-space:pre-wrap;box-shadow:0 4px 16px rgba(0,0,0,.4);"></div>
 
 <!-- ===== WORKOUT PAGE ===== -->
 <div class="page" id="pageWorkout" data-tab="workout">
@@ -3340,28 +3340,6 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
   document.addEventListener("touchend", ()=> setTimeout(show, 0), {passive:true});   // a tap always restores it if no field is focused
   window.addEventListener("pageshow", ()=> setTimeout(show, 0));
   if(vv){ vv.addEventListener("resize", show); }   // resize only — scroll fires constantly and would churn
-})();
-// ===== TEMPORARY bottom-bar diagnostic (remove once the iOS strip is solved) =====
-(function(){
-  const el=document.getElementById("vpdbg"); if(!el) return;
-  const probe=document.createElement("div");           // measures the live env(safe-area-inset-bottom)
-  probe.style.cssText="position:fixed;left:0;bottom:0;width:0;height:env(safe-area-inset-bottom);pointer-events:none;";
-  document.body.appendChild(probe);
-  let max=0;
-  function upd(){
-    const tb=document.querySelector(".tabbar"); const r=tb?tb.getBoundingClientRect():{top:0,bottom:0};
-    const vv=window.visualViewport, iH=window.innerHeight, sab=Math.round(probe.getBoundingClientRect().height);
-    const below=iH-Math.round(r.bottom);
-    max=Math.max(max, Math.abs(below));
-    el.textContent="iH"+iH+" vv"+(vv?Math.round(vv.height):"-")+" ch"+document.documentElement.clientHeight+" sab"+sab
-      +"\nbarTop"+Math.round(r.top)+" barBot"+Math.round(r.bottom)+" BELOW="+below+" (max"+max+")"
-      +" vvTop"+(vv?Math.round(vv.offsetTop):"-");
-  }
-  upd();
-  ["resize","orientationchange","pageshow","scroll"].forEach(e=> window.addEventListener(e, upd, true));
-  document.addEventListener("visibilitychange", ()=> setTimeout(upd, 60));
-  if(window.visualViewport){ visualViewport.addEventListener("resize", upd); visualViewport.addEventListener("scroll", upd); }
-  setInterval(upd, 400);
 })();
 $("bodySave").onclick=async()=>{
   const h=parseFloat($("heightIn").value), bf=parseFloat($("bfIn").value);
