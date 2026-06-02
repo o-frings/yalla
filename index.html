@@ -152,15 +152,18 @@
   #track{ display:flex; height:100%; }
   #track.anim{ transition:transform .3s cubic-bezier(.22,.61,.36,1); }
   #pager .page, #pager .page.active{ display:block; animation:none; flex:0 0 100%; width:100%; height:100%;
-    overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; padding:0 16px calc(42px + env(safe-area-inset-bottom)); }
+    overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; padding:0 16px calc(40px + env(safe-area-inset-bottom)); }
   .tabbar{ position:fixed; left:0; right:0; bottom:0; z-index:60; display:flex; max-width:540px; margin:0 auto;
-    padding:3px 8px calc(3px + env(safe-area-inset-bottom)); border-top:.5px solid var(--sep);
-    background:color-mix(in srgb, var(--bg) 80%, transparent); backdrop-filter:blur(22px) saturate(180%); -webkit-backdrop-filter:blur(22px) saturate(180%); }
-  .tabitem{ flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; background:none; border:none; cursor:pointer;
-    color:var(--l3); font-size:10.5px; font-weight:600; letter-spacing:.2px; padding:3px 4px; transition:color .15s, transform .12s; -webkit-tap-highlight-color:transparent; }
-  .tabitem svg{ width:22px; height:22px; }
+    height:calc(52px + env(safe-area-inset-bottom)); padding-bottom:env(safe-area-inset-bottom);  /* fixed bar; home-indicator inset only below the icons */
+    align-items:stretch; overflow:hidden; border-top:.5px solid var(--sep);
+    background:color-mix(in srgb, var(--bg) 80%, transparent); backdrop-filter:blur(22px) saturate(180%); -webkit-backdrop-filter:blur(22px) saturate(180%);
+    transform:translateZ(0); }   /* own compositing layer so the blur doesn't shimmer over the moving pager */
+  .tabitem{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
+    color:var(--l3); transition:color .15s; -webkit-tap-highlight-color:transparent; }
+  .tabitem svg{ width:26px; height:26px; transition:transform .12s; }
+  .tabitem span{ display:none; }                 /* icons only — labels hidden (kept as aria-label) */
   .tabitem.active{ color:var(--accent); }
-  .tabitem:active{ transform:scale(.88); }
+  .tabitem:active svg{ transform:scale(.86); }
   /* overview / coach cards */
   .ovk{ font-size:12px; color:var(--l3); font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
   .ovbig{ font-size:24px; font-weight:750; letter-spacing:-.4px; margin-top:3px; line-height:1.1; }
