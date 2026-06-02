@@ -191,6 +191,11 @@
     background:rgba(0,0,0,.5); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
   #onboardWrap.show{ display:flex; }
   .obcard{ background:var(--sheetbg); border-radius:22px; max-width:380px; width:100%; padding:24px 22px; box-shadow:0 20px 60px rgba(0,0,0,.45); }
+  .obbrand{ font-size:26px; margin-bottom:6px; }
+  .obbrand .wordmark{ font-size:26px; }
+  .obtag{ font-size:15px; color:var(--l2); line-height:1.45; margin:0 0 20px; }
+  .oblabel{ font-size:13px; font-weight:700; color:var(--l2); text-transform:uppercase; letter-spacing:.4px; margin-bottom:8px; }
+  #obName{ width:100%; }
   .obtitle{ font-size:23px; font-weight:750; letter-spacing:-.4px; }
   .obp{ font-size:14px; color:var(--l2); line-height:1.5; margin:8px 0 18px; }
   .obopts{ display:flex; flex-direction:column; gap:10px; }
@@ -677,6 +682,10 @@
 
     <div class="ed-label">Body</div>
     <div class="merow">
+      <label>Name</label>
+      <div class="meinput"><input id="nameIn" type="text" autocapitalize="words" autocomplete="given-name" placeholder="—" style="width:120px;text-align:right;"></div>
+    </div>
+    <div class="merow">
       <label>Sex</label>
       <div class="sexseg" id="sexSeg">
         <div class="s" data-sex="male">Male</div>
@@ -1070,7 +1079,11 @@
 <!-- ONBOARDING: pick your main objective (first run) -->
 <div id="onboardWrap">
   <div class="obcard">
-    <div class="obtitle">What’s your main goal?</div>
+    <div class="obbrand"><span class="wordmark">yalla</span></div>
+    <p class="obtag">Your pocket strength coach — built on the real science of muscle growth, minus the bro-myths.</p>
+    <div class="oblabel">First — what should we call you?</div>
+    <input id="obName" placeholder="Your first name" autocomplete="given-name" autocapitalize="words">
+    <div class="obtitle" style="margin-top:18px;">And what’s your main goal?</div>
     <p class="obp">This shapes your coaching — whether “on track” means gaining, leaning out, or getting stronger. You can change it anytime in Me.</p>
     <div class="obopts">
       <button class="obopt" data-obj="muscle"><b>Build muscle</b><span>Add size with a slight surplus</span></button>
@@ -1693,6 +1706,7 @@ let sb=null, cloudUser=null, _syncMeta={}, _pushTimers={};
 
 function cloudConfigured(){ return !!(SUPA.url && SUPA.key); }
 function cloudReady(){ return !!(sb && cloudUser); }
+function cloudAvailable(){ return !!sb; }   // cloud sync is enabled on this build/session (signed in or not)
 async function _persistMeta(){ await _localSet("_syncMeta", _syncMeta); }
 
 // Called once the SDK script has loaded (or right after the main script, whichever is later).
@@ -1951,7 +1965,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi]||e.n; }
-let settings={ activePlanId:null, pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:68, goalTarget:75, heightCm:null, bodyfatPct:null, sex:"male", theme:"auto", restSec:90, shareActivity:false };
+let settings={ activePlanId:null, name:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -2150,7 +2164,7 @@ function renderAll(){ renderNav(); renderDash(); renderSeg(); renderWorkout(); }
 function renderNav(){
   $("ltName").textContent = activePlan().name;
   $("planSub").textContent = activePlan().workouts.length + " workouts · rolling cycle";
-  $("bwGoalTxt").textContent = settings.goalTarget+" kg";
+  $("bwGoalTxt").textContent = settings.goalTarget!=null ? settings.goalTarget+" kg" : "—";
 }
 // ================= overview (coach home) =================
 function ovGreetWord(){ const h=new Date().getHours(); return h<5?"Still up?":h<12?"Good morning":h<18?"Good afternoon":"Good evening"; }
@@ -2192,7 +2206,7 @@ function startHomeWorkout(){
 }
 function renderOverview(){
   const host=$("ovBody"); if(!host) return;
-  $("ovGreet").textContent=ovGreetWord();
+  $("ovGreet").textContent=ovGreetWord()+(settings.name?", "+settings.name:"");
   try{ $("ovDate").textContent=new Date().toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"}); }catch(e){}
   const due=(settings.sinceDeload||0)>=DELOAD_AT, p=activePlan(), w=p&&p.workouts[curWk], did=trainedToday();
   let h="";
@@ -2230,10 +2244,14 @@ function renderOverview(){
   h+='<p class="ovp" style="margin:10px 4px 0;">'+motiv+'</p>';
   // --- Needs attention --- maps to your objective: the general goal + what the active plan focuses on
   const obj=planObjective(activePlan()), todo=[], under=ovUnderMuscles();
+  // first-things-first setup nudges (lead with signing in, then the bits the coach needs)
+  if(cloudAvailable() && !cloudReady()) todo.push({t:"Sign in to save your progress and sync across devices.", act:"account"});
+  if(!settings.objective) todo.push({t:"Set your main goal so the coach knows what “on track” means.", act:"objective"});
+  if(settings.goalTarget==null || settings.heightCm==null || !settings.sex) todo.push({t:"Add your details — height, sex and a goal weight — to unlock tracking.", act:"body"});
   if(under.length){ const ms=esc(listWords(under.slice(0,3).map(g=>MSHORT[g]||g)));
     todo.push({t:(obj.balanced ? "For balanced growth, add sets for "+ms+" — under ~"+WEEKLY_SET_MIN+" hard sets a week."
                                 : "Your plan targets "+ms+", but they're under ~"+WEEKLY_SET_MIN+" hard sets a week."), act:"balance"}); }
-  if((settings.objective==="fatloss"||settings.objective==="muscle"||!settings.objective)){
+  if((settings.objective==="fatloss"||settings.objective==="muscle") && settings.goalTarget!=null){
     if(!bw.length) todo.push({t:"Log your weight so the coach can track your goal.", act:"weight"});
     else if(daysSince(bw[bw.length-1].d)>10) todo.push({t:"Log your weight — it’s been over " + daysSince(bw[bw.length-1].d) + " days.", act:"weight"});
   }
@@ -2249,8 +2267,12 @@ function renderOverview(){
 }
 // route a Needs-attention item to where the user acts on it
 function ovAct(act){
-  if(act==="weight"){ showTab("me"); setTimeout(()=>{ const i=$("bwInput"); if(i){ i.scrollIntoView({behavior:"smooth",block:"center"}); i.focus(); } },70); }
-  else if(act==="balance"){ openMuscles(); }
+  const goto=(id,focus)=>{ showTab("me"); setTimeout(()=>{ const el=$(id); if(el){ el.scrollIntoView({behavior:"smooth",block:"center"}); if(focus) el.focus(); } },80); };
+  if(act==="weight") goto("bwInput", true);
+  else if(act==="balance") openMuscles();
+  else if(act==="account") goAccount();
+  else if(act==="objective") goto("objChips");
+  else if(act==="body") goto("goalStart", true);
   else showTab("workout");
 }
 // go to Me and reveal the account / sign-in section
@@ -2263,11 +2285,11 @@ function renderDash(){
   const now = bw.length?bw[bw.length-1].kg:null;
   $("bwNow").textContent = now!=null?now.toFixed(1):"—";
   $("bwNow").parentElement.classList.toggle("empty", now==null);
-  const s=settings.goalStart, g=settings.goalTarget;
-  const pct = now!=null ? Math.max(0,Math.min(100,((now-s)/(g-s))*100)) : 0;
+  const s=parseFloat(settings.goalStart), g=parseFloat(settings.goalTarget), hasGoal=!isNaN(s)&&!isNaN(g)&&g!==s;
+  const pct = (hasGoal && now!=null) ? Math.max(0,Math.min(100,((now-s)/(g-s))*100)) : 0;
   $("bwBar").style.width = pct+"%";
-  $("bwGoalTxt").textContent = settings.goalTarget+" kg";
-  $("bwLeft").textContent = now!=null ? (now>=g?"goal reached — amazing":(g-now).toFixed(1)+" kg to go") : "log your first weigh-in";
+  $("bwGoalTxt").textContent = hasGoal ? g+" kg" : "—";
+  $("bwLeft").textContent = !hasGoal ? "set a goal weight below" : (now!=null ? (now>=g?"goal reached — amazing":(g-now).toFixed(1)+" kg to go") : "log your first weigh-in");
   $("stSessions").textContent = settings.sessions;
   const hrs=(settings.timeTotal||0)/60;
   $("stTime").textContent = hrs>=10 ? Math.round(hrs) : round1(hrs);
@@ -2323,7 +2345,7 @@ function ffmiCat(ffmi, sex){
   return labels[i];
 }
 function renderCalc(now){
-  document.querySelectorAll("#sexSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.sex===(settings.sex||"male")));
+  document.querySelectorAll("#sexSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.sex===settings.sex));
   const box=$("calcRows"); if(!box) return;
   const h=settings.heightCm, bf=settings.bodyfatPct, rows=[];
   if(now!=null && h){
@@ -2345,11 +2367,13 @@ function drawSpark(){
   const c=$("spark"), ctx=c.getContext("2d"), W=c.width,H=c.height; ctx.clearRect(0,0,W,H);
   if(bw.length<2){ ctx.fillStyle="#636366"; ctx.font="12px -apple-system,sans-serif";
     ctx.fillText("log weight a few times to see your trend",6,H/2+4); return; }
-  const ks=bw.map(p=>p.kg), min=Math.min(...ks,settings.goalStart)-1, max=Math.max(...ks,settings.goalTarget)+1;
+  const gt=parseFloat(settings.goalTarget), gs=parseFloat(settings.goalStart);
+  const ks=bw.map(p=>p.kg), extra=[...ks]; if(!isNaN(gt)) extra.push(gt); if(!isNaN(gs)) extra.push(gs);
+  const min=Math.min(...extra)-1, max=Math.max(...extra)+1;
   const x=i=>6+(i/(bw.length-1))*(W-12), y=v=>H-4-((v-min)/(max-min))*(H-10);
   const ac=accentHex();
-  ctx.strokeStyle=hexAlpha(ac,.35); ctx.setLineDash([4,4]); ctx.beginPath();
-  ctx.moveTo(6,y(settings.goalTarget)); ctx.lineTo(W-6,y(settings.goalTarget)); ctx.stroke(); ctx.setLineDash([]);
+  if(!isNaN(gt)){ ctx.strokeStyle=hexAlpha(ac,.35); ctx.setLineDash([4,4]); ctx.beginPath();
+    ctx.moveTo(6,y(gt)); ctx.lineTo(W-6,y(gt)); ctx.stroke(); ctx.setLineDash([]); }
   ctx.strokeStyle=ac; ctx.lineWidth=2.5; ctx.lineJoin="round"; ctx.beginPath();
   bw.forEach((p,i)=> i?ctx.lineTo(x(i),y(p.kg)):ctx.moveTo(x(i),y(p.kg))); ctx.stroke();
   ctx.fillStyle=ac; const li=bw.length-1; ctx.beginPath(); ctx.arc(x(li),y(bw[li].kg),3.5,0,7); ctx.fill();
@@ -2744,8 +2768,8 @@ function showTab(name){
   document.querySelectorAll(".tabitem").forEach(t=> t.classList.toggle("active", t.dataset.tab===name));
   if(window.__pageGo) window.__pageGo(name); else { try{ window.scrollTo(0,0); }catch(e){} }
   if(name==="me"){
-    $("goalStart").value=settings.goalStart; $("goalTarget").value=settings.goalTarget;
-    $("heightIn").value=settings.heightCm||""; $("bfIn").value=settings.bodyfatPct||"";
+    $("goalStart").value=settings.goalStart||""; $("goalTarget").value=settings.goalTarget||"";
+    $("heightIn").value=settings.heightCm||""; $("bfIn").value=settings.bodyfatPct||""; $("nameIn").value=settings.name||"";
     renderDash(); renderAccount(); animateProgBars();
   } else if(name==="overview"){
     renderOverview(); renderAccount();
@@ -2834,6 +2858,7 @@ $("bodySave").onclick=async()=>{
   await sset("settings",settings); renderDash(); toast("Body details saved");
 };
 document.querySelectorAll("#sexSeg .s").forEach(s=> s.onclick=async()=>{ settings.sex=s.dataset.sex; await sset("settings",settings); renderDash(); });
+$("nameIn").onchange=async()=>{ settings.name=$("nameIn").value.trim().slice(0,24); await sset("settings",settings); };
 
 function renderPlanList(){
   const wrap=$("planList"); wrap.innerHTML="";
@@ -3673,9 +3698,11 @@ const OBJ_LABELS={ muscle:"Build muscle", strength:"Get stronger", fatloss:"Lose
 // what the scale should do for each objective (drives the "on track" read)
 function objectiveDir(){ const o=settings.objective; return o==="fatloss"?"lose":o==="muscle"?"gain":"maintain"; }
 async function setObjective(o){
+  const nm=$("obName"), ob=$("onboardWrap");                       // capture the forename when this comes from onboarding
+  if(nm && ob && ob.classList.contains("show") && nm.value.trim()) settings.name=nm.value.trim().slice(0,24);
   settings.objective=o; await sset("settings",settings);
   renderObjective();
-  const ob=$("onboardWrap"); if(ob) ob.classList.remove("show");
+  if(ob) ob.classList.remove("show");
   renderDash(); if(typeof renderOverview==="function") renderOverview();
 }
 function renderObjective(){ document.querySelectorAll("#objChips .chip").forEach(c=> c.classList.toggle("on", c.dataset.v===settings.objective)); }
