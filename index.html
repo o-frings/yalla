@@ -1810,7 +1810,14 @@ function workoutMinutes(w){
 }
 function workoutSupersets(w){ const set=new Set(); (w.ex||[]).forEach(e=>{ if(e.ss) set.add(e.ss); }); return set.size; }
 // a superset must stay in one gym area — group only consecutive isolation accessories that share equipment
-function exArea(name){ const k=equipFor(name).key; return k==="cable"?"cable":k==="machine"?"machine":"free"; }
+// the physical gym area a move lives in — supersets only pair within the same one (no running across the gym)
+function exArea(name){
+  const k=equipFor(name).key;
+  if(k==="cable"||k==="machine"||k==="body") return k;
+  const n=String(name).toLowerCase();   // split "free weights" into the dumbbell rack vs the barbell/rack platform
+  if(/dumbbell|\bdb\b|goblet|hammer curl|arnold|one-arm|incline db|lateral raise|rear delt fly|overhead triceps|triceps extension|chest-supported|split squat|bulgarian|\blunge\b|step-up|single-leg/.test(n)) return "dumbbell";
+  return "barbell";
+}
 function regroupSupersets(w, mode){
   if(!w||!w.ex) return;
   w.ex.forEach(e=>{ delete e.ss; });
@@ -2436,6 +2443,11 @@ async function init(){
     settings.shareActivity=false; settings.sharingOptIn=true;
     await sset("settings",settings);
   }
+  if(!settings.ssSameArea){   // re-pair every superset within one gym area (dumbbell/barbell/cable/machine/body)
+    plans.forEach(p=> (p.workouts||[]).forEach(w=>{ if((w.ex||[]).some(e=>e.ss)) regroupSupersets(w,"accessory"); }));
+    settings.ssSameArea=true;
+    await sset("plans",plans); await sset("settings",settings);
+  }
   if(!settings.activePlanId) settings.activePlanId = plans[0].id;
   const ni = nextRotateIndex(activePlan()); curWk = ni>=0?ni:0;
   renderAll();
@@ -2569,9 +2581,9 @@ function renderOverview(){
   } else if(did){
     h+='<div class="group"><div class="pad"><div class="ovk">Today</div><div class="ovbig">Done for today 💪</div><p class="ovp" style="margin-top:6px;">You’ve logged a session. Rest and refuel — showing up consistently is what builds it.</p></div></div>';
   } else if(w){
-    h+='<div class="group"><div class="pad"><div class="ovk">Next session</div><div class="ovbig">'+esc(w.name)+'</div><div class="ovmeta">≈'+workoutMinutes(w)+' min · '+w.ex.length+' exercise'+(w.ex.length===1?'':'s')+'</div><button class="btn wide ovstart" style="margin-top:14px;">Start workout</button></div></div>';
+    h+='<div class="group ovtap ovstart"><div class="pad"><div class="ovk">Next session</div><div class="ovbig">'+esc(w.name)+'</div><div class="ovmeta">≈'+workoutMinutes(w)+' min · '+w.ex.length+' exercise'+(w.ex.length===1?'':'s')+'</div><button class="btn wide" style="margin-top:14px; pointer-events:none;">Start workout</button></div></div>';
   } else {
-    h+='<div class="group"><div class="pad"><div class="ovbig">Pick a plan to begin</div><button class="btn wide ovstart" style="margin-top:14px;">Go to workout</button></div></div>';
+    h+='<div class="group ovtap ovstart"><div class="pad"><div class="ovbig">Pick a plan to begin</div><button class="btn wide" style="margin-top:14px; pointer-events:none;">Go to workout</button></div></div>';
   }
   // a one-line motivator under Today (the full stats live on Me)
   const f7=trainingDays(7);
