@@ -661,6 +661,12 @@
 <body>
 
 <div class="statusbar-bg"></div>
+<style id="dbgoutline">
+  .tabbar{ outline:3px solid #ff0000 !important; outline-offset:-3px; }   /* RED = tab bar */
+  #shell{ outline:3px solid #00ff00 !important; outline-offset:-3px; }    /* GREEN = app shell */
+  #pager .page.active{ outline:3px solid #ffe000 !important; outline-offset:-6px; }  /* YELLOW = current page */
+  .statusbar-bg{ outline:3px solid #00e5ff !important; }                  /* CYAN = top status backdrop */
+</style>
 
 <!-- ===== WORKOUT PAGE ===== -->
 <div class="page" id="pageWorkout" data-tab="workout">
