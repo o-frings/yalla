@@ -180,3 +180,22 @@ it — same project, no re-architecture. Postgres data is fully exportable, so n
 
 Once those two values exist, I build the client side: auth screen, the sync rewrite,
 and the feed — all behind the feature flag so the current app is never disrupted.
+
+---
+
+## Social — cheers & comments (optional)
+
+Lets friends 🔥 and comment on each other's shared workouts, with an optional
+push to the post's owner.
+
+1. **Tables + RLS:** run [`supabase/schema-social.sql`](supabase/schema-social.sql)
+   in the SQL Editor (creates `cheers` and `comments`, each readable by any
+   signed-in user, writable only by its author).
+2. **Push on cheer/comment (optional):** deploy the
+   [`social-notify`](supabase/functions/social-notify/index.ts) Edge Function
+   (same VAPID secrets as the reminders function in PUSH-SETUP.md). The app
+   calls it after a cheer/comment; it looks up the post owner and, if they have
+   a push subscription, sends them a notification. Self-actions are ignored.
+
+The app degrades gracefully: if these tables/function aren't deployed, the feed
+still works — cheer/comment just no-op with a gentle toast.

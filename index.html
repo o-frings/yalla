@@ -188,6 +188,17 @@
   .ovchev{ color:var(--l3); font-weight:600; margin-left:5px; }
   .ovtodo li.ovtap .ovchev{ position:absolute; right:0; }
   .ovnudge{ background:var(--accent-soft); border:.5px solid transparent; box-shadow:0 0 0 1px var(--accent-soft) inset; }
+  /* friends feed — cheer + comment */
+  .feedbar{ display:flex; gap:8px; margin-top:10px; }
+  .feedbar button{ background:var(--row); border:.5px solid var(--line); border-radius:20px; padding:6px 12px; font-size:13px; font-weight:600; color:var(--l2); cursor:pointer; transition:transform .1s, background .15s; }
+  .feedbar button:active{ transform:scale(.94); }
+  .feedbar .cheerbtn.on{ background:var(--accent-soft); color:var(--accent); border-color:var(--accent-soft); }
+  .feedbar button[disabled]{ opacity:.45; cursor:default; }
+  .commpanel{ margin-top:10px; }
+  .commrow{ font-size:13.5px; color:var(--ink); line-height:1.45; margin:5px 0; }
+  .commrow b{ color:var(--l2); font-weight:600; margin-right:4px; }
+  .commadd{ display:flex; gap:8px; margin-top:8px; }
+  .comminput{ flex:1; }
   /* swipeable discover deck — cards snap, the next one peeks so it reads as swipeable */
   .discwrap{ display:flex; gap:10px; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch;
     scrollbar-width:none; margin:0 -16px; padding:2px 16px; }
@@ -2070,7 +2081,7 @@ async function renderFeed(){
   list.innerHTML='<div class="levelcap" style="margin:0 4px;">Loading…</div>';
   let rows=[];
   try{
-    const { data, error } = await sb.from("activity").select("user_id,created_at,summary").order("created_at",{ascending:false}).limit(30);
+    const { data, error } = await sb.from("activity").select("id,user_id,created_at,summary").order("created_at",{ascending:false}).limit(30);
     if(error) throw error; rows=data||[];
   }catch(e){ list.innerHTML='<div class="levelcap" style="margin:0 4px;">Couldn\'t load the feed.</div>'; return; }
   if(!rows.length){ list.innerHTML='<div class="levelcap" style="margin:0 4px;">No activity yet. Finish a workout to be the first.</div>'; return; }
@@ -2079,19 +2090,39 @@ async function renderFeed(){
     const { data } = await sb.from("profiles").select("user_id,display_name").in("user_id",ids);
     (data||[]).forEach(p=>{ names[p.user_id]=p.display_name; });
   }catch(e){}
+  // batch-load cheers + comment counts for the visible activities (degrades gracefully if those tables aren't set up)
+  const aids=rows.map(r=>r.id).filter(Boolean), cheerN={}, cheered={}, commN={};
+  if(aids.length){
+    try{ const { data } = await sb.from("cheers").select("activity_id,user_id").in("activity_id",aids);
+      (data||[]).forEach(c=>{ cheerN[c.activity_id]=(cheerN[c.activity_id]||0)+1; if(c.user_id===cloudUser.id) cheered[c.activity_id]=true; }); }catch(e){}
+    try{ const { data } = await sb.from("comments").select("activity_id").in("activity_id",aids);
+      (data||[]).forEach(c=>{ commN[c.activity_id]=(commN[c.activity_id]||0)+1; }); }catch(e){}
+  }
   list.innerHTML="";
   rows.forEach(r=>{
     const s=r.summary||{}, mine=r.user_id===cloudUser.id;
     const who = mine ? "You" : (names[r.user_id] || "A friend");
-    const card=document.createElement("div");
-    card.style.cssText="display:flex; gap:12px; align-items:center; padding:12px 4px; border-bottom:.5px solid var(--line);";
+    const card=document.createElement("div"); card.style.cssText="padding:12px 4px; border-bottom:.5px solid var(--line);";
+    const top=document.createElement("div"); top.style.cssText="display:flex; gap:12px; align-items:center;";
     const txt=document.createElement("div"); txt.style.cssText="flex:1; min-width:0;";
     const stats=[s.sets!=null?s.sets+" sets":null, s.mins?Math.round(s.mins)+" min":null, s.prs?s.prs+" PR"+(s.prs>1?"s":""):null].filter(Boolean).join(" · ");
     txt.innerHTML='<div style="font-weight:600;">'+esc(who)+' · '+esc(s.name||"Workout")+'</div>'+
       '<div class="levelcap" style="margin:3px 0 0;">'+esc(stats)+'</div>'+
       '<div class="levelcap" style="margin:2px 0 0; opacity:.7;">'+esc(agoStr(Date.parse(r.created_at)))+'</div>';
     const cv=document.createElement("canvas"); cv.width=72; cv.height=72; cv.style.cssText="flex:0 0 auto; width:60px; height:60px;";
-    card.appendChild(txt); card.appendChild(cv); list.appendChild(card);
+    top.appendChild(txt); top.appendChild(cv); card.appendChild(top);
+    // social actions (cheer + comment) — own posts can't be cheered
+    if(r.id){
+      const bar=document.createElement("div"); bar.className="feedbar";
+      bar.innerHTML='<button class="cheerbtn'+(cheered[r.id]?" on":"")+'"'+(mine?" disabled":"")+'>🔥 <span class="cheerc">'+(cheerN[r.id]||0)+'</span></button>'
+        +'<button class="commbtn">💬 <span class="commc">'+(commN[r.id]||0)+'</span></button>';
+      const panel=document.createElement("div"); panel.className="commpanel"; panel.style.display="none";
+      card.appendChild(bar); card.appendChild(panel);
+      const cb=bar.querySelector(".cheerbtn");
+      if(!mine) cb.onclick=()=>toggleCheer(r, cb);
+      bar.querySelector(".commbtn").onclick=()=>toggleComments(r, panel, bar.querySelector(".commc"));
+    }
+    list.appendChild(card);
     miniRadar(cv, s.mtot||{});
   });
   // urgency: a friend who trained in the last day gets surfaced at the top of the overview
@@ -2105,6 +2136,38 @@ async function renderFeed(){
   }
 }
 
+// best-effort push to the post's owner when you cheer/comment (the social-notify Edge Function does the sending; no-op if not deployed)
+async function socialNotify(activityId, kind, text){ try{ if(sb && sb.functions) await sb.functions.invoke("social-notify",{ body:{ activityId, kind, text:text||"" } }); }catch(e){} }
+async function toggleCheer(r, btn){
+  if(!cloudReady()) return; const on=btn.classList.contains("on"), cspan=btn.querySelector(".cheerc");
+  btn.classList.toggle("on", !on); cspan.textContent=Math.max(0,(parseInt(cspan.textContent)||0)+(on?-1:1));   // optimistic
+  try{
+    if(on){ await sb.from("cheers").delete().eq("activity_id",r.id).eq("user_id",cloudUser.id); }
+    else { await sb.from("cheers").insert({ activity_id:r.id, user_id:cloudUser.id }); socialNotify(r.id,"cheer"); }
+  }catch(e){ btn.classList.toggle("on", on); cspan.textContent=Math.max(0,(parseInt(cspan.textContent)||0)+(on?1:-1)); toast("Couldn't save that — is the social table set up?"); }
+}
+async function toggleComments(r, panel, cspan){
+  if(panel.style.display!=="none"){ panel.style.display="none"; return; }
+  panel.style.display=""; await loadComments(r, panel, cspan);
+}
+async function loadComments(r, panel, cspan){
+  panel.innerHTML='<div class="levelcap" style="margin:6px 0;">Loading…</div>';
+  let rows=[];
+  try{ const { data } = await sb.from("comments").select("user_id,body,created_at").eq("activity_id",r.id).order("created_at",{ascending:true}); rows=data||[]; }
+  catch(e){ panel.innerHTML='<div class="levelcap" style="margin:6px 0;">Comments aren\'t set up yet.</div>'; return; }
+  let names={}; try{ const ids=[...new Set(rows.map(c=>c.user_id))]; if(ids.length){ const { data } = await sb.from("profiles").select("user_id,display_name").in("user_id",ids); (data||[]).forEach(p=>names[p.user_id]=p.display_name); } }catch(e){}
+  const listHtml = rows.map(c=>'<div class="commrow"><b>'+esc(c.user_id===cloudUser.id?"You":(names[c.user_id]||"Friend"))+'</b> '+esc(c.body)+'</div>').join('') || '<div class="levelcap" style="margin:4px 0;">No comments yet — say something nice.</div>';
+  panel.innerHTML='<div class="commlist">'+listHtml+'</div><div class="commadd"><input class="comminput" placeholder="Add a comment…" maxlength="240"><button class="btn sm commsend">Send</button></div>';
+  const inp=panel.querySelector(".comminput");
+  panel.querySelector(".commsend").onclick=async()=>{
+    const body=inp.value.trim(); if(!body) return; inp.value="";
+    try{ await sb.from("comments").insert({ activity_id:r.id, user_id:cloudUser.id, body });
+      if(r.user_id!==cloudUser.id) socialNotify(r.id,"comment",body);
+      if(cspan) cspan.textContent=(parseInt(cspan.textContent)||0)+1;
+      await loadComments(r, panel, cspan);
+    }catch(e){ toast("Couldn't post that comment."); }
+  };
+}
 let plans=[], last={}, bw=[], hist={}, extlog=[];
 let draft={};   // in-progress entries per workout, kept until the workout is saved: { sig: { t, s:{ exname:[{w,r}] } } }
 let swaps={}, swapIdx=null;
