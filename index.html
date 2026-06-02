@@ -1214,6 +1214,32 @@ const DEFAULT_PLANS = [
       {n:"Leg Extension", t:"3 × 12–15", s:3, ss:"c"},
       {n:"Standing Calf Raise", t:"4 × 8–12", s:4, ss:"c"}]},
   ]
+},
+{
+  id:"beginner-glp", name:"Glutes, Legs & Posture",
+  workouts:[
+    {name:"Day 1", sub:"Glutes & hamstrings", rotate:true, ex:[
+      {n:"Hip Thrust", t:"3 × 10–15", s:3},
+      {n:"Goblet Squat", t:"3 × 8–12", s:3},
+      {n:"Seated Leg Curl", t:"3 × 10–15", s:3},
+      {n:"Cable Pull-Through", t:"2 × 12–15", s:2}]},
+    {name:"Day 2", sub:"Quads & posture", rotate:true, ex:[
+      {n:"Leg Press", t:"3 × 10–15", s:3},
+      {n:"Reverse Lunge", t:"2 × 10–12", s:2},
+      {n:"Face Pulls", t:"3 × 15–20", s:3},
+      {n:"Band Pull-Aparts", t:"2 × 15–20", s:2}]},
+    {name:"Day 3", sub:"Legs & core", rotate:true, ex:[
+      {n:"Goblet Squat", t:"3 × 8–12", s:3},
+      {n:"Glute Bridge", t:"3 × 12–20", s:3},
+      {n:"Leg Extension", t:"3 × 12–15", s:3},
+      {n:"Plank", t:"3 × 30–45s", s:3}]},
+    {name:"Home", sub:"Bodyweight & band", rotate:false, ex:[
+      {n:"Glute Bridge", t:"3 × 15–20", s:3},
+      {n:"Reverse Lunge", t:"3 × 10–12", s:3},
+      {n:"Single-Leg Glute Bridge", t:"3 × 10–12", s:3},
+      {n:"Band Pull-Aparts", t:"3 × 15–20", s:3},
+      {n:"Plank", t:"3 × 30–45s", s:3}]},
+  ]
 }
 ];
 const DELOAD_AT = 24;
@@ -2052,6 +2078,11 @@ async function init(){
     if(!plans.length) plans=JSON.parse(JSON.stringify(DEFAULT_PLANS));
     if(!plans.some(p=>p.id===settings.activePlanId)) settings.activePlanId=plans[0].id;
     settings.examplesV4=true;
+    await sset("plans",plans); await sset("settings",settings);
+  }
+  if(!settings.examplesV5){                          // restore the "Glutes, Legs & Posture" example (dropped when V4 switched to standard splits) — additive only
+    DEFAULT_PLANS.forEach(d=>{ if(!plans.some(p=>p.id===d.id)) plans.push(JSON.parse(JSON.stringify(d))); });
+    settings.examplesV5=true;
     await sset("plans",plans); await sset("settings",settings);
   }
   if(!settings.armsSmoothed){
