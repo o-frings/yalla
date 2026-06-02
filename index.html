@@ -170,15 +170,16 @@
   /* hide the scrollbar (still scrollable) */
   #pager .page, .sheetbody{ scrollbar-width:none; -ms-overflow-style:none; }
   #pager .page::-webkit-scrollbar, .sheetbody::-webkit-scrollbar{ width:0; height:0; display:none; }
-  /* Tab bar pinned to the viewport bottom, translucent like .statusbar-bg at the top, with a FIXED bottom
-     clearance (no env()). Root cause of the long-running "bar moves up / bugged every second launch, fine
-     on rotate" bug: iOS reports env(safe-area-inset-bottom) inconsistently on the standalone PWA
-     (sometimes 34px, sometimes 0), so tying the bar height to it made it jump. A fixed clearance keeps the
-     bar identical on every launch and orientation. The earlier solid-grey band was that large env strip
-     going opaque over bare background; now the bar is thin and fixed, so the translucent fill matches the
-     top without that artifact. */
+  /* Tab bar pinned to the viewport bottom, translucent like .statusbar-bg at the top. Key fix for the
+     "blank space below the bar": on iOS a position:fixed bottom:0 element anchors to the SMALL viewport
+     (excludes the home-indicator safe area), while the page/shell reaches the physical bottom — leaving a
+     strip of bare page below the bar. The ::after extends the same translucent fill down through that
+     strip to the physical bottom, so the bar reaches the real edge while staying see-through. Fixed
+     clearance (no env()) so it never jumps. */
   .tabbar{ position:fixed; left:0; right:0; bottom:0; max-width:540px; margin:0 auto; z-index:50; display:flex; align-items:center;
     padding:12px 8px 16px; border-top:.5px solid var(--sep);
+    background:color-mix(in srgb, var(--bg) 88%, transparent); }
+  .tabbar::after{ content:""; position:absolute; left:0; right:0; top:100%; height:48px; pointer-events:none;
     background:color-mix(in srgb, var(--bg) 88%, transparent); }
   .tabitem{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
     color:var(--l3); transition:color .15s; -webkit-tap-highlight-color:transparent; }
@@ -661,12 +662,6 @@
 <body>
 
 <div class="statusbar-bg"></div>
-<style id="dbgoutline">
-  .tabbar{ outline:3px solid #ff0000 !important; outline-offset:-3px; }   /* RED = tab bar */
-  #shell{ outline:3px solid #00ff00 !important; outline-offset:-3px; }    /* GREEN = app shell */
-  #pager .page.active{ outline:3px solid #ffe000 !important; outline-offset:-6px; }  /* YELLOW = current page */
-  .statusbar-bg{ outline:3px solid #00e5ff !important; }                  /* CYAN = top status backdrop */
-</style>
 
 <!-- ===== WORKOUT PAGE ===== -->
 <div class="page" id="pageWorkout" data-tab="workout">
