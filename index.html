@@ -118,6 +118,10 @@
   .tmrtime{ font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.5px; min-width:52px; }
   .timerbar.run .tmrtime{ color:var(--accent); }
   .tmrlbl{ font-size:12px; color:var(--l3); flex:1; }
+  /* idle (not yet started): hide the 0:00 + reset so it reads as a single small "Start" affordance */
+  .timerbar.idle .tmrtime{ display:none; }
+  .timerbar.idle .tmrreset{ display:none; }
+  .timerbar.idle .tmrlbl{ font-size:13px; font-weight:500; color:var(--l2); }
   .tmrreset{ background:none; border:none; color:var(--l3); font-size:13px; font-weight:600; cursor:pointer; padding:9px 8px; margin:-3px -4px; }
   .tmrrepeat{ background:var(--accent-soft); border:none; color:var(--accent); font-size:12.5px; font-weight:600; cursor:pointer; padding:7px 11px; border-radius:16px; flex:0 0 auto; }
   .tmrrepeat:active{ opacity:.6; }
@@ -473,6 +477,7 @@
   .setrow .x{ color:var(--l3); flex:0 0 auto; font-weight:600; }
   .setrow .eq{ color:var(--l3); flex:0 0 auto; font-weight:600; font-size:13px; }
   .setrow .vol{ font-size:18px; color:var(--l2); font-weight:700; min-width:56px; flex:0 0 auto; text-align:right; line-height:1; font-variant-numeric:tabular-nums; }
+  .setrow.novol .eq, .setrow.novol .vol{ visibility:hidden; }   /* no number yet → hide the "= —" noise, keep column alignment */
   .setrow .vol.live{ color:var(--ink); }
   .setrow.pr .vol{ color:var(--accent); }
   .setrow .setdel{ flex:0 0 auto; width:40px; height:40px; margin:-8px -10px -8px -4px; border:none; background:none; color:var(--l3);
@@ -486,6 +491,17 @@
   .prspark i{ position:absolute; width:6px; height:6px; border-radius:50%; transform:translate(-50%,-50%); animation:prspark .65s ease-out forwards; }
   @keyframes prspark{ 0%{transform:translate(-50%,-50%) scale(1);opacity:1;} 100%{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(.3);opacity:0;} }
   .lnks{ display:flex; align-items:center; flex:0 0 auto; gap:6px; }
+  .menubtn{ background:none; border:none; padding:0; }
+  /* single body-level popover (the card clips overflow, so it can't live inside) */
+  .exmenu-pop{ position:fixed; z-index:200; min-width:184px; padding:6px; display:none; flex-direction:column;
+    background:var(--card); border:.5px solid var(--line); border-radius:15px; box-shadow:0 14px 38px rgba(0,0,0,.24); }
+  .exmenu-pop.show{ display:flex; animation:menupop .14s cubic-bezier(.2,.8,.2,1); transform-origin:top right; }
+  @keyframes menupop{ from{ opacity:0; transform:translateY(-5px) scale(.97); } to{ opacity:1; transform:none; } }
+  .exmenu-pop .mi{ display:flex; align-items:center; gap:12px; padding:12px 13px; border-radius:11px; cursor:pointer;
+    font-size:15.5px; font-weight:500; color:var(--ink); white-space:nowrap; }
+  .exmenu-pop .mi svg{ width:19px; height:19px; flex:0 0 auto; color:var(--l2); }
+  .exmenu-pop .mi:active{ background:var(--accent-soft); }
+  .exmenu-pop .mi.danger{ color:var(--red); } .exmenu-pop .mi.danger svg{ color:var(--red); }
   .lnkic{ color:var(--l2); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; margin:-8px 0; }
   .lnkic svg{ width:18px; height:18px; }
   .lnkic:active{ color:var(--accent); }
@@ -662,7 +678,6 @@
 
 <!-- WORKOUT -->
 <div class="seg" id="seg"></div>
-<div class="wkmeta" id="wkMeta"></div>
 <div class="timerbar" id="timerBar">
   <button class="tmrbtn" id="tmrToggle" aria-label="Start timer"></button>
   <span class="tmrtime" id="tmrTime">0:00</span>
@@ -682,6 +697,7 @@
 <div class="foot">On-device only · keep a backup · lift safely</div>
 </div><!-- /pageWorkout -->
 
+<div class="exmenu-pop" id="exMenu"></div>
 <div class="toast" id="toast"></div>
 <div class="coach" id="coach"><div class="coachbody"><span id="coachTxt"></span></div><button class="coachx" id="coachX">Got it</button></div>
 
@@ -2289,10 +2305,12 @@ $("cYes").onclick=()=>{ const fn=_confirmYes; confirmClose(); if(fn) fn(); };
 function tmrFmt(s){ s=Math.floor(s); const m=Math.floor(s/60), ss=s%60; return m+":"+(ss<10?"0":"")+ss; }
 function tmrElapsed(){ return timer.elapsed + (timer.running && timer.startedAt ? (Date.now()-timer.startedAt)/1000 : 0); }
 function tmrRender(){
+  const idle = !timer.running && timer.elapsed===0;   // not started yet → collapse to a slim "Start" affordance
   $("tmrTime").textContent=tmrFmt(tmrElapsed());
   $("timerBar").classList.toggle("run", timer.running);
+  $("timerBar").classList.toggle("idle", idle);
   $("tmrToggle").innerHTML = timer.running ? ICON.pause : ICON.play;
-  $("tmrLbl").textContent = timer.running ? "running" : (timer.elapsed>0?"paused":"session timer");
+  $("tmrLbl").textContent = timer.running ? "running" : (timer.elapsed>0?"paused":"Start session timer");
   $("tmrReset").style.visibility = (timer.elapsed>0||timer.running) ? "visible" : "hidden";
 }
 function tmrStart(){ if(timer.running) return; timer.startedAt=Date.now(); timer.running=true; timer.iv=setInterval(tmrRender,1000); tmrRender(); }
@@ -2963,7 +2981,7 @@ function renderSeg(){
   const ni=nextRotateIndex(p);
   p.workouts.forEach((w,i)=>{
     const s=document.createElement("div"); s.className="s"+(!freeMode && i===curWk?" active":"");
-    s.innerHTML=(i===ni?'<span class="ndot"></span>':'')+esc(w.name)+'<span class="wm">≈'+workoutMinutes(w)+' min</span>';
+    s.innerHTML=(i===ni?'<span class="ndot"></span>':'')+esc(w.name);
     s.onclick=()=>{ freeMode=false; curWk=i; swaps={}; renderSeg(); renderWorkout(); };
     seg.appendChild(s);
   });
@@ -3004,24 +3022,26 @@ function readiness(days){
 }
 function suggestion(name, t){
   const h=hist[name]||[];
-  if(!h.length) return { last:null, soft:true, cue:"First session — pick a weight you can handle for the target reps with 1–2 in reserve." };
+  if(!h.length) return { last:null, soft:true, show:true, cue:"First session — pick a weight you can handle for the target reps with 1–2 in reserve." };
   const lt=h[h.length-1], w=parseFloat(lt.w)||0, r=parseInt(lt.r)||0, days=daysSince(lt.d), rng=parseReps(t);
   const regime=readiness(days);
-  let cue, soft=false;
-  if(regime==="return"){ soft=true; cue="Back after "+days+" days — match "+fmtSet(lt)+" to find your groove, then build from there."; }
-  else if(regime==="undertrained"){ soft=true; cue="Training's been light lately — repeat "+fmtSet(lt)+" and rebuild your rhythm before adding load."; }
-  else if(regime==="overreached"){ soft=true; cue="You've trained hard and often — hold around "+fmtSet(lt)+" this week and let your body catch up."; }
+  // show=true only when the cue says something a glance at "Last … · Nd ago" wouldn't: layoff/deload context or a
+  // hit-the-ceiling milestone. Routine "beat it by a rep" cues are dropped from the card to cut per-card height.
+  let cue, soft=false, show=false;
+  if(regime==="return"){ soft=true; show=true; cue="Back after "+days+" days — match "+fmtSet(lt)+" to find your groove, then build from there."; }
+  else if(regime==="undertrained"){ soft=true; show=true; cue="Training's been light lately — repeat "+fmtSet(lt)+" and rebuild your rhythm before adding load."; }
+  else if(regime==="overreached"){ soft=true; show=true; cue="You've trained hard and often — hold around "+fmtSet(lt)+" this week and let your body catch up."; }
   else if(!rng){ cue="Beat last time — add a rep or a little load over "+fmtSet(lt)+"."; }
-  else if(r>=rng.high && w>0){ cue="Topped the range — add weight: try "+(w+incFor(name))+"kg for "+rng.low+"+ reps."; }
-  else if(r>=rng.high){ cue="You topped the range — make it harder and aim "+rng.low+"+ reps."; }
+  else if(r>=rng.high && w>0){ show=true; cue="Topped the range — add weight: try "+(w+incFor(name))+"kg for "+rng.low+"+ reps."; }
+  else if(r>=rng.high){ show=true; cue="You topped the range — make it harder and aim "+rng.low+"+ reps."; }
   else if(r>0){ cue="Beat it: aim "+(r+1)+" rep"+(r+1>1?"s":"")+(w?" at "+w+"kg":"")+" (target "+rng.low+"–"+rng.high+")."; }
   else { cue="Beat last time: "+fmtSet(lt)+"."; }
-  return { last:lt, days, regime, cue, soft };
+  return { last:lt, days, regime, cue, soft, show };
 }
 function metaHTML(name, t){
   const s=suggestion(name,t);
   const lastText = s.last ? 'Last '+fmtSet(s.last)+' · '+s.days+'d ago' : '';
-  return { lastText, soft:s.soft, cue:'<div class="cue'+(s.soft?' soft':'')+'">'+s.cue+'</div>' };
+  return { lastText, soft:s.soft, show:s.show, cue:'<div class="cue'+(s.soft?' soft':'')+'">'+s.cue+'</div>' };
 }
 function draftSig(){ return freeMode ? "free" : (activePlan().id + "|" + curWk); }
 let _draftTimer=null;
@@ -3063,10 +3083,6 @@ document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState=
 function renderWorkout(){
   const p=activePlan(), w=p.workouts[curWk], list=$("exlist"); list.innerHTML="";
   $("planSub").textContent = planMeta(p);
-  const nSS=workoutSupersets(w);
-  $("wkMeta").style.display="";
-  $("wkMeta").innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
-    +'≈ <b>'+workoutMinutes(w)+' min</b> · '+w.ex.length+' exercise'+(w.ex.length===1?'':'s')+(nSS?' · '+nSS+' superset'+(nSS>1?'s':''):'');
   w.ex.forEach((e,xi)=>{
     const name=dispName(e,xi);
     const ssPrev=xi>0?w.ex[xi-1].ss:null, ssNext=xi<w.ex.length-1?w.ex[xi+1].ss:null;
@@ -3078,10 +3094,7 @@ function renderWorkout(){
     const swapped=swaps[xi] && swaps[xi]!==e.n;
     const g=document.createElement("div"); g.className="group"+(inSS?" ss":"")+(inSS && e.ss===ssPrev?" ss-cont":""); g.dataset.ex=name; g.style.animationDelay=(xi*0.05)+"s";
     const meta=metaHTML(name, e.t), eq=equipFor(name);
-    const lk=[]; if(canSwap) lk.push('<a class="lnkic swap" data-i="'+xi+'" title="Swap exercise">'+ICON.swap+'</a>');
-    lk.push('<a class="lnkic info" data-ex="'+esc(name)+'" title="Info & demo">'+ICON.info+'</a>');
-    lk.push('<a class="lnkic rem" data-i="'+xi+'" title="Remove from workout">'+ICON.trash+'</a>');
-    const linksHTML='<span class="lnks">'+lk.join('')+'</span>';
+    const linksHTML='<button class="lnkic menubtn" data-i="'+xi+'" data-ex="'+esc(name)+'" data-swap="'+(canSwap?1:0)+'" aria-label="More actions"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg></button>';
     const mcol=MCOLOR[muscleFor(name)[0]]||"#888888";
     const mp=[];
     if(e.t) mp.push('<span class="tg">'+esc(e.t)+'</span>');
@@ -3091,15 +3104,15 @@ function renderWorkout(){
     let head=`<div class="pad" style="padding-bottom:0">
       <div class="exhead"><span class="eqic tinted" style="background:${hexAlpha(mcol,.15)};color:${mcol}" title="${esc(eq.label)}">${EQUIP[eq.key]}</span><span class="nm">${esc(name)}</span>${linksHTML}</div>
       ${ swapped ? '<div class="swapnote">'+ICON.swap+'instead of '+esc(e.n)+'</div>' : '' }
-      ${metaLine}${meta.cue}</div>`;
+      ${metaLine}${meta.show?meta.cue:''}</div>`;
     let rows="";
     for(let i=0;i<e.s;i++){ const pv=prev[i];
       const pvVol = pv ? setVol(name, pv.w, pv.r) : 0;
-      rows+=`<div class="setrow" data-pvol="${pvVol||''}"><span class="sn">${i+1}</span>
+      rows+=`<div class="setrow${pvVol?'':' novol'}" data-pvol="${pvVol||''}"><span class="sn">${i+1}</span>
         <input class="w" type="text" inputmode="decimal" autocomplete="off" placeholder="${pv&&pv.w?esc(pv.w):'kg'}">
         <span class="x">×</span>
         <input class="r" type="number" inputmode="numeric" placeholder="${pv&&pv.r?esc(pv.r):'reps'}">
-        <span class="prtag">PR</span><span class="eq">=</span><span class="vol">${pvVol?fmtVol(pvVol):'—'}</span><button class="setdel" aria-label="Remove set">${ICON.minus}</button></div>`;
+        <span class="prtag">PR</span><span class="eq">=</span><span class="vol">${pvVol?fmtVol(pvVol):''}</span><button class="setdel" aria-label="Remove set">${ICON.minus}</button></div>`;
     }
     g.innerHTML=head+rows+'<div class="freeadd"><a class="demo addset">'+ICON.plus+'add set</a></div>'; list.appendChild(g);
     g.querySelector(".addset").onclick=()=>{ const n=g.querySelectorAll(".setrow").length+1;
@@ -3801,11 +3814,11 @@ function exerciseLibrary(){
 }
 function freeSetRow(i, pv, name){
   const pvVol = (pv && name) ? setVol(name, pv.w, pv.r) : 0;
-  return '<div class="setrow" data-pvol="'+(pvVol||'')+'"><span class="sn">'+i+'</span>'
+  return '<div class="setrow'+(pvVol?'':' novol')+'" data-pvol="'+(pvVol||'')+'"><span class="sn">'+i+'</span>'
     +'<input class="w" type="text" inputmode="decimal" autocomplete="off" placeholder="'+(pv&&pv.w?esc(pv.w):'kg')+'">'
     +'<span class="x">×</span>'
     +'<input class="r" type="number" inputmode="numeric" placeholder="'+(pv&&pv.r?esc(pv.r):'reps')+'">'
-    +'<span class="prtag">PR</span><span class="eq">=</span><span class="vol">'+(pvVol?fmtVol(pvVol):'—')+'</span><button class="setdel" aria-label="Remove set">'+ICON.minus+'</button></div>';
+    +'<span class="prtag">PR</span><span class="eq">=</span><span class="vol">'+(pvVol?fmtVol(pvVol):'')+'</span><button class="setdel" aria-label="Remove set">'+ICON.minus+'</button></div>';
 }
 function buildFreeGroup(name){
   const prev=last[name]||[];
@@ -3819,7 +3832,7 @@ function buildFreeGroup(name){
     +'<div class="exhead"><span class="eqic tinted" style="background:'+hexAlpha(mcol,.15)+';color:'+mcol+'" title="'+esc(eq.label)+'">'+EQUIP[eq.key]+'</span><span class="nm">'+esc(name)+'</span>'
     +'<span class="lnks"><a class="lnkic info" data-ex="'+esc(name)+'" title="Info & demo">'+ICON.info+'</a></span>'
     +'<button class="freedel" title="Remove">×</button></div>'
-    +metaLine+meta.cue+'</div>'
+    +metaLine+(meta.show?meta.cue:'')+'</div>'
     +rows+'<div class="freeadd"><a class="demo addset">'+ICON.plus+'add set</a></div>';
   g.querySelector(".freedel").onclick=()=>{ confirmAsk("Remove "+name+"?", "Remove", ()=>{ const sec=g.closest(".secgrp"); g.remove(); if(sec && !sec.querySelector(".group")) sec.remove(); captureDraft(); }); };
   g.querySelector(".addset").onclick=()=>{ const n=g.querySelectorAll(".setrow").length+1;
@@ -3829,7 +3842,6 @@ function buildFreeGroup(name){
 }
 function renderFree(){
   $("planSub").textContent="Free workout — choose your exercises";
-  if($("wkMeta")) $("wkMeta").style.display="none";
   const list=$("exlist"); list.innerHTML="";
   const hint=document.createElement("p"); hint.className="freehint";
   hint.textContent="A one-off session. Add any exercises you like — grouped by muscle, logged to history just like a plan workout.";
@@ -3935,6 +3947,31 @@ function buildExRow(name, opts){
 // ================= swap exercise =================
 $("exlist").addEventListener("click", e=>{ const a=e.target.closest(".swap"); if(a) openSwap(+a.dataset.i); });
 $("exlist").addEventListener("click", e=>{ const a=e.target.closest(".rem"); if(a){ e.preventDefault(); removePlanExercise(+a.dataset.i); } });
+// per-exercise "···" overflow menu — one body-level popover positioned under the tapped button
+(function(){
+  const pop=$("exMenu"); let open=false;
+  const close=()=>{ if(!open) return; open=false; pop.classList.remove("show"); pop.innerHTML=""; };
+  window.closeExMenu=close;
+  function build(btn){
+    const xi=+btn.dataset.i, name=btn.dataset.ex, canSwap=btn.dataset.swap==="1";
+    const items=[];
+    if(canSwap) items.push({c:"swap", ic:ICON.swap, t:"Swap exercise", fn:()=>openSwap(xi)});
+    items.push({c:"info", ic:ICON.info, t:"Info & demo", fn:()=>openInfo(name)});
+    items.push({c:"rem danger", ic:ICON.trash, t:"Remove", fn:()=>removePlanExercise(xi)});
+    pop.innerHTML=items.map((it,k)=>'<div class="mi '+it.c+'" data-k="'+k+'">'+it.ic+'<span>'+it.t+'</span></div>').join("");
+    pop.querySelectorAll(".mi").forEach((el,k)=> el.onclick=()=>{ close(); items[k].fn(); });
+    // measure off-screen, then anchor the right edge to the button
+    pop.style.visibility="hidden"; pop.classList.add("show"); open=true;
+    const r=btn.getBoundingClientRect(), mw=pop.offsetWidth, mh=pop.offsetHeight;
+    let left=Math.max(8, r.right-mw);
+    let top=r.bottom+6; if(top+mh > window.innerHeight-8) top=Math.max(8, r.top-mh-6);
+    pop.style.left=left+"px"; pop.style.top=top+"px"; pop.style.visibility="";
+  }
+  $("exlist").addEventListener("click", e=>{ const b=e.target.closest(".menubtn"); if(!b) return;
+    e.preventDefault(); e.stopPropagation(); open ? close() : build(b); });
+  document.addEventListener("click", e=>{ if(open && !e.target.closest("#exMenu") && !e.target.closest(".menubtn")) close(); });
+  document.addEventListener("scroll", close, true);   // any scroll dismisses it
+})();
 $("exlist").addEventListener("click", e=>{ const a=e.target.closest(".setdel"); if(a){ e.preventDefault(); removeSetRow(a.closest(".setrow")); } });
 function removeSetRow(r){
   if(!r) return; const g=r.closest(".group"); if(!g) return;
@@ -3951,9 +3988,9 @@ $("exlist").addEventListener("input", e=>{ if(!e.target.classList||(!e.target.cl
   const r=e.target.closest(".setrow"), g=e.target.closest(".group"); if(r&&g) updateSetVol(r, g.dataset.ex); captureDraft(); });
 function updateSetVol(r, name){
   const wv=r.querySelector(".w").value.trim(), rv=r.querySelector(".r").value.trim(), vEl=r.querySelector(".vol");
-  if(rv===""&&wv===""){ const pv=r.dataset.pvol; vEl.textContent=pv?fmtVol(+pv):"—"; vEl.classList.remove("live"); setRowPR(r,false); return; }
+  if(rv===""&&wv===""){ const pv=r.dataset.pvol; vEl.textContent=pv?fmtVol(+pv):""; vEl.classList.remove("live"); r.classList.toggle("novol", !pv); setRowPR(r,false); return; }
   const vol=setVol(name, wv, rv);
-  vEl.textContent = vol?fmtVol(vol):"—"; vEl.classList.toggle("live", vol>0);
+  vEl.textContent = vol?fmtVol(vol):""; vEl.classList.toggle("live", vol>0); r.classList.toggle("novol", !vol);
   const best=bestVol(name);
   setRowPR(r, vol>0 && best>0 && vol>best);
 }
