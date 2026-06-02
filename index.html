@@ -170,14 +170,15 @@
   /* hide the scrollbar (still scrollable) */
   #pager .page, .sheetbody{ scrollbar-width:none; -ms-overflow-style:none; }
   #pager .page::-webkit-scrollbar, .sheetbody::-webkit-scrollbar{ width:0; height:0; display:none; }
-  /* Tab bar pinned to the viewport bottom. The translucent fill lives on ::before and stops ABOVE the
-     home-indicator strip, so that strip stays transparent and shows the page (no solid grey band — that
-     band, confirmed via diagnostics, was the bar fill painted over plain background in the safe area).
-     More transparent (60%) and short. (backdrop-filter blur is unusable here — renders solid on iOS.) */
+  /* Tab bar pinned to the viewport bottom, OPAQUE var(--bg). On iOS a translucent fixed bar can't win:
+     frosted blur renders solid (WebKit bug), a plain-alpha fill goes solid-grey over the bare background
+     (the "band"), and stopping the fill above the home-indicator strip lets content bleed through (the
+     "gap"). An opaque fill that equals the page background sidesteps all three: it blends with the page
+     (no visible panel / band), covers scrolled content (no bleed), and reads uniform top-to-bottom. Kept
+     short so it doesn't ride high. */
   .tabbar{ position:fixed; left:0; right:0; bottom:0; max-width:540px; margin:0 auto; z-index:50; display:flex; align-items:center;
-    padding:6px 8px calc(4px + env(safe-area-inset-bottom) * 0.5); background:transparent; }
-  .tabbar::before{ content:""; position:absolute; left:0; right:0; top:0; bottom:calc(env(safe-area-inset-bottom) * 0.5); z-index:-1;
-    background:color-mix(in srgb, var(--bg) 60%, transparent); border-top:.5px solid var(--sep); }
+    padding:6px 8px calc(4px + env(safe-area-inset-bottom) * 0.5); border-top:.5px solid var(--sep);
+    background:var(--bg); }
   .tabitem{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
     color:var(--l3); transition:color .15s; -webkit-tap-highlight-color:transparent; }
   .tabitem svg{ width:26px; height:26px; transition:transform .12s; }
