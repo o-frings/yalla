@@ -955,7 +955,11 @@
   <div class="grabber"></div>
   <div class="sheethdr"><span class="t" id="swapTitle">Swap</span><button class="btn plain sm" id="swapClose">Done</button></div>
   <div class="sheetbody">
-    <p style="color:var(--l2);font-size:13px;margin:0 4px 10px;line-height:1.45;">Pick any exercise for the same muscle group. Today's sets log under whichever you choose.</p>
+    <p style="color:var(--l2);font-size:13px;margin:0 4px 10px;line-height:1.45;">Pick any exercise for the same muscle group.</p>
+    <div class="seg appearance" id="swapScope">
+      <div class="s active" data-scope="today">Just today</div>
+      <div class="s" data-scope="perm">Permanently</div>
+    </div>
     <div class="seg appearance" id="swapLevelSeg">
       <div class="s active" data-lv="gym">Full gym</div>
       <div class="s" data-lv="park">Park</div>
@@ -2062,7 +2066,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi]||e.n; }
-let settings={ activePlanId:null, name:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false };
+let settings={ activePlanId:null, name:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false, planStartAt:null };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -2133,6 +2137,7 @@ async function init(){
   extlog= (await sget("extlog")) || [];
   draft = (await sget("draft")) || {};
   if(settings.achUnlocked==null) settings.achUnlocked=unlockedIds();
+  if(!settings.planStartAt) settings.planStartAt=Date.now();   // start the "freshen" clock for the active plan
   if(!settings.examplesV4){                          // refresh the built-in example plans (must run before the legacy plan-specific migrations below)
     const oldEx=["pushpull","ppl","fullbody","marie","beginner-glp","advanced-intense","intermediate-balanced"];
     plans = plans.filter(p=> !oldEx.includes(p.id));                       // drop the previous demo plans (user-built plans are kept)
@@ -2373,6 +2378,8 @@ function renderOverview(){
     else if(daysSince(bw[bw.length-1].d)>10) todo.push({t:"Log your weight — it’s been over " + daysSince(bw[bw.length-1].d) + " days.", act:"weight"});
   }
   if(due) todo.push({t:"Take a deload week to recover.", act:"workout"});
+  if(settings.planStartAt && (Date.now()-settings.planStartAt) > 42*86400000 && Object.keys(hist).length)
+    todo.push({t:"You've run this plan ~6 weeks — swap 1–2 accessories to freshen it (long-press swap → Permanently).", act:"workout"});
   h+='<div class="ed-label">Needs attention</div>';
   h+='<div class="ovobj">Optimising for <b>'+esc(obj.label)+'</b></div>';
   if(todo.length){ h+='<div class="group"><div class="pad"><ul class="ovtodo">'+todo.map(it=>'<li class="ovtap" data-act="'+it.act+'">'+it.t+'<span class="ovchev">›</span></li>').join('')+'</ul></div></div>'; }
@@ -2998,7 +3005,7 @@ function renderPlanList(){
         <div class="pscores"><span class="psc pscbtn" data-bal="1"><b>Balance</b> ${sc.balance}<small>/5</small> ›</span><span class="psc"><b>Hypertrophy</b> ${sc.hyp}<small>/5</small></span></div></div>
       <button class="edit share">Share</button><button class="edit">Edit</button>`;
     row.querySelector(".info").onclick=async(ev)=>{ if(ev.target.closest(".pscbtn")) return;   // let the Balance chip open the radar instead of switching
-      settings.activePlanId=p.id; freeMode=false; swaps={}; const ni=nextRotateIndex(p); curWk=ni>=0?ni:0;
+      settings.activePlanId=p.id; settings.planStartAt=Date.now(); freeMode=false; swaps={}; const ni=nextRotateIndex(p); curWk=ni>=0?ni:0;
       await sset("settings",settings); renderAll(); closeSheet("Plans"); toast("Switched to "+p.name); };
     row.querySelector(".pscbtn").onclick=(ev)=>{ ev.stopPropagation(); openMusclesFor(p.id); };
     row.querySelector(".share").onclick=()=>openShare(p);
@@ -3202,7 +3209,7 @@ $("importBtn").onclick=async()=>{
   if(!obj || (obj.t!=="plan" && obj.t!=="workouts")){ toast("That doesn’t look like a Yalla code"); return; }
   const np=sanitizePlan(obj);
   if(!np.workouts.length){ toast("No exercises found in that code"); return; }
-  plans.push(np); settings.activePlanId=np.id; settings.pointers[np.id]=0; freeMode=false;
+  plans.push(np); settings.activePlanId=np.id; settings.planStartAt=Date.now(); settings.pointers[np.id]=0; freeMode=false;
   await sset("plans",plans); await sset("settings",settings);
   const ni=nextRotateIndex(np); curWk=ni>=0?ni:0;
   closeSheet("Import"); renderAll(); toast("Imported “"+np.name+"”");
@@ -3584,9 +3591,11 @@ function removePlanExercise(xi){
 }
 $("swapClose").onclick=()=>closeSheet("Swap");
 $("scrimSwap").onclick=()=>closeSheet("Swap");
+let swapScope="today";
 function openSwap(xi){
-  swapIdx=xi; const e=activePlan().workouts[curWk].ex[xi];
+  swapIdx=xi; swapScope="today"; const e=activePlan().workouts[curWk].ex[xi];
   $("swapTitle").textContent="Swap: "+e.n;
+  document.querySelectorAll("#swapScope .s").forEach(s=> s.classList.toggle("active", s.dataset.scope==="today"));
   syncLevelSeg(); renderSwapList(); openSheet("Swap");
 }
 function renderSwapList(){
@@ -3596,11 +3605,23 @@ function renderSwapList(){
   if(exSort==="score") opts=opts.slice().sort((a,b)=> hScore(b).s-hScore(a).s || a.localeCompare(b));
   opts.forEach(o=>{
     const row=buildExRow(o, {checked:o===cur, meta:o===e.n?"original":""});
-    row.querySelector(".info").onclick=()=>{ if(o===e.n) delete swaps[swapIdx]; else swaps[swapIdx]=o;
-      closeSheet("Swap"); renderWorkout(); toast(o===e.n?"Back to "+e.n:"Swapped to "+o); };
+    row.querySelector(".info").onclick=async()=>{
+      if(swapScope==="perm"){                                   // edit the plan itself
+        const wk=activePlan().workouts[curWk];
+        wk.ex[swapIdx].n=o; delete swaps[swapIdx];
+        settings.planStartAt=Date.now();                        // freshening resets the 6-week clock
+        await sset("plans",plans); await sset("settings",settings);
+        closeSheet("Swap"); renderSeg(); renderWorkout(); renderDash(); toast("Swapped to "+o+" for good");
+      } else {                                                  // just this session
+        if(o===e.n) delete swaps[swapIdx]; else swaps[swapIdx]=o;
+        closeSheet("Swap"); renderWorkout(); toast(o===e.n?"Back to "+e.n:"Swapped to "+o);
+      }
+    };
     wrap.appendChild(row);
   });
 }
+document.querySelectorAll("#swapScope .s").forEach(s=> s.onclick=()=>{ swapScope=s.dataset.scope;
+  document.querySelectorAll("#swapScope .s").forEach(x=> x.classList.toggle("active", x===s)); });
 document.querySelectorAll("#swapLevelSeg .s").forEach(s=> s.onclick=()=>{ equipLevel=s.dataset.lv; syncLevelSeg(); renderSwapList(); });
 
 // ================= exercise info =================
