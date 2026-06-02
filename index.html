@@ -169,6 +169,7 @@
   .tabitem span{ display:none; }                 /* icons only — labels hidden (kept as aria-label) */
   .tabitem.active{ color:var(--accent); }
   .tabitem:active svg{ transform:scale(.86); }
+  body.kb .tabbar{ display:none; }   /* keyboard up → hide the bar so it can't ride up above it (standalone PWA shrinks the viewport) */
   /* overview / coach cards */
   .ovk{ font-size:12px; color:var(--l3); font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
   .ovbig{ font-size:24px; font-weight:750; letter-spacing:-.4px; margin-top:3px; line-height:1.1; }
@@ -2809,6 +2810,13 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
   };
   pager.addEventListener("touchend",end,{passive:true});
   pager.addEventListener("touchcancel",end,{passive:true});
+})();
+// hide the tab bar while a text field is focused — in a standalone PWA the keyboard shrinks the viewport, which otherwise floats a bottom-anchored bar up above the keyboard
+(function(){
+  const isField=el=> el && el.matches && el.matches('input:not([type=checkbox]):not([type=radio]):not([type=file]),textarea,select,[contenteditable="true"]');
+  let t=0;
+  document.addEventListener("focusin", e=>{ if(isField(e.target)){ clearTimeout(t); document.body.classList.add("kb"); } });
+  document.addEventListener("focusout", e=>{ if(isField(e.target)){ clearTimeout(t); t=setTimeout(()=>{ if(!isField(document.activeElement)) document.body.classList.remove("kb"); }, 150); } });
 })();
 $("bodySave").onclick=async()=>{
   const h=parseFloat($("heightIn").value), bf=parseFloat($("bfIn").value);
