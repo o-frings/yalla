@@ -141,9 +141,9 @@
   .largeTitle .ltmain .titleBtn{ flex:1; min-width:0; line-height:1.08; }
   .largeTitle .ltmain .iconbtn{ flex:0 0 auto; align-self:flex-start; margin-top:2px; }
   .largeTitle small{ display:block; font-size:14.5px; font-weight:500; color:var(--l2); letter-spacing:0; margin-top:6px; }
-  /* frosted backdrop behind the status-bar clock — slightly translucent so content blurs through */
+  /* backdrop behind the status-bar clock — slightly translucent (no blur, to match the tab bar and avoid scroll flicker) */
   .statusbar-bg{ position:fixed; top:0; left:0; right:0; height:env(safe-area-inset-top); z-index:40; pointer-events:none;
-    background:color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter:blur(22px) saturate(180%); -webkit-backdrop-filter:blur(22px) saturate(180%); }
+    background:color-mix(in srgb, var(--bg) 88%, transparent); }
   /* ===== pages + bottom tab bar ===== */
   .page{ display:none; }
   .page.active{ display:block; animation:pagein .26s ease; }
@@ -161,7 +161,7 @@
   .tabbar{ position:absolute; left:0; right:0; bottom:0; z-index:2; display:flex;
     height:calc(52px + env(safe-area-inset-bottom)); padding-bottom:env(safe-area-inset-bottom);  /* fixed height; home-indicator inset only below the icons */
     align-items:stretch; overflow:hidden; border-top:.5px solid var(--sep);
-    background:color-mix(in srgb, var(--bg) 68%, transparent); backdrop-filter:blur(22px) saturate(180%); -webkit-backdrop-filter:blur(22px) saturate(180%); }
+    background:color-mix(in srgb, var(--bg) 88%, transparent); }   /* slight transparency, no backdrop-filter — avoids the iOS blur flicker over momentum scroll / the moving pager */
   .tabitem{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
     color:var(--l3); transition:color .15s; -webkit-tap-highlight-color:transparent; }
   .tabitem svg{ width:26px; height:26px; transition:transform .12s; }
@@ -1129,6 +1129,55 @@ const DEFAULT_PLANS = [{
       {n:"Pike Push-Ups", t:"3 × 8–15", s:3},
       {n:"Hollow Hold (sec)", t:"3 × 30–45s", s:3}]},
   ]
+},
+{
+  id:"ppl", name:"Push · Pull · Legs",
+  workouts:[
+    {name:"Push", sub:"Chest, shoulders & triceps", rotate:true, ex:[
+      {n:"Barbell Bench Press", t:"3 × 6–10", s:3},
+      {n:"Overhead Press", t:"3 × 6–10", s:3},
+      {n:"Incline DB Press", t:"3 × 8–12", s:3},
+      {n:"Lateral Raise", t:"3 × 12–20", s:3, ss:"a"},
+      {n:"Overhead Triceps Extension", t:"3 × 10–15", s:3, ss:"a"},
+      {n:"Triceps Pushdown", t:"2 × 10–15", s:2}]},
+    {name:"Pull", sub:"Back, rear delts & biceps", rotate:true, ex:[
+      {n:"Weighted Pull-Up", t:"3 × 6–10", s:3},
+      {n:"Bent-Over Row", t:"3 × 6–10", s:3},
+      {n:"Lat Pulldown", t:"3 × 10–12", s:3},
+      {n:"Face Pulls", t:"3 × 15–20", s:3, ss:"b"},
+      {n:"Incline DB Curl", t:"3 × 8–12", s:3, ss:"b"},
+      {n:"Hammer Curl", t:"2 × 10–12", s:2}]},
+    {name:"Legs", sub:"Quads, hamstrings & calves", rotate:true, ex:[
+      {n:"Back Squat", t:"3 × 5–8", s:3},
+      {n:"Romanian Deadlift", t:"3 × 6–10", s:3},
+      {n:"Leg Press", t:"3 × 10–15", s:3},
+      {n:"Seated Leg Curl", t:"3 × 10–15", s:3, ss:"c"},
+      {n:"Standing Calf Raise", t:"4 × 8–12", s:4, ss:"c"},
+      {n:"Hanging Leg Raise", t:"3 × 10–15", s:3}]},
+  ]
+},
+{
+  id:"fullbody", name:"Full Body Starter",
+  workouts:[
+    {name:"Full Body A", sub:"Squat, push & pull", rotate:true, ex:[
+      {n:"Goblet Squat", t:"3 × 8–12", s:3},
+      {n:"Machine Chest Press", t:"3 × 8–12", s:3},
+      {n:"Lat Pulldown", t:"3 × 10–12", s:3},
+      {n:"Seated DB Press", t:"2 × 10–12", s:2},
+      {n:"Plank", t:"3 × 30–45s", s:3}]},
+    {name:"Full Body B", sub:"Hinge, press & row", rotate:true, ex:[
+      {n:"Leg Press", t:"3 × 10–15", s:3},
+      {n:"Incline DB Press", t:"3 × 8–12", s:3},
+      {n:"Seated Row", t:"3 × 10–12", s:3},
+      {n:"Romanian Deadlift", t:"3 × 8–12", s:3},
+      {n:"Cable Crunch", t:"3 × 12–15", s:3}]},
+    {name:"Full Body C", sub:"Mixed, bodyweight-friendly", rotate:true, ex:[
+      {n:"Hack Squat", t:"3 × 10–12", s:3},
+      {n:"Push-Ups", t:"3 × max", s:3},
+      {n:"One-Arm DB Row", t:"3 × 10–12", s:3},
+      {n:"Lateral Raise", t:"3 × 12–20", s:3},
+      {n:"Hanging Leg Raise", t:"3 × 10–15", s:3}]},
+  ]
 }
 ];
 const DELOAD_AT = 24;
@@ -1964,6 +2013,11 @@ async function init(){
     if(!plans.length) plans=JSON.parse(JSON.stringify(DEFAULT_PLANS));
     if(settings.activePlanId==="marie") settings.activePlanId = plans.length?plans[0].id:null;
     settings.marieRemoved=true;
+    await sset("plans",plans); await sset("settings",settings);
+  }
+  if(!settings.examplesSeeded2){                     // add the newer example plans to existing devices, once
+    ["ppl","fullbody"].forEach(id=>{ if(!plans.some(p=>p.id===id)){ const ex=DEFAULT_PLANS.find(p=>p.id===id); if(ex) plans.push(JSON.parse(JSON.stringify(ex))); } });
+    settings.examplesSeeded2=true;
     await sset("plans",plans); await sset("settings",settings);
   }
   if(!settings.armsSmoothed){
@@ -3623,7 +3677,7 @@ const COMPOUND_GROUPS=["chest","back","quads","hamstrings","shoulders"];
 // the emphasis radar's spokes — identical to the app-wide analytics groups
 const BUILD_GROUPS=MGROUPS;
 function buildKey(m){ return ({"Front Delts":"shoulders","Side Delts":"sidedelts","Rear Delts":"reardelts"}[m]) || m.toLowerCase(); }
-let build={ exp:"intermediate", obj:"muscle", focus:"balanced", bias:"balanced", time:60, freq:4, injuries:[], access:"gym", supersets:"on",
+let build={ exp:"intermediate", obj:"muscle", focus:["balanced"], bias:"balanced", time:60, freq:4, injuries:[], access:"gym", supersets:"on",
   emphasis:(function(){ const e={}; BUILD_GROUPS.forEach(m=>e[m]=0.5); return e; })() };
 function emphasisPreset(focus){
   const e={}; BUILD_GROUPS.forEach(m=>e[m]=0.5);
@@ -3819,12 +3873,28 @@ function buildPlan(b){
 }
 document.querySelectorAll("#sheetBuild .bopt").forEach(seg=>{ const k=seg.dataset.k; seg.querySelectorAll(".s").forEach(s=> s.onclick=()=>{
   seg.querySelectorAll(".s").forEach(x=>x.classList.toggle("active",x===s)); const v=s.dataset.v; build[k]=isNaN(+v)?v:+v; updateBuildPreview(); }); });
-document.querySelectorAll("#sheetBuild .bchips:not(.multi)").forEach(grp=>{ const k=grp.dataset.k; grp.querySelectorAll(".chip").forEach(c=> c.onclick=()=>{
-  grp.querySelectorAll(".chip").forEach(x=>x.classList.toggle("on",x===c)); build[k]=c.dataset.v;
-  if(k==="focus") build.emphasis=emphasisPreset(c.dataset.v); updateBuildPreview(); }); });
+document.querySelectorAll('#sheetBuild .bchips:not(.multi):not([data-k="focus"])').forEach(grp=>{ const k=grp.dataset.k; grp.querySelectorAll(".chip").forEach(c=> c.onclick=()=>{
+  grp.querySelectorAll(".chip").forEach(x=>x.classList.toggle("on",x===c)); build[k]=c.dataset.v; updateBuildPreview(); }); });
+// focus: pick up to TWO areas — emphasis becomes the union (per-muscle max) of their presets; "Balanced" is exclusive
+function emphasisFromFocuses(focuses){
+  const list=(focuses||[]).filter(f=>f && f!=="balanced");
+  if(!list.length) return emphasisPreset("balanced");
+  const e={}; BUILD_GROUPS.forEach(m=>e[m]=0);
+  list.forEach(f=>{ const p=emphasisPreset(f); BUILD_GROUPS.forEach(m=> e[m]=Math.max(e[m], p[m]!=null?p[m]:0)); });
+  return e;
+}
+document.querySelectorAll('#sheetBuild .bchips[data-k="focus"] .chip').forEach(c=> c.onclick=()=>{
+  const v=c.dataset.v; let sel=Array.isArray(build.focus)?build.focus.slice():[];
+  if(v==="balanced"){ sel=["balanced"]; }
+  else { sel=sel.filter(x=>x!=="balanced"); const i=sel.indexOf(v);
+    if(i>=0) sel.splice(i,1); else { sel.push(v); if(sel.length>2) sel.shift(); } }   // cap at two; drop the oldest
+  if(!sel.length) sel=["balanced"];
+  build.focus=sel; build.emphasis=emphasisFromFocuses(sel); syncEmphasisChips(); updateBuildPreview();
+});
 document.querySelectorAll("#sheetBuild .bchips.multi").forEach(grp=>{ const k=grp.dataset.k; grp.querySelectorAll(".chip").forEach(c=> c.onclick=()=>{
   c.classList.toggle("on"); build[k]=[].map.call(grp.querySelectorAll(".chip.on"),x=>x.dataset.v); updateBuildPreview(); }); });
-function syncEmphasisChips(){ document.querySelectorAll('#sheetBuild .bchips[data-k="focus"] .chip').forEach(c=> c.classList.toggle("on", c.dataset.v===build.focus)); }
+function syncEmphasisChips(){ const sel=Array.isArray(build.focus)?build.focus:(build.focus?[build.focus]:[]);
+  document.querySelectorAll('#sheetBuild .bchips[data-k="focus"] .chip').forEach(c=> c.classList.toggle("on", sel.indexOf(c.dataset.v)>=0)); }
 function drawEmphasisRadar(){
   const c=$("buildRadar"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const G=BUILD_GROUPS, cx=W/2, cy=H/2, R=W*0.30, n=G.length;
@@ -3852,12 +3922,12 @@ function updateBuildPreview(){
     let bestI=0,bestD=999; for(let i=0;i<n;i++){ const a=-90+i*360/n, d=Math.abs(((ang-a+540)%360)-180); if(d<bestD){bestD=d;bestI=i;} } return bestI; };
   const applyDrag=(ev)=>{ const r=c.getBoundingClientRect(); const px=(ev.clientX-r.left)/r.width*c.width, py=(ev.clientY-r.top)/r.height*c.height;
     const cx=c.width/2, cy=c.height/2, R=c.width*0.30, dist=Math.hypot(px-cx,py-cy), i=nearestSpoke(ev);
-    build.emphasis[BUILD_GROUPS[i]]=Math.max(0.12, Math.min(1, dist/R)); build.focus="custom"; updateBuildPreview(); };
+    build.emphasis[BUILD_GROUPS[i]]=Math.max(0.12, Math.min(1, dist/R)); build.focus=[]; syncEmphasisChips(); updateBuildPreview(); };
   c.addEventListener("pointerdown", e=>{ dragging=true; downX=e.clientX; downY=e.clientY; moved=false; try{ c.setPointerCapture(e.pointerId); }catch(_){} e.preventDefault(); });
   c.addEventListener("pointermove", e=>{ if(!dragging) return; if(Math.hypot(e.clientX-downX,e.clientY-downY)>7){ moved=true; applyDrag(e); } });
   c.addEventListener("pointerup", e=>{ if(dragging && !moved){    // a tap toggles that muscle's emphasis on/off
       const g=BUILD_GROUPS[nearestSpoke(e)], cur=build.emphasis[g]!=null?build.emphasis[g]:0.5;
-      build.emphasis[g] = cur>=0.85 ? 0.5 : 0.92; build.focus="custom"; updateBuildPreview(); }
+      build.emphasis[g] = cur>=0.85 ? 0.5 : 0.92; build.focus=[]; syncEmphasisChips(); updateBuildPreview(); }
     dragging=false; });
   c.addEventListener("pointercancel", ()=>{ dragging=false; });
 })();
