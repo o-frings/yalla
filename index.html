@@ -483,6 +483,13 @@
   .demo{ font-size:13px; color:var(--accent); text-decoration:none; }
   .demo.prog,.demo.swap{ cursor:pointer; display:inline-flex; align-items:center; padding:8px 4px; margin:-8px 12px -8px -4px; }
   .swapnote{ font-size:12px; color:var(--accent); font-weight:600; padding:0 8px 8px; }
+  .swapnote.warn{ color:#d97706; }
+  .injbanner{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; background:var(--accent-soft); color:var(--accent); font-size:13px; font-weight:600; line-height:1.35; padding:11px 14px; border-radius:14px; margin:0 0 12px; cursor:pointer; }
+  .injbanner b{ font-weight:700; }
+  .injbanner .injmanage{ margin-left:auto; font-weight:700; white-space:nowrap; }
+  .injrow{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .injrow .injchev{ opacity:.55; font-size:17px; line-height:1; }
+  .injrow.on{ background:var(--accent); color:#fff; }
 
   .setrow{ display:flex; align-items:center; gap:12px; padding:16px 20px; border-top:.5px solid var(--sep); }
   .setrow:first-of-type{ border-top:none; }
@@ -615,6 +622,22 @@
   .mrow.under .mbar{ opacity:.5; }
   .hsrc li span{ color:var(--l3); }
   .mdot{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:8px; vertical-align:middle; }
+  /* growth signal — per-muscle grow/hold/shrink estimate */
+  .growth{ border:.5px solid var(--line); border-left-width:3px; border-radius:14px; padding:14px 16px; background:var(--card); margin:0 4px 16px; }
+  .growth .ghead{ display:flex; align-items:center; gap:9px; }
+  .growth .gdot{ width:11px; height:11px; border-radius:50%; flex:0 0 auto; }
+  .growth .gtitle{ font-size:15px; font-weight:700; letter-spacing:-.2px; }
+  .growth .gsub{ font-size:14px; color:var(--l2); line-height:1.5; margin:8px 0 0; }
+  .growth .grid{ display:flex; flex-wrap:wrap; gap:7px; margin-top:13px; }
+  .gchip{ display:inline-flex; align-items:center; gap:5px; font-size:12.5px; font-weight:600; padding:5px 10px; border-radius:999px; border:.5px solid var(--line); background:var(--row); }
+  .gchip .garrow{ font-weight:800; font-size:13px; }
+  .gchip.grow{ color:#2b8a3e; border-color:#51cf6655; background:#51cf6618; }
+  .gchip.hold{ color:#9c6500; border-color:#f59f0055; background:#f59f0018; }
+  .gchip.shrink{ color:#c92a2a; border-color:#ff6b6b55; background:#ff6b6b18; }
+  .growth.grow{ border-left-color:#51cf66; } .growth .gdot.grow{ background:#51cf66; }
+  .growth.hold{ border-left-color:#f59f00; } .growth .gdot.hold{ background:#f59f00; }
+  .growth.shrink{ border-left-color:var(--red); } .growth .gdot.shrink{ background:var(--red); }
+  .growth.more{ border-left-color:var(--line); } .growth .gdot.more{ background:var(--l3); }
   #musRadar, #buildRadar{ width:100%; max-width:330px; height:auto; aspect-ratio:1/1; display:block; margin:16px auto 20px; }
   .emphradar{ max-width:300px!important; margin:8px auto 12px!important; touch-action:none; cursor:grab; -webkit-user-select:none; user-select:none; }
   .emphradar:active{ cursor:grabbing; }
@@ -706,6 +729,7 @@
   <span class="resttime" id="restTime">0:00</span>
   <span class="restadj"><button id="restMinus">−15</button><button id="restPlus">+15</button></span>
 </div>
+<div class="injbanner" id="injBanner" style="display:none;"></div>
 <div id="exlist"></div>
 <button class="btn wide" id="saveBtn" style="margin-top:12px;">Finish &amp; Save Workout</button>
 <div class="foot">On-device only · keep a backup · lift safely</div>
@@ -794,6 +818,9 @@
       <button class="chip" data-v="arms">Arms</button><button class="chip" data-v="shoulders">Shoulders</button><button class="chip" data-v="chest">Chest</button><button class="chip" data-v="back">Back</button><button class="chip" data-v="posture">Posture fix</button>
     </div>
     <div class="inlineconfirm" id="focusConfirm"></div>
+
+    <div class="ed-label">Niggle or injury <span class="subhint">— temporary; we work around it</span></div>
+    <button class="btn tinted wide injrow" id="injuryRow"><span id="injuryRowTxt">Nothing right now</span><span class="injchev">›</span></button>
 
     <div class="ed-label">Goal weight</div>
     <div class="gset">
@@ -1048,7 +1075,7 @@
     <div class="ed-label">Areas to protect <span class="subhint">— optional, select any</span></div>
     <div class="chips wrap bchips multi" data-k="injuries">
       <button class="chip" data-v="lowback">Lower back</button><button class="chip" data-v="knees">Knees</button>
-      <button class="chip" data-v="shoulders">Shoulders</button><button class="chip" data-v="elbows">Elbows</button>
+      <button class="chip" data-v="shoulders">Shoulders</button><button class="chip" data-v="elbows">Elbows</button><button class="chip" data-v="ankle">Ankle</button>
     </div>
 
     <button class="btn wide" id="buildGo" style="margin-top:16px;">Generate my plan</button>
@@ -1105,6 +1132,22 @@
     <p class="levelcap">Filtered to what you can train with right now.</p>
     <div class="sortbar"><button class="sortbtn" data-sort-btn></button></div>
     <div id="swapList"></div>
+  </div>
+</div>
+
+<!-- INJURY SHEET -->
+<div class="scrim" id="scrimInjury"></div>
+<div class="sheet" id="sheetInjury">
+  <div class="grabber"></div>
+  <div class="sheethdr"><span class="t">Niggle or injury</span><button class="btn plain sm" id="injuryClose">Done</button></div>
+  <div class="sheetbody">
+    <p style="color:var(--l2);font-size:13px;margin:0 4px 14px;line-height:1.45;">Pick what's bothering you. We'll quietly swap risky moves for safe same-muscle work until you clear it — your saved plan isn't changed.</p>
+    <div class="chips wrap multi" id="injuryChips">
+      <button class="chip" data-v="lowback">Lower back</button><button class="chip" data-v="knees">Knees</button>
+      <button class="chip" data-v="shoulders">Shoulders</button><button class="chip" data-v="elbows">Elbows</button>
+      <button class="chip" data-v="ankle">Ankle</button>
+    </div>
+    <button class="btn wide" id="injuryClear" style="margin-top:16px;">I've recovered — clear all</button>
   </div>
 </div>
 
@@ -1192,6 +1235,7 @@
   <div class="sheethdr"><span class="t">Muscle balance</span><button class="btn plain sm" id="musClose">Done</button></div>
   <div class="sheetbody">
     <p id="musIntro" style="color:var(--l2);font-size:13px;margin:0 4px 12px;line-height:1.45;">How balanced your training is — a full circle means even coverage, a dent means an undertrained group.</p>
+    <div class="growth" id="musGrowth" style="display:none;"></div>
     <div class="seg" id="musSrc" style="margin-bottom:8px;"></div>
     <div class="seg appearance" id="musSeg">
       <div class="s" data-d="7">This week</div>
@@ -1467,6 +1511,7 @@ const ICON={
   chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16"/><path d="M7 14l3-3 3 2 4-6"/></svg>',
   play:'<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5.5v13l11-6.5z"/></svg>',
   info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11.5v4.5"/><path d="M12 8h.01"/></svg>',
+  warn:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
   starF:'<svg class="star" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 17.95 6.2 20.5l1.1-6.45-4.7-4.6 6.5-.95z"/></svg>',
   starH:'<svg class="star" viewBox="0 0 24 24" fill="none"><defs><linearGradient id="hg"><stop offset="50%" stop-color="currentColor"/><stop offset="50%" stop-color="transparent"/></linearGradient></defs><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 17.95 6.2 20.5l1.1-6.45-4.7-4.6 6.5-.95z" fill="url(#hg)" stroke="currentColor" stroke-width="1"/></svg>',
   starE:'<svg class="star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 17.95 6.2 20.5l1.1-6.45-4.7-4.6 6.5-.95z"/></svg>',
@@ -2307,7 +2352,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi]||e.n; }
-let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false, planStartAt:null, discRead:{}, focusAreas:["balanced"] };
+let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:[] };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -2921,6 +2966,73 @@ function progMuscleWeekly(metric){
   });
   return series;
 }
+// ===== Growth signal: is each muscle (and the body overall) being trained enough to grow, hold, or lose size? =====
+// Two evidence-based axes, combined per muscle:
+//   DOSE  — recent weekly sets vs landmarks. Growth needs ~6–10+ fractional sets/muscle/wk (sch17, drr, rpvol);
+//           size is merely *maintained* on as little as ~1/3 of that (bickel); below maintenance, fibres atrophy
+//           within weeks (mujika).
+//   TREND — recent vs earlier weekly *volume* (load×reps×sets). Hypertrophy requires progressive overload
+//           (sch10); it can come from more load OR more reps, so volume — not load alone — is the signal (plotkin).
+// Output is an estimate of the TRAINING STIMULUS, not measured muscle size — the app can't see your body.
+function growthStatus(){
+  const setsS=progMuscleWeekly("sets"), volS=progMuscleWeekly("vol"), N=PROG_WEEKS;
+  const mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+  const recent=a=>mean(a.slice(N-3)), earlier=a=>mean(a.slice(Math.max(0,N-6),N-3));
+  let activeWeeks=0; for(let i=0;i<N;i++){ if(MGROUPS.some(g=>setsS[g][i]>0)) activeWeeks++; }
+  const per=[];
+  MGROUPS.forEach(g=>{
+    if(!setsS[g].some(v=>v>0)) return;                 // never trained in the window → not shown
+    const sets=recent(setsS[g]);                       // current weekly-set dose (last-3-week mean)
+    const rv=recent(volS[g]), ev=earlier(volS[g]);
+    const trend = ev>0 ? rv/ev : null;                 // null = no earlier baseline (just started this muscle)
+    let state, why;
+    if(sets < WEEKLY_SET_MAINT){
+      state="shrink"; why = sets<0.5 ? "barely trained lately — below what's needed to keep it"
+                                     : "below maintenance volume — too little to hold size";
+    } else if(trend!==null && trend < 0.75){
+      state="shrink"; why="weekly volume has dropped sharply — progress is at risk";
+    } else if(sets >= WEEKLY_SET_MIN){                  // adequate growth dose
+      if(trend===null || trend >= 1.08){ state="grow"; why="enough volume and still climbing — a growth stimulus"; }
+      else if(trend >= 0.92){ state="hold"; why="plenty of volume but it's been flat — maintaining; add a rep or a little load to push growth"; }
+      else { state="hold"; why="good volume but easing off — holding for now"; }
+    } else {                                            // WEEKLY_SET_MAINT..WEEKLY_SET_MIN: maintenance dose
+      if(trend!==null && trend >= 1.15 && sets >= WEEKLY_SET_MIN-1){ state="grow"; why="climbing toward a growth dose"; }
+      else { state="hold"; why="around maintenance volume — enough to hold size, under the ~"+WEEKLY_SET_MIN+"–"+WEEKLY_SET_TARGET+" sets that drive growth"; }
+    }
+    per.push({g, state, sets, trend, why});
+  });
+  const rank={shrink:0, hold:1, grow:2};               // surface what needs attention first
+  per.sort((a,b)=> rank[a.state]-rank[b.state] || b.sets-a.sets);
+  const cnt=s=>per.filter(p=>p.state===s).length;
+  const nGrow=cnt("grow"), nHold=cnt("hold"), nShrink=cnt("shrink"), active=per.length;
+  const tot=progWeeklyData("volume"); const trendAll = earlier(tot)>0 ? recent(tot)/earlier(tot) : null;
+  let cstate, cmsg;
+  if(activeWeeks<3 || active===0){
+    cstate="more"; cmsg="Log a few weeks of training and this will estimate, per muscle, whether your current training is enough to grow, hold, or slowly lose size.";
+  } else if(nShrink>nGrow && nShrink>=Math.ceil(active/3)){
+    cstate="shrink"; cmsg=nShrink+" of "+active+" trained muscles are getting too little to hold size — bump their weekly sets back up before you lose ground.";
+  } else if(nGrow>=Math.max(1,Math.round(active*0.4)) && (trendAll===null || trendAll>=0.95)){
+    cstate="grow"; cmsg=nGrow+" of "+active+" trained muscles are getting a growth stimulus"+(nHold?", "+nHold+" holding":"")+(nShrink?", "+nShrink+" slipping":"")+". Keep the progressive overload going.";
+  } else {
+    cstate="hold"; cmsg="You're mostly maintaining — "+nHold+" of "+active+" holding"+(nGrow?", "+nGrow+" growing":"")+(nShrink?", "+nShrink+" slipping":"")+". To grow, nudge load, reps or sets up on the flat groups.";
+  }
+  return { per, combined:{state:cstate, msg:cmsg, nGrow, nHold, nShrink, active} };
+}
+const GST_ARROW={grow:"↑", hold:"→", shrink:"↓"};
+const GST_HEAD={grow:"Overall: growing", hold:"Overall: holding", shrink:"Overall: at risk", more:"Growth signal"};
+function renderGrowth(){
+  const box=$("musGrowth"); if(!box) return;
+  const r=growthStatus();
+  box.style.display="";
+  box.className="growth "+r.combined.state;
+  let h='<div class="ghead"><span class="gdot '+r.combined.state+'"></span><span class="gtitle">'+esc(GST_HEAD[r.combined.state]||"Growth signal")+'</span></div>';
+  h+='<p class="gsub">'+esc(r.combined.msg)+'</p>';
+  if(r.per.length && r.combined.state!=="more"){
+    h+='<div class="grid">'+r.per.map(p=>'<span class="gchip '+p.state+'" title="'+esc(p.g+" · ~"+round1(p.sets)+" sets/wk — "+p.why)+'">'+esc(MSHORT[p.g]||p.g)+' <span class="garrow">'+GST_ARROW[p.state]+'</span></span>').join('')+'</div>';
+    h+='<p class="gsub" style="margin-top:11px;font-size:12px;color:var(--l3);">Per muscle over the last '+PROG_WEEKS+' weeks · ↑ growing · → holding · ↓ shrinking. An estimate of training stimulus, not a body measurement.</p>';
+  }
+  box.innerHTML=h;
+}
 function drawProgBars(){
   const c=$("progBars"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const cap=$("progCap"), ac=accentHex();
@@ -3098,8 +3210,11 @@ document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState=
 function renderWorkout(){
   const p=activePlan(), w=p.workouts[curWk], list=$("exlist"); list.innerHTML="";
   $("planSub").textContent = planMeta(p);
+  renderInjuryBanner();
   w.ex.forEach((e,xi)=>{
-    const name=dispName(e,xi);
+    const blocker = swaps[xi] ? null : blockingInjury(e.n);   // active injury key blocking this move (manual swap wins)
+    const isub = blocker ? injurySub(e) : null;               // safe same-muscle substitute, if one exists
+    const name = swaps[xi] || isub || e.n;
     const ssPrev=xi>0?w.ex[xi-1].ss:null, ssNext=xi<w.ex.length-1?w.ex[xi+1].ss:null;
     const inSS=e.ss && (e.ss===ssPrev || e.ss===ssNext), ssStart=inSS && e.ss!==ssPrev;
     if(ssStart){ const lbl=document.createElement("div"); lbl.className="sslabel"; lbl.innerHTML=ICON.flame+"Superset · alternate moves, rest once per round"; list.appendChild(lbl); }
@@ -3118,7 +3233,9 @@ function renderWorkout(){
     const metaLine = '<div class="exmeta">'+mp.join('<span class="dot">·</span>')+'</div>';
     let head=`<div class="pad" style="padding-bottom:0">
       <div class="exhead"><span class="eqic tinted" style="background:${hexAlpha(mcol,.15)};color:${mcol}" title="${esc(eq.label)}">${EQUIP[eq.key]}</span><span class="nm">${esc(name)}</span>${linksHTML}</div>
-      ${ swapped ? '<div class="swapnote">'+ICON.swap+'instead of '+esc(e.n)+'</div>' : '' }
+      ${ swapped ? '<div class="swapnote">'+ICON.swap+'instead of '+esc(e.n)+'</div>'
+         : isub ? '<div class="swapnote inj">'+ICON.swap+'working around your '+esc(INJ_LABEL[blocker]||'injury')+' · was '+esc(e.n)+'</div>'
+         : blocker ? '<div class="swapnote warn">'+ICON.warn+'tough on your '+esc(INJ_LABEL[blocker]||'injury')+' — ease off or swap</div>' : '' }
       ${metaLine}${meta.show?meta.cue:''}</div>`;
     let rows="";
     for(let i=0;i<e.s;i++){ const pv=prev[i];
@@ -3628,6 +3745,10 @@ let musWindow=7, musMetric="sets", musSrc="log", musVolMode="total";
 // lower bound (MEV) below which most trainees under-stimulate growth. One baseline for all groups —
 // real per-muscle landmarks differ, but a single target keeps the read honest and legible.
 const WEEKLY_SET_TARGET=10, WEEKLY_SET_MIN=6;
+// Maintenance volume (MV): size/strength built by a program are held on as little as ~1/3 of the volume
+// that built them (Bickel 2011); below roughly a third of the growth dose, fibres slowly atrophy (Mujika 2000).
+// ~1/3 of the ~10-set target → a 3-set/wk floor; under this, a previously-trained muscle reads as "shrinking".
+const WEEKLY_SET_MAINT=3;
 // span of the whole log in weeks (for converting "all time" totals to a weekly rate)
 function histSpanWeeks(){
   let lo=Infinity, hi=0;
@@ -3737,7 +3858,7 @@ function suggestAdd(muscle){
   const key=buildKey(muscle), inPlan=new Set();
   activePlan().workouts.forEach(w=>(w.ex||[]).forEach(e=>inPlan.add(familyKey(e.n))));
   const lvl=activePlan().level, gate = lvl==="beginner"?"beginner":"advanced";
-  return (BUILD_POOL[key]||[]).filter(x=> !injuryBlocks(x,settings.injuries||[]) && suitsExp(x,gate) && !inPlan.has(familyKey(x)))
+  return (BUILD_POOL[key]||[]).filter(x=> !injuryBlocks(x,settings.activeInjuries||[]) && suitsExp(x,gate) && !inPlan.has(familyKey(x)))
     .sort((a,b)=>suggestRank(b)-suggestRank(a)).slice(0,3);
 }
 function suggestRemove(muscle){
@@ -3776,6 +3897,7 @@ function renderMuscles(){
   const isLog = musSrc==="log";
   $("musSeg").style.display = isLog ? "" : "none";
   $("musMetric").style.display = isLog ? "" : "none";
+  if(isLog) renderGrowth(); else { const gb=$("musGrowth"); if(gb) gb.style.display="none"; }   // growth signal reads logged history, not plan projections
   let totals, byEx;
   if(isLog){
     document.querySelectorAll("#musSeg .s").forEach(s=> s.classList.toggle("active", +s.dataset.d===musWindow));
@@ -3830,7 +3952,9 @@ function renderMuscles(){
         ? "Spokes and bars show <b>sets per muscle per week</b> against a ~"+WEEKLY_SET_TARGET+"-set target; the window is a hard cut-off (no decay), since volume is usually judged weekly."
         : (useKg ? "Bars show <b>total load</b> (weight × reps, bodyweight-aware), scaled to your biggest group."
                  : "Switch to <b>Sets</b> to compare against weekly volume targets."));
-  const keys = useTarget ? ["sch17","drr","rpvol","vigotsky","mps"] : ["sch17","drr","vigotsky"];
+  if(isLog) $("musMethod").innerHTML += " The <b>growth signal</b> above reads each muscle's recent weekly sets against a growth dose (~"+WEEKLY_SET_MIN+"–"+WEEKLY_SET_TARGET+") and a maintenance floor (~"+WEEKLY_SET_MAINT+"), then checks whether its weekly volume is trending up, flat or down — growth needs both an adequate dose and progressive overload; below maintenance, muscle is slowly lost. It estimates the training stimulus, not measured size.";
+  let keys = useTarget ? ["sch17","drr","rpvol","vigotsky","mps"] : ["sch17","drr","vigotsky"];
+  if(isLog) keys = keys.concat(["sch10","plotkin","bickel","mujika"]);   // growth-signal evidence
   $("musSrcList").innerHTML = keys.map(k=>'<li>'+PROG_SRC[k]+'</li>').join('');
 }
 
@@ -4100,6 +4224,56 @@ document.querySelectorAll("#swapScope .s").forEach(s=> s.onclick=()=>{ swapScope
   document.querySelectorAll("#swapScope .s").forEach(x=> x.classList.toggle("active", x===s)); });
 document.querySelectorAll("#swapLevelSeg .s").forEach(s=> s.onclick=()=>{ equipLevel=s.dataset.lv; syncLevelSeg(); renderSwapList(); });
 
+// ================= temporary injuries (work around it) =================
+// A reversible overlay: while an injury is active, renderWorkout substitutes risky moves for safe
+// same-muscle work at render time. The stored plan is never touched — clearing restores it as-is.
+const INJ_LABEL={ lowback:"lower back", knees:"knees", shoulders:"shoulders", elbows:"elbows", ankle:"ankle" };
+function activeInjuries(){ return settings.activeInjuries||[]; }
+// which active injury (if any) rules this exercise out
+function blockingInjury(name){ return activeInjuries().find(k=> injuryBlocks(name,[k])) || null; }
+// best safe same-muscle replacement for a blocked move, preferring one that fits its training environment
+function injurySub(e){
+  const inj=activeInjuries(); if(!inj.length || !injuryBlocks(e.n,inj)) return null;
+  const lvl=exLevel(e.n), opts=swapOptions(e).filter(o=> o!==e.n && !injuryBlocks(o,inj));
+  return opts.find(o=> allowsAt(o,lvl)) || opts[0] || null;   // same environment first, else any safe move
+}
+function renderInjuryRow(){
+  const el=$("injuryRowTxt"); if(!el) return; const inj=activeInjuries();
+  el.textContent = inj.length ? listWords(inj.map(k=>INJ_LABEL[k]||k)) : "Nothing right now";
+  const row=$("injuryRow"); if(row) row.classList.toggle("on", inj.length>0);
+}
+function renderInjuryChips(){ const inj=activeInjuries();
+  document.querySelectorAll("#injuryChips .chip").forEach(c=> c.classList.toggle("on", inj.indexOf(c.dataset.v)>=0)); }
+// the persistent "you're injured" banner on the Workout page, with a live count of adjusted moves
+function renderInjuryBanner(){
+  const b=$("injBanner"); if(!b) return; const inj=activeInjuries();
+  if(!inj.length || freeMode){ b.style.display="none"; b.innerHTML=""; return; }
+  const w=activePlan().workouts[curWk]; let swapped=0, flagged=0;
+  (w?w.ex:[]).forEach((e,xi)=>{ if(swaps[xi] || !blockingInjury(e.n)) return; if(injurySub(e)) swapped++; else flagged++; });
+  let note = swapped ? swapped+" move"+(swapped>1?"s":"")+" adjusted" : "nothing risky today";
+  if(flagged) note += " · "+flagged+" to ease off";
+  b.innerHTML='🩹 <b>Working around your '+esc(listWords(inj.map(k=>INJ_LABEL[k]||k)))+'</b> · '+note+' <span class="injmanage">Manage ›</span>';
+  b.style.display="";
+}
+async function setActiveInjuries(arr){
+  settings.activeInjuries=(arr||[]).slice();
+  await sset("settings",settings);
+  renderInjuryRow(); renderInjuryChips();
+  if(freeMode) renderInjuryBanner(); else renderWorkout();   // re-apply the overlay (+ banner) on the workout page
+  if(typeof renderDash==="function") renderDash();
+}
+$("injuryRow").onclick=()=>{ renderInjuryChips(); openSheet("Injury"); };
+$("injuryClose").onclick=()=>closeSheet("Injury");
+$("scrimInjury").onclick=()=>closeSheet("Injury");
+$("injBanner").onclick=()=>{ renderInjuryChips(); openSheet("Injury"); };
+document.querySelectorAll("#injuryChips .chip").forEach(c=> c.onclick=()=>{
+  const inj=activeInjuries().slice(), v=c.dataset.v, i=inj.indexOf(v);
+  if(i>=0) inj.splice(i,1); else inj.push(v);
+  setActiveInjuries(inj);
+});
+$("injuryClear").onclick=()=>{ if(!activeInjuries().length){ closeSheet("Injury"); return; }
+  setActiveInjuries([]); closeSheet("Injury"); toast("Cleared — back to your full plan"); };
+
 // ================= exercise info =================
 $("exlist").addEventListener("click", e=>{ const a=e.target.closest(".info"); if(a){ e.preventDefault(); openInfo(a.dataset.ex); } });
 $("infoClose").onclick=()=>closeSheet("Info");
@@ -4352,7 +4526,11 @@ const PROG_SRC={
  drr:"Pelland JC, Remmert JF, Robinson ZP, Hinson SR, Zourdos MC (2024). The resistance training dose-response: meta-regressions exploring the effects of weekly volume and frequency on muscle hypertrophy and strength gain. <i>SportRxiv</i>. doi:10.51224/SRXIV.460. <span>— Counting indirect (secondary) muscle sets as 0.5 best explained hypertrophy, which is how this app weighs assistance work.</span>",
  vigotsky:"Vigotsky AD, Trajano GS, Vieira TM (2022). Longing for a longitudinal proxy: acutely measured surface EMG amplitude is not a validated predictor of muscle hypertrophy. <i>Sports Medicine</i>, 52, 193–199. <span>— Why this app weighs whole sets, not per-exercise EMG “activation”.</span>",
  rpvol:"Israetel M, et al. — Renaissance Periodization. Training volume landmarks for muscle growth (MEV / MAV / MRV). <span>— Basis for the ~"+10+"-set weekly target ring.</span>",
- mps:"Phillips SM, et al. (1997). Mixed muscle protein synthesis and breakdown after resistance exercise in humans. <i>Am. J. Physiology</i>, 273(1). <span>— Muscle-building signalling is elevated ~24–48 h per session, the basis for tracking volume by the week.</span>"
+ mps:"Phillips SM, et al. (1997). Mixed muscle protein synthesis and breakdown after resistance exercise in humans. <i>Am. J. Physiology</i>, 273(1). <span>— Muscle-building signalling is elevated ~24–48 h per session, the basis for tracking volume by the week.</span>",
+ bickel:"Bickel CS, Cross JM, Bamman MM (2011). Exercise dosing to retain resistance training adaptations in young and older adults. <i>Medicine &amp; Science in Sports &amp; Exercise</i>, 43(7), 1177–1187. doi:10.1249/MSS.0b013e318207c15d. <span>— After a build phase, muscle size was maintained on as little as ~1/3 (older) to ~1/9 (young) of the volume that built it — the basis for the maintenance-volume floor below which a muscle reads as “holding”, not growing.</span>",
+ mujika:"Mujika I, Padilla S (2000). Detraining: loss of training-induced physiological and performance adaptations. Part I — short-term insufficient training stimulus. <i>Sports Medicine</i>, 30(2), 79–87. <span>— With too little stimulus, muscle fibres atrophy and strength declines within weeks — the basis for the “shrinking” state when weekly volume drops below maintenance.</span>",
+ sch10:"Schoenfeld BJ (2010). The mechanisms of muscle hypertrophy and their application to resistance training. <i>Journal of Strength &amp; Conditioning Research</i>, 24(10), 2857–2872. <span>— Progressive tension overload is a primary driver of growth — why “growing” needs a rising trend, not just an adequate dose held flat.</span>",
+ plotkin:"Plotkin D, et al. (2022). Progressive overload without progressing load? The effects of load or repetition progression on muscular adaptations. <i>PeerJ</i>, 10:e14142. doi:10.7717/peerj.14142. <span>— Overload via added reps or added load drove similar growth — why the trend tracks total volume (load×reps×sets), not load alone.</span>"
 };
 function bwSlopePctWk(days){
   const cut=Date.now()-days*86400000;
@@ -4374,7 +4552,8 @@ async function setObjective(o){
   renderDash(); if(typeof renderOverview==="function") renderOverview();
 }
 function renderObjective(){ document.querySelectorAll("#objChips .chip").forEach(c=>{ c.classList.toggle("on", c.dataset.v===settings.objective); c.classList.remove("pending"); });
-  const fa=settings.focusAreas||["balanced"]; document.querySelectorAll("#focusChips .chip").forEach(c=>{ c.classList.toggle("on", fa.indexOf(c.dataset.v)>=0); c.classList.remove("pending"); }); }
+  const fa=settings.focusAreas||["balanced"]; document.querySelectorAll("#focusChips .chip").forEach(c=>{ c.classList.toggle("on", fa.indexOf(c.dataset.v)>=0); c.classList.remove("pending"); });
+  renderInjuryRow(); renderInjuryChips(); }
 // training focus — pending until confirmed; up to two, Balanced + an area = a light lean
 document.querySelectorAll("#focusChips .chip").forEach(c=> c.onclick=()=>{
   let sel=(_pendFocus||settings.focusAreas||[]).slice();
@@ -4485,6 +4664,9 @@ function injuryBlocks(name, injuries){
   if(injuries.includes("knees") && /lunge|bulgarian|step-up|sissy|pistol|leg extension/.test(n)) return true;
   if(injuries.includes("shoulders") && /overhead press|behind|upright row|\bdip\b|arnold/.test(n)) return true;
   if(injuries.includes("elbows") && /skull|close-grip|\bdip\b/.test(n)) return true;
+  // sprained ankle: avoid loaded plantarflexion, single-leg balance & deep loaded dorsiflexion.
+  // worded so "seated calf raise" survives as the safe Calves sub (standing / single-leg / leg-press calf are out).
+  if(injuries.includes("ankle") && /standing calf|single-leg calf|leg-press calf|\blunge\b|bulgarian|split squat|step-up|pistol|sissy|\bjump|box squat|back squat|front squat|goblet squat|hack squat|overhead squat/.test(n)) return true;
   return false;
 }
 const FOCUS_LABEL={ balanced:"balanced", upper:"upper body", lower:"lower body", glutes:"glutes & legs", arms:"arms", shoulders:"shoulders", chest:"chest", back:"back", posture:"posture" };
