@@ -2767,7 +2767,7 @@ function renderOverview(){
   const host=$("ovBody"); if(!host) return;
   $("ovGreet").textContent=ovGreetWord()+((settings.displayName||settings.name)?", "+(settings.displayName||settings.name):"");
   try{ $("ovDate").textContent=new Date().toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"}); }catch(e){}
-  const due=(settings.sinceDeload||0)>=DELOAD_AT, p=activePlan(), w=p&&p.workouts[curWk], did=trainedToday();
+  const due=(settings.sinceDeload||0)>=DELOAD_AT, p=activePlan(), w=p&&p.workouts[curWk], did=sessionToday();
   let h="";
   // --- Train-at-home nudge (2+ days since the last workout) ---
   const off=daysOff();
@@ -2788,8 +2788,8 @@ function renderOverview(){
   } else {
     h+='<div class="group ovtap ovstart"><div class="pad"><div class="ovbig">Pick a plan to begin</div><button class="btn wide" style="margin-top:16px; pointer-events:none;">Go to workout</button></div></div>';
   }
-  // a one-line motivator under Today (the full stats live on Me)
-  const f7=trainingDays(7);
+  // a one-line motivator under Today (the full stats live on Me) — counts only real sessions, not token efforts
+  const f7=sessionDays(7);
   const motiv = f7>=4?"Strong week — you’re putting in the work." : f7>=2?"Good momentum — keep it rolling." : f7>=1?"You’ve started — one more session lifts the whole week." : "Fresh week. The first session is the hardest — let’s go.";
   h+='<p class="ovp" style="margin:12px 0 0;">'+motiv+'</p>';
   // --- visual snapshot: three activity rings to fill this week + a "vs last month" delta ---
@@ -3245,6 +3245,19 @@ function trainingDays(nDays){
   Object.keys(hist).forEach(n=> (hist[n]||[]).forEach(e=>{ if(e.d>=cutoff) days.add(new Date(e.d).toDateString()); }));
   return days.size;
 }
+// A day only counts as a real session once it clears this many hard sets — a couple of push-ups
+// or chin tugs (1-3 sets) shouldn't fill the Sessions ring; a short focused session (5+) should.
+const QUALIFY_SETS=5;
+// sets logged per calendar day in the last nDays → { dateString: totalSets }
+function daySetMap(nDays){
+  const cutoff=Date.now()-nDays*86400000, m={};
+  Object.keys(hist).forEach(n=> (hist[n]||[]).forEach(e=>{ if(e.d>=cutoff){ const k=new Date(e.d).toDateString(); m[k]=(m[k]||0)+(e.n||0); } }));
+  return m;
+}
+// distinct days in the last nDays whose total sets clear the session gate
+function sessionDays(nDays){ const m=daySetMap(nDays); return Object.keys(m).filter(k=>m[k]>=QUALIFY_SETS).length; }
+function setsToday(){ const t=new Date().toDateString(); return daySetMap(1)[t]||0; }
+function sessionToday(){ return setsToday()>=QUALIFY_SETS; }
 // Progression follows an inverse-U over recent training frequency:
 //  • too sparse (after a layoff) → hold and rebuild   • regular & recovered → push
 //  • very frequent / fatigue stacked up → hold or ease off toward a deload
@@ -3404,7 +3417,10 @@ $("saveBtn").onclick=async()=>{
   if(mins>0){ settings.timeTotal=(settings.timeTotal||0)+mins; }
   session.mins=mins; session.beaten=beaten; session.sub=logged+" exercise"+(logged>1?"s":"");
   tmrReset(); restStop();
-  settings.sessions++;
+  // Only a session with real substance (>= QUALIFY_SETS sets) counts toward the lifetime tally,
+  // achievements, and the share/feed. The work is still logged below either way (history, PRs, rings-by-set).
+  const qualifies = session.sets >= QUALIFY_SETS;
+  if(qualifies) settings.sessions++;
   settings.beatTotal = (settings.beatTotal||0) + beaten;
   if(freeMode){ settings.sinceDeload++; }
   else if(w.rotate!==false){
@@ -3419,9 +3435,14 @@ $("saveBtn").onclick=async()=>{
   if(freeMode){ renderSeg(); renderFree(); renderDash(); }
   else { const ni=nextRotateIndex(p); if(w.rotate!==false && ni>=0) curWk=ni; renderSeg(); renderWorkout(); renderDash(); }
   if(beaten>0){ celebrate(); if(navigator.vibrate) try{ navigator.vibrate([0,60,40,120]); }catch(e){} toast("New best! You beat "+beaten+" lift"+(beaten>1?"s":"")+" — keep climbing.", true); }
-  openShareTile(session);
-  cloudPublish(session);   // post a summary to the friends feed (no raw weights), if signed in + sharing on
-  cloudTouchWorkout();     // reset the 2-day "train at home" reminder timer
+  if(qualifies){
+    openShareTile(session);
+    cloudPublish(session);   // post a summary to the friends feed (no raw weights), if signed in + sharing on
+  } else if(beaten===0){     // a token effort — log it, but be honest that it won't fill the week's Sessions ring
+    const more=QUALIFY_SETS-session.sets;
+    toast("Logged "+session.sets+" set"+(session.sets===1?"":"s")+" — "+more+" more and it counts as a full session this week.");
+  }
+  cloudTouchWorkout();     // reset the 2-day "train at home" reminder timer (any movement keeps the streak alive)
   if(fresh.length) setTimeout(()=>celebrateAch(fresh), beaten>0?1300:1200);
 };
 
