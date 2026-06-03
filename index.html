@@ -4851,22 +4851,18 @@ init();
 // Kick off cloud sync if the SDK is already present (it may also self-trigger via its onload).
 if(window.supabase && window.__cloudInit) window.__cloudInit();
 
-// iOS standalone PWA mis-computes 100dvh / the layout-viewport height on a COLD LAUNCH — the shell ends
-// short of the physical screen, leaving "blank/black space" at the bottom on every screen (incl. sheets,
-// where no tab bar exists). A re-layout corrects it, which is why rotating to landscape and back clears it.
-// CSS units (dvh/vh) and innerHeight share the bug, but the *physical screen* size does not — so derive
-// the app height from screen.width/height (orientation-aware) and publish it as --appH for the shell to use.
+// iOS standalone PWA mis-computes 100dvh on a COLD LAUNCH — the shell ends short of the screen, leaving
+// "blank space" at the bottom on every screen (incl. sheets). A re-layout corrects it (why rotating and
+// back clears it). Drive the shell height from window.innerHeight (the VISIBLE viewport — never taller
+// than the screen, so it can't push the bar off-bottom) and re-read it after the cold-launch settle, when
+// iOS reports the corrected value. dvh/vh stay as the pre-JS fallback.
 (function(){
-  function appH(){
-    const lo=Math.min(screen.width||0, screen.height||0), hi=Math.max(screen.width||0, screen.height||0);
-    const portrait = window.matchMedia("(orientation: portrait)").matches;
-    const h = portrait ? hi : lo;
-    return h>0 ? h : window.innerHeight;     // fall back to innerHeight if screen dims are unavailable
-  }
-  function apply(){ document.documentElement.style.setProperty("--appH", appH()+"px"); }
+  function apply(){ const h=window.innerHeight; if(h>0) document.documentElement.style.setProperty("--appH", h+"px"); }
   apply();
-  ["resize","orientationchange","pageshow"].forEach(e=> window.addEventListener(e, ()=> setTimeout(apply, 0)));
+  ["resize","orientationchange","pageshow","load"].forEach(e=> window.addEventListener(e, ()=> setTimeout(apply, 0)));
   document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) setTimeout(apply, 0); });
+  if(window.visualViewport) window.visualViewport.addEventListener("resize", ()=> setTimeout(apply, 0));
+  [80, 250, 600, 1200].forEach(d=> setTimeout(apply, d));   // catch the post-cold-launch correction
 })();
 
 // Offline support: register the service worker when served over HTTPS (e.g. GitHub Pages).
