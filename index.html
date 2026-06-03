@@ -177,7 +177,9 @@
      overlaying the pager so content scrolls under it. */
   .tabbar{ position:absolute; left:0; right:0; bottom:0; z-index:50; display:flex; align-items:center;
     padding:15px 8px 21px; border-top:.5px solid var(--sep);
-    background:color-mix(in srgb, var(--bg) 88%, transparent); }
+    background:color-mix(in srgb, var(--bg) 88%, transparent);
+    transition:transform .3s cubic-bezier(.4,0,.2,1); will-change:transform; }
+  .tabbar.barhide{ transform:translateY(118%); pointer-events:none; }   /* slides off the bottom on scroll-down */
   .tabitem{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
     color:var(--l3); transition:color .15s; -webkit-tap-highlight-color:transparent; }
   .tabitem svg{ width:32px; height:32px; transition:transform .12s; }
@@ -731,7 +733,7 @@
   <div class="largeTitle"><div class="ltmain"><span class="titleBtn" style="cursor:default;"><span id="ovGreet">Overview</span></span></div><small id="ovDate"></small></div>
   <div id="ovBody"></div>
   <div class="ed-label" id="ovFeedLabel" style="display:none;">Friends</div>
-  <div id="feedCTA" class="group ovtap" style="display:none; cursor:pointer;" onclick="goAccount()"><div class="pad"><p style="font-size:14px;color:var(--l2);line-height:1.5;margin:2px 0;">Tap to sign in under <b>Me → Account &amp; sync</b> to share your workouts and see what your friends are training.<span class="ovchev">›</span></p></div></div>
+  <div id="feedCTA" class="group ovtap" style="display:none; cursor:pointer;" onclick="goAccount()"><div class="pad"><p style="font-size:14px;color:var(--l2);line-height:1.5;margin:2px 0;">Tap to sign in under <b>Settings ⚙ → Account &amp; sync</b> to share your workouts and see what your friends are training.<span class="ovchev">›</span></p></div></div>
   <div id="feedList"></div>
 </div>
 
@@ -2512,7 +2514,7 @@ function maybeBackupNudge(){
     if(!ref){ settings.lastBackupNudgeAt = Date.now(); sset("settings", settings); return; } // start the clock on first session with data
     if((Date.now()-ref)/86400000 < 14) return;                                               // at most once every 14 days
     settings.lastBackupNudgeAt = Date.now(); sset("settings", settings);
-    setTimeout(()=>toast("Tip: back up your log in Me → Export. Phones can clear saved app data.", true), 1400);
+    setTimeout(()=>toast("Tip: back up your log in Settings ⚙ → Your data. Phones can clear saved app data.", true), 1400);
   }catch(e){}
 }
 function renderAll(){ renderNav(); renderDash(); renderSeg(); renderWorkout(); }
@@ -2715,9 +2717,10 @@ function ovAct(act){
 }
 // go to Me and reveal the account / sign-in section
 function goAccount(){
-  showTab("me");
-  setTimeout(()=>{ const b=$("acctBox"); if(b && b.style.display!=="none"){ b.scrollIntoView({behavior:"smooth",block:"center"});
-    const e=$("acctEmail"); if(e && $("acctOut") && $("acctOut").style.display!=="none") e.focus(); } },70);
+  // login lives in the Settings sheet now — open it and scroll to the Account & sync block
+  renderDash(); renderAccount(); openSheet("Settings");
+  setTimeout(()=>{ const b=$("acctBox"); if(b){ b.scrollIntoView({behavior:"smooth",block:"center"});
+    const e=$("acctEmail"); if(e && $("acctOut") && $("acctOut").style.display!=="none") e.focus(); } }, 380);
 }
 function renderDash(){
   const now = bw.length?bw[bw.length-1].kg:null;
@@ -3239,6 +3242,7 @@ document.querySelectorAll("#onboardWrap .obopt").forEach(b=> b.onclick=()=> setO
 // ================= pages / bottom tab bar =================
 function showTab(name){
   if(typeof cancelPending==="function") cancelPending();   // drop any unconfirmed objective/focus change on navigation
+  if(window.__revealBar) window.__revealBar();             // always show the tab bar when switching tabs
   document.querySelectorAll(".page").forEach(p=> p.classList.toggle("active", p.dataset.tab===name));
   document.querySelectorAll(".tabitem").forEach(t=> t.classList.toggle("active", t.dataset.tab===name));
   if(window.__pageGo) window.__pageGo(name); else { try{ window.scrollTo(0,0); }catch(e){} }
@@ -3253,6 +3257,25 @@ function showTab(name){
   }
 }
 document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.dataset.tab));
+// Auto-hide the tab bar on scroll: slide it away when scrolling DOWN into content, bring it back the
+// instant you scroll UP (or reach the top). Keeps it out of the way like Apple's apps; window.__revealBar
+// re-shows it on tab switches. Per-page scrollTop tracking so swiping between tabs doesn't false-trigger.
+(function(){
+  const bar=document.querySelector(".tabbar"); if(!bar) return;
+  let lastY=0, hidden=false;
+  function reveal(){ if(hidden){ hidden=false; bar.classList.remove("barhide"); } }
+  function conceal(){ if(!hidden){ hidden=true; bar.classList.add("barhide"); } }
+  window.__revealBar=function(){ reveal(); const a=document.querySelector(".page.active"); lastY=a?a.scrollTop:0; };
+  function onScroll(e){
+    const el=e.target; if(!el || !el.classList || !el.classList.contains("page") || !el.classList.contains("active")) return;
+    const y=el.scrollTop;
+    if(y<=10){ reveal(); lastY=y; return; }          // at/near the top → always visible
+    const dy=y-lastY;
+    if(dy>8) conceal(); else if(dy<-8) reveal();      // small deadzone so tiny jitters don't toggle it
+    lastY=y;
+  }
+  document.querySelectorAll(".page").forEach(p=> p.addEventListener("scroll", onScroll, {passive:true}));
+})();
 // drag the three pages with your finger — Overview ↔ Workout ↔ Me track 1:1, snapping to the nearest on release
 (function(){
   const ORDER=["overview","workout","me"];
@@ -4857,7 +4880,17 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // than the screen, so it can't push the bar off-bottom) and re-read it after the cold-launch settle, when
 // iOS reports the corrected value. dvh/vh stay as the pre-JS fallback.
 (function(){
-  function apply(){ const h=window.innerHeight; if(h>0) document.documentElement.style.setProperty("--appH", h+"px"); }
+  // Track the LARGEST innerHeight seen in the current orientation. innerHeight shrinks when the keyboard
+  // opens (e.g. focusing the email field in Settings) — taking the max means that shrink can never pull
+  // --appH (and the shell) short again. Reset the max on a real orientation change. innerHeight is the
+  // visible viewport so it never exceeds the screen → the bar can't be pushed off-bottom.
+  let maxH=0, orient="";
+  function apply(){
+    const o = window.matchMedia("(orientation: portrait)").matches ? "p" : "l";
+    if(o!==orient){ orient=o; maxH=0; }                 // new orientation → start its max fresh
+    const h=window.innerHeight;
+    if(h>maxH){ maxH=h; document.documentElement.style.setProperty("--appH", maxH+"px"); }
+  }
   apply();
   ["resize","orientationchange","pageshow","load"].forEach(e=> window.addEventListener(e, ()=> setTimeout(apply, 0)));
   document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) setTimeout(apply, 0); });
