@@ -69,7 +69,10 @@
     font-variant-numeric:tabular-nums; }
   html{ background:var(--bg); transition:background .25s ease; }
  body{ max-width:540px; margin:0 auto; padding:0 16px calc(80px + env(safe-area-inset-bottom)); min-height:100vh; }
-  body::before{ content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+  /* Full-window app background. Use top:0 + height:100vh (NOT inset:0) — inset:0's bottom anchors to the
+     DYNAMIC viewport, which is briefly short on a standalone cold launch, so the bg would flash short for a
+     frame before settling. 100vh (static large viewport) covers the full height from the very first paint. */
+  body::before{ content:""; position:fixed; top:0; left:0; right:0; height:100vh; z-index:-1; pointer-events:none;
     background:
       radial-gradient(140% 60% at 50% 42%, var(--accent-soft) 0%, transparent 68%),
       var(--bg);
