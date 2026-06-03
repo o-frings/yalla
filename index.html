@@ -3270,6 +3270,7 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
 // SCROLL-LINKED tab bar (REVERSED): the bar tracks your scroll 1:1 — it slides UP INTO view as you scroll
 // DOWN, and slides DOWN OUT of view as you scroll UP, at the same speed in both directions (no fixed-duration
 // snap). window.__revealBar smoothly re-shows it on tab switch (tap or swipe) so the nav stays reachable.
+// At the BOTTOM of the content the bar always stays present (fills the end-of-scroll space, absorbs bounce).
 // Per-page scrollTop tracking (el._barLastY) so swiping between tabs can't jump it.
 (function(){
   const bar=document.querySelector(".tabbar"); if(!bar) return;
@@ -3288,6 +3289,10 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
     const y=el.scrollTop;
     const prev = (el._barLastY==null) ? y : el._barLastY;
     el._barLastY = y;
+    // At the bottom of the content the bar STAYS present (and absorbs iOS's rubber-band bounce, whose
+    // settle-back would otherwise read as a scroll-up and hide it). This also fills what would be empty
+    // space below the last item. Also covers short, non-scrolling pages (always at-bottom → bar shown).
+    if(y + el.clientHeight >= el.scrollHeight - 4){ if(offset!==0){ offset=0; render(true); } return; }
     const dy=y-prev; if(dy===0) return;
     offset=Math.max(0, Math.min(maxOff, offset - dy));               // scroll DOWN (dy>0) → reveal; scroll UP → hide; clamped, 1:1
     render(false);
