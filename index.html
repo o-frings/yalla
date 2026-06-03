@@ -4882,14 +4882,18 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // ~62px "blank strip" at the bottom on every screen (incl. sheets). On-device data: innerHeight reports 894
 // while screen.height is the true 956; the 894→956 zone is OUTSIDE the addressable layout viewport, so no
 // positioned/fixed/background element can paint into it. Only a layout-viewport RECOMPUTE clears it — which
-// is exactly what rotating the device and back does (it makes WebKit rebuild the viewport from the WebView's
-// now-settled frame). So we mimic rotation: once the launch frame has settled, force WebKit to RE-PARSE the
-// viewport meta (replace the node, momentary fixed-px width → restore device-width) so it rebuilds the
-// layout viewport against the correct frame. The grows-only --appH below then picks up the corrected
-// innerHeight (956) and the shell reaches the real bottom. dvh/vh stay as the pre-JS fallback.
-// (Two earlier attempts failed and are NOT repeated: the on-LOAD attribute "kick" ran before the frame
-//  settled and only mutated content; `height=device-height` PINNED the viewport so even rotation stopped
-//  recovering it.)
+// is exactly what rotating the device and back does (WebKit rebuilds the viewport from the WebView's settled
+// frame). So we mimic rotation: force WebKit to RE-PARSE the viewport meta (replace the node, momentary
+// fixed-px width → restore device-width) so it rebuilds the layout viewport. The grows-only --appH then picks
+// up the corrected innerHeight (956) and the shell reaches the real bottom. dvh/vh stay as the pre-JS fallback.
+//
+// WHY A LOOP (not a fixed timer schedule): the launch frame settles to its true height at an UNPREDICTABLE
+// moment, and a re-parse only takes effect once it has. A fixed schedule (fire at 60/250/…ms) is a guess and
+// was flaky — if every shot landed before the frame settled, nothing happened and the blank returned. Instead
+// we POLL: re-parse, then check innerHeight vs screen.height, and keep going until they match (or a cap). A
+// re-parse against a still-short frame changes no layout, so the silent retries cost nothing visually; the one
+// pass after the frame settles does the real rebuild. (Ruled out and NOT repeated: the on-LOAD attribute kick
+// ran too early & only mutated content; `height=device-height` PINNED the viewport so even rotation failed.)
 (function(){
   const VP = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content";
   let maxH=0, orient="";
@@ -4899,10 +4903,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
     const h=window.innerHeight;
     if(h>maxH){ maxH=h; document.documentElement.style.setProperty("--appH", maxH+"px"); }
   }
-  // Replace the viewport meta NODE (not just its content) to force a fresh viewport parse: first against a
-  // fixed-px width equal to the current width (no horizontal change, but it forces WebKit to rebuild and
-  // re-read the frame height), then restore device-width. apply() right after captures any corrected height.
-  function recompute(){
+  function reparse(){
     const m = document.querySelector('meta[name="viewport"]');
     if(!m) return;
     const next = document.createElement("meta");
@@ -4911,17 +4912,31 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
     m.replaceWith(next);
     void document.documentElement.offsetHeight;   // flush layout against the fixed-px width
     requestAnimationFrame(function(){
-      next.setAttribute("content", VP);           // restore device-width → second rebuild vs the settled frame
+      next.setAttribute("content", VP);           // restore device-width → second rebuild vs the current frame
       apply();
     });
   }
+  // Only iOS standalone has the bug; elsewhere innerHeight is legitimately < screen.height (browser chrome)
+  // and we must NOT loop. navigator.standalone is the iOS-standalone signal.
+  const standalone = ("standalone" in navigator) ? !!navigator.standalone : false;
+  function screenH(){ return (window.screen && window.screen.height) || 0; }
+  function short(){ return standalone && screenH() > 0 && window.innerHeight < screenH() - 4; }
+  let timer = null, tries = 0;
+  function ensure(reset){
+    if(reset){ tries = 0; if(timer){ clearTimeout(timer); timer = null; } }
+    apply();
+    if(!short() || tries >= 20){ if(timer){ clearTimeout(timer); timer = null; } return; }  // matched, or ~6s cap
+    tries++;
+    reparse();
+    timer = setTimeout(function(){ timer = null; ensure(false); }, 300);
+  }
   apply();
-  ["resize","orientationchange","pageshow","load"].forEach(e=> window.addEventListener(e, ()=> setTimeout(apply, 0)));
-  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) setTimeout(apply, 0); });
-  // Post-settle recompute schedule — fires across the cold-launch frame-settle window, then stops.
-  function schedule(){ [60, 250, 600, 1200, 2000].forEach(t=> setTimeout(recompute, t)); }
-  window.addEventListener("load", schedule);
-  window.addEventListener("pageshow", schedule);
+  // Re-arm the loop on every signal that the viewport may have (re)entered the short state: launch, BFCache
+  // restore, resume from background, and real resizes/rotations.
+  ["resize","orientationchange"].forEach(e=> window.addEventListener(e, ()=> ensure(true)));
+  window.addEventListener("load", ()=> ensure(true));
+  window.addEventListener("pageshow", ()=> ensure(true));
+  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) ensure(true); });
 })();
 
 // Offline support: register the service worker when served over HTTPS (e.g. GitHub Pages).
