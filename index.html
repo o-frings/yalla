@@ -166,7 +166,7 @@
   #track{ display:flex; height:100%; }
   #track.anim{ transition:transform .3s cubic-bezier(.22,.61,.36,1); }
   #pager .page, #pager .page.active{ display:block; animation:none; flex:0 0 100%; width:100%; height:100%;
- overflow-y:auto; overscroll-behavior-y:contain; padding:0 16px calc(64px + env(safe-area-inset-bottom)); }
+ overflow-y:auto; overscroll-behavior-y:contain; padding:0 16px calc(72px + env(safe-area-inset-bottom)); }
   /* hide the scrollbar (still scrollable) */
   #pager .page, .sheetbody{ scrollbar-width:none; -ms-overflow-style:none; }
   #pager .page::-webkit-scrollbar, .sheetbody::-webkit-scrollbar{ width:0; height:0; display:none; }
@@ -177,7 +177,10 @@
      the physical bottom, so an absolute bar at its bottom touches the real edge. Translucent like the top,
      overlaying the pager so content scrolls under it. */
   .tabbar{ position:absolute; left:0; right:0; bottom:0; z-index:50; display:flex; align-items:center;
-    padding:15px 8px 21px; border-top:.5px solid var(--sep);
+    /* ~56px content row (12 + 32px icon + 12, centered) + the home-indicator safe area reserved BELOW it
+       (iOS HIG pattern). Pre-cold-launch-fix the shell didn't reach the screen bottom so the inset read 0;
+       now it reports the real ~34px and the icons clear the home indicator instead of crowding it. */
+    padding:12px 8px calc(12px + env(safe-area-inset-bottom)); border-top:.5px solid var(--sep);
     background:color-mix(in srgb, var(--bg) 88%, transparent);
     transition:transform .3s cubic-bezier(.4,0,.2,1); will-change:transform; }
   .tabbar.barhide{ transform:translateY(118%); pointer-events:none; }   /* slides off the bottom on scroll-down */
