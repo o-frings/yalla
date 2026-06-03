@@ -181,14 +181,7 @@
        (iOS HIG pattern). Pre-cold-launch-fix the shell didn't reach the screen bottom so the inset read 0;
        now it reports the real ~34px and the icons clear the home indicator instead of crowding it. */
     padding:12px 8px calc(12px + env(safe-area-inset-bottom)); border-top:.5px solid var(--sep);
-    /* OPAQUE var(--bg) — must match the root-canvas background exactly. On a bugged iOS cold launch the layout
-       viewport is stuck short (894 vs the real 956) and is unrecoverable in-page; the ~62px strip below the bar
-       is then painted by the <html> canvas with var(--bg). A TRANSLUCENT bar picks up the content behind it
-       (e.g. a white card) and reads lighter than that solid strip — THAT mismatch was the "blank space" bug.
-       Opaque var(--bg) makes the bar identical to the strip, so the bar looks anchored to the screen bottom on
-       both good (956) and bugged (894) launches. (Diagnostics proved the canvas reaches the strip but no
-       in-page signal recovers 956 — see memory yalla-ios-bottom-blank-space.) */
-    background:var(--bg);
+    background:color-mix(in srgb, var(--bg) 88%, transparent);
     transition:transform .3s cubic-bezier(.4,0,.2,1); will-change:transform; }
   .tabbar.barhide{ transform:translateY(118%); pointer-events:none; }   /* slides off the bottom on scroll-down */
   .tabitem{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
