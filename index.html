@@ -189,7 +189,7 @@
     padding:12px 8px calc(12px + env(safe-area-inset-bottom)); border-top:.5px solid var(--sep);
     background:color-mix(in srgb, var(--bg) 88%, transparent);
     transition:transform .3s cubic-bezier(.4,0,.2,1); will-change:transform; }
-  .tabbar.barhide{ transform:translateY(118%); pointer-events:none; }   /* slides off the bottom on scroll-down */
+  /* hide/show is scroll-linked from JS (inline transform); see the scroll-linked tab bar IIFE */
   .tabitem{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
     color:var(--l3); transition:color .15s; -webkit-tap-highlight-color:transparent; }
   .tabitem svg{ width:32px; height:32px; transition:transform .12s; }
@@ -3267,23 +3267,34 @@ function showTab(name){
   }
 }
 document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.dataset.tab));
-// Auto-hide the tab bar on scroll: slide it away when scrolling DOWN into content, bring it back the
-// instant you scroll UP (or reach the top). Keeps it out of the way like Apple's apps; window.__revealBar
-// re-shows it on tab switches. Per-page scrollTop tracking so swiping between tabs doesn't false-trigger.
+// SCROLL-LINKED tab bar: the bar tracks your scroll 1:1 — it slides DOWN out of view as you scroll down,
+// and slides back UP into view as you scroll up, at the same speed in both directions (no fixed-duration
+// snap). At the very top it's always fully shown, and window.__revealBar smoothly re-shows it on tab
+// switch (tap or swipe). Per-page scrollTop tracking (el._barLastY) so swiping between tabs can't jump it.
 (function(){
   const bar=document.querySelector(".tabbar"); if(!bar) return;
-  let lastY=0, hidden=false;
-  function reveal(){ if(hidden){ hidden=false; bar.classList.remove("barhide"); } }
-  function conceal(){ if(!hidden){ hidden=true; bar.classList.add("barhide"); } }
-  window.__revealBar=function(){ reveal(); const a=document.querySelector(".page.active"); lastY=a?a.scrollTop:0; };
+  const EASE="transform .3s cubic-bezier(.4,0,.2,1)";   // smooth glide for programmatic reveals (tab switch / top)
+  let offset=0, maxOff=120;
+  function measure(){ maxOff=Math.round((bar.offsetHeight||100)*1.18); }   // px needed to tuck it fully off-screen
+  function render(snap){
+    bar.style.transition   = snap ? EASE : "none";        // snap=smooth glide; otherwise follow the finger 1:1
+    bar.style.transform    = offset>0 ? "translateY("+offset+"px)" : "";
+    bar.style.pointerEvents = offset>=maxOff-1 ? "none" : "";
+  }
+  // Re-show smoothly (called on every tab switch, tap or swipe) and re-anchor the active page's scroll.
+  window.__revealBar=function(){ offset=0; render(true); const a=document.querySelector(".page.active"); if(a) a._barLastY=a.scrollTop; };
   function onScroll(e){
     const el=e.target; if(!el || !el.classList || !el.classList.contains("page") || !el.classList.contains("active")) return;
     const y=el.scrollTop;
-    if(y<=10){ reveal(); lastY=y; return; }          // at/near the top → always visible
-    const dy=y-lastY;
-    if(dy>8) conceal(); else if(dy<-8) reveal();      // small deadzone so tiny jitters don't toggle it
-    lastY=y;
+    const prev = (el._barLastY==null) ? y : el._barLastY;
+    el._barLastY = y;
+    if(y<=10){ if(offset!==0){ offset=0; render(true); } return; }   // at the top → fully shown (smooth)
+    const dy=y-prev; if(dy===0) return;
+    offset=Math.max(0, Math.min(maxOff, offset+dy));                 // down → hide, up → reveal, clamped, 1:1
+    render(false);
   }
+  measure();
+  window.addEventListener("resize", measure);
   document.querySelectorAll(".page").forEach(p=> p.addEventListener("scroll", onScroll, {passive:true}));
 })();
 // drag the three pages with your finger — Overview ↔ Workout ↔ Me track 1:1, snapping to the nearest on release
