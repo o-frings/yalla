@@ -661,6 +661,21 @@
 <body>
 
 <div class="statusbar-bg"></div>
+<div id="vpdbg" style="position:fixed;top:calc(env(safe-area-inset-top) + 56px);left:50%;transform:translateX(-50%);z-index:99999;font:12px/1.45 ui-monospace,Menlo,monospace;color:#fff;background:rgba(200,0,0,.92);padding:8px 12px;border-radius:10px;text-align:center;pointer-events:none;white-space:pre-wrap;box-shadow:0 4px 16px rgba(0,0,0,.4);"></div>
+<script>
+(function(){
+  function upd(){ var el=document.getElementById("vpdbg"); if(!el) return;
+    var sh=document.getElementById("shell"); var r=sh?sh.getBoundingClientRect():{height:0,bottom:0};
+    var appH=getComputedStyle(document.documentElement).getPropertyValue("--appH").trim()||"(unset)";
+    el.textContent="iH"+window.innerHeight+" sH"+(window.screen&&screen.height)+" cH"+document.documentElement.clientHeight
+      +"\nappH"+appH+" shellH"+Math.round(r.height)+" shellBot"+Math.round(r.bottom)
+      +"\nblankBelowShell="+(window.innerHeight-Math.round(r.bottom));
+  }
+  upd(); setInterval(upd,400);
+  ["resize","orientationchange","pageshow","scroll"].forEach(function(e){ window.addEventListener(e,upd,true); });
+  document.addEventListener("visibilitychange",function(){ setTimeout(upd,80); });
+})();
+</script>
 
 <!-- ===== WORKOUT PAGE ===== -->
 <div class="page" id="pageWorkout" data-tab="workout">
