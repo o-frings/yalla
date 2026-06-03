@@ -157,11 +157,10 @@
   .page.active{ display:block; animation:pagein .26s ease; }
   @keyframes pagein{ from{ opacity:0; transform:translateY(5px); } to{ opacity:1; transform:none; } }
   /* horizontal pager: three panels side-by-side that follow the finger, each scrolling vertically on its own */
-  /* Fixed app shell sized purely by CSS dynamic-viewport height (100dvh) — no JS. On the installed iOS
-     PWA, dvh tracks the real screen across launch/resume/rotation and self-corrects; measuring it in JS
-     and pinning an inline px height is what stranded the tab bar above the bottom on relaunch. 100vh is
-     the fallback for engines without dvh. */
-  #shell{ position:fixed; top:0; left:0; right:0; height:100vh; height:100dvh; max-width:540px; margin:0 auto; overflow:hidden; z-index:1; }
+  /* Fixed app shell. Height is driven by --appH (set from the physical screen size in JS) because iOS
+     standalone mis-measures dvh/vh short on a cold launch, leaving blank space at the bottom; the screen
+     size is immune to that bug. 100vh/100dvh are fallbacks before/without the JS. */
+  #shell{ position:fixed; top:0; left:0; right:0; height:100vh; height:100dvh; height:var(--appH, 100dvh); max-width:540px; margin:0 auto; overflow:hidden; z-index:1; }
   #pager{ position:absolute; inset:0; overflow:hidden; }
   #track{ display:flex; height:100%; }
   #track.anim{ transition:transform .3s cubic-bezier(.22,.61,.36,1); }
@@ -4852,20 +4851,22 @@ init();
 // Kick off cloud sync if the SDK is already present (it may also self-trigger via its onload).
 if(window.supabase && window.__cloudInit) window.__cloudInit();
 
-// iOS standalone PWA mis-computes 100dvh on a COLD LAUNCH — the shell ends short of the physical screen,
-// leaving "blank/black space" at the bottom across every screen (incl. sheets, where no tab bar exists).
-// A re-layout corrects it, which is exactly why rotating to landscape and back clears it. Force that same
-// re-layout on launch/resume/rotate by nudging the viewport meta (a no-op token), so the user never has to.
+// iOS standalone PWA mis-computes 100dvh / the layout-viewport height on a COLD LAUNCH — the shell ends
+// short of the physical screen, leaving "blank/black space" at the bottom on every screen (incl. sheets,
+// where no tab bar exists). A re-layout corrects it, which is why rotating to landscape and back clears it.
+// CSS units (dvh/vh) and innerHeight share the bug, but the *physical screen* size does not — so derive
+// the app height from screen.width/height (orientation-aware) and publish it as --appH for the shell to use.
 (function(){
-  const m=document.querySelector('meta[name="viewport"]'); if(!m) return;
-  const base=m.getAttribute("content");
-  let busy=false;
-  function kick(){ if(busy) return; busy=true; m.setAttribute("content", base+", ");
-    requestAnimationFrame(()=>{ m.setAttribute("content", base); busy=false; }); }
-  ["load","pageshow","orientationchange"].forEach(e=> window.addEventListener(e, ()=> setTimeout(kick, 60)));
-  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) setTimeout(kick, 60); });
-  if(window.visualViewport) window.visualViewport.addEventListener("resize", ()=> setTimeout(kick, 60));
-  setTimeout(kick, 250); setTimeout(kick, 900);   // belt-and-braces for the cold-launch timing
+  function appH(){
+    const lo=Math.min(screen.width||0, screen.height||0), hi=Math.max(screen.width||0, screen.height||0);
+    const portrait = window.matchMedia("(orientation: portrait)").matches;
+    const h = portrait ? hi : lo;
+    return h>0 ? h : window.innerHeight;     // fall back to innerHeight if screen dims are unavailable
+  }
+  function apply(){ document.documentElement.style.setProperty("--appH", appH()+"px"); }
+  apply();
+  ["resize","orientationchange","pageshow"].forEach(e=> window.addEventListener(e, ()=> setTimeout(apply, 0)));
+  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) setTimeout(apply, 0); });
 })();
 
 // Offline support: register the service worker when served over HTTPS (e.g. GitHub Pages).
