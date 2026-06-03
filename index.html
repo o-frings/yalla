@@ -667,6 +667,11 @@
   .crow span:last-child{ color:var(--l2); }
   .freehint{ font-size:13px; color:var(--l2); padding:0 4px 16px; line-height:1.45; }
   .tipsrc{ font-size:11px; color:var(--l3); margin-top:11px; font-style:italic; }
+  .tipcard{ display:block; text-decoration:none; color:inherit; -webkit-tap-highlight-color:transparent; }
+  .tipcard:active{ opacity:.82; }
+  .tiplink{ font-size:12px; font-weight:700; color:var(--accent); margin-top:12px; }
+  .srclink{ color:inherit; text-decoration:none; }
+  .srcarrow{ color:var(--accent)!important; font-weight:700; white-space:nowrap; }
   .freeadd{ padding:12px 16px 16px; border-top:.5px solid var(--sep); }
   .addset{ cursor:pointer; font-weight:600; display:inline-flex; align-items:center; gap:3px; padding:8px 8px; margin:-8px -8px; min-height:24px; }
   .exhead .freedel{ color:var(--red); background:none; border:none; font-size:24px; line-height:1; cursor:pointer; padding:8px; margin:-8px -4px; }
@@ -2753,6 +2758,62 @@ const TIPS=[
   {id:"purpose",      src:"Alimujiang et al. 2019",    cat:"health", t:"Having a clear sense of purpose — a reason to get up in the morning — is linked to lower mortality, regardless of wealth or health."},
   {id:"reading",      src:"Bavishi et al. 2016",       cat:"health", t:"Book readers tend to live longer: around 30 minutes a day was linked to a 23% lower death risk over 12 years — and only books showed it, not newspapers."}
 ];
+// Canonical study links (DOI-resolver where one exists), all verified to resolve. Keyed to PROG_SRC keys so the
+// Muscle-balance "sources" list can become clickable; see EVIDENCE.md for the full ledger.
+const SRC_DOI={
+  sch17:"https://doi.org/10.1080/02640414.2016.1210197",
+  sch16:"https://doi.org/10.1007/s40279-016-0543-8",
+  sch10:"https://doi.org/10.1519/JSC.0b013e3181e840f3",
+  drr:"https://doi.org/10.51224/SRXIV.460",
+  vigotsky:"https://doi.org/10.1007/s40279-021-01619-2",
+  rpvol:"https://rpstrength.com/blogs/articles/training-volume-landmarks-muscle-growth",
+  mps:"https://doi.org/10.1152/ajpendo.1997.273.1.E99",
+  bickel:"https://doi.org/10.1249/MSS.0b013e318207c15d",
+  mujika:"https://doi.org/10.2165/00007256-200030020-00002",
+  plotkin:"https://doi.org/10.7717/peerj.14142",
+  garthe:"https://doi.org/10.1080/17461391.2011.643923",
+  slater:"https://doi.org/10.3389/fnut.2019.00131",
+  morton:"https://doi.org/10.1136/bjsports-2017-097608",
+  helms:"https://doi.org/10.1186/1550-2783-11-20"
+};
+// Each tip → its study link. Training tips reuse SRC_DOI; health tips carry their own verified DOI.
+const TIP_DOI={
+  vol10:SRC_DOI.sch17, volmin:SRC_DOI.sch17,
+  freq2:SRC_DOI.sch16, freqlag:SRC_DOI.sch16,
+  overload:SRC_DOI.sch10, tension:SRC_DOI.sch10,
+  repsOK:SRC_DOI.plotkin,
+  dose:SRC_DOI.drr, spread:SRC_DOI.drr,
+  landmarks:SRC_DOI.rpvol, deload:SRC_DOI.rpvol, rampvol:SRC_DOI.rpvol,
+  window:SRC_DOI.mps, recover:SRC_DOI.mps,
+  emg:SRC_DOI.vigotsky, feel:SRC_DOI.vigotsky,
+  maintain:SRC_DOI.bickel, dontskip:SRC_DOI.bickel,
+  detrain:SRC_DOI.mujika, comeback:SRC_DOI.mujika,
+  protein:SRC_DOI.morton, proteinceil:SRC_DOI.morton,
+  surplus:SRC_DOI.slater, nodeficit:SRC_DOI.slater,
+  leangain:SRC_DOI.garthe,
+  cut:SRC_DOI.helms, cutprotein:SRC_DOI.helms, lossrate:SRC_DOI.helms, nocrash:SRC_DOI.helms,
+  steps10k:"https://doi.org/10.1016/S2468-2667(21)00302-9",
+  weekendwarrior:"https://doi.org/10.1001/jamainternmed.2016.8014",
+  vilpa:"https://doi.org/10.1038/s41591-022-02100-x",
+  rtdose:"https://doi.org/10.1136/bjsports-2021-105061",
+  vo2nolimit:"https://doi.org/10.1001/jamanetworkopen.2018.3605",
+  sitbreaks:"https://doi.org/10.7326/M17-0212",
+  grip:"https://doi.org/10.1016/S0140-6736(14)62000-6",
+  sitrise:"https://doi.org/10.1177/2047487312471759",
+  sauna:"https://doi.org/10.1001/jamainternmed.2014.8187",
+  hydration:"https://doi.org/10.1016/j.ebiom.2022.104404",
+  fiber:"https://doi.org/10.1016/S0140-6736(18)31809-9",
+  coffee:"https://doi.org/10.1136/bmj.j5024",
+  sleepreg:"https://doi.org/10.1093/sleep/zsad253",
+  social:"https://doi.org/10.1371/journal.pmed.1000316",
+  optimism:"https://doi.org/10.1073/pnas.1900712116",
+  purpose:"https://doi.org/10.1001/jamanetworkopen.2019.4270",
+  reading:"https://doi.org/10.1016/j.socscimed.2016.07.014"
+};
+// one citation <li>, linked to its study where we have a URL
+function srcLi(k){ const u=SRC_DOI[k];
+  return u ? '<li><a class="srclink" href="'+u+'" target="_blank" rel="noopener">'+PROG_SRC[k]+' <span class="srcarrow">↗</span></a></li>'
+           : '<li>'+PROG_SRC[k]+'</li>'; }
 // Decided once per app launch (in init), so it doesn't reshuffle as you switch tabs. Roughly every 3rd open we
 // surface a tip; which tip is drawn stochastically from the goal-relevant pool, weighted by how long since it
 // was last shown (recency). A tip is eligible if it has no `goals`, the user has no objective set, or its
@@ -2835,11 +2896,15 @@ function renderOverview(){
   // --- Coach tip --- an occasional research-backed pointer (shown ~every 3rd open; see decideTip).
   // Health tips are observational, so they're flagged "Linked in research"; training tips "Backed by research".
   if(currentTip){
-    const isHealth = currentTip.cat==="health";
+    const isHealth = currentTip.cat==="health", url = TIP_DOI[currentTip.id];
     h+='<div class="ed-label">'+(isHealth?'Health note':'Coach tip')+'</div>';
-    h+='<div class="group"><div class="pad"><div class="ovbig" style="font-size:18px;">'+(isHealth?'🌱':'💡')+' Did you know?</div>'
+    const inner='<div class="pad"><div class="ovbig" style="font-size:18px;">'+(isHealth?'🌱':'💡')+' Did you know?</div>'
       +'<p class="ovp" style="margin-top:8px;">'+esc(currentTip.t)+'</p>'
-      +'<div class="tipsrc">'+(isHealth?'Linked in research — ':'Backed by research — ')+esc(currentTip.src)+'</div></div></div>';
+      +'<div class="tipsrc">'+(isHealth?'Linked in research — ':'Backed by research — ')+esc(currentTip.src)+'</div>'
+      +(url?'<div class="tiplink">Read the study ↗</div>':'')+'</div>';
+    // whole panel taps through to the study, like the "Watch a how-to video" button
+    h+= url ? '<a class="group tipcard" href="'+esc(url)+'" target="_blank" rel="noopener">'+inner+'</a>'
+            : '<div class="group">'+inner+'</div>';
   }
   // --- Needs attention --- ordered by urgency (severity first); maps to your objective
   const obj=planObjective(activePlan()), todo=[], under=ovUnderMuscles();
@@ -4116,7 +4181,7 @@ function renderMuscles(){
   if(isLog) $("musMethod").innerHTML += " The <b>growth signal</b> above reads each muscle's recent weekly sets against a growth dose (~"+WEEKLY_SET_MIN+"–"+WEEKLY_SET_TARGET+") and a maintenance floor (~"+WEEKLY_SET_MAINT+"), then checks whether its weekly volume is trending up, flat or down — growth needs both an adequate dose and progressive overload; below maintenance, muscle is slowly lost. It estimates the training stimulus, not measured size.";
   let keys = useTarget ? ["sch17","drr","rpvol","vigotsky","mps"] : ["sch17","drr","vigotsky"];
   if(isLog) keys = keys.concat(["sch10","plotkin","bickel","mujika"]);   // growth-signal evidence
-  $("musSrcList").innerHTML = keys.map(k=>'<li>'+PROG_SRC[k]+'</li>').join('');
+  $("musSrcList").innerHTML = keys.map(srcLi).join('');
 }
 
 // ================= appearance (auto / light / dark) =================
@@ -4801,7 +4866,7 @@ function renderInsight(){
   box.className="insight v-"+r.v;
   box.innerHTML='<div class="ititle">'+esc(r.title)+'</div><div class="itext">'+esc(r.text)+'</div>';
   const sb=$("progSrcBox"), sl=$("progSrc");
-  if(r.src && r.src.length){ sb.style.display=""; sl.innerHTML=r.src.map(k=>'<li>'+PROG_SRC[k]+'</li>').join(''); }
+  if(r.src && r.src.length){ sb.style.display=""; sl.innerHTML=r.src.map(srcLi).join(''); }
   else sb.style.display="none";
 }
 
