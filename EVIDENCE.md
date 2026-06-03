@@ -4,8 +4,9 @@ What this app's coaching claims rest on, and how strong each claim really is. Tw
 
 - **Part A — Training & nutrition.** Powers the volume model, the muscle-balance radar, the growth signal, and the goal-tagged coach tips. Mostly **experimental** evidence.
 - **Part B — General health & longevity.** Powers (proposed) "anyone" coach tips. Almost entirely **observational** evidence.
+- **Part C — Injury management.** Powers the self-care advice shown when a temporary injury is flagged. Leading clinical guidelines / RCTs; general guidance, **not** medical advice.
 
-Citations also live in-app in `PROG_SRC` (Part A) and the Muscle-balance "How this is measured & sources" block.
+Citations also live in-app in `PROG_SRC` / `SRC_DOI` (Parts A & C) and the Muscle-balance "How this is measured & sources" block.
 
 ---
 
@@ -202,6 +203,44 @@ Causation is the whole game here, so every study is tagged:
 - **Design:** Prospective cohort (Health & Retirement Study, 3,635, >50). **Evidence: Correlational.**
 - **Finding:** >3.5 h/wk book reading → 23% lower mortality over 12 y (~2-year survival advantage); books, not newspapers/magazines.
 - **Tip `reading`.** Charming; observational.
+
+---
+
+# Part C — Injury management (self-care advice)
+
+Powers the treatment advice shown when you flag a temporary injury in **Me → Niggle or injury**. These are leading evidence-based clinical guidelines / RCTs for common training niggles. Citations live in-app in `PROG_SRC` / `SRC_DOI` (keys `injAnkle`…`injElbow`) and render with a clickable source link inside the injury sheet. **Framing rule:** general self-management guidance, *not* medical advice — the in-app copy says so and points to a clinician for significant or lasting pain.
+
+The same five keys also drive how hard the plan adapts: a flagged injury swaps risky lifts for safe same-muscle work (mild/moderate) or rests the whole body part (severe), via `INJURY_TIERS` + `INJURY_REGION`.
+
+### Ankle sprain → move early, don't immobilise
+- **Vuurberg G, et al. (2018).** Diagnosis, treatment and prevention of ankle sprains: update of an evidence-based clinical guideline. *Br J Sports Med* 52(15). Key `injAnkle`. doi:10.1136/bjsports-2017-098106.
+- **Design:** Evidence-based clinical guideline (systematic-review backed). **Evidence: Causal-leaning** (guideline synthesising RCTs).
+- **Finding:** Functional support + early controlled mobilisation/weight-bearing beats immobilisation; RICE for early symptoms; exercise/proprioceptive (balance) training reduces recurrence.
+- **We take:** Advice copy for `ankle`; balance-work prompt. Severe = rest the whole lower body (`INJURY_REGION.ankle`).
+
+### Patellofemoral / knee pain → exercise therapy is the lever
+- **Collins NJ, et al. (2018).** 2018 Consensus statement on exercise therapy and physical interventions to treat patellofemoral pain (5th Int. PFP Research Retreat). *Br J Sports Med* 52(18):1170–1178. Key `injKnee`. doi:10.1136/bjsports-2018-099397.
+- **Design:** Expert consensus over systematic-review evidence. **Evidence: Causal-leaning.**
+- **Finding:** Combined hip- + knee-focused exercise therapy (plus load management) improves pain and function more than rest or passive care.
+- **We take:** Advice copy for `knees` (keep moving, build hip/quad strength, manage load).
+
+### Low back pain → stay active, avoid bed rest
+- **Foster NE, et al. (2018).** Prevention and treatment of low back pain: evidence, challenges, and promising directions. *Lancet* 391(10137):2368–2383. Key `injBack`. doi:10.1016/S0140-6736(18)30489-6.
+- **Design:** Major evidence review (Lancet LBP series). **Evidence: Causal-leaning** (synthesis of guideline/RCT evidence).
+- **Finding:** Guidelines converge on reassurance, staying active, avoiding bed rest, and exercise; most episodes settle.
+- **We take:** Advice copy for `lowback` (stay active, ease back to normal activity).
+
+### Rotator cuff / shoulder pain → progressive loading, not injections
+- **Hopewell S, et al. (2021).** Progressive exercise vs best-practice advice, with/without corticosteroid injection, for rotator cuff disorders (GRASP): pragmatic 2×2 factorial RCT. *Lancet* 398(10298):416–428. Key `injShoulder`. doi:10.1016/S0140-6736(21)00846-1.
+- **Design:** Multicentre **RCT** (n=708). **Evidence: Causal.**
+- **Finding:** A single best-practice advice session with home exercises matched a longer physio-led progressive programme; corticosteroid injection added no meaningful benefit.
+- **We take:** Advice copy for `shoulders` (back off provocative overhead, load progressively, injections add little).
+
+### Lateral elbow tendinopathy → load it, skip the steroid shot
+- **Coombes BK, Bisset L, Vicenzino B (2015).** Management of lateral elbow tendinopathy: one size does not fit all. *J Orthop Sports Phys Ther* 45(11):938–949. Key `injElbow`. doi:10.2519/jospt.2015.5841.
+- **Design:** Clinical commentary / evidence synthesis. **Evidence: Causal-leaning** (draws on RCTs incl. steroid-harm trials).
+- **Finding:** Active management (isometric/eccentric loading, load/grip management) outperforms rest; corticosteroid injection improves short-term pain but worsens long-term recurrence.
+- **We take:** Advice copy for `elbows` (load it, manage grip, avoid steroid injections).
 
 ---
 

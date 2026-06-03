@@ -44,8 +44,13 @@
     --hi:rgba(255,255,255,.65);
     --accent-glow:rgba(255,90,40,.40);
     --red:#ff3b30;
-    --okbg:rgba(81,207,102,.13); --oktx:#2b8a3e; --warnbg:rgba(245,159,0,.13); --warntx:#9a6a00;
+    --warntx:#9a6a00;   /* "ease off" caution note on the workout card */
     --sevok:#2f9e44; --sev1:#f0b400; --sev2:#f0820c; --sev3:#e03131;   /* injury intensity: green→yellow→orange→red */
+    /* fading gradients (same idea as the main --grad) — green all-clear, then mild→severe */
+    --grad-ok:linear-gradient(135deg,#51cf66 0%,#2f9e44 100%);
+    --grad-s1:linear-gradient(135deg,#ffd43b 0%,#f59f00 100%);
+    --grad-s2:linear-gradient(135deg,#ff922b 0%,#ef5f12 100%);
+    --grad-s3:linear-gradient(135deg,#ff6b6b 0%,#e03131 100%);
     --r-lg:22px; --r-md:14px; --r-sm:10px;
   }
   html.dark{
@@ -62,7 +67,7 @@
     --hi:rgba(255,255,255,.055);
     --accent-glow:rgba(255,122,58,.38);
     --red:#ff453a;
-    --okbg:rgba(81,207,102,.16); --oktx:#69db7c; --warnbg:rgba(245,159,0,.18); --warntx:#ffc566;
+    --warntx:#ffc566;
     --r-lg:22px; --r-md:14px; --r-sm:10px;
   }
   *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; -webkit-font-smoothing:antialiased; -webkit-text-size-adjust:100%; text-size-adjust:100%;}
@@ -490,21 +495,31 @@
   .injbanner{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; background:var(--accent-soft); color:var(--accent); font-size:13px; font-weight:600; line-height:1.35; padding:11px 14px; border-radius:14px; margin:0 0 12px; cursor:pointer; }
   .injbanner b{ font-weight:700; }
   .injbanner .injmanage{ margin-left:auto; font-weight:700; white-space:nowrap; }
-  .injrow{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
-  .injrow .injchev{ opacity:.55; font-size:17px; line-height:1; }
-  .injrow.ok{ background:var(--okbg); color:var(--oktx); }       /* healthy — subtle green, blends in */
-  .injrow.on{ background:var(--warnbg); color:var(--warntx); }   /* injured — soft amber, signals active limits */
-  /* intensity segment: yellow (mild) → orange → red (severe); muted tint when idle, solid fill when picked */
+  /* Me-page status row: same colour scale as the intensity picker, on a soft fading gradient (like --grad) */
+  .injrow{ display:flex; align-items:center; justify-content:space-between; gap:8px; border:none; transition:filter .2s ease; }
+  .injrow .injchev{ opacity:.7; font-size:17px; line-height:1; }
+  .injrow.ok{ background:var(--grad-ok); color:#fff; box-shadow:none; }   /* all-clear — calm green */
+  .injrow.s1{ background:var(--grad-s1); color:#3a2c00; box-shadow:none; }
+  .injrow.s2{ background:var(--grad-s2); color:#fff; box-shadow:none; }
+  .injrow.s3{ background:var(--grad-s3); color:#fff; box-shadow:none; }
+  /* intensity segment: muted tint when idle; the picked option takes its fading gradient */
   #injurySev .s[data-sev="1"]{ color:#b8890a; } #injurySev .s[data-sev="2"]{ color:#cf6f0a; } #injurySev .s[data-sev="3"]{ color:#d63a3a; }
-  #injurySev .s[data-sev="1"].active{ background:var(--sev1); color:#3a2c00; box-shadow:none; }
-  #injurySev .s[data-sev="2"].active{ background:var(--sev2); color:#fff; box-shadow:none; }
-  #injurySev .s[data-sev="3"].active{ background:var(--sev3); color:#fff; box-shadow:none; }
-  /* accept button takes the all-clear green, or the chosen intensity's colour */
+  #injurySev .s[data-sev="1"].active{ background:var(--grad-s1); color:#3a2c00; box-shadow:none; }
+  #injurySev .s[data-sev="2"].active{ background:var(--grad-s2); color:#fff; box-shadow:none; }
+  #injurySev .s[data-sev="3"].active{ background:var(--grad-s3); color:#fff; box-shadow:none; }
+  /* accept button: all-clear green, or the chosen intensity's gradient — matches the row + segment */
   .btn.injaccept{ box-shadow:none; }
-  .btn.injaccept.ok{ background:var(--sevok); color:#fff; }
-  .btn.injaccept.s1{ background:var(--sev1); color:#3a2c00; }
-  .btn.injaccept.s2{ background:var(--sev2); color:#fff; }
-  .btn.injaccept.s3{ background:var(--sev3); color:#fff; }
+  .btn.injaccept.ok{ background:var(--grad-ok); color:#fff; }
+  .btn.injaccept.s1{ background:var(--grad-s1); color:#3a2c00; }
+  .btn.injaccept.s2{ background:var(--grad-s2); color:#fff; }
+  .btn.injaccept.s3{ background:var(--grad-s3); color:#fff; }
+  /* research-backed treatment advice cards in the injury sheet */
+  #injuryAdvice{ margin-top:18px; }
+  .injadvice{ background:var(--row); border-radius:var(--r-md); padding:14px 16px; margin-bottom:10px; }
+  .injadv-h{ font-size:14px; font-weight:700; margin-bottom:6px; }
+  .injadvice p{ font-size:13px; color:var(--l2); line-height:1.5; margin:0 0 9px; }
+  .injadvice .srclink{ display:block; font-size:11.5px; color:var(--l3); line-height:1.45; }
+  .injdisc{ font-size:11px; color:var(--l3); line-height:1.45; font-style:italic; margin:2px 4px 0; }
 
   .setrow{ display:flex; align-items:center; gap:12px; padding:16px 20px; border-top:.5px solid var(--sep); }
   .setrow:first-of-type{ border-top:none; }
@@ -1179,6 +1194,7 @@
       </div>
       <p class="levelcap" style="margin:8px 4px 0;">Mild swaps a few risky lifts; severe rests the whole area — you'll only train unaffected parts.</p>
     </div>
+    <div id="injuryAdvice" style="display:none;"></div>
     <button class="btn wide injaccept ok" id="injuryAccept" style="margin-top:16px;">All good ✓</button>
   </div>
 </div>
@@ -2774,7 +2790,13 @@ const SRC_DOI={
   garthe:"https://doi.org/10.1080/17461391.2011.643923",
   slater:"https://doi.org/10.3389/fnut.2019.00131",
   morton:"https://doi.org/10.1136/bjsports-2017-097608",
-  helms:"https://doi.org/10.1186/1550-2783-11-20"
+  helms:"https://doi.org/10.1186/1550-2783-11-20",
+  // injury self-management guidelines (Part C in EVIDENCE.md) — all verified to resolve
+  injAnkle:"https://doi.org/10.1136/bjsports-2017-098106",
+  injKnee:"https://doi.org/10.1136/bjsports-2018-099397",
+  injBack:"https://doi.org/10.1016/S0140-6736(18)30489-6",
+  injShoulder:"https://doi.org/10.1016/S0140-6736(21)00846-1",
+  injElbow:"https://doi.org/10.2519/jospt.2015.5841"
 };
 // Each tip → its study link. Training tips reuse SRC_DOI; health tips carry their own verified DOI.
 const TIP_DOI={
@@ -4455,6 +4477,14 @@ document.querySelectorAll("#swapLevelSeg .s").forEach(s=> s.onclick=()=>{ equipL
 // mild/moderate → swap risky moves for safe same-muscle work; severe → drop the whole body part, train only unaffected areas.
 const INJ_LABEL={ lowback:"lower back", knees:"knees", shoulders:"shoulders", elbows:"elbows", ankle:"ankle" };
 const SEV_LABEL={ 1:"mild", 2:"moderate", 3:"severe" };
+// Evidence-based self-management per injury — shown in the sheet, each linked to its guideline (keys in PROG_SRC/SRC_DOI; full ledger in EVIDENCE.md Part C).
+const INJURY_ADVICE={
+  ankle:{ src:"injAnkle", tip:"Don't rest it stiff — gentle weight-bearing and ankle circles as pain allows recover faster than immobilising. Support it (brace or tape), ice and elevate the first days, then add balance work once you can stand on it to cut re-sprain risk." },
+  knees:{ src:"injKnee", tip:"Keep moving within a pain-free range. Building hip and quad strength and managing load (depth and volume) is the most effective treatment — more than resting up." },
+  lowback:{ src:"injBack", tip:"Stay active and avoid bed rest. Keep gentle movement and ease back to normal activity — most episodes settle within weeks, and staying mobile speeds it up." },
+  shoulders:{ src:"injShoulder", tip:"Back off painful overhead work, then load it progressively. Guided home exercises work as well as formal physio, and injections add little — gradual loading is the lever." },
+  elbows:{ src:"injElbow", tip:"Load it, don't fully rest it. Pain-tolerable isometric and eccentric work plus managing your grip beat passive rest; steroid injections worsen long-term outcomes, so skip them." }
+};
 function activeInjuries(){ return settings.activeInjuries||[]; }
 function injSeverity(){ return Math.max(1,Math.min(3, settings.injurySeverity||2)); }
 // which active injury (if any) rules this exercise out, at the current severity
@@ -4486,9 +4516,9 @@ function resolveInjuryNames(w){
   });
 }
 function renderInjuryRow(){
-  const el=$("injuryRowTxt"); if(!el) return; const inj=activeInjuries();
-  el.textContent = inj.length ? listWords(inj.map(k=>INJ_LABEL[k]||k))+" · "+SEV_LABEL[injSeverity()] : "Feeling good — no limits";
-  const row=$("injuryRow"); if(row){ row.classList.toggle("on", inj.length>0); row.classList.toggle("ok", inj.length===0); }
+  const el=$("injuryRowTxt"); if(!el) return; const inj=activeInjuries(), sev=injSeverity();
+  el.textContent = inj.length ? listWords(inj.map(k=>INJ_LABEL[k]||k))+" · "+SEV_LABEL[sev] : "Feeling good — no limits";
+  const row=$("injuryRow"); if(row){ row.classList.remove("ok","s1","s2","s3"); row.classList.add(inj.length ? "s"+sev : "ok"); }  // same colour scale as the picker
 }
 // the persistent "you're injured" banner on the Workout page, with a live count of adjusted moves
 function renderInjuryBanner(){
@@ -4519,6 +4549,15 @@ function renderInjurySheet(){
   document.querySelectorAll("#injuryChips .chip").forEach(c=> c.classList.toggle("on", _pendInj.indexOf(c.dataset.v)>=0));
   const wrap=$("injurySevWrap"); if(wrap) wrap.style.display = _pendInj.length ? "" : "none";
   document.querySelectorAll("#injurySev .s").forEach(s=> s.classList.toggle("active", +s.dataset.sev===_pendSev));
+  const adv=$("injuryAdvice"); if(adv){
+    if(_pendInj.length){ adv.style.display="";
+      adv.innerHTML = _pendInj.map(k=>{ const a=INJURY_ADVICE[k]; if(!a) return ""; const u=SRC_DOI[a.src], lbl=(INJ_LABEL[k]||k);
+        return '<div class="injadvice"><div class="injadv-h">🩹 '+esc(lbl.charAt(0).toUpperCase()+lbl.slice(1))+' — how to treat it</div>'
+          +'<p>'+esc(a.tip)+'</p>'
+          +(u?'<a class="srclink" href="'+u+'" target="_blank" rel="noopener">'+PROG_SRC[a.src]+' <span class="srcarrow">↗</span></a>':'')+'</div>'; }).join('')
+        +'<p class="injdisc">General guidance from sports-medicine research — not a substitute for seeing a clinician about significant or lasting pain.</p>';
+    } else { adv.style.display="none"; adv.innerHTML=""; }
+  }
   const btn=$("injuryAccept"); if(btn){ const hurt=_pendInj.length>0;
     btn.className = "btn wide injaccept "+(hurt ? "s"+_pendSev : "ok");   // green when all-clear, else the chosen intensity's colour
     btn.textContent = hurt ? "Apply" : "All good ✓"; }
@@ -4797,7 +4836,13 @@ const PROG_SRC={
  bickel:"Bickel CS, Cross JM, Bamman MM (2011). Exercise dosing to retain resistance training adaptations in young and older adults. <i>Medicine &amp; Science in Sports &amp; Exercise</i>, 43(7), 1177–1187. doi:10.1249/MSS.0b013e318207c15d. <span>— After a build phase, muscle size was maintained on as little as ~1/3 (older) to ~1/9 (young) of the volume that built it — the basis for the maintenance-volume floor below which a muscle reads as “holding”, not growing.</span>",
  mujika:"Mujika I, Padilla S (2000). Detraining: loss of training-induced physiological and performance adaptations. Part I — short-term insufficient training stimulus. <i>Sports Medicine</i>, 30(2), 79–87. <span>— With too little stimulus, muscle fibres atrophy and strength declines within weeks — the basis for the “shrinking” state when weekly volume drops below maintenance.</span>",
  sch10:"Schoenfeld BJ (2010). The mechanisms of muscle hypertrophy and their application to resistance training. <i>Journal of Strength &amp; Conditioning Research</i>, 24(10), 2857–2872. <span>— Progressive tension overload is a primary driver of growth — why “growing” needs a rising trend, not just an adequate dose held flat.</span>",
- plotkin:"Plotkin D, et al. (2022). Progressive overload without progressing load? The effects of load or repetition progression on muscular adaptations. <i>PeerJ</i>, 10:e14142. doi:10.7717/peerj.14142. <span>— Overload via added reps or added load drove similar growth — why the trend tracks total volume (load×reps×sets), not load alone.</span>"
+ plotkin:"Plotkin D, et al. (2022). Progressive overload without progressing load? The effects of load or repetition progression on muscular adaptations. <i>PeerJ</i>, 10:e14142. doi:10.7717/peerj.14142. <span>— Overload via added reps or added load drove similar growth — why the trend tracks total volume (load×reps×sets), not load alone.</span>",
+ // injury self-management (Part C) — the advice shown when you flag a niggle
+ injAnkle:"Vuurberg G, et al. (2018). Diagnosis, treatment and prevention of ankle sprains: update of an evidence-based clinical guideline. <i>British Journal of Sports Medicine</i>, 52(15).",
+ injKnee:"Collins NJ, et al. (2018). 2018 Consensus statement on exercise therapy and physical interventions to treat patellofemoral pain. <i>British Journal of Sports Medicine</i>, 52(18).",
+ injBack:"Foster NE, et al. (2018). Prevention and treatment of low back pain: evidence, challenges, and promising directions. <i>The Lancet</i>, 391(10137).",
+ injShoulder:"Hopewell S, et al. (2021). Progressive exercise vs best-practice advice, with or without corticosteroid injection, for rotator cuff disorders (GRASP): a randomised controlled trial. <i>The Lancet</i>, 398(10298).",
+ injElbow:"Coombes BK, Bisset L, Vicenzino B (2015). Management of lateral elbow tendinopathy: one size does not fit all. <i>Journal of Orthopaedic &amp; Sports Physical Therapy</i>, 45(11)."
 };
 function bwSlopePctWk(days){
   const cut=Date.now()-days*86400000;
@@ -4928,28 +4973,31 @@ function emphasisPreset(focus){
 // Contraindicated movements per injury, tiered by severity (1 mild → 3 severe). Tiers are cumulative:
 // a move is out if it matches any tier from 1 up to the active severity. Higher severity = stronger limits —
 // e.g. a moderate ankle keeps leg press & hip thrust, but a severe (painful) one rules them out too.
+// Tiers are cumulative. T1 (mild) already pulls the clearly-risky moves; T2 (moderate) pulls most loaded
+// patterns, leaving only gentle isolation to substitute to; T3 (severe) is reinforced by INJURY_REGION below,
+// which rests the whole body part. Mild/moderate intentionally bite hard — a niggle still deserves real caution.
 const INJURY_TIERS={
-  lowback:[ /deadlift|good morning|bent-over row|barbell row|t-bar|clean|snatch/,
-            /back squat|front squat|romanian|\brdl\b|hip hinge|overhead press|push press/,
-            /\bsquat\b|\brow\b|hip thrust|leg press|standing.*press|good morning|sit-up/ ],
-  knees:[   /sissy|pistol|\bjump\b|plyo|\bhop\b/,
-            /\blunge\b|bulgarian|step-up|hack squat|leg extension/,
-            /\bsquat\b|leg press|\blunge\b|leg curl|step-up|wall sit/ ],
-  shoulders:[ /overhead press|behind|upright row|arnold|push press|snatch|pike/,
-              /\bdip\b|incline.*(press|bench)|lateral raise|shoulder press/,
-              /bench|push-?up|\bfly\b|pulldown|pull-?up|\bpress\b|raise|\brow\b/ ],
-  elbows:[  /skull|close-grip|\bdip\b|overhead.*extension|kickback/,
-            /pushdown|triceps|\bcurl\b|chin-?up/,
-            /bench|\bpress\b|push-?up|\bcurl\b|\brow\b|pull-?up|pulldown/ ],
-  // ankle sprain: T1 balance/impact, T2 standing-loaded + all squats/lunges, T3 even foot-supported load (leg press, hip thrust, all calf & hinges)
-  ankle:[   /pistol|sissy|\bjump\b|plyo|\bhop\b|skater|single-leg calf/,
-            /standing calf|leg-press calf|\blunge\b|bulgarian|split squat|step-up|back squat|front squat|goblet squat|hack squat|overhead squat|box squat|wall sit/,
-            /seated calf|calf raise|leg press|hip thrust|glute bridge|\bbridge\b|pull-through|deadlift|romanian|\brdl\b|good morning|\bsquat\b|\blunge\b/ ]
+  lowback:[ /deadlift|good morning|bent-over row|barbell row|t-bar|clean|snatch|hyperextension|back extension/,
+            /\bsquat\b|romanian|\brdl\b|hip hinge|overhead press|push press|hip thrust|leg press|sit-up|landmine|standing.*press/,
+            /\brow\b|pulldown|pull-?up|chin-?up|crunch|leg raise/ ],
+  knees:[   /sissy|pistol|\bjump\b|plyo|\bhop\b|\blunge\b|bulgarian|step-up|deep squat/,
+            /\bsquat\b|leg press|hack squat|wall sit/,
+            /leg extension|leg curl/ ],
+  shoulders:[ /overhead press|behind|upright row|arnold|push press|snatch|pike|lateral raise|\bdip\b/,
+              /bench|incline.*(press|bench)|\bpress\b|\bfly\b|pec deck|pulldown|pull-?up|\brow\b|raise|chin-?up/,
+              /push-?up|pullover/ ],
+  elbows:[  /skull|close-grip|\bdip\b|overhead.*extension|kickback|pushdown/,
+            /triceps|\bcurl\b|chin-?up|pull-?up|preacher|hammer/,
+            /bench|\bpress\b|push-?up|\brow\b|pulldown|\bfly\b/ ],
+  // ankle: T1 impact/balance + standing & single-leg calf + all lunges; T2 all squats, leg press, hip thrust, hinges; T3 whole leg (region)
+  ankle:[   /pistol|sissy|\bjump\b|plyo|\bhop\b|skater|single-leg calf|standing calf|leg-press calf|\blunge\b|bulgarian|split squat|step-up|wall sit/,
+            /back squat|front squat|goblet squat|hack squat|overhead squat|box squat|\bsquat\b|leg press|hip thrust|glute bridge|\bbridge\b|pull-through|deadlift|romanian|\brdl\b|good morning/,
+            /calf raise|leg extension|leg curl/ ]
 };
 // At SEVERE, the whole body part is off-limits — every muscle here is avoided entirely, leaving only unaffected areas.
 const INJURY_REGION={
   ankle:["Quads","Hamstrings","Glutes","Calves"],   // whole lower body — everything is weight-bearing on the ankle
-  knees:["Quads","Hamstrings","Glutes","Calves"],
+  knees:["Quads","Hamstrings","Glutes"],            // seated calf work spares the knee
   lowback:["Back"],
   shoulders:["Front Delts","Side Delts","Rear Delts"],
   elbows:["Biceps","Triceps"]
