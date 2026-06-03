@@ -4939,6 +4939,43 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
   document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) ensure(true); });
 })();
 
+// ===== TEMP DIAGNOSTIC — cold-launch blank strip is intermittent ("every 2nd launch"). REMOVE once pinned. =====
+// Captures a per-launch viewport time series and renders it at the bottom (tap to hide). Stores this launch's
+// summary so the overlay can also show the PREVIOUS launch — since the bug alternates, one screenshot then
+// shows both the good and the bugged state. Key question: does visualViewport.height read the true height
+// even when innerHeight is short? Only runs in the iOS standalone PWA.
+(function(){
+  const standalone = ("standalone" in navigator) ? !!navigator.standalone : false;
+  if(!standalone) return;
+  const T0 = (window.performance && performance.now) ? performance.now() : 0;
+  function now(){ return Math.round(((window.performance&&performance.now)?performance.now():0) - T0); }
+  function sh(){ return (window.screen&&window.screen.height)||-1; }
+  function vh(){ return window.visualViewport ? Math.round(window.visualViewport.height) : -1; }
+  function sb(){ const s=document.getElementById("shell"); return s?Math.round(s.getBoundingClientRect().bottom):-1; }
+  function appH(){ return ((getComputedStyle(document.documentElement).getPropertyValue("--appH")||"").trim())||"-"; }
+  const series=[]; let lastKey="";
+  function snap(tag){
+    const k = window.innerHeight+"/"+vh()+"/"+sb();
+    if(k!==lastKey){ series.push(now()+"ms "+tag+" ih="+window.innerHeight+" vv="+vh()+" sb="+sb()); lastKey=k; }
+  }
+  snap("init");
+  let c=0; const iv=setInterval(()=>{ snap("·"); if(++c>=40) clearInterval(iv); }, 200);   // sample ~8s
+  ["resize","orientationchange","pageshow"].forEach(e=> window.addEventListener(e, ()=> snap(e)));
+  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) snap("vis"); });
+  setTimeout(function(){
+    const bugged = sh()>0 && sb()>0 && sb() < sh()-4;
+    const cur = { bugged:bugged, sh:sh(), ih:window.innerHeight, vv:vh(), ch:document.documentElement.clientHeight, sb:sb(), appH:appH() };
+    let prev=null; try{ prev=JSON.parse(localStorage.getItem("yallaBlankDiag")||"null"); }catch(e){}
+    try{ localStorage.setItem("yallaBlankDiag", JSON.stringify(cur)); }catch(e){}
+    function fmt(d,label){ return d ? (label+" "+(d.bugged?"BUGGED":"ok")+"  sh="+d.sh+" ih="+d.ih+" vv="+d.vv+" ch="+d.ch+" sb="+d.sb+" appH="+d.appH) : (label+": (none)"); }
+    const box=document.createElement("pre");
+    box.textContent = "BLANK DIAG (tap to hide)\n"+fmt(cur,"THIS")+"\n"+fmt(prev,"PREV")+"\n— ih/vv/sb timeline —\n"+series.join("\n");
+    box.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:99999;margin:0;padding:10px 12px;background:rgba(0,0,0,.92);color:#3f6;font:11px/1.3 ui-monospace,Menlo,monospace;white-space:pre-wrap;max-height:70vh;overflow:auto;-webkit-user-select:text;user-select:text;";
+    box.addEventListener("click", ()=> box.remove());
+    document.body.appendChild(box);
+  }, 7000);
+})();
+
 // Offline support: register the service worker when served over HTTPS (e.g. GitHub Pages).
 // Skipped silently on file:// so opening the raw file still works.
 if("serviceWorker" in navigator && location.protocol==="https:"){
