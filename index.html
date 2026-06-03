@@ -4891,11 +4891,16 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // 956) and stays that way for the whole session — it does NOT settle late, and NOTHING in-page recovers 956
 // (viewport-meta re-parse is inert; only a real WebView resize i.e. rotation fixes it). BUT the magenta paint
 // test proved the ROOT CANVAS (<html> background) DOES paint the 894→956 strip. So the fix is purely visual:
-//   1. <html> background = var(--bg) (already set) fills the strip with the app colour, and
+//   1. the strip is filled by the <html> canvas background = var(--bg), and
 //   2. the tab bar is OPAQUE var(--bg) (see .tabbar CSS) so it matches that strip exactly and reads as anchored
 //      to the screen bottom — on both 956 (good) and 894 (bugged) launches, identically.
-// This IIFE just sizes the shell to the addressable viewport (grows-only --appH from innerHeight) so the bar is
-// always on-screen; the canvas + opaque bar handle the strip. dvh/vh stay as the pre-JS fallback.
+// THE 70% CATCH: <html> already has background:var(--bg), yet ~30% of launches still showed a white strip. The
+// reason: on a cold launch WebKit's FIRST paint covers only the layout viewport (894); the 894→956 strip keeps
+// the WebView's white backing and nothing later invalidates it. The magenta test only worked because it was a
+// JS background change AFTER load — which forces a full-canvas repaint. So we replicate that: nudge the <html>
+// background after load (var(--bg2) for one frame → back to the prior value) to force WebKit to repaint the
+// whole canvas, including the strip. The nudge is only visible in the strip and only for a frame (both shades
+// are app-bg), so it's imperceptible. iOS standalone only.
 (function(){
   let maxH=0, orient="";
   function apply(){
@@ -4904,9 +4909,25 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
     const h=window.innerHeight;
     if(h>maxH){ maxH=h; document.documentElement.style.setProperty("--appH", maxH+"px"); }
   }
+  const standalone = ("standalone" in navigator) ? !!navigator.standalone : false;
+  let painting = false;
+  function paintStrip(){
+    if(!standalone || painting) return;
+    painting = true;
+    const de = document.documentElement;
+    const cur = de.style.background;                 // whatever the theme set inline (hex), or "" → stylesheet var(--bg)
+    de.style.background = "var(--bg2)";               // one-frame nudge to a near-identical shade...
+    void de.offsetHeight;
+    requestAnimationFrame(function(){
+      de.style.background = cur;                       // ...restore → forces a full-canvas repaint incl. the strip
+      painting = false;
+    });
+  }
   apply();
-  ["resize","orientationchange","pageshow","load"].forEach(e=> window.addEventListener(e, ()=> setTimeout(apply, 0)));
-  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) setTimeout(apply, 0); });
+  ["resize","orientationchange","pageshow","load"].forEach(e=> window.addEventListener(e, ()=>{ setTimeout(apply, 0); paintStrip(); }));
+  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden){ setTimeout(apply, 0); paintStrip(); } });
+  // also nudge across the cold-launch settle window in case the bad first paint lands after these events
+  [120, 400, 900, 1800].forEach(t=> setTimeout(paintStrip, t));
 })();
 
 // Offline support: register the service worker when served over HTTPS (e.g. GitHub Pages).
