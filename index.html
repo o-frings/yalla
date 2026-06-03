@@ -519,7 +519,16 @@
   .injadv-h{ font-size:14px; font-weight:700; margin-bottom:6px; }
   .injadvice p{ font-size:13px; color:var(--l2); line-height:1.5; margin:0 0 9px; }
   .injadvice .srclink{ display:block; font-size:11.5px; color:var(--l3); line-height:1.45; }
+  .injadvice.redflag{ border-left:3px solid var(--sev3); }   /* severe — possible fracture/tear */
   .injdisc{ font-size:11px; color:var(--l3); line-height:1.45; font-style:italic; margin:2px 4px 0; }
+  /* "train these instead" suggestions when an injury rests part of a session */
+  .injfill-h{ font-size:14px; font-weight:700; line-height:1.4; }
+  .injfill-sub{ font-size:12.5px; color:var(--l2); line-height:1.5; margin:6px 0 12px; }
+  .injfill-list{ display:flex; flex-direction:column; gap:8px; }
+  .injfill-add{ display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--row); border:.5px solid var(--sep); border-radius:var(--r-md); padding:12px 14px; font-family:inherit; font-size:15px; font-weight:600; color:var(--ink); cursor:pointer; }
+  .injfill-add svg{ width:18px; height:18px; color:var(--accent); flex:0 0 auto; }
+  .injfill-add small{ margin-left:auto; font-size:12px; font-weight:600; color:var(--l3); }
+  .injfill-add:active{ filter:brightness(.97); }
 
   .setrow{ display:flex; align-items:center; gap:12px; padding:16px 20px; border-top:.5px solid var(--sep); }
   .setrow:first-of-type{ border-top:none; }
@@ -855,8 +864,10 @@
     </div>
     <div class="inlineconfirm" id="focusConfirm"></div>
 
-    <div class="ed-label">Niggle or injury <span class="subhint">— temporary; we work around it</span></div>
-    <button class="btn tinted wide injrow ok" id="injuryRow"><span id="injuryRowTxt">Feeling good — no limits</span><span class="injchev">›</span></button>
+    <div class="ed-label">Weak spots <span class="subhint">— areas to prioritise when an injury frees up time</span></div>
+    <div class="chips wrap" id="weakChips">
+      <button class="chip" data-v="chest">Chest</button><button class="chip" data-v="back">Back</button><button class="chip" data-v="shoulders">Shoulders</button><button class="chip" data-v="arms">Arms</button><button class="chip" data-v="quads">Quads</button><button class="chip" data-v="hamstrings">Hamstrings</button><button class="chip" data-v="glutes">Glutes</button><button class="chip" data-v="calves">Calves</button><button class="chip" data-v="core">Core</button>
+    </div>
 
     <!-- Goal weight lives here until it's set, then moves into Settings (see placeGoalBlock) -->
     <div id="goalHomeMe"><div id="goalBlock">
@@ -868,6 +879,9 @@
         <button class="btn tinted sm" id="goalSave">Save</button>
       </div>
     </div></div>
+
+    <div class="ed-label" style="margin-top:8px;">Niggle or injury <span class="subhint">— temporary; we work around it</span></div>
+    <button class="btn tinted wide injrow ok" id="injuryRow"><span id="injuryRowTxt">Feeling good — no limits</span><span class="injchev">›</span></button>
 
     <div id="setBody">
     <div id="goalHomeSettings"></div>
@@ -1192,7 +1206,7 @@
       <div class="seg appearance" id="injurySev">
         <div class="s" data-sev="1">Mild</div><div class="s active" data-sev="2">Moderate</div><div class="s" data-sev="3">Severe</div>
       </div>
-      <p class="levelcap" style="margin:8px 4px 0;">Mild swaps a few risky lifts; severe rests the whole area — you'll only train unaffected parts.</p>
+      <p class="levelcap" style="margin:8px 4px 0;">Mild swaps a few risky lifts; severe rests the whole area (and, if it could be a fracture or bad tear, says to get it checked).</p>
     </div>
     <div id="injuryAdvice" style="display:none;"></div>
     <button class="btn wide injaccept ok" id="injuryAccept" style="margin-top:16px;">All good ✓</button>
@@ -2400,7 +2414,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi]||e.n; }
-let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:[], injurySeverity:2 };
+let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:[], injurySeverity:2, weakSpots:[] };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -3473,12 +3487,24 @@ function renderWorkout(){
       const tmp=document.createElement("div"); tmp.innerHTML=freeSetRow(n, null, name);
       g.querySelector(".freeadd").insertAdjacentElement("beforebegin", tmp.firstChild); captureDraft(); };
   });
-  if(activeInjuries().length && shown===0){   // severe injury rested every move in this session
-    const m=document.createElement("div"); m.className="group";
-    m.innerHTML='<div class="pad" style="padding:18px 20px;color:var(--l2);font-size:13.5px;line-height:1.5;">'
-      +'🩹 This whole session trains your '+esc(listWords(activeInjuries().map(k=>INJ_LABEL[k]||k)))
-      +', which you\'re fully resting right now. Pick a different day from the tabs above — or add an exercise for an unaffected area below.</div>';
-    list.appendChild(m);
+  // when an injury rests a big chunk of the session, offer alternatives for unaffected areas
+  const lost=injRes.filter(r=>r.drop).length;
+  if(activeInjuries().length && (shown===0 || lost>=2)){
+    const area=listWords(activeInjuries().map(k=>INJ_LABEL[k]||k));
+    const sugg=injuryFillSuggestions(Math.min(Math.max(lost,2),4));
+    const card=document.createElement("div"); card.className="group injfill";
+    const head = shown===0
+      ? "🩹 This session is all <b>"+esc(area)+"</b> work — fully rested right now."
+      : "🩹 Resting your <b>"+esc(area)+"</b> drops "+lost+" move"+(lost>1?"s":"")+" here.";
+    let h='<div class="pad" style="padding:16px 20px;"><div class="injfill-h">'+head+'</div>';
+    if(sugg.length){
+      h+='<p class="injfill-sub">Train an unaffected area instead — picked from your weak spots, focus and where you\'re light this week:</p>'
+        +'<div class="injfill-list">'+sugg.map(s=>'<button class="injfill-add" data-add="'+esc(s.name)+'">'+ICON.plus
+          +'<span>'+esc(s.name)+'</span><small>'+esc(MSHORT[BUILD_MG[s.key]]||s.key)+'</small></button>').join('')+'</div>';
+    } else h+='<p class="injfill-sub">Pick a different day from the tabs above, or take this one as rest.</p>';
+    h+='</div>';
+    card.innerHTML=h; list.appendChild(card);
+    card.querySelectorAll(".injfill-add").forEach(b=> b.onclick=()=> addToCurrentWorkout(b.dataset.add));
   }
   const addBtn=document.createElement("button"); addBtn.className="btn tinted wide"; addBtn.style.marginTop="2px";
   addBtn.innerHTML=ICON.plus+"Add exercise"; addBtn.onclick=()=>openAdd("plan"); list.appendChild(addBtn);
@@ -4478,13 +4504,29 @@ document.querySelectorAll("#swapLevelSeg .s").forEach(s=> s.onclick=()=>{ equipL
 const INJ_LABEL={ lowback:"lower back", knees:"knees", shoulders:"shoulders", elbows:"elbows", ankle:"ankle" };
 const SEV_LABEL={ 1:"mild", 2:"moderate", 3:"severe" };
 // Evidence-based self-management per injury — shown in the sheet, each linked to its guideline (keys in PROG_SRC/SRC_DOI; full ledger in EVIDENCE.md Part C).
+// `tip` = load-management self-care (mild/moderate). `severe` = a red-flag note shown at the top intensity, which
+// can mean a fracture or full tear — there the safe advice is rest + get assessed, NOT the "load it early" guidance.
 const INJURY_ADVICE={
-  ankle:{ src:"injAnkle", tip:"Don't rest it stiff — gentle weight-bearing and ankle circles as pain allows recover faster than immobilising. Support it (brace or tape), ice and elevate the first days, then add balance work once you can stand on it to cut re-sprain risk." },
-  knees:{ src:"injKnee", tip:"Keep moving within a pain-free range. Building hip and quad strength and managing load (depth and volume) is the most effective treatment — more than resting up." },
-  lowback:{ src:"injBack", tip:"Stay active and avoid bed rest. Keep gentle movement and ease back to normal activity — most episodes settle within weeks, and staying mobile speeds it up." },
-  shoulders:{ src:"injShoulder", tip:"Back off painful overhead work, then load it progressively. Guided home exercises work as well as formal physio, and injections add little — gradual loading is the lever." },
-  elbows:{ src:"injElbow", tip:"Load it, don't fully rest it. Pain-tolerable isometric and eccentric work plus managing your grip beat passive rest; steroid injections worsen long-term outcomes, so skip them." }
+  ankle:{ src:"injAnkle",
+    tip:"Don't rest it stiff — gentle weight-bearing and ankle circles as pain allows recover faster than immobilising. Support it (brace or tape), ice and elevate the first days, then add balance work once you can stand on it to cut re-sprain risk.",
+    severe:"If you can't bear weight on it, or it's very swollen, deformed or unstable, treat it as a possible fracture — get it assessed (and imaged) before loading it again. Rest it fully meanwhile." },
+  knees:{ src:"injKnee",
+    tip:"Keep moving within a pain-free range. Building hip and quad strength and managing load (depth and volume) is the most effective treatment — more than resting up.",
+    severe:"Locking, giving way, an inability to straighten it, or marked swelling can mean a fracture or a ligament/meniscus tear — get it assessed before loading it again. Rest it fully meanwhile." },
+  lowback:{ src:"injBack",
+    tip:"Stay active and avoid bed rest. Keep gentle movement and ease back to normal activity — most episodes settle within weeks, and staying mobile speeds it up.",
+    severe:"Severe pain — especially with leg numbness or weakness, or any change in bladder or bowel control — needs prompt medical review. Rest and seek care before training it again." },
+  shoulders:{ src:"injShoulder",
+    tip:"Back off painful overhead work, then load it progressively. Guided home exercises work as well as formal physio, and injections add little — gradual loading is the lever.",
+    severe:"Severe pain after a fall, a visible deformity, or being unable to lift the arm can mean a fracture or full-thickness tear — get it assessed before loading it again." },
+  elbows:{ src:"injElbow",
+    tip:"Load it, don't fully rest it. Pain-tolerable isometric and eccentric work plus managing your grip beat passive rest; steroid injections worsen long-term outcomes, so skip them.",
+    severe:"Severe pain after trauma or a fall, or a visible deformity, can mean a fracture — get it assessed before loading it again. Rest it fully meanwhile." }
 };
+// weak-spot chips (Me) → the analytics-muscle build keys they prioritise
+const WEAK_EXPAND={ chest:["chest"], back:["back"], shoulders:["shoulders","sidedelts","reardelts"], arms:["biceps","triceps"], quads:["quads"], hamstrings:["hamstrings"], glutes:["glutes"], calves:["calves"], core:["core"] };
+// build key → its analytics-muscle (MGROUP) name, for reading weekly volume gaps
+const BUILD_MG={ chest:"Chest", back:"Back", shoulders:"Front Delts", sidedelts:"Side Delts", reardelts:"Rear Delts", biceps:"Biceps", triceps:"Triceps", quads:"Quads", hamstrings:"Hamstrings", glutes:"Glutes", calves:"Calves", core:"Core" };
 function activeInjuries(){ return settings.activeInjuries||[]; }
 function injSeverity(){ return Math.max(1,Math.min(3, settings.injurySeverity||2)); }
 // which active injury (if any) rules this exercise out, at the current severity
@@ -4520,6 +4562,44 @@ function renderInjuryRow(){
   el.textContent = inj.length ? listWords(inj.map(k=>INJ_LABEL[k]||k))+" · "+SEV_LABEL[sev] : "Feeling good — no limits";
   const row=$("injuryRow"); if(row){ row.classList.remove("ok","s1","s2","s3"); row.classList.add(inj.length ? "s"+sev : "ok"); }  // same colour scale as the picker
 }
+function renderWeakSpots(){ const w=settings.weakSpots||[];
+  document.querySelectorAll("#weakChips .chip").forEach(c=> c.classList.toggle("on", w.indexOf(c.dataset.v)>=0)); }
+document.querySelectorAll("#weakChips .chip").forEach(c=> c.onclick=async()=>{
+  const w=(settings.weakSpots||[]).slice(), v=c.dataset.v, i=w.indexOf(v);
+  if(i>=0) w.splice(i,1); else w.push(v);
+  settings.weakSpots=w; await sset("settings",settings); renderWeakSpots();
+});
+// When an injury rests part of a session, suggest alternative moves for UNAFFECTED muscles —
+// ranked by your weak spots, then training focus, then where you're light on weekly volume.
+function injuryFillSuggestions(maxN){
+  const inj=activeInjuries(); if(!inj.length) return [];
+  const sev=injSeverity();
+  const wk=weeklyEquiv(muscleVolume(28,"sets").totals, 28);                 // weekly sets per muscle (gap signal)
+  const weak=new Set((settings.weakSpots||[]).flatMap(w=>WEAK_EXPAND[w]||[w]));
+  const focusKeys=new Set((settings.focusAreas||[]).flatMap(f=>focusGroups(f)));
+  const today=new Set(activePlan().workouts[curWk].ex.map(e=>buildKey(muscleFor(e.n)[0])));
+  const score=key=>{ let s=0;
+    if(weak.has(key)) s+=4;                                                  // your stated weak spots win
+    if(focusKeys.has(key)) s+=2;                                             // then your training focus
+    const sets=wk[BUILD_MG[key]]||0;                                         // then the biggest weekly-volume gaps
+    if(sets<WEEKLY_SET_MIN) s+=2; else if(sets<WEEKLY_SET_TARGET) s+=1;
+    if(today.has(key)) s-=1.5;                                               // already on today's card → deprioritise
+    return s; };
+  const keys=Object.keys(BUILD_POOL).filter(key=> (BUILD_POOL[key]||[]).some(x=>!injuryBlocks(x,inj,sev)))  // still trainable
+    .sort((a,b)=> score(b)-score(a) || a.localeCompare(b));
+  const out=[], usedFam=new Set();
+  for(const key of keys){ if(out.length>=maxN) break;
+    const cand=suggestAdd(BUILD_MG[key]).find(x=> !usedFam.has(familyKey(x)));
+    if(cand){ usedFam.add(familyKey(cand)); out.push({key, name:cand}); }
+  }
+  return out;
+}
+async function addToCurrentWorkout(name){
+  const wk=activePlan().workouts[curWk]; if(!wk) return;
+  if(wk.ex.some(e=>e.n===name)){ toast(name+" is already in this session"); return; }
+  wk.ex.push({n:name, t:"3 × 8–12", s:3});
+  await sset("plans",plans); renderSeg(); renderWorkout(); renderDash(); toast("Added "+name);
+}
 // the persistent "you're injured" banner on the Workout page, with a live count of adjusted moves
 function renderInjuryBanner(){
   const b=$("injBanner"); if(!b) return; const inj=activeInjuries();
@@ -4550,10 +4630,11 @@ function renderInjurySheet(){
   const wrap=$("injurySevWrap"); if(wrap) wrap.style.display = _pendInj.length ? "" : "none";
   document.querySelectorAll("#injurySev .s").forEach(s=> s.classList.toggle("active", +s.dataset.sev===_pendSev));
   const adv=$("injuryAdvice"); if(adv){
-    if(_pendInj.length){ adv.style.display="";
+    if(_pendInj.length){ adv.style.display=""; const severe=_pendSev>=3;
       adv.innerHTML = _pendInj.map(k=>{ const a=INJURY_ADVICE[k]; if(!a) return ""; const u=SRC_DOI[a.src], lbl=(INJ_LABEL[k]||k);
-        return '<div class="injadvice"><div class="injadv-h">🩹 '+esc(lbl.charAt(0).toUpperCase()+lbl.slice(1))+' — how to treat it</div>'
-          +'<p>'+esc(a.tip)+'</p>'
+        const body=(severe && a.severe) ? a.severe : a.tip;                 // severe could be a fracture/tear → rest & get assessed, not "load it"
+        return '<div class="injadvice'+(severe?' redflag':'')+'"><div class="injadv-h">🩹 '+esc(lbl.charAt(0).toUpperCase()+lbl.slice(1))+(severe?' — treat with care':' — how to treat it')+'</div>'
+          +'<p>'+esc(body)+'</p>'
           +(u?'<a class="srclink" href="'+u+'" target="_blank" rel="noopener">'+PROG_SRC[a.src]+' <span class="srcarrow">↗</span></a>':'')+'</div>'; }).join('')
         +'<p class="injdisc">General guidance from sports-medicine research — not a substitute for seeing a clinician about significant or lasting pain.</p>';
     } else { adv.style.display="none"; adv.innerHTML=""; }
@@ -4865,7 +4946,7 @@ async function setObjective(o){
 }
 function renderObjective(){ document.querySelectorAll("#objChips .chip").forEach(c=>{ c.classList.toggle("on", c.dataset.v===settings.objective); c.classList.remove("pending"); });
   const fa=settings.focusAreas||["balanced"]; document.querySelectorAll("#focusChips .chip").forEach(c=>{ c.classList.toggle("on", fa.indexOf(c.dataset.v)>=0); c.classList.remove("pending"); });
-  renderInjuryRow(); placeGoalBlock(); }
+  renderInjuryRow(); renderWeakSpots(); placeGoalBlock(); }
 // training focus — pending until confirmed; up to two, Balanced + an area = a light lean
 document.querySelectorAll("#focusChips .chip").forEach(c=> c.onclick=()=>{
   let sel=(_pendFocus||settings.focusAreas||[]).slice();
