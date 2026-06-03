@@ -651,6 +651,7 @@
   .crow{ display:flex; justify-content:space-between; padding:12px 4px; border-top:.5px solid var(--sep); font-size:14px; }
   .crow span:last-child{ color:var(--l2); }
   .freehint{ font-size:13px; color:var(--l2); padding:0 4px 16px; line-height:1.45; }
+  .tipsrc{ font-size:11px; color:var(--l3); margin-top:11px; font-style:italic; }
   .freeadd{ padding:12px 16px 16px; border-top:.5px solid var(--sep); }
   .addset{ cursor:pointer; font-weight:600; display:inline-flex; align-items:center; gap:3px; padding:8px 8px; margin:-8px -8px; min-height:24px; }
   .exhead .freedel{ color:var(--red); background:none; border:none; font-size:24px; line-height:1; cursor:pointer; padding:8px; margin:-8px -4px; }
@@ -2554,6 +2555,7 @@ async function init(){
   }
   if(!settings.activePlanId) settings.activePlanId = plans[0].id;
   const ni = nextRotateIndex(activePlan()); curWk = ni>=0?ni:0;
+  decideTip();          // pick this launch's coach tip (if any) before the first render
   renderAll();
   showTab("overview");   // open on the coach home
   if(!settings.objective){ const ob=$("onboardWrap"); if(ob) ob.classList.add("show"); }   // ask the objective up front
@@ -2664,6 +2666,71 @@ function startHomeWorkout(){
   showTab("workout");
   toast("Home workout ready — no equipment needed. Let's go!");
 }
+// Short, research-backed coach tips. Each maps to a paper in PROG_SRC (full citation lives on the Muscle-balance
+// sheet); `src` is the short attribution shown on the card. `id` is stable so recency tracking survives edits.
+// `goals` (optional) restricts a tip to matching objectives (muscle/strength/fatloss/fitness) — mostly the
+// nutrition tips; training tips have no `goals` and apply to everyone. Multiple distinct tips are drawn from
+// each paper, staying within what it actually supports.
+const TIPS=[
+  // ---- training: volume, frequency, overload (apply to every goal) ----
+  {id:"vol10",        src:"Schoenfeld 2017",           t:"Aim for roughly 10+ hard sets per muscle each week — that's the volume where growth reliably shows up."},
+  {id:"volmin",       src:"Schoenfeld 2017",           t:"Under about 10 weekly sets per muscle you're likely leaving growth on the table — but you don't need to live in the gym to clear that bar."},
+  {id:"freq2",        src:"Schoenfeld 2016",           t:"Hit each muscle about twice a week. The same sets split over two days tend to grow a little more than one big session."},
+  {id:"freqlag",      src:"Schoenfeld 2016",           t:"Got a lagging muscle? Add a second short session for it during the week rather than piling every set onto one day."},
+  {id:"overload",     src:"Schoenfeld 2010",           t:"Muscle grows when you ask a bit more of it over time — add a rep or a little weight once a set starts to feel easy."},
+  {id:"tension",      src:"Schoenfeld 2010",           t:"Challenging loads lifted with real effort create the mechanical tension that tells a muscle to grow — that's the core of it."},
+  {id:"repsOK",       src:"Plotkin et al. 2022",       t:"Can't add weight today? Add a rep. Progressing reps builds muscle just as well as adding load."},
+  {id:"dose",         src:"Pelland et al. 2024",       t:"More weekly sets generally means more growth — but assistance work counts only about half, so train each muscle directly too."},
+  {id:"spread",       src:"Pelland et al. 2024",       t:"Once you're past ~10 sets for a muscle, spreading them over more days lets you add volume without each session dragging."},
+  {id:"landmarks",    src:"Renaissance Periodization", t:"There's a productive range for volume: too little won't grow, too much just piles on fatigue. ~10–20 sets a week per muscle suits most."},
+  {id:"deload",       src:"Renaissance Periodization", t:"When progress stalls and everything feels heavy, take a planned easy week — clearing fatigue lets you push hard again."},
+  {id:"rampvol",      src:"Renaissance Periodization", t:"Start a training block at the lower end of your volume and add a set here and there as you adapt — leave yourself room to grow."},
+  // ---- recovery & the muscle-building window ----
+  {id:"window",       src:"Phillips et al. 1997",      t:"Muscle is built in the day or two after training, not during the workout — which is why spreading sessions through the week pays off."},
+  {id:"recover",      src:"Phillips et al. 1997",      t:"Recovery is part of the program — the growth signal from a session runs ~24–48 hours, so give a muscle time before hammering it again."},
+  // ---- effort vs. feel ----
+  {id:"emg",          src:"Vigotsky et al. 2022",      t:"Chasing the “burn” or a big pump doesn't reliably mean more growth — total hard sets over the week is what counts."},
+  {id:"feel",         src:"Vigotsky et al. 2022",      t:"How “activated” a muscle feels isn't a reliable guide to growth — track your weekly sets and whether the weights are climbing instead."},
+  // ---- busy weeks & maintenance (apply to every goal) ----
+  {id:"maintain",     src:"Bickel et al. 2011",        t:"Pressed for time? You can keep the muscle you've built on as little as a third of your usual volume — even one hard set a week helps."},
+  {id:"dontskip",     src:"Bickel et al. 2011",        t:"On a hectic week, don't skip entirely — a short, reduced session holds onto what you've built far better than nothing."},
+  {id:"detrain",      src:"Mujika & Padilla 2000",     t:"A week or two off won't cost you — strength holds for weeks. Rest when you need it; just don't let a layoff stretch into months."},
+  {id:"comeback",     src:"Mujika & Padilla 2000",     t:"Missed some sessions to illness or travel? A few won't erase months of work — just pick up where you left off."},
+  // ---- protein (everyone) ----
+  {id:"protein",      src:"Morton et al. 2018",        t:"Around 1.6 g of protein per kg of bodyweight a day covers most lifters — much beyond that adds little."},
+  {id:"proteinceil",  src:"Morton et al. 2018",        t:"Past ~1.6 g/kg, extra protein does little for muscle — your training and sleep move the needle more than another shake."},
+  // ---- nutrition for building (gain goal) ----
+  {id:"surplus",      src:"Slater et al. 2019",        goals:["muscle"], t:"To build muscle, eat in a slight calorie surplus — trying to grow at maintenance is an uphill battle."},
+  {id:"nodeficit",    src:"Slater et al. 2019",        goals:["muscle"], t:"You can't build much muscle in a real calorie deficit — if size is the goal, eat at least at maintenance."},
+  {id:"leangain",     src:"Garthe et al. 2013",        goals:["muscle"], t:"Gain slowly: about 0.25–0.5% of bodyweight a week keeps new gains mostly muscle, not fat."},
+  // ---- nutrition for cutting (fat-loss goal) ----
+  {id:"cut",          src:"Helms et al. 2014",         goals:["fatloss"], t:"Cutting? Keep protein high and keep lifting heavy — that's what tells your body to hold onto muscle while the fat comes off."},
+  {id:"cutprotein",   src:"Helms et al. 2014",         goals:["fatloss"], t:"On a cut, protein needs go up, not down — aim toward the higher end (~2 g/kg) to protect muscle in a deficit."},
+  {id:"lossrate",     src:"Helms et al. 2014",         goals:["fatloss"], t:"Losing fat? Keep it to about 0.5–1% of bodyweight a week — faster tends to drag your strength and muscle down with it."},
+  {id:"nocrash",      src:"Helms et al. 2014",         goals:["fatloss"], t:"Crash diets backfire — a moderate deficit you can actually sustain keeps more muscle and strength than slashing calories."}
+];
+// Decided once per app launch (in init), so it doesn't reshuffle as you switch tabs. Roughly every 3rd open we
+// surface a tip; which tip is drawn stochastically from the goal-relevant pool, weighted by how long since it
+// was last shown (recency). A tip is eligible if it has no `goals`, the user has no objective set, or its
+// `goals` include the current objective.
+let currentTip=null;
+function decideTip(){
+  const ts = settings.tipState = settings.tipState || { opens:0, last:{} };
+  ts.opens = (ts.opens||0) + 1;
+  currentTip = null;
+  if(ts.opens > 1 && ts.opens % 3 === 0){           // skip the very first open; then ~every 3rd
+    const obj = settings.objective;
+    const pool = TIPS.filter(tip => !tip.goals || !obj || tip.goals.indexOf(obj) >= 0);
+    // weight ∝ opens since last shown; never-shown tips get the highest weight
+    const w = pool.map(tip => { const at = ts.last[tip.id]; return at==null ? ts.opens + 1 : Math.max(0.01, ts.opens - at); });
+    const sum = w.reduce((a,b)=>a+b, 0);
+    let r = Math.random() * sum, pick = 0;
+    for(let i=0;i<pool.length;i++){ r -= w[i]; if(r <= 0){ pick = i; break; } }
+    currentTip = pool[pick];
+    ts.last[currentTip.id] = ts.opens;
+  }
+  sset("settings", settings);
+}
 function renderOverview(){
   const host=$("ovBody"); if(!host) return;
   $("ovGreet").textContent=ovGreetWord()+((settings.displayName||settings.name)?", "+(settings.displayName||settings.name):"");
@@ -2720,6 +2787,13 @@ function renderOverview(){
     h+='<div class="ed-label">Discover'+(dt.length>1?' <span class="subhint">— swipe ›</span>':'')+'</div>';
     h+='<div class="discwrap" id="discWrap">'+dt.map(d=>'<div class="group ovnudge disccard"><div class="pad"><button class="discx" data-tip="'+d.id+'" aria-label="Dismiss">✕</button><div class="ovbig" style="font-size:18px; padding-right:20px;">'+esc(d.t)+'</div><p class="ovp" style="margin-top:8px;">'+esc(d.s)+'</p>'+(d.act?'<button class="btn wide ovdisc" data-act="'+d.act+'" data-tip="'+d.id+'" style="margin-top:16px;">'+esc(d.btn)+'</button>':'')+'</div></div>').join('')+'</div>';
     if(dt.length>1) h+='<div class="discdots" id="discDots">'+dt.map((_,i)=>'<span class="discdot'+(i===0?' on':'')+'"></span>').join('')+'</div>';
+  }
+  // --- Coach tip --- an occasional research-backed pointer (shown ~every 3rd open; see decideTip)
+  if(currentTip){
+    h+='<div class="ed-label">Coach tip</div>';
+    h+='<div class="group"><div class="pad"><div class="ovbig" style="font-size:18px;">💡 Did you know?</div>'
+      +'<p class="ovp" style="margin-top:8px;">'+esc(currentTip.t)+'</p>'
+      +'<div class="tipsrc">Backed by research — '+esc(currentTip.src)+'</div></div></div>';
   }
   // --- Needs attention --- ordered by urgency (severity first); maps to your objective
   const obj=planObjective(activePlan()), todo=[], under=ovUnderMuscles();
