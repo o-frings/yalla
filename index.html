@@ -2829,12 +2829,20 @@ function startHomeWorkout(){
 let EVIDENCE = { studies:{}, advice:[], categories:[] };
 let TIPS = [];        // start-page random tips, derived from EVIDENCE.advice (injury-care items excluded — they're contextual)
 let TIP_DOI = {};     // tip id → study URL
+let SRC_DOI = {};     // study key → study URL  (powers the muscle-balance / progress-insight / injury source links)
+let PROG_SRC = {};    // study key → citation HTML (same surfaces)
 async function loadEvidence(){
   try{ const r = await fetch("evidence.json"); if(r.ok) EVIDENCE = await r.json(); }   // SW is network-first, so this stays fresh online and works offline
-  catch(e){ /* offline before precache, or fetch error → tips & library degrade gracefully */ }
+  catch(e){ /* offline before precache, or fetch error → tips, library & source links degrade gracefully */ }
   buildTips();
 }
 function studyUrl(k){ const s=EVIDENCE.studies[k]; if(!s) return null; return s.doi ? "https://doi.org/"+s.doi : (s.url||null); }
+// full citation HTML for a source list, e.g. "Authors (year). Title. <i>Journal</i>. — why we use it"
+function citeHTML(k){ const s=EVIDENCE.studies[k]; if(!s) return "";
+  const t = esc(s.title||"");
+  let h = esc(s.authors||"") + " (" + (s.year||"") + "). " + t + (/[?!.]$/.test(t)?" ":". ") + "<i>" + esc(s.journal||"") + "</i>.";
+  if(s.note) h += ' <span>— ' + esc(s.note) + '</span>';
+  return h; }
 // short citation label, e.g. "Schoenfeld et al. 2017", from a study record
 function shortCite(k){ const s=EVIDENCE.studies[k]; if(!s) return "";
   let first=(s.authors||"").split(/,| & /)[0].replace(/\s+[A-Z][A-Za-z]?(?:\s+[A-Z][A-Za-z]?)*$/,"").trim();
@@ -2842,7 +2850,10 @@ function shortCite(k){ const s=EVIDENCE.studies[k]; if(!s) return "";
   const multi=/,|&|et al/i.test(s.authors||"");
   return (first + (multi?" et al. ":" ") + (s.year||"")).trim(); }
 function buildTips(){
-  TIPS=[]; TIP_DOI={};
+  TIPS=[]; TIP_DOI={}; SRC_DOI={}; PROG_SRC={};
+  // source links + citations for the muscle-balance, progress-insight and injury surfaces (keyed by study)
+  Object.keys(EVIDENCE.studies||{}).forEach(k=>{ SRC_DOI[k]=studyUrl(k); PROG_SRC[k]=citeHTML(k); });
+  // start-page random tips, derived from the advice list
   (EVIDENCE.advice||[]).forEach(a=>{
     const aud=a.audience||["all"];
     if(aud.some(x=>String(x).indexOf("injury:")===0)) return;        // injury-care advice is shown in context, not as a random tip
@@ -2852,30 +2863,6 @@ function buildTips(){
     TIP_DOI[a.id]=studyUrl(a.study);
   });
 }
-// Canonical study links (DOI-resolver where one exists), all verified to resolve. Keyed to PROG_SRC keys so the
-// Muscle-balance "sources" list can become clickable; see EVIDENCE.md for the full ledger.
-const SRC_DOI={
-  sch17:"https://doi.org/10.1080/02640414.2016.1210197",
-  sch16:"https://doi.org/10.1007/s40279-016-0543-8",
-  sch10:"https://doi.org/10.1519/JSC.0b013e3181e840f3",
-  drr:"https://doi.org/10.51224/SRXIV.460",
-  vigotsky:"https://doi.org/10.1007/s40279-021-01619-2",
-  rpvol:"https://rpstrength.com/blogs/articles/training-volume-landmarks-muscle-growth",
-  mps:"https://doi.org/10.1152/ajpendo.1997.273.1.E99",
-  bickel:"https://doi.org/10.1249/MSS.0b013e318207c15d",
-  mujika:"https://doi.org/10.2165/00007256-200030020-00002",
-  plotkin:"https://doi.org/10.7717/peerj.14142",
-  garthe:"https://doi.org/10.1080/17461391.2011.643923",
-  slater:"https://doi.org/10.3389/fnut.2019.00131",
-  morton:"https://doi.org/10.1136/bjsports-2017-097608",
-  helms:"https://doi.org/10.1186/1550-2783-11-20",
-  // injury self-management guidelines (Part C in EVIDENCE.md) — all verified to resolve
-  injAnkle:"https://doi.org/10.1136/bjsports-2017-098106",
-  injKnee:"https://doi.org/10.1136/bjsports-2018-099397",
-  injBack:"https://doi.org/10.1016/S0140-6736(18)30489-6",
-  injShoulder:"https://doi.org/10.1016/S0140-6736(21)00846-1",
-  injElbow:"https://doi.org/10.2519/jospt.2015.5841"
-};
 // one citation <li>, linked to its study where we have a URL
 function srcLi(k){ const u=SRC_DOI[k];
   return u ? '<li><a class="srclink" href="'+u+'" target="_blank" rel="noopener">'+PROG_SRC[k]+' <span class="srcarrow">↗</span></a></li>'
@@ -4988,28 +4975,6 @@ function celebrateAch(ids){ if(!ids||!ids.length) return; const a=ACHIEVEMENTS.f
   celebrate(); toast("Achievement unlocked  "+a.icon+"  "+a.t+(ids.length>1?"  +"+(ids.length-1)+" more":""), true); }
 
 // ================= progress diagnostic (nutrition vs training) =================
-const PROG_SRC={
- garthe:"Garthe I, et al. (2013). Effect of nutritional intervention on body composition and performance in elite athletes. <i>European Journal of Sport Science</i>, 13(3), 295–303.",
- slater:"Slater GJ, et al. (2019). Is an energy surplus required to maximize skeletal muscle hypertrophy associated with resistance training? <i>Frontiers in Nutrition</i>, 6:131.",
- morton:"Morton RW, et al. (2018). A systematic review, meta-analysis and meta-regression of protein supplementation on resistance-trained muscle mass and strength. <i>British Journal of Sports Medicine</i>, 52(6).",
- helms:"Helms ER, et al. (2014). Evidence-based recommendations for natural bodybuilding contest preparation: nutrition and supplementation. <i>J. International Society of Sports Nutrition</i>, 11:20.",
- sch17:"Schoenfeld BJ, et al. (2017). Dose-response relationship between weekly resistance training volume and muscle hypertrophy. <i>Journal of Sports Sciences</i>, 35(11).",
- sch16:"Schoenfeld BJ, et al. (2016). Effects of resistance training frequency on muscle hypertrophy: a meta-analysis. <i>Sports Medicine</i>, 46(11).",
- drr:"Pelland JC, Remmert JF, Robinson ZP, Hinson SR, Zourdos MC (2024). The resistance training dose-response: meta-regressions exploring the effects of weekly volume and frequency on muscle hypertrophy and strength gain. <i>SportRxiv</i>. doi:10.51224/SRXIV.460. <span>— Counting indirect (secondary) muscle sets as 0.5 best explained hypertrophy, which is how this app weighs assistance work.</span>",
- vigotsky:"Vigotsky AD, Trajano GS, Vieira TM (2022). Longing for a longitudinal proxy: acutely measured surface EMG amplitude is not a validated predictor of muscle hypertrophy. <i>Sports Medicine</i>, 52, 193–199. <span>— Why this app weighs whole sets, not per-exercise EMG “activation”.</span>",
- rpvol:"Israetel M, et al. — Renaissance Periodization. Training volume landmarks for muscle growth (MEV / MAV / MRV). <span>— Basis for the ~"+10+"-set weekly target ring.</span>",
- mps:"Phillips SM, et al. (1997). Mixed muscle protein synthesis and breakdown after resistance exercise in humans. <i>Am. J. Physiology</i>, 273(1). <span>— Muscle-building signalling is elevated ~24–48 h per session, the basis for tracking volume by the week.</span>",
- bickel:"Bickel CS, Cross JM, Bamman MM (2011). Exercise dosing to retain resistance training adaptations in young and older adults. <i>Medicine &amp; Science in Sports &amp; Exercise</i>, 43(7), 1177–1187. doi:10.1249/MSS.0b013e318207c15d. <span>— After a build phase, muscle size was maintained on as little as ~1/3 (older) to ~1/9 (young) of the volume that built it — the basis for the maintenance-volume floor below which a muscle reads as “holding”, not growing.</span>",
- mujika:"Mujika I, Padilla S (2000). Detraining: loss of training-induced physiological and performance adaptations. Part I — short-term insufficient training stimulus. <i>Sports Medicine</i>, 30(2), 79–87. <span>— With too little stimulus, muscle fibres atrophy and strength declines within weeks — the basis for the “shrinking” state when weekly volume drops below maintenance.</span>",
- sch10:"Schoenfeld BJ (2010). The mechanisms of muscle hypertrophy and their application to resistance training. <i>Journal of Strength &amp; Conditioning Research</i>, 24(10), 2857–2872. <span>— Progressive tension overload is a primary driver of growth — why “growing” needs a rising trend, not just an adequate dose held flat.</span>",
- plotkin:"Plotkin D, et al. (2022). Progressive overload without progressing load? The effects of load or repetition progression on muscular adaptations. <i>PeerJ</i>, 10:e14142. doi:10.7717/peerj.14142. <span>— Overload via added reps or added load drove similar growth — why the trend tracks total volume (load×reps×sets), not load alone.</span>",
- // injury self-management (Part C) — the advice shown when you flag a niggle
- injAnkle:"Vuurberg G, et al. (2018). Diagnosis, treatment and prevention of ankle sprains: update of an evidence-based clinical guideline. <i>British Journal of Sports Medicine</i>, 52(15).",
- injKnee:"Collins NJ, et al. (2018). 2018 Consensus statement on exercise therapy and physical interventions to treat patellofemoral pain. <i>British Journal of Sports Medicine</i>, 52(18).",
- injBack:"Foster NE, et al. (2018). Prevention and treatment of low back pain: evidence, challenges, and promising directions. <i>The Lancet</i>, 391(10137).",
- injShoulder:"Hopewell S, et al. (2021). Progressive exercise vs best-practice advice, with or without corticosteroid injection, for rotator cuff disorders (GRASP): a randomised controlled trial. <i>The Lancet</i>, 398(10298).",
- injElbow:"Coombes BK, Bisset L, Vicenzino B (2015). Management of lateral elbow tendinopathy: one size does not fit all. <i>Journal of Orthopaedic &amp; Sports Physical Therapy</i>, 45(11)."
-};
 function bwSlopePctWk(days){
   const cut=Date.now()-days*86400000;
   const pts=(bw||[]).filter(p=>p.d>=cut).slice().sort((a,b)=>a.d-b.d);
