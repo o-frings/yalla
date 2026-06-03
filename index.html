@@ -68,7 +68,7 @@
     font-family:-apple-system,"SF Pro Text","SF Pro Display","Helvetica Neue",system-ui,sans-serif;
     font-variant-numeric:tabular-nums; }
   html{ background:var(--bg); transition:background .25s ease; }
- body{ max-width:540px; margin:0 auto; padding:0 16px calc(80px + env(safe-area-inset-bottom)); min-height:100vh; min-height:100dvh; }
+ body{ max-width:540px; margin:0 auto; padding:0 16px calc(80px + env(safe-area-inset-bottom)); min-height:100vh; }
   body::before{ content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
     background:
       radial-gradient(140% 60% at 50% 42%, var(--accent-soft) 0%, transparent 68%),
@@ -157,11 +157,14 @@
   .page.active{ display:block; animation:pagein .26s ease; }
   @keyframes pagein{ from{ opacity:0; transform:translateY(5px); } to{ opacity:1; transform:none; } }
   /* horizontal pager: three panels side-by-side that follow the finger, each scrolling vertically on its own */
-  /* Fixed app shell. Height is driven by --appH (= physical screen height, set in JS). iOS standalone
-     mis-measures dvh/vh AND innerHeight short on a cold launch (the ~62px blank strip = screen.height −
-     innerHeight, confirmed by on-device diagnostics); screen.height is correct in both states. 100vh/dvh
-     are pre-JS fallbacks. */
-  #shell{ position:fixed; top:0; left:0; right:0; height:100vh; height:100dvh; height:var(--appH, 100dvh); max-width:540px; margin:0 auto; overflow:hidden; z-index:1; }
+  /* Fixed app shell, full window height. USE 100vh — NOT 100dvh and NOT a JS innerHeight override.
+     The iOS standalone cold-launch "blank strip" bug: the DYNAMIC viewport (100dvh, window.innerHeight,
+     visualViewport) is not initialized until a geometry change (device rotation), so on a cold launch it
+     reports ~62px short and the shell ends above the screen bottom. 100vh is the STATIC large viewport and
+     is correct from cold start; in standalone there's no browser toolbar, so 100vh == the real window height
+     in both states. (We previously cascaded 100vh → 100dvh → var(--appH), which meant the broken dynamic
+     values always won and 100vh never actually applied — that was the bug. See memory yalla-ios-bottom-blank-space.) */
+  #shell{ position:fixed; top:0; left:0; right:0; height:100vh; max-width:540px; margin:0 auto; overflow:hidden; z-index:1; }
   #pager{ position:absolute; inset:0; overflow:hidden; }
   #track{ display:flex; height:100%; }
   #track.anim{ transition:transform .3s cubic-bezier(.22,.61,.36,1); }
@@ -173,8 +176,8 @@
   /* Tab bar anchored to the SHELL bottom (position:absolute inside #shell), not the fixed viewport.
      Why: a position:fixed bottom:0 element lives in iOS's SMALL/layout viewport, whose bottom sits ABOVE
      the physical screen edge — so a fixed bar can never reach into the home-indicator zone, leaving the
-     bare "blank space" below it (and JS can't even measure it). #shell is height:100dvh, which DOES reach
-     the physical bottom, so an absolute bar at its bottom touches the real edge. Translucent like the top,
+     bare "blank space" below it (and JS can't even measure it). #shell is height:100vh, which DOES reach
+     the physical bottom from cold start, so an absolute bar at its bottom touches the real edge. Translucent like the top,
      overlaying the pager so content scrolls under it. */
   .tabbar{ position:absolute; left:0; right:0; bottom:0; z-index:50; display:flex; align-items:center;
     /* ~56px content row (12 + 32px icon + 12, centered) + the home-indicator safe area reserved BELOW it
@@ -554,7 +557,7 @@
   .scrim.show{ opacity:1; pointer-events:auto; }
   .sheet{ position:fixed; left:0; right:0; bottom:0; max-width:540px; margin:0 auto; z-index:100;
     background:var(--sheetbg); border-radius:22px 22px 0 0; transform:translateY(102%);
-    transition:transform .34s cubic-bezier(.2,.8,.2,1); max-height:92vh; max-height:92dvh; display:flex; flex-direction:column; }
+    transition:transform .34s cubic-bezier(.2,.8,.2,1); max-height:92vh; display:flex; flex-direction:column; }
   .sheet.show{ transform:translateY(0); box-shadow:0 -1px 0 var(--hi), 0 -20px 50px -20px rgba(0,0,0,.4); }
   .sheet{ overflow:hidden; }
   .grabber{ width:36px; height:5px; background:var(--grabber); border-radius:3px; margin:8px auto 2px; flex:0 0 auto; }
@@ -3292,10 +3295,10 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
   shell.appendChild(pager);
   pages.forEach(p=> track.appendChild(p));               // all three pages move into the swipe track, in tab order
   const tabbar=document.querySelector(".tabbar"); if(tabbar) shell.appendChild(tabbar);  // overlay tab bar, painted last
-  // Shell height is pure CSS 100dvh — NO JS height-setting. On the installed iOS PWA, reading
-  // visualViewport.height at launch/resume can return a stale/short value that then sticks as an inline
-  // px height (the "bar floated up, every second relaunch" bug). 100dvh is the dynamic viewport unit
-  // built for exactly this and self-corrects without a JS race, so we let the browser own it.
+  // Shell height is pure CSS 100vh — NO JS height-setting (see the #shell rule). On the installed iOS PWA,
+  // reading visualViewport.height/innerHeight at launch returns a stale/short value (the DYNAMIC viewport
+  // isn't initialized until a geometry change), which is exactly the cold-launch blank-strip bug; 100dvh has
+  // the same flaw. 100vh is the static large viewport, correct from cold start in standalone, so we let CSS own it.
   const W=()=> pager.clientWidth || window.innerWidth;
   const curTab=()=>{ const a=document.querySelector(".page.active"); return a?a.dataset.tab:"overview"; };
   const clamp=(v,a,b)=> v<a?a:(v>b?b:v);
@@ -4878,30 +4881,11 @@ init();
 // Kick off cloud sync if the SDK is already present (it may also self-trigger via its onload).
 if(window.supabase && window.__cloudInit) window.__cloudInit();
 
-// iOS standalone PWA cold-launch "blank strip" at the bottom — SOLVED by painting, not by resizing.
-// Decisive on-device diagnostics (see memory yalla-ios-bottom-blank-space): on a bugged cold launch the layout
-// viewport is stuck SHORT (innerHeight = visualViewport.height = clientHeight = 894 vs the real screen.height
-// 956) and stays that way for the whole session — it does NOT settle late, and NOTHING in-page recovers 956
-// (viewport-meta re-parse is inert; only a real WebView resize i.e. rotation fixes it). BUT the magenta paint
-// test proved the ROOT CANVAS (<html> background) DOES paint the 894→956 strip. So the fix is purely visual:
-//   1. the strip is filled by the <html> canvas background = var(--bg), and
-//   2. the tab bar is OPAQUE var(--bg) (see .tabbar CSS) so it matches that strip exactly and reads as anchored
-//      to the screen bottom — on both 956 (good) and 894 (bugged) launches, identically.
-// (A v29 attempt to FORCE a full-canvas repaint by nudging the <html> background made it WORSE — 100% white
-//  strip — almost certainly because the `transition:background .25s ease` on <html> turned the repeated nudges
-//  into constant churn so the strip never settled. Reverted. The strip paint is left to the static canvas bg.)
-(function(){
-  let maxH=0, orient="";
-  function apply(){
-    const o = window.matchMedia("(orientation: portrait)").matches ? "p" : "l";
-    if(o!==orient){ orient=o; maxH=0; }
-    const h=window.innerHeight;
-    if(h>maxH){ maxH=h; document.documentElement.style.setProperty("--appH", maxH+"px"); }
-  }
-  apply();
-  ["resize","orientationchange","pageshow","load"].forEach(e=> window.addEventListener(e, ()=> setTimeout(apply, 0)));
-  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) setTimeout(apply, 0); });
-})();
+// iOS standalone PWA cold-launch "blank strip" — fixed in CSS by using 100vh for #shell (see its rule).
+// No JS height management: the old --appH override drove the shell from window.innerHeight, which is the
+// DYNAMIC viewport and reports ~62px short on a cold launch (not initialized until a geometry change), so it
+// REINTRODUCED the very bug it tried to fix. 100vh is the static large viewport and is correct from cold
+// start in standalone mode. Removing the JS lets 100vh actually apply.
 
 // Offline support: register the service worker when served over HTTPS (e.g. GitHub Pages).
 // Skipped silently on file:// so opening the raw file still works.
