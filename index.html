@@ -69,7 +69,7 @@
     font-variant-numeric:tabular-nums; }
   html{ background:var(--bg); transition:background .25s ease; }
  body{ max-width:540px; margin:0 auto; padding:0 16px calc(80px + env(safe-area-inset-bottom)); min-height:100vh; min-height:100dvh; }
-  body::before{ content:""; position:fixed; top:0; left:0; right:0; height:var(--appH, 100dvh); z-index:-1; pointer-events:none;
+  body::before{ content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
     background:
       radial-gradient(140% 60% at 50% 42%, var(--accent-soft) 0%, transparent 68%),
       var(--bg);
@@ -4881,18 +4881,18 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // than the screen, so it can't push the bar off-bottom) and re-read it after the cold-launch settle, when
 // iOS reports the corrected value. dvh/vh stay as the pre-JS fallback.
 (function(){
-  // Drive the shell height from the PHYSICAL SCREEN size, not innerHeight. On-device diagnostics proved
-  // screen.height is correct in BOTH states (956 on cold launch AND after rotate), while innerHeight is
-  // the liar — it reports 956 after rotation but only 894 on a cold launch, which is exactly the ~62px
-  // blank strip (screen.height − innerHeight). Orientation-aware: portrait uses the long screen edge.
-  function appH(){
-    const w=(window.screen&&screen.width)||0, h=(window.screen&&screen.height)||0;
-    const hi=Math.max(w,h), lo=Math.min(w,h);
-    const portrait = window.matchMedia("(orientation: portrait)").matches;
-    const v = portrait ? hi : lo;
-    return v>0 ? v : window.innerHeight;     // fall back only if screen dims are unavailable
+  // --appH from innerHeight (grows-only per orientation). NOTE: this leaves the ~62px cold-launch blank
+  // strip unsolved on the iOS PWA (innerHeight reports 894 vs the real 956), but it keeps the tab bar
+  // ON-SCREEN — which using screen.height (956) does NOT, because the 894→956 zone is outside the
+  // addressable viewport and any element positioned into it goes off-screen. Proper fix = force a
+  // layout-viewport recompute (what rotation does); deferred to a fresh investigation.
+  let maxH=0, orient="";
+  function apply(){
+    const o = window.matchMedia("(orientation: portrait)").matches ? "p" : "l";
+    if(o!==orient){ orient=o; maxH=0; }
+    const h=window.innerHeight;
+    if(h>maxH){ maxH=h; document.documentElement.style.setProperty("--appH", maxH+"px"); }
   }
-  function apply(){ document.documentElement.style.setProperty("--appH", appH()+"px"); }
   apply();
   ["resize","orientationchange","pageshow","load"].forEach(e=> window.addEventListener(e, ()=> setTimeout(apply, 0)));
   document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) setTimeout(apply, 0); });
