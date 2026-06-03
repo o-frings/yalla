@@ -2721,7 +2721,25 @@ const TIPS=[
   {id:"cut",          src:"Helms et al. 2014",         goals:["fatloss"], t:"Cutting? Keep protein high and keep lifting heavy — that's what tells your body to hold onto muscle while the fat comes off."},
   {id:"cutprotein",   src:"Helms et al. 2014",         goals:["fatloss"], t:"On a cut, protein needs go up, not down — aim toward the higher end (~2 g/kg) to protect muscle in a deficit."},
   {id:"lossrate",     src:"Helms et al. 2014",         goals:["fatloss"], t:"Losing fat? Keep it to about 0.5–1% of bodyweight a week — faster tends to drag your strength and muscle down with it."},
-  {id:"nocrash",      src:"Helms et al. 2014",         goals:["fatloss"], t:"Crash diets backfire — a moderate deficit you can actually sustain keeps more muscle and strength than slashing calories."}
+  {id:"nocrash",      src:"Helms et al. 2014",         goals:["fatloss"], t:"Crash diets backfire — a moderate deficit you can actually sustain keeps more muscle and strength than slashing calories."},
+  // ---- general health & longevity (apply to anyone; all observational — phrased as "linked to", see EVIDENCE.md) ----
+  {id:"steps10k",     src:"Paluch et al. 2022",        cat:"health", t:"“10,000 steps” began as a 1960s marketing slogan, not science — in the data, most of the lower-mortality benefit shows up by around 7,000–8,000 steps a day."},
+  {id:"weekendwarrior",src:"O'Donovan et al. 2017",    cat:"health", t:"Short on time midweek? People who pack their exercise into just 1–2 days show much the same lower death risk as those who spread it out — the weekly total is what's linked to the benefit."},
+  {id:"vilpa",        src:"Stamatakis et al. 2022",    cat:"health", t:"Even with no formal workouts, three or four 1-minute bursts of huffing and puffing a day — stairs, a hard walk uphill — are linked to markedly lower mortality."},
+  {id:"rtdose",       src:"Momma et al. 2022",         cat:"health", t:"Just 30–60 minutes of strength training a week is associated with the biggest drop in early-death risk — and piling on much more adds little for longevity."},
+  {id:"vo2nolimit",   src:"Mandsager et al. 2018",     cat:"health", t:"There seems to be no “fit enough”: across 122,000 people, higher cardio fitness kept tracking with lower death risk — and being unfit carried risk on par with smoking."},
+  {id:"sitbreaks",    src:"Diaz et al. 2017",          cat:"health", t:"It's not just how long you sit, but how you sit — standing up to move for a couple of minutes every half hour is linked to lower risk, and steadier blood sugar."},
+  {id:"grip",         src:"Leong et al. 2015 (PURE)",  cat:"health", t:"Grip strength tracks with lifespan better than blood pressure does — not because squeezing helps, but because it mirrors your whole-body strength and health."},
+  {id:"sitrise",      src:"Brito et al. 2012",         cat:"health", t:"A quick self-check: can you lower to the floor and stand back up without using your hands? People who manage it easily in midlife tend to outlive those who can't."},
+  {id:"sauna",        src:"Laukkanen et al. 2015",     cat:"health", t:"In one long Finnish study, frequent sauna use (4–7×/week) was linked to roughly half the heart-disease death risk of once a week — heat may gently stress the heart a little like exercise."},
+  {id:"hydration",    src:"Dmitrieva et al. 2023",     cat:"health", t:"Staying well-hydrated may help you age more slowly: over 30 years, adults whose blood sodium sat at the high end of normal showed faster aging and earlier illness."},
+  {id:"fiber",        src:"Reynolds et al. 2019",      cat:"health", t:"Everyone chases protein and forgets fiber — yet getting 25–30 g a day is one of the most consistent dietary links to a longer, healthier life."},
+  {id:"coffee",       src:"Poole et al. 2017",         cat:"health", t:"Good news for coffee drinkers: 3–4 cups a day is linked to lower overall and heart-disease death risk — for most people it's more likely to help than harm."},
+  {id:"sleepreg",     src:"Windred et al. 2024",       cat:"health", t:"A consistent sleep schedule may matter more than how long you sleep — steady bed and wake times predicted lower death risk better than sleep duration did."},
+  {id:"social",       src:"Holt-Lunstad et al. 2010",  cat:"health", t:"Weak social ties carry a mortality risk on the scale of smoking 15 cigarettes a day — so a regular catch-up with friends counts as real health behaviour."},
+  {id:"optimism",     src:"Lee et al. 2019",           cat:"health", t:"Optimists tend to live 11–15% longer and are far likelier to reach 85 — and outlook is something you can practise and shift."},
+  {id:"purpose",      src:"Alimujiang et al. 2019",    cat:"health", t:"Having a clear sense of purpose — a reason to get up in the morning — is linked to lower mortality, regardless of wealth or health."},
+  {id:"reading",      src:"Bavishi et al. 2016",       cat:"health", t:"Book readers tend to live longer: around 30 minutes a day was linked to a 23% lower death risk over 12 years — and only books showed it, not newspapers."}
 ];
 // Decided once per app launch (in init), so it doesn't reshuffle as you switch tabs. Roughly every 3rd open we
 // surface a tip; which tip is drawn stochastically from the goal-relevant pool, weighted by how long since it
@@ -2802,12 +2820,14 @@ function renderOverview(){
     h+='<div class="discwrap" id="discWrap">'+dt.map(d=>'<div class="group ovnudge disccard"><div class="pad"><button class="discx" data-tip="'+d.id+'" aria-label="Dismiss">✕</button><div class="ovbig" style="font-size:18px; padding-right:20px;">'+esc(d.t)+'</div><p class="ovp" style="margin-top:8px;">'+esc(d.s)+'</p>'+(d.act?'<button class="btn wide ovdisc" data-act="'+d.act+'" data-tip="'+d.id+'" style="margin-top:16px;">'+esc(d.btn)+'</button>':'')+'</div></div>').join('')+'</div>';
     if(dt.length>1) h+='<div class="discdots" id="discDots">'+dt.map((_,i)=>'<span class="discdot'+(i===0?' on':'')+'"></span>').join('')+'</div>';
   }
-  // --- Coach tip --- an occasional research-backed pointer (shown ~every 3rd open; see decideTip)
+  // --- Coach tip --- an occasional research-backed pointer (shown ~every 3rd open; see decideTip).
+  // Health tips are observational, so they're flagged "Linked in research"; training tips "Backed by research".
   if(currentTip){
-    h+='<div class="ed-label">Coach tip</div>';
-    h+='<div class="group"><div class="pad"><div class="ovbig" style="font-size:18px;">💡 Did you know?</div>'
+    const isHealth = currentTip.cat==="health";
+    h+='<div class="ed-label">'+(isHealth?'Health note':'Coach tip')+'</div>';
+    h+='<div class="group"><div class="pad"><div class="ovbig" style="font-size:18px;">'+(isHealth?'🌱':'💡')+' Did you know?</div>'
       +'<p class="ovp" style="margin-top:8px;">'+esc(currentTip.t)+'</p>'
-      +'<div class="tipsrc">Backed by research — '+esc(currentTip.src)+'</div></div></div>';
+      +'<div class="tipsrc">'+(isHealth?'Linked in research — ':'Backed by research — ')+esc(currentTip.src)+'</div></div></div>';
   }
   // --- Needs attention --- ordered by urgency (severity first); maps to your objective
   const obj=planObjective(activePlan()), todo=[], under=ovUnderMuscles();
