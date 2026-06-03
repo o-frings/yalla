@@ -4875,17 +4875,20 @@ init();
 // Kick off cloud sync if the SDK is already present (it may also self-trigger via its onload).
 if(window.supabase && window.__cloudInit) window.__cloudInit();
 
-// iOS standalone PWA mis-computes 100dvh on a COLD LAUNCH — the shell ends short of the screen, leaving
-// "blank space" at the bottom on every screen (incl. sheets). A re-layout corrects it (why rotating and
-// back clears it). Drive the shell height from window.innerHeight (the VISIBLE viewport — never taller
-// than the screen, so it can't push the bar off-bottom) and re-read it after the cold-launch settle, when
-// iOS reports the corrected value. dvh/vh stay as the pre-JS fallback.
+// iOS standalone PWA mis-computes 100dvh on a COLD LAUNCH — the shell ends short of the screen, leaving a
+// ~62px "blank strip" at the bottom on every screen (incl. sheets). On-device data: innerHeight reports 894
+// while screen.height is the true 956; the 894→956 zone is OUTSIDE the addressable layout viewport, so no
+// positioned/fixed/background element can paint into it. Only a layout-viewport RECOMPUTE clears it — which
+// is exactly what rotating the device and back does (it makes WebKit rebuild the viewport from the WebView's
+// now-settled frame). So we mimic rotation: once the launch frame has settled, force WebKit to RE-PARSE the
+// viewport meta (replace the node, momentary fixed-px width → restore device-width) so it rebuilds the
+// layout viewport against the correct frame. The grows-only --appH below then picks up the corrected
+// innerHeight (956) and the shell reaches the real bottom. dvh/vh stay as the pre-JS fallback.
+// (Two earlier attempts failed and are NOT repeated: the on-LOAD attribute "kick" ran before the frame
+//  settled and only mutated content; `height=device-height` PINNED the viewport so even rotation stopped
+//  recovering it.)
 (function(){
-  // --appH from innerHeight (grows-only per orientation). NOTE: this leaves the ~62px cold-launch blank
-  // strip unsolved on the iOS PWA (innerHeight reports 894 vs the real 956), but it keeps the tab bar
-  // ON-SCREEN — which using screen.height (956) does NOT, because the 894→956 zone is outside the
-  // addressable viewport and any element positioned into it goes off-screen. Proper fix = force a
-  // layout-viewport recompute (what rotation does); deferred to a fresh investigation.
+  const VP = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content";
   let maxH=0, orient="";
   function apply(){
     const o = window.matchMedia("(orientation: portrait)").matches ? "p" : "l";
@@ -4893,9 +4896,29 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
     const h=window.innerHeight;
     if(h>maxH){ maxH=h; document.documentElement.style.setProperty("--appH", maxH+"px"); }
   }
+  // Replace the viewport meta NODE (not just its content) to force a fresh viewport parse: first against a
+  // fixed-px width equal to the current width (no horizontal change, but it forces WebKit to rebuild and
+  // re-read the frame height), then restore device-width. apply() right after captures any corrected height.
+  function recompute(){
+    const m = document.querySelector('meta[name="viewport"]');
+    if(!m) return;
+    const next = document.createElement("meta");
+    next.setAttribute("name", "viewport");
+    next.setAttribute("content", "width=" + window.innerWidth + ", initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content");
+    m.replaceWith(next);
+    void document.documentElement.offsetHeight;   // flush layout against the fixed-px width
+    requestAnimationFrame(function(){
+      next.setAttribute("content", VP);           // restore device-width → second rebuild vs the settled frame
+      apply();
+    });
+  }
   apply();
   ["resize","orientationchange","pageshow","load"].forEach(e=> window.addEventListener(e, ()=> setTimeout(apply, 0)));
   document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) setTimeout(apply, 0); });
+  // Post-settle recompute schedule — fires across the cold-launch frame-settle window, then stops.
+  function schedule(){ [60, 250, 600, 1200, 2000].forEach(t=> setTimeout(recompute, t)); }
+  window.addEventListener("load", schedule);
+  window.addEventListener("pageshow", schedule);
 })();
 
 // Offline support: register the service worker when served over HTTPS (e.g. GitHub Pages).
