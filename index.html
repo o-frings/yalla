@@ -44,6 +44,7 @@
     --hi:rgba(255,255,255,.65);
     --accent-glow:rgba(255,90,40,.40);
     --red:#ff3b30;
+    --okbg:rgba(81,207,102,.13); --oktx:#2b8a3e; --warnbg:rgba(245,159,0,.13); --warntx:#9a6a00;
     --r-lg:22px; --r-md:14px; --r-sm:10px;
   }
   html.dark{
@@ -60,6 +61,7 @@
     --hi:rgba(255,255,255,.055);
     --accent-glow:rgba(255,122,58,.38);
     --red:#ff453a;
+    --okbg:rgba(81,207,102,.16); --oktx:#69db7c; --warnbg:rgba(245,159,0,.18); --warntx:#ffc566;
     --r-lg:22px; --r-md:14px; --r-sm:10px;
   }
   *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; -webkit-font-smoothing:antialiased; -webkit-text-size-adjust:100%; text-size-adjust:100%;}
@@ -483,13 +485,14 @@
   .demo{ font-size:13px; color:var(--accent); text-decoration:none; }
   .demo.prog,.demo.swap{ cursor:pointer; display:inline-flex; align-items:center; padding:8px 4px; margin:-8px 12px -8px -4px; }
   .swapnote{ font-size:12px; color:var(--accent); font-weight:600; padding:0 8px 8px; }
-  .swapnote.warn{ color:#d97706; }
+  .swapnote.warn{ color:var(--warntx); }
   .injbanner{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; background:var(--accent-soft); color:var(--accent); font-size:13px; font-weight:600; line-height:1.35; padding:11px 14px; border-radius:14px; margin:0 0 12px; cursor:pointer; }
   .injbanner b{ font-weight:700; }
   .injbanner .injmanage{ margin-left:auto; font-weight:700; white-space:nowrap; }
   .injrow{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .injrow .injchev{ opacity:.55; font-size:17px; line-height:1; }
-  .injrow.on{ background:var(--accent); color:#fff; }
+  .injrow.ok{ background:var(--okbg); color:var(--oktx); }       /* healthy — subtle green, blends in */
+  .injrow.on{ background:var(--warnbg); color:var(--warntx); }   /* injured — soft amber, signals active limits */
 
   .setrow{ display:flex; align-items:center; gap:12px; padding:16px 20px; border-top:.5px solid var(--sep); }
   .setrow:first-of-type{ border-top:none; }
@@ -821,17 +824,21 @@
     <div class="inlineconfirm" id="focusConfirm"></div>
 
     <div class="ed-label">Niggle or injury <span class="subhint">— temporary; we work around it</span></div>
-    <button class="btn tinted wide injrow" id="injuryRow"><span id="injuryRowTxt">Nothing right now</span><span class="injchev">›</span></button>
+    <button class="btn tinted wide injrow ok" id="injuryRow"><span id="injuryRowTxt">Feeling good — no limits</span><span class="injchev">›</span></button>
 
-    <div class="ed-label">Goal weight</div>
-    <div class="gset">
-      <input id="goalStart" type="number" inputmode="decimal" placeholder="Start">
-      <span style="color:var(--l3)">→</span>
-      <input id="goalTarget" type="number" inputmode="decimal" placeholder="Goal">
-      <button class="btn tinted sm" id="goalSave">Save</button>
-    </div>
+    <!-- Goal weight lives here until it's set, then moves into Settings (see placeGoalBlock) -->
+    <div id="goalHomeMe"><div id="goalBlock">
+      <div class="ed-label">Goal weight</div>
+      <div class="gset">
+        <input id="goalStart" type="number" inputmode="decimal" placeholder="Start">
+        <span style="color:var(--l3)">→</span>
+        <input id="goalTarget" type="number" inputmode="decimal" placeholder="Goal">
+        <button class="btn tinted sm" id="goalSave">Save</button>
+      </div>
+    </div></div>
 
     <div id="setBody">
+    <div id="goalHomeSettings"></div>
     <div class="ed-label">Body</div>
     <div class="merow">
       <label>Name</label>
@@ -1147,6 +1154,13 @@
       <button class="chip" data-v="lowback">Lower back</button><button class="chip" data-v="knees">Knees</button>
       <button class="chip" data-v="shoulders">Shoulders</button><button class="chip" data-v="elbows">Elbows</button>
       <button class="chip" data-v="ankle">Ankle</button>
+    </div>
+    <div id="injurySevWrap" style="display:none;">
+      <div class="ed-label" style="margin-top:18px;">How bad is it? <span class="subhint">— stronger limits as it worsens</span></div>
+      <div class="seg appearance" id="injurySev">
+        <div class="s" data-sev="1">Mild</div><div class="s active" data-sev="2">Moderate</div><div class="s" data-sev="3">Severe</div>
+      </div>
+      <p class="levelcap" style="margin:8px 4px 0;">Mild keeps most lifts; severe even swaps out leg press &amp; hip thrust.</p>
     </div>
     <button class="btn wide" id="injuryClear" style="margin-top:16px;">I've recovered — clear all</button>
   </div>
@@ -2353,7 +2367,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi]||e.n; }
-let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:[] };
+let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:[], injurySeverity:2 };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -3415,12 +3429,23 @@ $("closePlans").onclick=()=>closeSheet("Plans");
 $("scrimPlans").onclick=()=>closeSheet("Plans");
 // move the "set-once" groups (body details, appearance, account, data) off Me into the Settings sheet
 (function(){ const body=$("settingsBody"); if(!body) return; ["setBody","setMisc"].forEach(id=>{ const el=$(id); if(el) body.appendChild(el); }); })();
+// Goal weight: prompt for it on the Me page while unset; once filled it moves into Settings to keep Me uncluttered.
+function placeGoalBlock(){
+  const blk=$("goalBlock"); if(!blk) return;
+  const filled = settings.goalStart!=null && settings.goalTarget!=null;
+  const home = filled ? $("goalHomeSettings") : $("goalHomeMe");
+  if(home && blk.parentElement!==home) home.appendChild(blk);
+  if($("goalStart")) $("goalStart").value = settings.goalStart!=null ? settings.goalStart : "";
+  if($("goalTarget")) $("goalTarget").value = settings.goalTarget!=null ? settings.goalTarget : "";
+}
 $("openSettings").onclick=()=>{ renderDash(); renderAccount(); openSheet("Settings"); };
 $("settingsClose").onclick=()=>closeSheet("Settings");
 $("scrimSettings").onclick=()=>closeSheet("Settings");
 $("goalSave").onclick=async()=>{ const s=parseFloat($("goalStart").value),g=parseFloat($("goalTarget").value);
   if(isNaN(s)||isNaN(g)||g<=s){ toast("Goal must be above start"); return; }
-  settings.goalStart=s; settings.goalTarget=g; await sset("settings",settings); renderDash(); toast("Goal updated"); };
+  const wasOnMe = $("goalBlock") && $("goalBlock").parentElement===$("goalHomeMe");
+  settings.goalStart=s; settings.goalTarget=g; await sset("settings",settings); renderDash(); placeGoalBlock();
+  toast(wasOnMe ? "Goal saved — find it in Settings ⚙" : "Goal updated"); };
 // objective selector (Me) + first-run onboarding
 // --- changes to objective/focus aren't saved until confirmed via an inline prompt right under the control ---
 let _pendFocus=null, _pendObj=null;
@@ -3932,7 +3957,7 @@ function suggestAdd(muscle){
   const key=buildKey(muscle), inPlan=new Set();
   activePlan().workouts.forEach(w=>(w.ex||[]).forEach(e=>inPlan.add(familyKey(e.n))));
   const lvl=activePlan().level, gate = lvl==="beginner"?"beginner":"advanced";
-  return (BUILD_POOL[key]||[]).filter(x=> !injuryBlocks(x,settings.activeInjuries||[]) && suitsExp(x,gate) && !inPlan.has(familyKey(x)))
+  return (BUILD_POOL[key]||[]).filter(x=> !injuryBlocks(x,settings.activeInjuries||[],settings.injurySeverity) && suitsExp(x,gate) && !inPlan.has(familyKey(x)))
     .sort((a,b)=>suggestRank(b)-suggestRank(a)).slice(0,3);
 }
 function suggestRemove(muscle){
@@ -4302,22 +4327,28 @@ document.querySelectorAll("#swapLevelSeg .s").forEach(s=> s.onclick=()=>{ equipL
 // A reversible overlay: while an injury is active, renderWorkout substitutes risky moves for safe
 // same-muscle work at render time. The stored plan is never touched — clearing restores it as-is.
 const INJ_LABEL={ lowback:"lower back", knees:"knees", shoulders:"shoulders", elbows:"elbows", ankle:"ankle" };
+const SEV_LABEL={ 1:"mild", 2:"moderate", 3:"severe" };
 function activeInjuries(){ return settings.activeInjuries||[]; }
-// which active injury (if any) rules this exercise out
-function blockingInjury(name){ return activeInjuries().find(k=> injuryBlocks(name,[k])) || null; }
+function injSeverity(){ return Math.max(1,Math.min(3, settings.injurySeverity||2)); }
+// which active injury (if any) rules this exercise out, at the current severity
+function blockingInjury(name){ return activeInjuries().find(k=> injuryBlocks(name,[k],injSeverity())) || null; }
 // best safe same-muscle replacement for a blocked move, preferring one that fits its training environment
 function injurySub(e){
-  const inj=activeInjuries(); if(!inj.length || !injuryBlocks(e.n,inj)) return null;
-  const lvl=exLevel(e.n), opts=swapOptions(e).filter(o=> o!==e.n && !injuryBlocks(o,inj));
+  const inj=activeInjuries(), sev=injSeverity(); if(!inj.length || !injuryBlocks(e.n,inj,sev)) return null;
+  const lvl=exLevel(e.n), opts=swapOptions(e).filter(o=> o!==e.n && !injuryBlocks(o,inj,sev));
   return opts.find(o=> allowsAt(o,lvl)) || opts[0] || null;   // same environment first, else any safe move
 }
 function renderInjuryRow(){
   const el=$("injuryRowTxt"); if(!el) return; const inj=activeInjuries();
-  el.textContent = inj.length ? listWords(inj.map(k=>INJ_LABEL[k]||k)) : "Nothing right now";
-  const row=$("injuryRow"); if(row) row.classList.toggle("on", inj.length>0);
+  el.textContent = inj.length ? listWords(inj.map(k=>INJ_LABEL[k]||k))+" · "+SEV_LABEL[injSeverity()] : "Feeling good — no limits";
+  const row=$("injuryRow"); if(row){ row.classList.toggle("on", inj.length>0); row.classList.toggle("ok", inj.length===0); }
 }
+function renderInjurySev(){ const sev=injSeverity();
+  document.querySelectorAll("#injurySev .s").forEach(s=> s.classList.toggle("active", +s.dataset.sev===sev)); }
 function renderInjuryChips(){ const inj=activeInjuries();
-  document.querySelectorAll("#injuryChips .chip").forEach(c=> c.classList.toggle("on", inj.indexOf(c.dataset.v)>=0)); }
+  document.querySelectorAll("#injuryChips .chip").forEach(c=> c.classList.toggle("on", inj.indexOf(c.dataset.v)>=0));
+  const sev=$("injurySevWrap"); if(sev) sev.style.display = inj.length ? "" : "none";   // severity only matters once something's flagged
+  renderInjurySev(); }
 // the persistent "you're injured" banner on the Workout page, with a live count of adjusted moves
 function renderInjuryBanner(){
   const b=$("injBanner"); if(!b) return; const inj=activeInjuries();
@@ -4345,6 +4376,8 @@ document.querySelectorAll("#injuryChips .chip").forEach(c=> c.onclick=()=>{
   if(i>=0) inj.splice(i,1); else inj.push(v);
   setActiveInjuries(inj);
 });
+document.querySelectorAll("#injurySev .s").forEach(s=> s.onclick=()=>{
+  settings.injurySeverity=+s.dataset.sev; renderInjurySev(); setActiveInjuries(activeInjuries()); });   // re-apply overlay at the new severity
 $("injuryClear").onclick=()=>{ if(!activeInjuries().length){ closeSheet("Injury"); return; }
   setActiveInjuries([]); closeSheet("Injury"); toast("Cleared — back to your full plan"); };
 
@@ -4627,7 +4660,7 @@ async function setObjective(o){
 }
 function renderObjective(){ document.querySelectorAll("#objChips .chip").forEach(c=>{ c.classList.toggle("on", c.dataset.v===settings.objective); c.classList.remove("pending"); });
   const fa=settings.focusAreas||["balanced"]; document.querySelectorAll("#focusChips .chip").forEach(c=>{ c.classList.toggle("on", fa.indexOf(c.dataset.v)>=0); c.classList.remove("pending"); });
-  renderInjuryRow(); renderInjuryChips(); }
+  renderInjuryRow(); renderInjuryChips(); placeGoalBlock(); }
 // training focus — pending until confirmed; up to two, Balanced + an area = a light lean
 document.querySelectorAll("#focusChips .chip").forEach(c=> c.onclick=()=>{
   let sel=(_pendFocus||settings.focusAreas||[]).slice();
@@ -4732,16 +4765,33 @@ function emphasisPreset(focus){
   else if(focus==="posture"){ e["Rear Delts"]=1; e.Back=0.85; e.Core=0.65; e["Side Delts"]=0.55; e.Glutes=0.55; set(["Chest","Front Delts","Biceps","Triceps","Quads","Hamstrings","Calves"],0.42); }
   return e;
 }
-function injuryBlocks(name, injuries){
-  if(!injuries||!injuries.length) return false; const n=name.toLowerCase();
-  if(injuries.includes("lowback") && /deadlift|good morning|bent-over row|barbell row|back squat|front squat|romanian|t-bar/.test(n)) return true;
-  if(injuries.includes("knees") && /lunge|bulgarian|step-up|sissy|pistol|leg extension/.test(n)) return true;
-  if(injuries.includes("shoulders") && /overhead press|behind|upright row|\bdip\b|arnold/.test(n)) return true;
-  if(injuries.includes("elbows") && /skull|close-grip|\bdip\b/.test(n)) return true;
-  // sprained ankle: avoid loaded plantarflexion, single-leg balance & deep loaded dorsiflexion.
-  // worded so "seated calf raise" survives as the safe Calves sub (standing / single-leg / leg-press calf are out).
-  if(injuries.includes("ankle") && /standing calf|single-leg calf|leg-press calf|\blunge\b|bulgarian|split squat|step-up|pistol|sissy|\bjump|box squat|back squat|front squat|goblet squat|hack squat|overhead squat/.test(n)) return true;
-  return false;
+// Contraindicated movements per injury, tiered by severity (1 mild → 3 severe). Tiers are cumulative:
+// a move is out if it matches any tier from 1 up to the active severity. Higher severity = stronger limits —
+// e.g. a moderate ankle keeps leg press & hip thrust, but a severe (painful) one rules them out too.
+const INJURY_TIERS={
+  lowback:[ /deadlift|good morning|bent-over row|barbell row|t-bar|clean|snatch/,
+            /back squat|front squat|romanian|\brdl\b|hip hinge|overhead press|push press/,
+            /\bsquat\b|\brow\b|hip thrust|leg press|standing.*press|good morning|sit-up/ ],
+  knees:[   /sissy|pistol|\bjump\b|plyo|\bhop\b/,
+            /\blunge\b|bulgarian|step-up|hack squat|leg extension/,
+            /\bsquat\b|leg press|\blunge\b|leg curl|step-up|wall sit/ ],
+  shoulders:[ /overhead press|behind|upright row|arnold|push press|snatch|pike/,
+              /\bdip\b|incline.*(press|bench)|lateral raise|shoulder press/,
+              /bench|push-?up|\bfly\b|pulldown|pull-?up|\bpress\b|raise|\brow\b/ ],
+  elbows:[  /skull|close-grip|\bdip\b|overhead.*extension|kickback/,
+            /pushdown|triceps|\bcurl\b|chin-?up/,
+            /bench|\bpress\b|push-?up|\bcurl\b|\brow\b|pull-?up|pulldown/ ],
+  // ankle sprain: T1 balance/impact, T2 standing-loaded + all squats/lunges, T3 even foot-supported load (leg press, hip thrust, all calf & hinges)
+  ankle:[   /pistol|sissy|\bjump\b|plyo|\bhop\b|skater|single-leg calf/,
+            /standing calf|leg-press calf|\blunge\b|bulgarian|split squat|step-up|back squat|front squat|goblet squat|hack squat|overhead squat|box squat|wall sit/,
+            /seated calf|calf raise|leg press|hip thrust|glute bridge|\bbridge\b|pull-through|deadlift|romanian|\brdl\b|good morning|\bsquat\b|\blunge\b/ ]
+};
+// severity defaults to 2 (moderate) for build-time "areas to protect"; active injuries pass settings.injurySeverity
+function injuryBlocks(name, injuries, severity){
+  if(!injuries||!injuries.length) return false;
+  const n=name.toLowerCase(), sev=Math.max(1,Math.min(3, severity||2));
+  return injuries.some(k=>{ const tiers=INJURY_TIERS[k]; if(!tiers) return false;
+    for(let i=0;i<sev && i<tiers.length;i++) if(tiers[i].test(n)) return true; return false; });
 }
 const FOCUS_LABEL={ balanced:"balanced", upper:"upper body", lower:"lower body", glutes:"glutes & legs", arms:"arms", shoulders:"shoulders", chest:"chest", back:"back", posture:"posture" };
 function focusGroups(focus){ return ({ upper:["chest","back","shoulders"], lower:["quads","hamstrings","glutes"],
