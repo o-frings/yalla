@@ -170,20 +170,18 @@
   /* hide the scrollbar (still scrollable) */
   #pager .page, .sheetbody{ scrollbar-width:none; -ms-overflow-style:none; }
   #pager .page::-webkit-scrollbar, .sheetbody::-webkit-scrollbar{ width:0; height:0; display:none; }
-  /* Tab bar pinned to the viewport bottom, translucent like .statusbar-bg at the top. Key fix for the
-     "blank space below the bar": on iOS a position:fixed bottom:0 element anchors to the SMALL viewport
-     (excludes the home-indicator safe area), while the page/shell reaches the physical bottom — leaving a
-     strip of bare page below the bar. The ::after extends the same translucent fill down through that
-     strip to the physical bottom, so the bar reaches the real edge while staying see-through. Fixed
-     clearance (no env()) so it never jumps. */
-  .tabbar{ position:fixed; left:0; right:0; bottom:0; max-width:540px; margin:0 auto; z-index:50; display:flex; align-items:center;
-    padding:12px 8px 16px; border-top:.5px solid var(--sep);
-    background:color-mix(in srgb, var(--bg) 88%, transparent); }
-  .tabbar::after{ content:""; position:absolute; left:0; right:0; top:100%; height:48px; pointer-events:none;
+  /* Tab bar anchored to the SHELL bottom (position:absolute inside #shell), not the fixed viewport.
+     Why: a position:fixed bottom:0 element lives in iOS's SMALL/layout viewport, whose bottom sits ABOVE
+     the physical screen edge — so a fixed bar can never reach into the home-indicator zone, leaving the
+     bare "blank space" below it (and JS can't even measure it). #shell is height:100dvh, which DOES reach
+     the physical bottom, so an absolute bar at its bottom touches the real edge. Translucent like the top,
+     overlaying the pager so content scrolls under it. */
+  .tabbar{ position:absolute; left:0; right:0; bottom:0; z-index:50; display:flex; align-items:center;
+    padding:15px 8px 21px; border-top:.5px solid var(--sep);
     background:color-mix(in srgb, var(--bg) 88%, transparent); }
   .tabitem{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
     color:var(--l3); transition:color .15s; -webkit-tap-highlight-color:transparent; }
-  .tabitem svg{ width:29px; height:29px; transition:transform .12s; }
+  .tabitem svg{ width:32px; height:32px; transition:transform .12s; }
   .tabitem span{ display:none; }                 /* icons only — labels hidden (kept as aria-label) */
   .tabitem.active{ color:var(--accent); }
   .tabitem:active svg{ transform:scale(.86); }
@@ -4853,6 +4851,22 @@ init();
 
 // Kick off cloud sync if the SDK is already present (it may also self-trigger via its onload).
 if(window.supabase && window.__cloudInit) window.__cloudInit();
+
+// iOS standalone PWA mis-computes 100dvh on a COLD LAUNCH — the shell ends short of the physical screen,
+// leaving "blank/black space" at the bottom across every screen (incl. sheets, where no tab bar exists).
+// A re-layout corrects it, which is exactly why rotating to landscape and back clears it. Force that same
+// re-layout on launch/resume/rotate by nudging the viewport meta (a no-op token), so the user never has to.
+(function(){
+  const m=document.querySelector('meta[name="viewport"]'); if(!m) return;
+  const base=m.getAttribute("content");
+  let busy=false;
+  function kick(){ if(busy) return; busy=true; m.setAttribute("content", base+", ");
+    requestAnimationFrame(()=>{ m.setAttribute("content", base); busy=false; }); }
+  ["load","pageshow","orientationchange"].forEach(e=> window.addEventListener(e, ()=> setTimeout(kick, 60)));
+  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) setTimeout(kick, 60); });
+  if(window.visualViewport) window.visualViewport.addEventListener("resize", ()=> setTimeout(kick, 60));
+  setTimeout(kick, 250); setTimeout(kick, 900);   // belt-and-braces for the cold-launch timing
+})();
 
 // Offline support: register the service worker when served over HTTPS (e.g. GitHub Pages).
 // Skipped silently on file:// so opening the raw file still works.
