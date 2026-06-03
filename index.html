@@ -3267,10 +3267,10 @@ function showTab(name){
   }
 }
 document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.dataset.tab));
-// SCROLL-LINKED tab bar: the bar tracks your scroll 1:1 — it slides DOWN out of view as you scroll down,
-// and slides back UP into view as you scroll up, at the same speed in both directions (no fixed-duration
-// snap). At the very top it's always fully shown, and window.__revealBar smoothly re-shows it on tab
-// switch (tap or swipe). Per-page scrollTop tracking (el._barLastY) so swiping between tabs can't jump it.
+// SCROLL-LINKED tab bar (REVERSED): the bar tracks your scroll 1:1 — it slides UP INTO view as you scroll
+// DOWN, and slides DOWN OUT of view as you scroll UP, at the same speed in both directions (no fixed-duration
+// snap). window.__revealBar smoothly re-shows it on tab switch (tap or swipe) so the nav stays reachable.
+// Per-page scrollTop tracking (el._barLastY) so swiping between tabs can't jump it.
 (function(){
   const bar=document.querySelector(".tabbar"); if(!bar) return;
   const EASE="transform .3s cubic-bezier(.4,0,.2,1)";   // smooth glide for programmatic reveals (tab switch / top)
@@ -3288,9 +3288,8 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
     const y=el.scrollTop;
     const prev = (el._barLastY==null) ? y : el._barLastY;
     el._barLastY = y;
-    if(y<=10){ if(offset!==0){ offset=0; render(true); } return; }   // at the top → fully shown (smooth)
     const dy=y-prev; if(dy===0) return;
-    offset=Math.max(0, Math.min(maxOff, offset+dy));                 // down → hide, up → reveal, clamped, 1:1
+    offset=Math.max(0, Math.min(maxOff, offset - dy));               // scroll DOWN (dy>0) → reveal; scroll UP → hide; clamped, 1:1
     render(false);
   }
   measure();
