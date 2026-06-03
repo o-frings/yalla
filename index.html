@@ -699,6 +699,19 @@
   .tiplink{ font-size:12px; font-weight:700; color:var(--accent); margin-top:12px; }
   .srclink{ color:inherit; text-decoration:none; }
   .srcarrow{ color:var(--accent)!important; font-weight:700; white-space:nowrap; }
+  /* Learn / coaching library */
+  .libteaser{ font-size:13px; font-weight:700; color:var(--accent); margin:10px 4px 0; cursor:pointer; }
+  .libteaser:active{ opacity:.7; }
+  .libcard{ display:block; text-decoration:none; color:inherit; margin-bottom:10px; -webkit-tap-highlight-color:transparent; }
+  .libcard:active{ opacity:.85; }
+  .libcard .libtext{ font-size:15px; line-height:1.45; margin:9px 0 0; color:var(--ink); }
+  .libtop{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .libev{ font-size:11px; font-weight:700; letter-spacing:.2px; padding:3px 9px; border-radius:999px; border:.5px solid var(--line); }
+  .libev.ev-do{ color:#2b8a3e; background:#51cf6618; border-color:#51cf6655; }
+  .libev.ev-linked{ color:#9c6500; background:#f59f0018; border-color:#f59f0055; }
+  .libev.ev-marker{ color:var(--l2); background:var(--row); }
+  .libweak{ font-size:11px; font-weight:600; color:#c92a2a; background:#ff6b6b18; border:.5px solid #ff6b6b55; padding:3px 9px; border-radius:999px; }
+  #libChips .s{ padding:7px 13px; border-radius:999px; font-size:13px; }
   .freeadd{ padding:12px 16px 16px; border-top:.5px solid var(--sep); }
   .addset{ cursor:pointer; font-weight:600; display:inline-flex; align-items:center; gap:3px; padding:8px 8px; margin:-8px -8px; min-height:24px; }
   .exhead .freedel{ color:var(--red); background:none; border:none; font-size:24px; line-height:1; cursor:pointer; padding:8px; margin:-8px -4px; }
@@ -828,6 +841,9 @@
     <div class="row" style="gap:8px; margin-bottom:16px;">
       <button class="btn tinted sm" id="meBalance" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;flex:0 0 auto"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>Muscle balance</button>
       <button class="btn tinted sm" id="meOther" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;flex:0 0 auto"><path d="M3 12h4l2.5-7 4 14 2.5-7H21"/></svg>Other training</button>
+    </div>
+    <div class="row" style="margin-bottom:16px;">
+      <button class="btn tinted sm" id="meLearn" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;flex:0 0 auto"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>Learn — coaching library</button>
     </div>
     <div class="row" style="justify-content:space-between; align-items:flex-end;">
       <div class="bwnum"><span id="bwNow">—</span><small>kg</small></div>
@@ -971,10 +987,14 @@
           <label for="acctName">What should I call you?</label>
           <div class="meinput"><input id="acctName" type="text" autocapitalize="words" placeholder="Your name or alias" style="width:140px;text-align:right;"></div>
         </div>
-        <label class="row" style="justify-content:space-between; align-items:center; margin-top:12px;">
-          <span class="levelcap" style="margin:0;">Share my workouts to the friends feed</span>
-          <input type="checkbox" id="shareToggle">
-        </label>
+        <div class="ed-label" style="margin-top:16px;">Sharing with friends</div>
+        <div class="seg appearance" id="shareSeg">
+          <div class="s" data-lvl="0">Off</div>
+          <div class="s" data-lvl="1">Summary</div>
+          <div class="s" data-lvl="2">Detail</div>
+          <div class="s" data-lvl="3">Full</div>
+        </div>
+        <p class="levelcap" id="shareSegHint" style="margin:8px 4px 0; line-height:1.4;"></p>
         <label class="row" style="justify-content:space-between; align-items:center; margin-top:12px;">
           <span class="levelcap" style="margin:0;">Remind me to train after 2 quiet days</span>
           <input type="checkbox" id="remindToggle">
@@ -1016,6 +1036,14 @@
       <button class="btn tinted wide" id="saveImgBtn">Save image</button>
     </div>
   </div>
+</div>
+
+<!-- WORKOUT DETAIL SHEET (feed) -->
+<div class="scrim" id="scrimWO"></div>
+<div class="sheet" id="sheetWO">
+  <div class="grabber"></div>
+  <div class="sheethdr"><span class="t" id="woWho">Workout</span><button class="btn plain sm" id="woClose">Done</button></div>
+  <div class="sheetbody" id="woBody"></div>
 </div>
 
 <!-- OTHER TRAINING SHEET -->
@@ -1319,6 +1347,19 @@
       <p id="musMethod" style="color:var(--l2);font-size:13px;line-height:1.5;margin:8px 0 8px;"></p>
       <ul id="musSrcList"></ul>
     </details>
+  </div>
+</div>
+
+<!-- LEARN / COACH LIBRARY SHEET -->
+<div class="scrim" id="scrimLibrary"></div>
+<div class="sheet" id="sheetLibrary">
+  <div class="grabber"></div>
+  <div class="sheethdr"><span class="t">Learn</span><button class="btn plain sm" id="libClose">Done</button></div>
+  <div class="sheetbody">
+    <p style="color:var(--l2);font-size:13px;margin:0 4px 12px;line-height:1.45;">Every piece of coaching advice in Yalla, with the research behind it. Tap any card to open the study.</p>
+    <input id="libSearch" type="search" placeholder="Search advice…" style="width:100%; box-sizing:border-box; padding:11px 14px; border:.5px solid var(--line); border-radius:12px; background:var(--row); color:var(--ink); font-size:15px; margin-bottom:10px;">
+    <div class="seg wrap" id="libChips" style="flex-wrap:wrap; gap:6px; margin-bottom:14px;"></div>
+    <div id="libList"></div>
   </div>
 </div>
 
@@ -2233,7 +2274,7 @@ function renderAccount(){
     outB.style.display="none"; inB.style.display="";
     $("acctWho").textContent=cloudUser.email||"Signed in";
     const an=$("acctName"); if(an && document.activeElement!==an) an.value=settings.displayName||settings.name||"";
-    const tog=$("shareToggle"); if(tog) tog.checked = settings.shareActivity===true;
+    renderShareSeg();
     const rtog=$("remindToggle"); if(rtog) rtog.checked = settings.remindersOn===true;
     setFeed(true);
     renderFeed();
@@ -2245,22 +2286,25 @@ function renderAccount(){
 
 // Post a workout summary to the shared feed — shape + counts only, never raw weights.
 async function cloudPublish(session){
-  if(!cloudReady() || !settings.shareActivity) return;
-  try{
-    await sb.from("activity").insert({
-      user_id: cloudUser.id, kind:"workout",
-      summary:{ name:session.name, sub:session.sub, sets:session.sets, mins:session.mins||0, prs:session.beaten||0, mtot:session.mtot||{} }
-    });
-  }catch(e){}
+  const lvl=settings.shareLevel||0;
+  if(!cloudReady() || lvl<1) return;
+  const ex=session.exercises||[];
+  // Detail rises with the sharer's chosen level — weights are shared ONLY at level 3 (Full).
+  // `lvl` rides along so the viewer can clamp to min(theirs, ours): you only see what you share.
+  const summary={ name:session.name, sub:session.sub, sets:session.sets, mins:session.mins||0,
+    prs:session.beaten||0, mtot:session.mtot||{}, vol:Math.round(session.totalVol||0), exN:ex.length, lvl };
+  if(session.top) summary.top = lvl>=3 ? {name:session.top.name, w:session.top.w, r:session.top.r} : {name:session.top.name};
+  if(lvl>=2) summary.ex = ex.map(e=>({ name:e.name, sets:(e.sets||[]).map(s=> lvl>=3 ? {w:s.w, r:s.r} : {r:s.r}) }));
+  try{ await sb.from("activity").insert({ user_id:cloudUser.id, kind:"workout", summary }); }catch(e){}
 }
 // auto-post when all three weekly rings are closed (once per week; needs sign-in + sharing on)
 function weekKey(d){ d=d?new Date(d):new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-((d.getDay()+6)%7)); return d.toDateString(); }
 async function shareRingsClosed(sets){
-  if(!cloudReady() || !settings.shareActivity) return;
+  if(!cloudReady() || (settings.shareLevel||0)<1) return;
   const wk=weekKey(); if(settings.ringsSharedWk===wk) return;     // once per week
   settings.ringsSharedWk=wk; await sset("settings",settings);
   try{ await sb.from("activity").insert({ user_id:cloudUser.id, kind:"rings",
-    summary:{ name:"Closed all 3 rings this week 🎯", sets:Math.round(sets)||0, mins:0, prs:0, mtot:{} } }); }catch(e){}
+    summary:{ name:"Closed all 3 rings this week 🎯", sets:Math.round(sets)||0, mins:0, prs:0, mtot:{}, lvl:1 } }); }catch(e){}
   toast("All rings closed — shared with your crew! 🎯", true);
 }
 
@@ -2296,18 +2340,27 @@ function agoStr(ts){ const s=Math.max(0,(Date.now()-ts)/1000);
 function miniRadar(cv, tot){
   const W=cv.width, H=cv.height, x=cv.getContext("2d"), cx=W/2, cy=H/2, R=Math.min(W,H)/2-4;
   const G=MGROUPS, n=G.length, pt=(i,rr)=>{ const a=(-90+i*360/n)*Math.PI/180; return [cx+rr*Math.cos(a), cy+rr*Math.sin(a)]; };
-  const max=Math.max(1, ...G.map(g=>tot[g]||0));
+  // Proportional fingerprint: each axis is this muscle's SHARE of the session's volume (relative to
+  // itself, never to targets), scaled by muscle count so an even split sits mid-radius. The plotted
+  // total is therefore constant regardless of how big or small the session was.
+  const sum=G.reduce((a,g)=>a+(tot[g]||0),0);
   x.clearRect(0,0,W,H);
   x.strokeStyle="rgba(127,127,127,.30)"; x.lineWidth=1;
   x.beginPath(); x.arc(cx,cy,R,0,Math.PI*2); x.stroke();
   for(let i=0;i<n;i++){ const [px,py]=pt(i,R); x.beginPath(); x.moveTo(cx,cy); x.lineTo(px,py); x.stroke(); }
-  const rv=g=>0.08+0.92*((tot[g]||0)/max);
+  const rv=g=> sum ? Math.min(1, 0.08+0.30*(n*(tot[g]||0)/sum)) : 0;
   x.beginPath(); G.forEach((g,i)=>{ const [px,py]=pt(i,R*rv(g)); i?x.lineTo(px,py):x.moveTo(px,py); }); x.closePath();
   x.fillStyle="rgba(240,128,32,.30)"; x.fill(); x.lineWidth=2; x.strokeStyle="#f08020"; x.stroke();
 }
 
 async function renderFeed(){
   const list=$("feedList"); if(!list || !cloudReady()) return;
+  const myLvl=settings.shareLevel||0;
+  if(myLvl<1){   // the feed is reciprocal — share nothing, see nothing
+    list.innerHTML='<div class="levelcap" style="margin:0 4px; line-height:1.5;">The feed is reciprocal — you only see what you share. Turn on sharing under <b>Me → Account</b> to see your friends\' workouts.</div>';
+    const host=$("ovBody"); if(host){ const old=host.querySelector(".ovfriend"); if(old) old.remove(); }
+    return;
+  }
   list.innerHTML='<div class="levelcap" style="margin:0 4px;">Loading…</div>';
   let rows=[];
   try{
@@ -2332,15 +2385,24 @@ async function renderFeed(){
   rows.forEach(r=>{
     const s=r.summary||{}, mine=r.user_id===cloudUser.id;
     const who = mine ? "You" : (names[r.user_id] || "A friend");
+    const viewLvl=Math.min(myLvl, s.lvl||1);   // clamp the post to your own level — you only see what you share
     const card=document.createElement("div"); card.style.cssText="padding:12px 4px; border-bottom:.5px solid var(--line);";
     const top=document.createElement("div"); top.style.cssText="display:flex; gap:12px; align-items:center;";
     const txt=document.createElement("div"); txt.style.cssText="flex:1; min-width:0;";
-    const stats=[s.sets!=null?s.sets+" sets":null, s.mins?Math.round(s.mins)+" min":null, s.prs?s.prs+" PR"+(s.prs>1?"s":""):null].filter(Boolean).join(" · ");
+    const stats=[ s.exN?s.exN+" ex":null, s.sets!=null?s.sets+" sets":null, s.vol?fmtKg(s.vol):null,
+      s.mins?Math.round(s.mins)+" min":null, s.prs?s.prs+" PR"+(s.prs>1?"s":""):null ].filter(Boolean).join(" · ");
+    const t=s.top, topLine = t&&t.name ? ("Top · "+t.name + (viewLvl>=3 && t.w>0 ? " · "+t.w+"kg×"+t.r : "")) : "";
+    const mt=s.mtot||{}, topM=MGROUPS.slice().sort((a,b)=>(mt[b]||0)-(mt[a]||0)).filter(g=>(mt[g]||0)>0).slice(0,2).map(g=>MSHORT[g]||g);
+    const hl = topM.length ? "mostly "+topM.join(" · ") : "";
+    const canOpen = viewLvl>=2 && s.ex && s.ex.length;
     txt.innerHTML='<div style="font-weight:600;">'+esc(who)+' · '+esc(s.name||"Workout")+'</div>'+
       '<div class="levelcap" style="margin:4px 0 0;">'+esc(stats)+'</div>'+
-      '<div class="levelcap" style="margin:2px 0 0; opacity:.7;">'+esc(agoStr(Date.parse(r.created_at)))+'</div>';
+      (topLine?'<div class="levelcap" style="margin:2px 0 0;">'+esc(topLine)+'</div>':'')+
+      (hl?'<div class="levelcap" style="margin:2px 0 0; opacity:.85;">'+esc(hl)+'</div>':'')+
+      '<div class="levelcap" style="margin:2px 0 0; opacity:.7;">'+esc(agoStr(Date.parse(r.created_at)))+(canOpen?' · tap for detail ›':'')+'</div>';
     const cv=document.createElement("canvas"); cv.width=72; cv.height=72; cv.style.cssText="flex:0 0 auto; width:60px; height:60px;";
     top.appendChild(txt); top.appendChild(cv); card.appendChild(top);
+    if(canOpen){ top.style.cursor="pointer"; top.onclick=()=>openWorkoutDetail(r, who, viewLvl); }
     // social actions (cheer + comment) — own posts can't be cheered
     if(r.id){
       const bar=document.createElement("div"); bar.className="feedbar";
@@ -2364,6 +2426,33 @@ async function renderFeed(){
       host.insertBefore(c, host.firstChild);
     }
   }
+}
+
+// Full-workout view for a feed post. `viewLvl` is the already-clamped level (min of yours and the
+// sharer's): 2 shows exercises + sets×reps, 3 also shows the weights lifted.
+function openWorkoutDetail(r, who, viewLvl){
+  const s=r.summary||{}, body=$("woBody"); if(!body) return;
+  $("woWho").textContent = who||"Workout";
+  let when=""; try{ when=new Date(Date.parse(r.created_at)).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); }catch(e){}
+  let h='<div class="ovbig" style="font-size:22px;">'+esc(s.name||"Workout")+'</div>';
+  if(when) h+='<div class="levelcap" style="margin:4px 0 0;">'+esc(when)+'</div>';
+  const mt=s.mtot||{}, topM=MGROUPS.slice().sort((a,b)=>(mt[b]||0)-(mt[a]||0)).filter(g=>(mt[g]||0)>0).slice(0,2).map(g=>MSHORT[g]||g);
+  h+='<div style="text-align:center; margin:14px 0 2px;"><canvas id="woRadar" width="320" height="320" style="width:190px; height:190px;"></canvas></div>';
+  if(topM.length) h+='<div class="levelcap" style="text-align:center; margin:0 0 6px;">mostly '+esc(topM.join(" · "))+'</div>';
+  const chips=[["Volume", s.vol?fmtKg(s.vol):"—"],["Sets", ""+(s.sets||0)],["Time", (s.mins||0)+" min"],["PRs", ""+(s.prs||0)]];
+  h+='<div class="row" style="gap:8px; margin:12px 0;">'+chips.map(c=>'<div style="flex:1; background:var(--row); border-radius:14px; padding:10px 4px; text-align:center;"><div style="font-weight:700; font-size:18px;">'+esc(c[1])+'</div><div class="levelcap" style="margin-top:2px;">'+esc(c[0])+'</div></div>').join('')+'</div>';
+  if(viewLvl>=2 && s.ex && s.ex.length){
+    h+='<div class="ed-label">Exercises</div>';
+    h+=s.ex.map(e=>{
+      const setsTxt=(e.sets||[]).map(st=>{ const hasW=viewLvl>=3 && st.w!=null && st.w!=="";
+        return (hasW ? st.w+"kg×"+(st.r||0) : (st.r||0)+" reps"); }).join(" · ");
+      return '<div style="padding:10px 4px; border-bottom:.5px solid var(--line);"><div style="font-weight:600;">'+esc(e.name)+'</div><div class="levelcap" style="margin-top:3px;">'+esc(setsTxt)+'</div></div>';
+    }).join('');
+    if(viewLvl<3) h+='<p class="levelcap" style="margin:10px 4px 0; opacity:.75;">Share at <b>Full</b> intensity to see the weights friends lifted — you only see the detail you share.</p>';
+  }
+  body.innerHTML=h;
+  const cv=$("woRadar"); if(cv) miniRadar(cv, mt);
+  openSheet("WO");
 }
 
 // best-effort push to the post's owner when you cheer/comment (the social-notify Edge Function does the sending; no-op if not deployed)
@@ -2410,7 +2499,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi]||e.n; }
-let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[] };
+let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[] };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -2605,6 +2694,12 @@ async function init(){
     settings.shareActivity=false; settings.sharingOptIn=true;
     await sset("settings",settings);
   }
+  if(settings.shareLevel==null){
+    // Migrate the old on/off toggle to the 4-level intensity scale. "On" mapped to summary-only
+    // (the old behaviour never shared weights), so the conservative carry-over is level 1.
+    settings.shareLevel = settings.shareActivity ? 1 : 0;
+    await sset("settings",settings);
+  }
   if(!settings.ssSameArea){   // re-pair every superset within one gym area (dumbbell/barbell/cable/machine/body)
     plans.forEach(p=> (p.workouts||[]).forEach(w=>{ if((w.ex||[]).some(e=>e.ss)) regroupSupersets(w,"accessory"); }));
     settings.ssSameArea=true;
@@ -2612,6 +2707,7 @@ async function init(){
   }
   if(!settings.activePlanId) settings.activePlanId = plans[0].id;
   const ni = nextRotateIndex(activePlan()); curWk = ni>=0?ni:0;
+  await loadEvidence(); // load canonical evidence.json → builds the coach-tip pool + Learn library
   decideTip();          // pick this launch's coach tip (if any) before the first render
   renderAll();
   showTab("overview");   // open on the coach home
@@ -2728,62 +2824,34 @@ function startHomeWorkout(){
 // `goals` (optional) restricts a tip to matching objectives (muscle/strength/fatloss/fitness) — mostly the
 // nutrition tips; training tips have no `goals` and apply to everyone. Multiple distinct tips are drawn from
 // each paper, staying within what it actually supports.
-const TIPS=[
-  // ---- training: volume, frequency, overload (apply to every goal) ----
-  {id:"vol10",        src:"Schoenfeld 2017",           t:"Aim for roughly 10+ hard sets per muscle each week — that's the volume where growth reliably shows up."},
-  {id:"volmin",       src:"Schoenfeld 2017",           t:"Under about 10 weekly sets per muscle you're likely leaving growth on the table — but you don't need to live in the gym to clear that bar."},
-  {id:"freq2",        src:"Schoenfeld 2016",           t:"Hit each muscle about twice a week. The same sets split over two days tend to grow a little more than one big session."},
-  {id:"freqlag",      src:"Schoenfeld 2016",           t:"Got a lagging muscle? Add a second short session for it during the week rather than piling every set onto one day."},
-  {id:"overload",     src:"Schoenfeld 2010",           t:"Muscle grows when you ask a bit more of it over time — add a rep or a little weight once a set starts to feel easy."},
-  {id:"tension",      src:"Schoenfeld 2010",           t:"Challenging loads lifted with real effort create the mechanical tension that tells a muscle to grow — that's the core of it."},
-  {id:"repsOK",       src:"Plotkin et al. 2022",       t:"Can't add weight today? Add a rep. Progressing reps builds muscle just as well as adding load."},
-  {id:"dose",         src:"Pelland et al. 2024",       t:"More weekly sets generally means more growth — but assistance work counts only about half, so train each muscle directly too."},
-  {id:"spread",       src:"Pelland et al. 2024",       t:"Once you're past ~10 sets for a muscle, spreading them over more days lets you add volume without each session dragging."},
-  {id:"landmarks",    src:"Renaissance Periodization", t:"There's a productive range for volume: too little won't grow, too much just piles on fatigue. ~10–20 sets a week per muscle suits most."},
-  {id:"deload",       src:"Renaissance Periodization", t:"When progress stalls and everything feels heavy, take a planned easy week — clearing fatigue lets you push hard again."},
-  {id:"rampvol",      src:"Renaissance Periodization", t:"Start a training block at the lower end of your volume and add a set here and there as you adapt — leave yourself room to grow."},
-  // ---- recovery & the muscle-building window ----
-  {id:"window",       src:"Phillips et al. 1997",      t:"Muscle is built in the day or two after training, not during the workout — which is why spreading sessions through the week pays off."},
-  {id:"recover",      src:"Phillips et al. 1997",      t:"Recovery is part of the program — the growth signal from a session runs ~24–48 hours, so give a muscle time before hammering it again."},
-  // ---- effort vs. feel ----
-  {id:"emg",          src:"Vigotsky et al. 2022",      t:"Chasing the “burn” or a big pump doesn't reliably mean more growth — total hard sets over the week is what counts."},
-  {id:"feel",         src:"Vigotsky et al. 2022",      t:"How “activated” a muscle feels isn't a reliable guide to growth — track your weekly sets and whether the weights are climbing instead."},
-  // ---- busy weeks & maintenance (apply to every goal) ----
-  {id:"maintain",     src:"Bickel et al. 2011",        t:"Pressed for time? You can keep the muscle you've built on as little as a third of your usual volume — even one hard set a week helps."},
-  {id:"dontskip",     src:"Bickel et al. 2011",        t:"On a hectic week, don't skip entirely — a short, reduced session holds onto what you've built far better than nothing."},
-  {id:"detrain",      src:"Mujika & Padilla 2000",     t:"A week or two off won't cost you — strength holds for weeks. Rest when you need it; just don't let a layoff stretch into months."},
-  {id:"comeback",     src:"Mujika & Padilla 2000",     t:"Missed some sessions to illness or travel? A few won't erase months of work — just pick up where you left off."},
-  // ---- protein (everyone) ----
-  {id:"protein",      src:"Morton et al. 2018",        t:"Around 1.6 g of protein per kg of bodyweight a day covers most lifters — much beyond that adds little."},
-  {id:"proteinceil",  src:"Morton et al. 2018",        t:"Past ~1.6 g/kg, extra protein does little for muscle — your training and sleep move the needle more than another shake."},
-  // ---- nutrition for building (gain goal) ----
-  {id:"surplus",      src:"Slater et al. 2019",        goals:["muscle"], t:"To build muscle, eat in a slight calorie surplus — trying to grow at maintenance is an uphill battle."},
-  {id:"nodeficit",    src:"Slater et al. 2019",        goals:["muscle"], t:"You can't build much muscle in a real calorie deficit — if size is the goal, eat at least at maintenance."},
-  {id:"leangain",     src:"Garthe et al. 2013",        goals:["muscle"], t:"Gain slowly: about 0.25–0.5% of bodyweight a week keeps new gains mostly muscle, not fat."},
-  // ---- nutrition for cutting (fat-loss goal) ----
-  {id:"cut",          src:"Helms et al. 2014",         goals:["fatloss"], t:"Cutting? Keep protein high and keep lifting heavy — that's what tells your body to hold onto muscle while the fat comes off."},
-  {id:"cutprotein",   src:"Helms et al. 2014",         goals:["fatloss"], t:"On a cut, protein needs go up, not down — aim toward the higher end (~2 g/kg) to protect muscle in a deficit."},
-  {id:"lossrate",     src:"Helms et al. 2014",         goals:["fatloss"], t:"Losing fat? Keep it to about 0.5–1% of bodyweight a week — faster tends to drag your strength and muscle down with it."},
-  {id:"nocrash",      src:"Helms et al. 2014",         goals:["fatloss"], t:"Crash diets backfire — a moderate deficit you can actually sustain keeps more muscle and strength than slashing calories."},
-  // ---- general health & longevity (apply to anyone; all observational — phrased as "linked to", see EVIDENCE.md) ----
-  {id:"steps10k",     src:"Paluch et al. 2022",        cat:"health", t:"“10,000 steps” began as a 1960s marketing slogan, not science — in the data, most of the lower-mortality benefit shows up by around 7,000–8,000 steps a day."},
-  {id:"weekendwarrior",src:"O'Donovan et al. 2017",    cat:"health", t:"Short on time midweek? People who pack their exercise into just 1–2 days show much the same lower death risk as those who spread it out — the weekly total is what's linked to the benefit."},
-  {id:"vilpa",        src:"Stamatakis et al. 2022",    cat:"health", t:"Even with no formal workouts, three or four 1-minute bursts of huffing and puffing a day — stairs, a hard walk uphill — are linked to markedly lower mortality."},
-  {id:"rtdose",       src:"Momma et al. 2022",         cat:"health", t:"Just 30–60 minutes of strength training a week is associated with the biggest drop in early-death risk — and piling on much more adds little for longevity."},
-  {id:"vo2nolimit",   src:"Mandsager et al. 2018",     cat:"health", t:"There seems to be no “fit enough”: across 122,000 people, higher cardio fitness kept tracking with lower death risk — and being unfit carried risk on par with smoking."},
-  {id:"sitbreaks",    src:"Diaz et al. 2017",          cat:"health", t:"It's not just how long you sit, but how you sit — standing up to move for a couple of minutes every half hour is linked to lower risk, and steadier blood sugar."},
-  {id:"grip",         src:"Leong et al. 2015 (PURE)",  cat:"health", t:"Grip strength tracks with lifespan better than blood pressure does — not because squeezing helps, but because it mirrors your whole-body strength and health."},
-  {id:"sitrise",      src:"Brito et al. 2012",         cat:"health", t:"A quick self-check: can you lower to the floor and stand back up without using your hands? People who manage it easily in midlife tend to outlive those who can't."},
-  {id:"sauna",        src:"Laukkanen et al. 2015",     cat:"health", t:"In one long Finnish study, frequent sauna use (4–7×/week) was linked to roughly half the heart-disease death risk of once a week — heat may gently stress the heart a little like exercise."},
-  {id:"hydration",    src:"Dmitrieva et al. 2023",     cat:"health", t:"Staying well-hydrated may help you age more slowly: over 30 years, adults whose blood sodium sat at the high end of normal showed faster aging and earlier illness."},
-  {id:"fiber",        src:"Reynolds et al. 2019",      cat:"health", t:"Everyone chases protein and forgets fiber — yet getting 25–30 g a day is one of the most consistent dietary links to a longer, healthier life."},
-  {id:"coffee",       src:"Poole et al. 2017",         cat:"health", t:"Good news for coffee drinkers: 3–4 cups a day is linked to lower overall and heart-disease death risk — for most people it's more likely to help than harm."},
-  {id:"sleepreg",     src:"Windred et al. 2024",       cat:"health", t:"A consistent sleep schedule may matter more than how long you sleep — steady bed and wake times predicted lower death risk better than sleep duration did."},
-  {id:"social",       src:"Holt-Lunstad et al. 2010",  cat:"health", t:"Weak social ties carry a mortality risk on the scale of smoking 15 cigarettes a day — so a regular catch-up with friends counts as real health behaviour."},
-  {id:"optimism",     src:"Lee et al. 2019",           cat:"health", t:"Optimists tend to live 11–15% longer and are far likelier to reach 85 — and outlook is something you can practise and shift."},
-  {id:"purpose",      src:"Alimujiang et al. 2019",    cat:"health", t:"Having a clear sense of purpose — a reason to get up in the morning — is linked to lower mortality, regardless of wealth or health."},
-  {id:"reading",      src:"Bavishi et al. 2016",       cat:"health", t:"Book readers tend to live longer: around 30 minutes a day was linked to a 23% lower death risk over 12 years — and only books showed it, not newspapers."}
-];
+// Coach tips + the Learn library are built from the canonical evidence.json (see EVIDENCE.md), loaded once at
+// startup. The old hand-maintained arrays are gone — evidence.json is the single source of truth.
+let EVIDENCE = { studies:{}, advice:[], categories:[] };
+let TIPS = [];        // start-page random tips, derived from EVIDENCE.advice (injury-care items excluded — they're contextual)
+let TIP_DOI = {};     // tip id → study URL
+async function loadEvidence(){
+  try{ const r = await fetch("evidence.json"); if(r.ok) EVIDENCE = await r.json(); }   // SW is network-first, so this stays fresh online and works offline
+  catch(e){ /* offline before precache, or fetch error → tips & library degrade gracefully */ }
+  buildTips();
+}
+function studyUrl(k){ const s=EVIDENCE.studies[k]; if(!s) return null; return s.doi ? "https://doi.org/"+s.doi : (s.url||null); }
+// short citation label, e.g. "Schoenfeld et al. 2017", from a study record
+function shortCite(k){ const s=EVIDENCE.studies[k]; if(!s) return "";
+  let first=(s.authors||"").split(/,| & /)[0].replace(/\s+[A-Z][A-Za-z]?(?:\s+[A-Z][A-Za-z]?)*$/,"").trim();
+  if(!first) first=(s.authors||"");
+  const multi=/,|&|et al/i.test(s.authors||"");
+  return (first + (multi?" et al. ":" ") + (s.year||"")).trim(); }
+function buildTips(){
+  TIPS=[]; TIP_DOI={};
+  (EVIDENCE.advice||[]).forEach(a=>{
+    const aud=a.audience||["all"];
+    if(aud.some(x=>String(x).indexOf("injury:")===0)) return;        // injury-care advice is shown in context, not as a random tip
+    const tip={ id:a.id, t:a.text, src:shortCite(a.study), tone:a.tone||"do", cat:a.category, strength:a.strength||"standard" };
+    if(!(aud.length===1 && aud[0]==="all")) tip.goals=aud;            // goal-restricted (muscle / fatloss)
+    TIPS.push(tip);
+    TIP_DOI[a.id]=studyUrl(a.study);
+  });
+}
 // Canonical study links (DOI-resolver where one exists), all verified to resolve. Keyed to PROG_SRC keys so the
 // Muscle-balance "sources" list can become clickable; see EVIDENCE.md for the full ledger.
 const SRC_DOI={
@@ -2808,44 +2876,45 @@ const SRC_DOI={
   injShoulder:"https://doi.org/10.1016/S0140-6736(21)00846-1",
   injElbow:"https://doi.org/10.2519/jospt.2015.5841"
 };
-// Each tip → its study link. Training tips reuse SRC_DOI; health tips carry their own verified DOI.
-const TIP_DOI={
-  vol10:SRC_DOI.sch17, volmin:SRC_DOI.sch17,
-  freq2:SRC_DOI.sch16, freqlag:SRC_DOI.sch16,
-  overload:SRC_DOI.sch10, tension:SRC_DOI.sch10,
-  repsOK:SRC_DOI.plotkin,
-  dose:SRC_DOI.drr, spread:SRC_DOI.drr,
-  landmarks:SRC_DOI.rpvol, deload:SRC_DOI.rpvol, rampvol:SRC_DOI.rpvol,
-  window:SRC_DOI.mps, recover:SRC_DOI.mps,
-  emg:SRC_DOI.vigotsky, feel:SRC_DOI.vigotsky,
-  maintain:SRC_DOI.bickel, dontskip:SRC_DOI.bickel,
-  detrain:SRC_DOI.mujika, comeback:SRC_DOI.mujika,
-  protein:SRC_DOI.morton, proteinceil:SRC_DOI.morton,
-  surplus:SRC_DOI.slater, nodeficit:SRC_DOI.slater,
-  leangain:SRC_DOI.garthe,
-  cut:SRC_DOI.helms, cutprotein:SRC_DOI.helms, lossrate:SRC_DOI.helms, nocrash:SRC_DOI.helms,
-  steps10k:"https://doi.org/10.1016/S2468-2667(21)00302-9",
-  weekendwarrior:"https://doi.org/10.1001/jamainternmed.2016.8014",
-  vilpa:"https://doi.org/10.1038/s41591-022-02100-x",
-  rtdose:"https://doi.org/10.1136/bjsports-2021-105061",
-  vo2nolimit:"https://doi.org/10.1001/jamanetworkopen.2018.3605",
-  sitbreaks:"https://doi.org/10.7326/M17-0212",
-  grip:"https://doi.org/10.1016/S0140-6736(14)62000-6",
-  sitrise:"https://doi.org/10.1177/2047487312471759",
-  sauna:"https://doi.org/10.1001/jamainternmed.2014.8187",
-  hydration:"https://doi.org/10.1016/j.ebiom.2022.104404",
-  fiber:"https://doi.org/10.1016/S0140-6736(18)31809-9",
-  coffee:"https://doi.org/10.1136/bmj.j5024",
-  sleepreg:"https://doi.org/10.1093/sleep/zsad253",
-  social:"https://doi.org/10.1371/journal.pmed.1000316",
-  optimism:"https://doi.org/10.1073/pnas.1900712116",
-  purpose:"https://doi.org/10.1001/jamanetworkopen.2019.4270",
-  reading:"https://doi.org/10.1016/j.socscimed.2016.07.014"
-};
 // one citation <li>, linked to its study where we have a URL
 function srcLi(k){ const u=SRC_DOI[k];
   return u ? '<li><a class="srclink" href="'+u+'" target="_blank" rel="noopener">'+PROG_SRC[k]+' <span class="srcarrow">↗</span></a></li>'
            : '<li>'+PROG_SRC[k]+'</li>'; }
+
+// ===== Learn / coach library — browse every piece of advice from evidence.json, grouped & searchable =====
+let libCat="all", libQuery="";
+function openLibrary(){ libCat="all"; libQuery=""; const s=$("libSearch"); if(s) s.value=""; renderLibrary(); openSheet("Library"); }
+function libTierLabel(t){ return {meta:"meta-analysis",rct:"RCT",review:"review / guideline",cohort:"cohort study","small-cohort":"small study",mechanism:"lab study"}[t]||t; }
+function renderLibrary(){
+  const chips=$("libChips"); if(!chips) return;
+  const cats=EVIDENCE.categories||[];
+  chips.innerHTML = ['<div class="s'+(libCat==="all"?" active":"")+'" data-cat="all">All</div>']
+    .concat(cats.map(c=>'<div class="s'+(libCat===c.id?" active":"")+'" data-cat="'+esc(c.id)+'">'+esc(c.label)+'</div>')).join('');
+  chips.querySelectorAll(".s").forEach(el=> el.onclick=()=>{ libCat=el.dataset.cat; renderLibrary(); });
+  const q=libQuery.trim().toLowerCase();
+  const order=cats.map(c=>c.id), catLabel={}; cats.forEach(c=>catLabel[c.id]=c.label);
+  const adv=(EVIDENCE.advice||[]).filter(a=>{
+    if(libCat!=="all" && a.category!==libCat) return false;
+    if(q){ const s=EVIDENCE.studies[a.study]||{}; if((a.text+" "+(a.detail||"")+" "+(s.authors||"")+" "+(s.journal||"")).toLowerCase().indexOf(q)<0) return false; }
+    return true;
+  }).sort((a,b)=> (order.indexOf(a.category)-order.indexOf(b.category)));
+  const list=$("libList");
+  if(!adv.length){ list.innerHTML='<p class="freehint">'+((EVIDENCE.advice||[]).length?'No advice matches that search.':'Couldn’t load the library — check your connection and reopen.')+'</p>'; return; }
+  const showHeaders=(libCat==="all"); let h="", last=null;
+  adv.forEach(a=>{
+    if(showHeaders && a.category!==last){ h+='<div class="ed-label" style="margin-top:14px;">'+esc(catLabel[a.category]||a.category)+'</div>'; last=a.category; }
+    const s=EVIDENCE.studies[a.study]||{}, url=studyUrl(a.study);
+    const evClass = (s.evidence==="causal"||s.evidence==="causal-leaning") ? "ev-do" : (s.evidence==="marker" ? "ev-marker" : "ev-linked");
+    const inner='<div class="pad">'
+      +'<div class="libtop"><span class="libev '+evClass+'">'+esc(libTierLabel(s.tier||""))+'</span>'+(a.strength==="weak"?'<span class="libweak">weaker evidence</span>':'')+'</div>'
+      +'<p class="libtext">'+esc(a.text)+'</p>'
+      +'<div class="tipsrc">'+esc(a.detail||shortCite(a.study))+'</div>'
+      +(url?'<div class="tiplink">Read the study ↗</div>':'')+'</div>';
+    h+= url ? '<a class="group libcard" href="'+esc(url)+'" target="_blank" rel="noopener">'+inner+'</a>'
+            : '<div class="group libcard">'+inner+'</div>';
+  });
+  list.innerHTML=h;
+}
 // Decided once per app launch (in init), so it doesn't reshuffle as you switch tabs. Roughly every 3rd open we
 // surface a tip; which tip is drawn stochastically from the goal-relevant pool, weighted by how long since it
 // was last shown (recency). A tip is eligible if it has no `goals`, the user has no objective set, or its
@@ -2855,11 +2924,11 @@ function decideTip(){
   const ts = settings.tipState = settings.tipState || { opens:0, last:{} };
   ts.opens = (ts.opens||0) + 1;
   currentTip = null;
-  if(ts.opens > 1 && ts.opens % 3 === 0){           // skip the very first open; then ~every 3rd
+  if(TIPS.length && ts.opens > 1 && ts.opens % 3 === 0){   // skip the very first open; then ~every 3rd
     const obj = settings.objective;
     const pool = TIPS.filter(tip => !tip.goals || !obj || tip.goals.indexOf(obj) >= 0);
-    // weight ∝ opens since last shown; never-shown tips get the highest weight
-    const w = pool.map(tip => { const at = ts.last[tip.id]; return at==null ? ts.opens + 1 : Math.max(0.01, ts.opens - at); });
+    // weight ∝ opens since last shown; never-shown tips get the highest weight; weak single-cohort tips show rarely
+    const w = pool.map(tip => { const at = ts.last[tip.id]; const base = at==null ? ts.opens + 1 : Math.max(0.01, ts.opens - at); return tip.strength==="weak" ? base*0.25 : base; });
     const sum = w.reduce((a,b)=>a+b, 0);
     let r = Math.random() * sum, pick = 0;
     for(let i=0;i<pool.length;i++){ r -= w[i]; if(r <= 0){ pick = i; break; } }
@@ -2928,15 +2997,17 @@ function renderOverview(){
   // --- Coach tip --- an occasional research-backed pointer (shown ~every 3rd open; see decideTip).
   // Health tips are observational, so they're flagged "Linked in research"; training tips "Backed by research".
   if(currentTip){
-    const isHealth = currentTip.cat==="health", url = TIP_DOI[currentTip.id];
-    h+='<div class="ed-label">'+(isHealth?'Health note':'Coach tip')+'</div>';
-    const inner='<div class="pad"><div class="ovbig" style="font-size:18px;">'+(isHealth?'🌱':'💡')+' Did you know?</div>'
+    // observational ('linked') tips are flagged "Linked in research"; causal ('do') tips "Backed by research"
+    const linked = currentTip.tone==="linked", url = TIP_DOI[currentTip.id];
+    h+='<div class="ed-label">'+(linked?'Health note':'Coach tip')+'</div>';
+    const inner='<div class="pad"><div class="ovbig" style="font-size:18px;">'+(linked?'🌱':'💡')+' Did you know?</div>'
       +'<p class="ovp" style="margin-top:8px;">'+esc(currentTip.t)+'</p>'
-      +'<div class="tipsrc">'+(isHealth?'Linked in research — ':'Backed by research — ')+esc(currentTip.src)+'</div>'
+      +'<div class="tipsrc">'+(linked?'Linked in research — ':'Backed by research — ')+esc(currentTip.src)+'</div>'
       +(url?'<div class="tiplink">Read the study ↗</div>':'')+'</div>';
     // whole panel taps through to the study, like the "Watch a how-to video" button
     h+= url ? '<a class="group tipcard" href="'+esc(url)+'" target="_blank" rel="noopener">'+inner+'</a>'
             : '<div class="group">'+inner+'</div>';
+    h+='<div class="libteaser" id="ovLibLink">Browse all coaching tips →</div>';
   }
   // --- Needs attention --- ordered by urgency (severity first); maps to your objective
   const obj=planObjective(activePlan()), todo=[], under=ovUnderMuscles();
@@ -2965,6 +3036,7 @@ function renderOverview(){
   host.innerHTML=h;
   const sb=host.querySelector(".ovstart"); if(sb) sb.onclick=()=>showTab("workout");
   const hb=host.querySelector(".ovhome"); if(hb) hb.onclick=startHomeWorkout;
+  const ll=host.querySelector("#ovLibLink"); if(ll) ll.onclick=openLibrary;
   if(ovRings && $("ovRingsC")){ drawRings("ovRingsC", ovRings);
     const snap=host.querySelector(".ovsnap"); if(snap) snap.onclick=()=>showTab("me"); }
   host.querySelectorAll(".discx").forEach(x=> x.onclick=(ev)=>{ ev.stopPropagation(); dismissTip(x.dataset.tip, x.closest(".disccard")); });
@@ -3526,7 +3598,7 @@ $("repeatBtn").onclick=repeatLastWorkout;
 $("saveBtn").onclick=async()=>{
   const savedSig=draftSig();
   const p=activePlan(); const w = freeMode ? null : p.workouts[curWk]; let logged=0, beaten=0;
-  const session={ name: freeMode?"Free workout":(w?w.name:"Workout"), sub:"", totalVol:0, sets:0, beaten:0, top:null, mtot:{}, date:Date.now() };
+  const session={ name: freeMode?"Free workout":(w?w.name:"Workout"), sub:"", totalVol:0, sets:0, beaten:0, top:null, mtot:{}, exercises:[], date:Date.now() };
   document.querySelectorAll("#exlist .group").forEach(g=>{
     const name=g.dataset.ex, pt=topSet(last[name]), sets=[];
     g.querySelectorAll(".setrow").forEach(r=>{ const wv=r.querySelector(".w").value.trim(), rv=r.querySelector(".r").value.trim();
@@ -3538,6 +3610,7 @@ $("saveBtn").onclick=async()=>{
       const tw=parseFloat(nt.w)||0, tr=parseInt(nt.r)||0;
       if(!session.top || tw>session.top.w) session.top={name, w:tw, r:tr};
       muscleFor(name).forEach((grp,gi)=> session.mtot[grp]=(session.mtot[grp]||0)+vol*(gi===0?1:0.5));
+      session.exercises.push({ name, sets: sets.map(s=>({w:s.w, r:s.r})) });
       (hist[name]=hist[name]||[]).push({d:Date.now(), w:nt.w, r:nt.r, n:sets.length, v:Math.round(vol)}); }
   });
   if(!logged){ toast(freeMode?"Add an exercise and log a set":"Log at least one set first"); return; }
@@ -3983,6 +4056,8 @@ function shareCompute(){
 }
 $("shareClose").onclick=()=>closeSheet("Share");
 $("scrimShare").onclick=()=>closeSheet("Share");
+if($("woClose")) $("woClose").onclick=()=>closeSheet("WO");
+if($("scrimWO")) $("scrimWO").onclick=()=>closeSheet("WO");
 $("shareCopy").onclick=()=>{
   const ta=$("shareCode"); ta.focus(); ta.select();
   const done=ok=>toast(ok?"Code copied":"Select the code and copy it");
@@ -4034,6 +4109,10 @@ function weeklyEquiv(totals, windowDays){
 $("meBalance").onclick=()=>{ openMuscles(); };
 $("musClose").onclick=()=>closeSheet("Mus");
 $("scrimMus").onclick=()=>closeSheet("Mus");
+$("libClose").onclick=()=>closeSheet("Library");
+$("scrimLibrary").onclick=()=>closeSheet("Library");
+$("libSearch").oninput=function(){ libQuery=this.value; renderLibrary(); };
+$("meLearn").onclick=()=>openLibrary();
 // ---- per-plan "about" / coach notes ----
 // consistent attributes line for any plan: days (+home) · duration · level
 function planMeta(plan){
@@ -5430,7 +5509,23 @@ if($("acctName")) $("acctName").onchange=async()=>{ const v=$("acctName").value.
 if($("acctPush")) $("acctPush").onclick=cloudForcePush;
 if($("nameSave")) $("nameSave").onclick=saveDisplayName;
 if($("acctDelete")) $("acctDelete").onclick=cloudDeleteData;
-if($("shareToggle")) $("shareToggle").onchange=async(e)=>{ settings.shareActivity=!!e.target.checked; await sset("settings",settings); toast(settings.shareActivity?"Sharing on — friends see your workout summaries.":"Sharing off — your workouts stay private."); };
+// Sharing intensity: 0 off · 1 summary · 2 detail (sets×reps) · 3 full (incl. weights).
+// "You only see what you share" — the feed clamps every post to your own level (see renderFeed).
+const SHARE_HINTS=[
+  "Off — your workouts stay private, and the friends feed stays hidden.",
+  "Summary — friends see your counts, volume and a muscle map. You see their summaries too.",
+  "Detail — also shares each exercise with sets & reps (no weights). You see friends' detail.",
+  "Full — shares everything, including the weights you lifted. You see friends' full logs." ];
+function renderShareSeg(){
+  const lvl=settings.shareLevel||0;
+  document.querySelectorAll("#shareSeg .s").forEach(s=> s.classList.toggle("active", (+s.dataset.lvl)===lvl));
+  const hint=$("shareSegHint"); if(hint) hint.textContent=SHARE_HINTS[lvl]||"";
+}
+document.querySelectorAll("#shareSeg .s").forEach(s=>{
+  s.onclick=async()=>{ const lvl=+s.dataset.lvl; settings.shareLevel=lvl; settings.shareActivity=lvl>0;
+    await sset("settings",settings); renderShareSeg(); renderFeed();
+    toast(lvl===0?"Sharing off — your workouts stay private." : "Sharing on — "+["","summaries","detail (sets & reps)","full detail incl. weights"][lvl]+"."); };
+});
 if($("remindToggle")) $("remindToggle").onchange=async(e)=>{
   if(e.target.checked){ const ok=await pushSubscribe(); e.target.checked=ok; settings.remindersOn=ok; if(ok) toast("Reminders on — we’ll nudge you after 2 quiet days."); }
   else { await pushDisable(); settings.remindersOn=false; toast("Reminders off."); }
@@ -5446,11 +5541,12 @@ function fmtKgShort(v){ v=Math.round(v); return v>=1000 ? (v/1000).toFixed(v>=10
 function rrect(x,X,Y,w,h,r){ x.beginPath(); x.moveTo(X+r,Y); x.arcTo(X+w,Y,X+w,Y+h,r); x.arcTo(X+w,Y+h,X,Y+h,r); x.arcTo(X,Y+h,X,Y,r); x.arcTo(X,Y,X+w,Y,r); x.closePath(); }
 function tileRadar(x,cx,cy,R,tot){
   const G=MGROUPS, n=G.length, pt=(i,rr)=>{ const a=(-90+i*360/n)*Math.PI/180; return [cx+rr*Math.cos(a), cy+rr*Math.sin(a)]; };
-  const max=Math.max(1, ...G.map(g=>tot[g]||0));
+  // Proportional fingerprint (see miniRadar): share-of-session, self-relative, constant total.
+  const sum=G.reduce((a,g)=>a+(tot[g]||0),0);
   x.strokeStyle="rgba(255,255,255,.30)"; x.lineWidth=2;
   [0.5,1].forEach(f=>{ x.beginPath(); x.arc(cx,cy,R*f,0,Math.PI*2); x.stroke(); });
   for(let i=0;i<n;i++){ const [px,py]=pt(i,R); x.beginPath(); x.moveTo(cx,cy); x.lineTo(px,py); x.stroke(); }
-  const rv=g=>0.06+0.94*((tot[g]||0)/max);
+  const rv=g=> sum ? Math.min(1, 0.06+0.30*(n*(tot[g]||0)/sum)) : 0;
   x.beginPath(); G.forEach((g,i)=>{ const [px,py]=pt(i,R*rv(g)); i?x.lineTo(px,py):x.moveTo(px,py); }); x.closePath();
   x.fillStyle="rgba(255,255,255,.32)"; x.fill(); x.lineWidth=5; x.strokeStyle="#fff"; x.stroke();
   G.forEach((g,i)=>{ const [px,py]=pt(i,R*rv(g)); x.beginPath(); x.arc(px,py,8,0,Math.PI*2); x.fillStyle="#fff"; x.fill(); });

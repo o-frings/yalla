@@ -1,254 +1,110 @@
 # Yalla — Evidence Ledger
 
-What this app's coaching claims rest on, and how strong each claim really is. Two parts:
+Human-readable companion to **`evidence.json`**, which is the canonical, machine-readable source of truth (the app reads it for tips, the browsable Library and DOI links). When the two disagree, **`evidence.json` wins** — update it first, then mirror the change here.
 
-- **Part A — Training & nutrition.** Powers the volume model, the muscle-balance radar, the growth signal, and the goal-tagged coach tips. Mostly **experimental** evidence.
-- **Part B — General health & longevity.** Powers (proposed) "anyone" coach tips. Almost entirely **observational** evidence.
-- **Part C — Injury management.** Powers the self-care advice shown when a temporary injury is flagged. Leading clinical guidelines / RCTs; general guidance, **not** medical advice.
+Every coaching claim in Yalla traces to a study below, with its concrete result, how strong the evidence is, and how strong the *source* is.
 
-Citations also live in-app in `PROG_SRC` / `SRC_DOI` (Parts A & C) and the Muscle-balance "How this is measured & sources" block.
+## Source-quality priority
 
----
+We **prioritise meta-analyses, systematic reviews and umbrella reviews in reputable journals** (BJSM, Lancet, JAMA, BMJ, PNAS, *Sports Medicine*, etc.) over single small cohorts. Each study carries a `tier`; weak single cohorts are flagged and shown sparingly in-app. Current mix: **14 meta-analyses/reviews-of-trials, 4 RCTs, 10 reviews/guidelines, 11 cohorts, 1 mechanistic, 2 small cohorts (flagged).**
 
-## How to read the "Evidence" column
+## Two legends
 
-Causation is the whole game here, so every study is tagged:
+**Causal strength** (`evidence`) — can we say *do X → get Y*?
 
-| Tag | Meaning | Can we say "do X → get Y"? |
-|---|---|---|
-| **Causal** | RCT, or meta-analysis of RCTs | Yes — randomisation rules out most confounding |
-| **Causal-leaning** | Controlled experiments / mechanistic studies, but not a clean RCT for the exact claim | Mostly — direction is sound, magnitude less certain |
-| **Correlational** | Observational (prospective cohort, cross-sectional, meta-analysis of cohorts). Adjusted for confounders, but residual confounding + reverse causation remain | **No** — only "associated with". Phrase as *linked to / associated with* |
-| **Correlational + mechanism** | Observational for the headline (e.g. mortality), but acute RCTs / mechanism explain *why* | Plausibly causal, not proven |
-| **Marker (not lever)** | Observational, and the measured thing is a *proxy* for health, not necessarily a cause you can train into longevity | No — predicts, doesn't promise |
+| Tag | Meaning |
+|---|---|
+| `causal` | RCT or meta-analysis of RCTs — yes |
+| `causal-leaning` | controlled/mechanistic/guideline, not a clean RCT — mostly |
+| `correlational` | observational; association only — phrase "linked to" |
+| `correlational+mech` | observational headline + RCT/mechanism for the *why* |
+| `marker` | observational, and a *proxy* — predicts, doesn't promise |
 
-**Rule of thumb for copy:** Part A tips may use imperative, mechanistic language ("add a rep and the muscle grows"). Part B tips must use associational language ("linked to", "tend to") and never promise lifespan.
+**Source quality** (`tier`): `meta` (meta-analysis/review — preferred) · `rct` · `review` (guideline/consensus/narrative) · `cohort` (large) · `small-cohort` (weak, flagged) · `mechanism`.
+
+**Copy rule:** `tone:"do"` (imperative, mechanistic) is allowed only for causal / causal-leaning studies. `tone:"linked"` (observational, marker) must use "linked to / tends to" and must never promise lifespan. This is enforced in `evidence.json`.
+
+## Library categories (how users browse all of it)
+
+The app surfaces every item in a dedicated, searchable **Library** screen grouped into: **Training · Recovery & sleep · Nutrition · Move for life · Body signals · Mind & happiness · Injury care & prevention.** The random start-page tip is a teaser that links into the matching Library entry; nothing is buried, nothing is dumped all at once.
 
 ---
 
 # Part A — Training & nutrition (mostly causal)
 
-### Volume drives hypertrophy → ~10+ sets/muscle/week
-- **Schoenfeld BJ, Ogborn D, Krieger JW (2017).** Dose–response relationship between weekly resistance-training volume and muscle hypertrophy. *J Sports Sci* 35(11). Key `sch17`.
-- **Design:** Meta-analysis of training studies (largely RCTs). **Evidence: Causal.**
-- **Finding:** More weekly sets → more growth; benefits accrue around ≥10 sets/muscle/wk.
-- **We take:** The ~10-set target ring; `WEEKLY_SET_TARGET=10`, `WEEKLY_SET_MIN=6`. Growth-signal "growth dose".
-
-### Fractional set counting (secondary = 0.5) + dose–response
-- **Pelland JC, Remmert JF, Robinson ZP, Hinson SR, Zourdos MC (2024).** The resistance-training dose–response: meta-regressions on weekly volume & frequency for hypertrophy and strength. *SportRxiv*, doi:10.51224/SRXIV.460. Key `drr`.
-- **Design:** Meta-regression of training studies. **Evidence: Causal-leaning** (experimental inputs; modelled dose–response).
-- **Finding:** Counting indirect/secondary sets as **0.5** best predicted hypertrophy (vs 0 or 1.0). More frequency helps accommodate higher volume.
-- **We take:** Primary ×1.0 / secondary ×0.5 weighting throughout `muscleVolume`, radar, growth signal. Tips `dose`, `spread`.
-
-### Training frequency
-- **Schoenfeld BJ, Ogborn D, Krieger JW (2016).** Effects of resistance-training frequency on muscle hypertrophy: a meta-analysis. *Sports Med* 46(11). Key `sch16`.
-- **Design:** Meta-analysis of training studies. **Evidence: Causal-leaning.**
-- **Finding:** Training a muscle ~2×/wk tends to beat 1×/wk at matched volume.
-- **We take:** Tips `freq2`, `freqlag`; frequency logic in plan builder.
-
-### Mechanisms of growth → progressive overload
-- **Schoenfeld BJ (2010).** The mechanisms of muscle hypertrophy and their application to resistance training. *J Strength Cond Res* 24(10):2857–2872. Key `sch10`.
-- **Design:** Narrative/mechanistic review. **Evidence: Causal-leaning** (mechanistic synthesis).
-- **Finding:** Mechanical tension (progressive overload) is a primary hypertrophy driver.
-- **We take:** Growth signal requires a *rising* trend, not just adequate dose. Tips `overload`, `tension`.
-
-### Overload via load OR reps
-- **Plotkin D, Coleman M, Van Every D, et al. (2022).** Progressive overload without progressing load? *PeerJ* 10:e14142, doi:10.7717/peerj.14142. Key `plotkin`.
-- **Design:** **RCT** (43 trained adults, 8 wk, load- vs rep-progression). **Evidence: Causal.**
-- **Finding:** Added reps and added load drove similar growth.
-- **We take:** Growth-signal trend tracks **total volume** (load×reps×sets), not load alone. Tip `repsOK`.
-
-### Volume landmarks (MEV / MAV / MRV) + deloads
-- **Israetel M, et al. — Renaissance Periodization.** Training volume landmarks for muscle growth. Key `rpvol`.
-- **Design:** Practitioner framework synthesising training literature (not a single study). **Evidence: Causal-leaning** (model built on experimental work).
-- **Finding:** A productive volume window exists; too little under-stimulates, too much adds fatigue; planned deloads clear fatigue.
-- **We take:** ~10–20 set framing; deload logic; tips `landmarks`, `deload`, `rampvol`.
-
-### Muscle-protein synthesis time course → weekly accounting
-- **Phillips SM, et al. (1997).** Mixed muscle protein synthesis and breakdown after resistance exercise. *Am J Physiol* 273(1). Key `mps`.
-- **Design:** Experimental (measured MPS post-exercise). **Evidence: Causal/mechanistic.**
-- **Finding:** MPS elevated ~24–48 h post-session.
-- **We take:** Weekly (not daily, no time-decay) volume accounting. Tips `window`, `recover`.
-
-### Maintenance volume (~1/3 of building volume)
-- **Bickel CS, Cross JM, Bamman MM (2011).** Exercise dosing to retain resistance-training adaptations. *Med Sci Sports Exerc* 43(7):1177–1187, doi:10.1249/MSS.0b013e318207c15d. Key `bickel`.
-- **Design:** **Controlled training trial** (70 adults; 16 wk build, then 32 wk reduced dose). **Evidence: Causal.**
-- **Finding:** Gains maintained on ~1/3 (older) to ~1/9 (young) of the building volume.
-- **We take:** Maintenance floor `WEEKLY_SET_MAINT=3`; growth-signal "holding" state. Tips `maintain`, `dontskip`.
-
-### Detraining / atrophy timeline
-- **Mujika I, Padilla S (2000).** Detraining Part I — short-term insufficient training stimulus. *Sports Med* 30(2):79–87. Key `mujika`.
-- **Design:** Narrative review of detraining experiments. **Evidence: Causal-leaning** (detraining studies are experimental: stop training, measure).
-- **Finding:** Strength holds for weeks; longer layoffs bring fibre atrophy.
-- **We take:** Growth-signal "shrinking" state below maintenance. Tips `detrain`, `comeback`.
-
-### EMG ≠ hypertrophy
-- **Vigotsky AD, Trajano GS, Vieira TM (2022).** Acutely measured surface EMG amplitude is not a validated predictor of hypertrophy. *Sports Med* 52:193–199. Key `vigotsky`.
-- **Design:** Methodological/validity review. **Evidence: Causal-leaning** (measurement-validity argument).
-- **Finding:** Acute "activation"/EMG doesn't reliably predict growth.
-- **We take:** We weight whole sets, not per-exercise "activation". Tips `emg`, `feel`.
-
-### Nutrition
-- **Morton RW, et al. (2018).** Protein supplementation meta-analysis. *Br J Sports Med* 52(6). Key `morton`. — **Meta-analysis of RCTs. Causal.** ~1.6 g/kg/day covers most lifters; little benefit beyond. Tips `protein`, `proteinceil`.
-- **Slater GJ, et al. (2019).** Is an energy surplus required to maximise hypertrophy? *Front Nutr* 6:131. Key `slater`. — **Review of experimental + observational. Causal-leaning.** A slight surplus supports growth. Tips `surplus`, `nodeficit` (goal: muscle).
-- **Garthe I, et al. (2013).** Nutritional intervention on body composition & performance in elite athletes. *Eur J Sport Sci* 13(3):295–303. Key `garthe`. — **Intervention study. Causal-leaning.** Slower gain (~0.25–0.5%/wk) → leaner gains. Tip `leangain` (goal: muscle).
-- **Helms ER, et al. (2014).** Evidence-based recommendations for natural bodybuilding contest prep: nutrition. *J Int Soc Sports Nutr* 11:20. Key `helms`. — **Review/recommendations. Causal-leaning.** On a deficit, keep protein high (~2 g/kg), lift heavy, deficit moderate (~0.5–1%/wk). Tips `cut`, `cutprotein`, `lossrate`, `nocrash` (goal: fatloss).
-
-**Part A summary:** Hypertrophy/strength claims are RCT-grade (`plotkin`, `bickel`, `morton`) or meta-analyses of training studies (`sch17`, `sch16`, `drr`). We can speak causally. Nutrition is a mix of intervention studies and evidence-based reviews — strong, slightly softer.
+- **`sch17` — Schoenfeld, Ogborn, Krieger (2017),** *J Sports Sci.* [10.1080/02640414.2016.1210197](https://doi.org/10.1080/02640414.2016.1210197) · *meta · causal · 15 studies* — Graded dose–response: each added weekly set ≈ **+0.37%** muscle gain; near-max around **~10+ sets/muscle/wk.** → ~10-set target ring; growth-dose.
+- **`drr` — Pelland et al. (2024),** *SportRxiv.* [10.51224/SRXIV.460](https://doi.org/10.51224/SRXIV.460) · *meta · causal-leaning* — Indirect/secondary sets weighted **0.5** best fit hypertrophy; more frequency accommodates volume. → primary ×1 / secondary ×0.5 weighting. *(preprint)*
+- **`sch16` — Schoenfeld et al. (2016),** *Sports Med.* [10.1007/s40279-016-0543-8](https://doi.org/10.1007/s40279-016-0543-8) · *meta · causal-leaning · 10 studies* — At matched volume, **~2×/wk** modestly out-grew 1×/wk. → frequency tips & builder.
+- **`sch10` — Schoenfeld (2010),** *JSCR.* [10.1519/JSC.0b013e3181e840f3](https://doi.org/10.1519/JSC.0b013e3181e840f3) · *review · causal-leaning* — Mechanical tension (progressive overload) is the primary growth driver. → growth signal needs a *rising* trend; `overload`, `tension`.
+- **`plotkin` — Plotkin et al. (2022),** *PeerJ.* [10.7717/peerj.14142](https://doi.org/10.7717/peerj.14142) · *rct · causal · n=43* — Adding **reps** built as much as adding **load.** → trend tracks total volume; `repsOK`.
+- **`rpvol` — Renaissance Periodization (Israetel et al.).** [article](https://rpstrength.com/blogs/articles/training-volume-landmarks-muscle-growth) · *review · causal-leaning* — Productive window ~**10 (MEV) → 20 (MAV)** sets/muscle; deload to clear fatigue. → `landmarks`, `deload`, `rampvol`.
+- **`mps` — Phillips et al. (1997),** *Am J Physiol.* [10.1152/ajpendo.1997.273.1.E99](https://doi.org/10.1152/ajpendo.1997.273.1.E99) · *mechanism · causal-leaning · n=8* — Protein synthesis **roughly doubled (~+100%) by 24 h,** elevated ~**24–48 h.** → weekly accounting; `window`, `recover`.
+- **`bickel` — Bickel, Cross, Bamman (2011),** *MSSE.* [10.1249/MSS.0b013e318207c15d](https://doi.org/10.1249/MSS.0b013e318207c15d) · *rct · causal · n=70* — Gains held on as little as **1/3 (older) to 1/9 (young)** of building volume over 32 wk. → maintenance floor; `maintain`, `dontskip`.
+- **`mujika` — Mujika & Padilla (2000),** *Sports Med.* [10.2165/00007256-200030020-00002](https://doi.org/10.2165/00007256-200030020-00002) · *review · causal-leaning* — Strength largely retained **~2–4 wk** off; longer → atrophy. → "shrinking" state; `detrain`, `comeback`.
+- **`vigotsky` — Vigotsky et al. (2022),** *Sports Med.* [10.1007/s40279-021-01619-2](https://doi.org/10.1007/s40279-021-01619-2) · *review · causal-leaning* — Acute EMG "activation" doesn't predict growth. → weigh sets, not "feel"; `emg`, `feel`.
+- **`morton` — Morton et al. (2018),** *BJSM.* [10.1136/bjsports-2017-097608](https://doi.org/10.1136/bjsports-2017-097608) · *meta · causal · 49 RCTs* — Protein added **~+0.3 kg** lean mass; benefit plateaued **~1.6 g/kg/day.** → `protein`, `proteinceil`.
+- **`slater` — Slater et al. (2019),** *Front Nutr.* [10.3389/fnut.2019.00131](https://doi.org/10.3389/fnut.2019.00131) · *review · causal-leaning* — A modest surplus supports growth; big surpluses add mostly fat. → `surplus`, `nodeficit` (goal: muscle).
+- **`garthe` — Garthe et al. (2013),** *Eur J Sport Sci.* [10.1080/17461391.2011.643923](https://doi.org/10.1080/17461391.2011.643923) · *rct · causal-leaning · n=39* — Faster gain (+3.9% vs +1.5% BW) added **more fat, not more lean.** → `leangain` (goal: muscle).
+- **`helms` — Helms, Aragon, Fitschen (2014),** *JISSN.* [10.1186/1550-2783-11-20](https://doi.org/10.1186/1550-2783-11-20) · *review · causal-leaning* — Lean cut: **~0.5–1%/wk** loss, protein **~2.3–3.1 g/kg LBM**, keep lifting. → `cut`, `cutprotein`, `lossrate`, `nocrash` (goal: fatloss).
 
 ---
 
-# Part B — General health & longevity (almost all correlational)
+# Part B — General health, longevity & happiness (mostly correlational)
 
-> ⚠️ With one partial exception (breaking up sitting has acute-RCT mechanism), **every Part B finding below is observational.** Large and carefully adjusted, but association ≠ causation. Copy must say "linked to / associated with" and must not promise extra years of life. "Marker" items are proxies we likely *can't* train directly into longevity.
+> Almost all observational. Adjusted and large, but association ≠ causation — copy says "linked to / tends to," never promises lifespan. The two **exercise→mood** items (`singh`) and **fibre** risk-factor data are the causal exceptions. **Markers** (`grip`, `sitrise`) are proxies, not levers. `sauna` and `sitrise` are weak single cohorts — flagged, shown sparingly.
 
-### Steps — benefit plateaus well before 10,000
-- **Paluch AE, et al. (2022).** Daily steps and all-cause mortality: meta-analysis of 15 cohorts. *Lancet Public Health* 7(3):e219–e228.
-- **Design:** Meta-analysis of prospective cohorts (47,471 adults). **Evidence: Correlational.**
-- **Finding:** Lower mortality with more steps; benefit largely plateaus ~6,000–8,000 (older) / ~8,000–10,000 (younger). The "10,000" target was never evidence-based.
-- **Tip `steps10k`.** Surprise: debunks a famous number. *Confounding: healthier people walk more.*
+**Move for life**
+- **`paluch` — Paluch et al. (2022),** *Lancet Public Health.* [10.1016/S2468-2667(21)00302-9](https://doi.org/10.1016/S2468-2667(21)00302-9) · *meta · correlational · 15 cohorts, 47,471* — Mortality fell with steps, plateauing **~7–8k (60+) / 8–10k (<60)**; top vs bottom quartile **~40–53% lower** (HR 0.47–0.60). 10k was a slogan. → `steps10k`.
+- **`odonovan` — O'Donovan et al. (2017),** *JAMA Intern Med.* [10.1001/jamainternmed.2016.8014](https://doi.org/10.1001/jamainternmed.2016.8014) · *cohort · correlational · 63,591* — "Weekend warriors" **~30% lower** all-cause mortality (HR 0.70), ≈ regularly active. → `weekendwarrior`.
+- **`stamatakis` — Stamatakis et al. (2022),** *Nat Med.* [10.1038/s41591-022-02100-x](https://doi.org/10.1038/s41591-022-02100-x) · *cohort · correlational* — **~4.4 min/day** of vigorous bursts ≈ **26–30% lower** all-cause/cancer, **32–34% lower** CVD mortality. → `vilpa`.
+- **`momma` — Momma et al. (2022),** *BJSM.* [10.1136/bjsports-2021-105061](https://doi.org/10.1136/bjsports-2021-105061) · *meta · correlational · 16 studies* — **30–60 min/wk** strength work ≈ **10–17% lower** mortality, J-shaped. → `rtdose`.
+- **`mandsager` — Mandsager et al. (2018),** *JAMA Netw Open.* [10.1001/jamanetworkopen.2018.3605](https://doi.org/10.1001/jamanetworkopen.2018.3605) · *cohort · correlational · 122,007* — Fitness → lower mortality, **no upper limit**; elite vs low **HR 0.20**; unfitness ≈ smoking. → `vo2nolimit`.
+- **`diaz` — Diaz et al. (2017),** *Ann Intern Med.* [10.7326/M17-0212](https://doi.org/10.7326/M17-0212) · *cohort · correlational+mech · 7,985* — More total sitting **and** longer unbroken bouts (≥60–90 min) → higher mortality; short bouts (<30 min) best. → `sitbreaks`.
+- **`laukkanen` — Laukkanen et al. (2015),** *JAMA Intern Med.* [10.1001/jamainternmed.2014.8187](https://doi.org/10.1001/jamainternmed.2014.8187) · *small-cohort · correlational · 2,315 men* ⚠️ — 4–7 sauna/wk vs 1: all-cause **HR 0.60**, CVD 0.50. → `sauna` *(weak: single-sex cohort)*.
 
-### Weekend warrior — concentration doesn't blunt benefit
-- **O'Donovan G, et al. (2017).** Weekend-warrior and other activity patterns and mortality. *JAMA Intern Med* 177(3):335–342.
-- **Design:** Prospective cohort (replicated since). **Evidence: Correlational.**
-- **Finding:** 1–2 sessions/wk meeting the weekly total gave mortality reductions similar to spread-out activity.
-- **Tip `weekendwarrior`.** *Reverse causation: the unwell exercise less, on any schedule.*
+**Nutrition & hydration**
+- **`reynolds` — Reynolds et al. (2019),** *Lancet.* [10.1016/S0140-6736(18)31809-9](https://doi.org/10.1016/S0140-6736(18)31809-9) · *meta · correlational+mech · 185 cohorts + 58 RCTs* — **+8 g/day fibre ≈ 7% lower** mortality; high vs low **15–30% lower**; ~25–29 g/day. → `fiber`.
+- **`poole` — Poole et al. (2017),** *BMJ.* [10.1136/bmj.j5024](https://doi.org/10.1136/bmj.j5024) · *meta · correlational · 201 meta-analyses* — **3–4 cups coffee/day ≈ 17% lower** all-cause mortality (RR 0.83). → `coffee`.
+- **`dmitrieva` — Dmitrieva et al. (2023),** *eBioMedicine.* [10.1016/j.ebiom.2022.104404](https://doi.org/10.1016/j.ebiom.2022.104404) · *cohort · correlational · ARIC, ~25 y* — Serum Na **>142 ≈ +39%** chronic disease, **~50%** higher odds "biologically older"; **>144 ≈ +21%** premature death. → `hydration`.
 
-### VILPA — 1-minute bursts in daily life
-- **Stamatakis E, et al. (2022).** Wearable-measured vigorous intermittent lifestyle physical activity and mortality. *Nat Med.*
-- **Design:** Prospective cohort, wrist accelerometers (UK Biobank). **Evidence: Correlational.**
-- **Finding:** ~3–4 min/day of brief vigorous bursts associated with markedly lower all-cause/CVD/cancer mortality in non-exercisers.
-- **Tip `vilpa`.** Novel, device-measured (less recall bias). Still observational.
+**Recovery & sleep**
+- **`windred` — Windred et al. (2024),** *Sleep.* [10.1093/sleep/zsad253](https://doi.org/10.1093/sleep/zsad253) · *cohort · correlational · 60,977* — Most-regular sleepers **20–48% lower** mortality; regularity beat duration. → `sleepreg`.
 
-### Strength training — sweet spot 30–60 min/week
-- **Momma H, et al. (2022).** Muscle-strengthening activities and mortality/non-communicable disease: systematic review & meta-analysis. *Br J Sports Med* 56(13):755–763.
-- **Design:** Meta-analysis of cohort studies (16 studies). **Evidence: Correlational** for the mortality endpoint (the *training → strength* link itself is RCT-backed).
-- **Finding:** 10–17% lower all-cause mortality; maximal benefit ~30–60 min/wk, J-shaped (more isn't better for mortality).
-- **Tip `rtdose`.** Ties to the app; honest framing: "linked to".
+**Body signals (markers, not levers)**
+- **`leong` — Leong et al. (2015), PURE,** *Lancet.* [10.1016/S0140-6736(14)62000-6](https://doi.org/10.1016/S0140-6736(14)62000-6) · *cohort · marker · 139,691* — Each **5 kg lower grip ≈ +16%** all-cause / +17% CV mortality; beat systolic BP. → `grip`.
+- **`brito` — Brito et al. (2012),** *Eur J Prev Cardiol.* [10.1177/2047487312471759](https://doi.org/10.1177/2047487312471759) · *small-cohort · marker · 2,002* ⚠️ — Lowest sitting-rising scorers **~5–6×** the mortality of top scorers. → `sitrise` *(weak: small cohort)*.
 
-### Cardiorespiratory fitness — no upper ceiling
-- **Mandsager K, et al. (2018).** Cardiorespiratory fitness and long-term mortality (treadmill testing). *JAMA Netw Open* 1(6):e183605.
-- **Design:** Retrospective cohort (122,007 patients). **Evidence: Correlational.**
-- **Finding:** Higher fitness → lower mortality with no observed upper limit; being unfit carried risk comparable to or exceeding smoking.
-- **Tip `vo2nolimit`.** *Selection: clinical treadmill-test population.*
-
-### Breaking up sitting
-- **Diaz KM, et al. (2017).** Patterns of sedentary behavior and mortality. *Ann Intern Med* 167(7):465–475.
-- **Design:** Prospective cohort (REGARDS, 7,985), accelerometer. **Evidence: Correlational + mechanism** (acute RCTs show movement breaks improve post-meal glucose/insulin).
-- **Finding:** Greater total *and* longer uninterrupted sitting bouts → higher mortality; short, frequent breaks looked best.
-- **Tip `sitbreaks`.** Strongest Part B case for partial causality.
-
-### Grip strength — predicts mortality (MARKER)
-- **Leong DP, et al. (2015).** Prognostic value of grip strength (PURE). *Lancet* 386(9990):266–273.
-- **Design:** Prospective cohort (139,691, 17 countries). **Evidence: Marker (not lever).**
-- **Finding:** Each 5 kg lower grip → ~16% higher all-cause, ~17% CV mortality; beat systolic BP as a predictor.
-- **Tip `grip`.** Honest framing: grip *reflects* whole-body strength/health; squeezing a gripper won't itself add years.
-
-### Sitting-rising test — predicts mortality (MARKER)
-- **Brito LBB, et al. (2012/2014).** Ability to sit and rise from the floor as a predictor of all-cause mortality. *Eur J Prev Cardiol* 21(7):892.
-- **Design:** Prospective cohort (2,002 adults, 51–80; median 6.3 y). **Evidence: Marker (not lever); smaller sample.**
-- **Finding:** Low score → 5–6× mortality vs high score.
-- **Tip `sitrise`** — *candidate to cut for rigor.* Fun self-test, but small and a proxy.
-
-### Sauna frequency
-- **Laukkanen T, et al. (2015).** Sauna bathing and fatal CV/all-cause mortality. *JAMA Intern Med* 175(4):542–548.
-- **Design:** Prospective cohort (KIHD; 2,315 middle-aged Finnish **men**). **Evidence: Correlational; single-sex, single-population.**
-- **Finding:** 4–7×/wk vs 1×/wk: all-cause HR ~0.60, CV death HR ~0.50.
-- **Tip `sauna`** — *candidate to cut/soften.* Generalisability limited.
-
-### Hydration / serum sodium and aging
-- **Dmitrieva NI, et al. (2023).** High-normal serum sodium, accelerated biological aging, chronic disease, premature mortality. *eBioMedicine* (NIH).
-- **Design:** Prospective cohort (11,255 adults, ~30 y). **Evidence: Correlational; indirect proxy.**
-- **Finding:** Serum sodium at the high end of normal (≥142 mmol/L) → faster biological aging, more chronic disease, earlier death.
-- **Tip `hydration`.** *Sodium is an indirect hydration marker; causation unproven.*
-
-### Dietary fiber
-- **Reynolds A, et al. (2019).** Carbohydrate quality and human health: systematic reviews & meta-analyses. *Lancet* 393(10170):434–445.
-- **Design:** Systematic reviews/meta-analyses — cohorts (mortality) **+ RCTs** (risk factors like weight, BP, cholesterol). **Evidence: Correlational for mortality, causal for intermediate markers.**
-- **Finding:** 25–29 g+/day → 15–30% lower all-cause & CV mortality; dose-responsive.
-- **Tip `fiber`.** Among the better-supported Part B items.
-
-### Coffee
-- **Poole R, et al. (2017).** Coffee consumption and health: umbrella review. *BMJ* 359:j5024.
-- **Design:** Umbrella review of 201 meta-analyses (mostly observational). **Evidence: Correlational.**
-- **Finding:** 3–4 cups/day associated with the largest reduction in all-cause & CV mortality; "more likely to benefit than harm".
-- **Tip `coffee`.** *Individual suitability (pregnancy, anxiety, arrhythmia).*
-
-### Sleep regularity > duration
-- **Windred DP, et al. (2024).** Sleep regularity a stronger predictor of mortality than sleep duration. *Sleep* 47(1):zsad253.
-- **Design:** Prospective cohort (UK Biobank, 60,977; accelerometer). **Evidence: Correlational.**
-- **Finding:** Most-regular sleepers had 20–48% lower all-cause mortality; regularity out-predicted duration.
-- **Tip `sleepreg`.** Device-measured; still observational.
-
-### Social connection ≈ smoking
-- **Holt-Lunstad J, et al. (2010).** Social relationships and mortality risk: meta-analysis. *PLoS Med* 7(7):e1000316. — 148 studies, 308,849 people. **+ (2015)** *Perspect Psychol Sci* 10(2):227–237 — isolation/loneliness, 3.4M people.
-- **Design:** Meta-analyses of cohorts. **Evidence: Correlational.**
-- **Finding:** Strong social ties ~50% higher survival; weak ties carry risk likened to smoking ~15 cigarettes/day.
-- **Tip `social`.** Striking magnitude; association.
-
-### Optimism
-- **Lee LO, et al. (2019).** Optimism and exceptional longevity, 2 cohorts. *PNAS* 116(37):18357–18362.
-- **Design:** Prospective cohorts (Nurses' Health Study women; VA Normative Aging men). **Evidence: Correlational.**
-- **Finding:** Most optimistic had 11–15% longer lifespan, 50–70% greater odds of reaching 85; held after adjusting for health behaviours.
-- **Tip `optimism`.**
-
-### Purpose in life
-- **Alimujiang A, et al. (2019).** Life purpose and mortality, US adults >50. *JAMA Netw Open* 2(5):e194270.
-- **Design:** Prospective cohort (Health & Retirement Study, 6,985). **Evidence: Correlational.**
-- **Finding:** Stronger purpose → lower all-cause mortality, independent of wealth/health.
-- **Tip `purpose`.**
-
-### Reading books
-- **Bavishi A, Slade MD, Levy BR (2016).** A chapter a day: book reading and longevity. *Soc Sci Med* 164:44–48.
-- **Design:** Prospective cohort (Health & Retirement Study, 3,635, >50). **Evidence: Correlational.**
-- **Finding:** >3.5 h/wk book reading → 23% lower mortality over 12 y (~2-year survival advantage); books, not newspapers/magazines.
-- **Tip `reading`.** Charming; observational.
+**Mind & happiness**
+- **`singh` — Singh et al. (2023),** *BJSM.* [10.1136/bjsports-2022-106195](https://doi.org/10.1136/bjsports-2022-106195) · *meta · causal · 97 reviews, 128,119* — Exercise eased **depression (−0.43)** and **anxiety (−0.42)** vs usual care — ≈ therapy/medication. → `exerciseMood`.
+- **`white` — White et al. (2019),** *Sci Rep.* [10.1038/s41598-019-44097-3](https://doi.org/10.1038/s41598-019-44097-3) · *cohort · correlational · ~20,000* — **≥120 min/week in nature** → better health & wellbeing; nothing below that. → `nature`.
+- **`carr` — Carr et al. (2021),** *J Positive Psychol.* [10.1080/17439760.2020.1818807](https://doi.org/10.1080/17439760.2020.1818807) · *meta · causal · 347 studies* — Positive-psychology habits: wellbeing **g=0.39**, depression g=−0.39. → `gratitude`.
+- **`curry` — Curry et al. (2018),** *J Exp Soc Psychol.* [10.1016/j.jesp.2018.02.014](https://doi.org/10.1016/j.jesp.2018.02.014) · *meta · causal · 27 studies* — Acts of kindness lift the **giver's** wellbeing (**d=0.28**). → `kindness`.
+- **`holtlunstad` — Holt-Lunstad et al. (2010),** *PLoS Med.* [10.1371/journal.pmed.1000316](https://doi.org/10.1371/journal.pmed.1000316) · *meta · correlational · 308,849* — Strong ties **≈ +50%** survival odds (OR 1.50) ≈ quitting smoking. → `social`.
+- **`lee` — Lee et al. (2019),** *PNAS.* [10.1073/pnas.1900712116](https://doi.org/10.1073/pnas.1900712116) · *cohort · correlational* — Optimists **11–15% longer** lifespan, 50–70% higher odds of reaching 85. → `optimism`.
+- **`alimujiang` — Alimujiang et al. (2019),** *JAMA Netw Open.* [10.1001/jamanetworkopen.2019.4270](https://doi.org/10.1001/jamanetworkopen.2019.4270) · *cohort · correlational · 6,985* — Lowest vs highest purpose **~2.4×** mortality (HR 2.43). → `purpose`.
+- **`bavishi` — Bavishi, Slade, Levy (2016),** *Soc Sci Med.* [10.1016/j.socscimed.2016.07.014](https://doi.org/10.1016/j.socscimed.2016.07.014) · *cohort · correlational · 3,635* — Reading books **>3.5 h/wk → 23% lower** mortality (HR 0.80). → `reading`.
 
 ---
 
-# Part C — Injury management (self-care advice)
+# Part C — Injury care & prevention (guidelines / RCTs)
 
-Powers the treatment advice shown when you flag a temporary injury in **Me → Niggle or injury**. These are leading evidence-based clinical guidelines / RCTs for common training niggles. Citations live in-app in `PROG_SRC` / `SRC_DOI` (keys `injAnkle`…`injElbow`) and render with a clickable source link inside the injury sheet. **Framing rule:** general self-management guidance, *not* medical advice — the in-app copy says so and points to a clinician for significant or lasting pain.
+General self-management and prevention, **not medical advice** — in-app copy says so and points to a clinician for significant or lasting pain. The management entries also drive how the plan adapts a flagged injury (`INJURY_TIERS` + `INJURY_REGION`).
 
-The same five keys also drive how hard the plan adapts: a flagged injury swaps risky lifts for safe same-muscle work (mild/moderate) or rests the whole body part (severe), via `INJURY_TIERS` + `INJURY_REGION`.
+**Prevention**
+- **`lauersen` — Lauersen, Bertelsen, Andersen (2014),** *BJSM.* [10.1136/bjsports-2013-092538](https://doi.org/10.1136/bjsports-2013-092538) · *meta · causal · 25 RCTs, 26,610* — **Strength training cut injuries to under a third** (RR ~0.32); overuse halved (RR 0.53); **stretching did not help.** → `prevStrength`.
+- **`vandyk` — van Dyk, Behan, Whiteley (2019),** *BJSM.* [10.1136/bjsports-2018-100045](https://doi.org/10.1136/bjsports-2018-100045) · *meta · causal · 15 studies, 8,459* — Nordic hamstring exercise **~halved** hamstring injuries (RR 0.49). → `prevHamstring`.
 
-### Ankle sprain → move early, don't immobilise
-- **Vuurberg G, et al. (2018).** Diagnosis, treatment and prevention of ankle sprains: update of an evidence-based clinical guideline. *Br J Sports Med* 52(15). Key `injAnkle`. doi:10.1136/bjsports-2017-098106.
-- **Design:** Evidence-based clinical guideline (systematic-review backed). **Evidence: Causal-leaning** (guideline synthesising RCTs).
-- **Finding:** Functional support + early controlled mobilisation/weight-bearing beats immobilisation; RICE for early symptoms; exercise/proprioceptive (balance) training reduces recurrence.
-- **We take:** Advice copy for `ankle`; balance-work prompt. Severe = rest the whole lower body (`INJURY_REGION.ankle`).
-
-### Patellofemoral / knee pain → exercise therapy is the lever
-- **Collins NJ, et al. (2018).** 2018 Consensus statement on exercise therapy and physical interventions to treat patellofemoral pain (5th Int. PFP Research Retreat). *Br J Sports Med* 52(18):1170–1178. Key `injKnee`. doi:10.1136/bjsports-2018-099397.
-- **Design:** Expert consensus over systematic-review evidence. **Evidence: Causal-leaning.**
-- **Finding:** Combined hip- + knee-focused exercise therapy (plus load management) improves pain and function more than rest or passive care.
-- **We take:** Advice copy for `knees` (keep moving, build hip/quad strength, manage load).
-
-### Low back pain → stay active, avoid bed rest
-- **Foster NE, et al. (2018).** Prevention and treatment of low back pain: evidence, challenges, and promising directions. *Lancet* 391(10137):2368–2383. Key `injBack`. doi:10.1016/S0140-6736(18)30489-6.
-- **Design:** Major evidence review (Lancet LBP series). **Evidence: Causal-leaning** (synthesis of guideline/RCT evidence).
-- **Finding:** Guidelines converge on reassurance, staying active, avoiding bed rest, and exercise; most episodes settle.
-- **We take:** Advice copy for `lowback` (stay active, ease back to normal activity).
-
-### Rotator cuff / shoulder pain → progressive loading, not injections
-- **Hopewell S, et al. (2021).** Progressive exercise vs best-practice advice, with/without corticosteroid injection, for rotator cuff disorders (GRASP): pragmatic 2×2 factorial RCT. *Lancet* 398(10298):416–428. Key `injShoulder`. doi:10.1016/S0140-6736(21)00846-1.
-- **Design:** Multicentre **RCT** (n=708). **Evidence: Causal.**
-- **Finding:** A single best-practice advice session with home exercises matched a longer physio-led progressive programme; corticosteroid injection added no meaningful benefit.
-- **We take:** Advice copy for `shoulders` (back off provocative overhead, load progressively, injections add little).
-
-### Lateral elbow tendinopathy → load it, skip the steroid shot
-- **Coombes BK, Bisset L, Vicenzino B (2015).** Management of lateral elbow tendinopathy: one size does not fit all. *J Orthop Sports Phys Ther* 45(11):938–949. Key `injElbow`. doi:10.2519/jospt.2015.5841.
-- **Design:** Clinical commentary / evidence synthesis. **Evidence: Causal-leaning** (draws on RCTs incl. steroid-harm trials).
-- **Finding:** Active management (isometric/eccentric loading, load/grip management) outperforms rest; corticosteroid injection improves short-term pain but worsens long-term recurrence.
-- **We take:** Advice copy for `elbows` (load it, manage grip, avoid steroid injections).
+**Care (when a niggle is flagged)**
+- **`injAnkle` — Vuurberg et al. (2018),** *BJSM guideline.* [10.1136/bjsports-2017-098106](https://doi.org/10.1136/bjsports-2017-098106) · *review · causal-leaning* — Early controlled weight-bearing > immobilisation; balance training **~halves** re-sprain risk. → `injAnkle`.
+- **`injKnee` — Collins et al. (2018),** *BJSM consensus.* [10.1136/bjsports-2018-099397](https://doi.org/10.1136/bjsports-2018-099397) · *review · causal-leaning* — Combined hip+knee exercise therapy beats rest/passive care for kneecap pain. → `injKnee`.
+- **`injBack` — Foster et al. (2018),** *Lancet.* [10.1016/S0140-6736(18)30489-6](https://doi.org/10.1016/S0140-6736(18)30489-6) · *review · causal-leaning* — Low back pain: reassurance, stay active, avoid bed rest. → `injBack`.
+- **`injShoulder` — Hopewell et al. (2021), GRASP,** *Lancet.* [10.1016/S0140-6736(21)00846-1](https://doi.org/10.1016/S0140-6736(21)00846-1) · *rct · causal · n=708* — Advice + home exercise matched full physio; **steroid injection added nothing.** → `injShoulder`.
+- **`injElbow` — Coombes, Bisset, Vicenzino (2015),** *JOSPT* (+ 2013 RCT, JAMA). [10.2519/jospt.2015.5841](https://doi.org/10.2519/jospt.2015.5841) · *review · causal-leaning* — Load it, don't rest it; **steroid worsened 1-yr recurrence (72% vs 8%)** ([Coombes 2013 RCT](https://doi.org/10.1001/jama.2013.129)). → `injElbow`.
 
 ---
 
-## Decisions for implementation
+## Changelog
+- **v2 (2026-06-04):** Added source `tier` to every study and a source-quality-priority rule (meta-analyses/reviews first). Made every finding concrete with verified effect sizes (double-checked against sources). Added **injury prevention** (`lauersen`, `vandyk`) and **happiness/life-satisfaction** (`singh`, `white`, `carr`, `curry`). Relabelled categories *Mind & happiness* and *Injury care & prevention*. Flagged weak single cohorts (`sauna`, `sitrise`). All DOIs verified to resolve.
+- **v1 (2026-06-03):** Initial ledger (Parts A/B/C) as prose.
 
-- **Part A** tips keep imperative, mechanistic phrasing.
-- **Part B** tips: associational language only ("linked to", "tend to"); no lifespan promises. **Markers** (`grip`, `sitrise`) framed as *reflects/predicts*, not *do-this-to-live-longer*.
-- Part B tips carry no objective `goals` (they target anyone). Suggest a `cat:"health"` tag so we can balance how often health vs. training tips surface.
-- **Rigor cuts on the table:** `sitrise` (small sample, marker) and `sauna` (single-sex cohort) are the weakest; keep, soften, or drop.
-
-_Last updated: 2026-06-03._
+_Canonical data: `evidence.json`. Last updated 2026-06-04._
