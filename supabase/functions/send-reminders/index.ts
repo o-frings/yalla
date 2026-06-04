@@ -29,8 +29,14 @@ Deno.serve(async (req) => {
     Deno.env.get("VAPID_PRIVATE")!,
   );
 
-  // Opportunistic housekeeping: keep the social-notify rate-limit log small.
+  // Opportunistic housekeeping: keep the social-notify rate-limit log small, prune old live
+  // reactions, and close any "live" session whose broadcaster went quiet (app closed mid-workout
+  // without finishing) so it can't linger as a stuck 🔴 in friends' feeds. The client also closes
+  // its own session on finish/toggle-off; this is the backstop. 20-min idle ⇒ closed.
   await sb.from("notify_log").delete().lt("sent_at", new Date(Date.now() - 2 * DAY).toISOString());
+  await sb.from("live_reactions").delete().lt("created_at", new Date(Date.now() - 2 * DAY).toISOString());
+  await sb.from("live_sessions").update({ active: false })
+    .eq("active", true).lt("updated_at", new Date(Date.now() - 20 * 60_000).toISOString());
 
   const cutoff = new Date(Date.now() - 2 * DAY).toISOString();
   const { data: rows, error } = await sb

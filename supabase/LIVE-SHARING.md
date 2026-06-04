@@ -1,9 +1,13 @@
-# Yalla — live workout sharing (design, not yet built)
+# Yalla — live workout sharing
 
-Status: **APPROVED SCOPE, NOT IMPLEMENTED.** Decisions locked 2026-06-04:
+Status: **IMPLEMENTED 2026-06-04.** Decisions locked:
 - **Audience:** per-friend grant — you allow specific accepted followers to watch (a permanent allow-list).
 - **Detail:** full live detail — current exercise, sets/reps/weight as logged, elapsed time.
 - **Transport:** Supabase Realtime (sub-second), RLS-gated.
+- **Push:** going live fires a Web Push to each granted follower (`social-notify` kind `live`).
+- **Cheer/comment:** granted watchers can cheer/comment *during* the session (`live_reactions`, streamed
+  back to the broadcaster). The finished workout still becomes a normal `activity` post with its own
+  permanent cheers/comments.
 
 Builds on the friends system (`follows`) from `schema-hardening.sql`. Land this **after** the
 `harden-edge-functions-and-schema` branch merges, to avoid schema collisions.

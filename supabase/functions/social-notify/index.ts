@@ -44,6 +44,48 @@ Deno.serve(async (req) => {
   const { data: aprof } = await sb.from("profiles").select("display_name").eq("user_id", actor.id).maybeSingle();
   const who = clean(aprof?.display_name) || "A friend";
 
+  // ---- Going live: fan out to every accepted follower the actor granted live access to. ----
+  // This is a one-to-many push (unlike the single-recipient kinds below), so it's handled inline
+  // and returns early. The client calls it once, at go-live; the per-recipient rate limit below
+  // collapses any accidental re-invokes.
+  if (kind === "live") {
+    webpush.setVapidDetails(
+      Deno.env.get("VAPID_SUBJECT") || "mailto:hello@yalla.app",
+      Deno.env.get("VAPID_PUBLIC")!,
+      Deno.env.get("VAPID_PRIVATE")!,
+    );
+    const { data: grants } = await sb.from("follows").select("follower")
+      .eq("followee", actor.id).eq("status", "accepted").eq("live", true);
+    const followers = (grants ?? []).map((g: any) => g.follower);
+    if (!followers.length) return OK();
+
+    // Don't re-push a go-live to the same follower within 10 minutes (re-entering the workout, etc.).
+    const since = new Date(Date.now() - 600_000).toISOString();
+    const { data: recent } = await sb.from("notify_log").select("recipient")
+      .eq("actor", actor.id).eq("kind", "live").gte("sent_at", since).in("recipient", followers);
+    const muted = new Set((recent ?? []).map((r: any) => r.recipient));
+
+    const { data: subs } = await sb.from("push_subscriptions")
+      .select("user_id, subscription").in("user_id", followers);
+    const payload = JSON.stringify({
+      title: "Yalla",
+      body: `${who} is training live 🔴 — tap to watch & cheer`,
+      url: `./?live=${actor.id}`,
+      tag: `yalla-live-${actor.id}`,
+    });
+    for (const s of subs ?? []) {
+      if (muted.has(s.user_id) || !s.subscription) continue;
+      try {
+        await webpush.sendNotification(s.subscription, payload);
+        await sb.from("notify_log").insert({ actor: actor.id, recipient: s.user_id, kind: "live" });
+      } catch (e) {
+        const code = (e && ((e as any).statusCode || (e as any).status)) || 0;
+        if (code === 404 || code === 410) await sb.from("push_subscriptions").delete().eq("user_id", s.user_id);
+      }
+    }
+    return OK();
+  }
+
   // Resolve who to notify (`recipient`) and the message, per event kind.
   let recipient: string | null = null;
   let msg = "";

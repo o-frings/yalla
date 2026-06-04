@@ -39,5 +39,48 @@ language sql stable security definer set search_path = '' as $$
 $$;
 grant execute on function public.my_followers() to authenticated;
 
--- 4. Realtime: stream live_sessions changes (RLS still decides who receives each row).
-alter publication supabase_realtime add table public.live_sessions;
+-- 4. live cheers / comments during a session. Short-lived (the cron prunes them); the finished
+--    workout's permanent cheers/comments still live on the `activity` row. A reaction is visible to
+--    the owner and to anyone the owner granted live access; only a granted watcher may post one.
+create table if not exists public.live_reactions (
+  id         bigint generated always as identity primary key,
+  owner      uuid not null references auth.users on delete cascade,   -- the broadcaster
+  actor      uuid not null references auth.users on delete cascade,   -- the friend cheering / commenting
+  kind       text not null check (kind in ('cheer','comment')),
+  body       text check (char_length(body) between 1 and 240),        -- null for cheers
+  created_at timestamptz not null default now()
+);
+alter table public.live_reactions enable row level security;
+create index if not exists live_reactions_owner_idx on public.live_reactions (owner, created_at desc);
+
+-- helper: is the current user a watcher the given owner has granted live access to?
+create or replace function public.can_watch_live(owner_id uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.follows f
+                 where f.follower = auth.uid() and f.followee = owner_id
+                   and f.status = 'accepted' and f.live = true);
+$$;
+grant execute on function public.can_watch_live(uuid) to authenticated;
+
+drop policy if exists "read live reactions" on public.live_reactions;
+create policy "read live reactions" on public.live_reactions for select
+  using (owner = auth.uid() or public.can_watch_live(owner));
+
+drop policy if exists "post live reaction" on public.live_reactions;
+create policy "post live reaction" on public.live_reactions for insert
+  with check (actor = auth.uid() and public.can_watch_live(owner));
+
+-- 5. Realtime: stream live_sessions + live_reactions changes (RLS still decides who receives each row).
+-- `alter publication … add table` errors if the table is already a member, so guard each add to
+-- keep this whole script safely re-runnable.
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'live_sessions') then
+    alter publication supabase_realtime add table public.live_sessions;
+  end if;
+  if not exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'live_reactions') then
+    alter publication supabase_realtime add table public.live_reactions;
+  end if;
+end $$;
