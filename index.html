@@ -2388,14 +2388,14 @@ function agoStr(ts){ const s=Math.max(0,(Date.now()-ts)/1000);
   if(s<90) return "just now"; const m=s/60; if(m<60) return Math.round(m)+"m ago";
   const h=m/60; if(h<24) return Math.round(h)+"h ago"; const d=h/24; return d<7?Math.round(d)+"d ago":new Date(ts).toLocaleDateString(undefined,{month:"short",day:"numeric"}); }
 
-// Rose / coxcomb chart of a workout's muscle split: each muscle is a wedge sized by its share of the
-// session's volume. Radius for share s is s^ROSE_GAMMA — a gentle curve (well below √) that lifts
-// small shares so the rosette is big and legible (and, in the builder, easy to grab); a single-muscle
-// workout still fills its wedge to the rim, untrained muscles stay empty, nothing crosses the ring.
-const ROSE_GAMMA=0.25;
+// Rose / coxcomb chart of a workout's muscle split. Normalized so the muscle with the MOST volume
+// reaches the rim and the rest fall away on a CONVEX curve: radius = (value/max)^ROSE_GAMMA, exponent
+// > 1 so the decay is steepest near the outer ring — emphasised muscles shoot to the edge and the
+// background muscles drop right back, giving strong contrast. Untrained muscles stay empty.
+const ROSE_GAMMA=2.5;
 function roseRadii(G, tot){
-  const total=G.reduce((a,g)=>a+(tot[g]||0),0);
-  return G.map(g=> total ? Math.pow((tot[g]||0)/total, ROSE_GAMMA) : 0);   // radius fraction in [0,1]
+  let mx=0; G.forEach(g=>{ const v=tot[g]||0; if(v>mx) mx=v; });
+  return G.map(g=> mx>0 ? Math.pow((tot[g]||0)/mx, ROSE_GAMMA) : 0);   // radius fraction in [0,1]
 }
 function drawRose(x, cx, cy, R, G, tot, o){
   o=o||{}; const n=G.length, frac=roseRadii(G,tot);
@@ -5407,10 +5407,9 @@ document.querySelectorAll("#sheetBuild .bchips.multi").forEach(grp=>{ const k=gr
   c.classList.toggle("on"); build[k]=[].map.call(grp.querySelectorAll(".chip.on"),x=>x.dataset.v); updateBuildPreview(); }); });
 function syncEmphasisChips(){ const sel=Array.isArray(build.focus)?build.focus:(build.focus?[build.focus]:[]);
   document.querySelectorAll('#sheetBuild .bchips[data-k="focus"] .chip').forEach(c=> c.classList.toggle("on", sel.indexOf(c.dataset.v)>=0)); }
-// The builder rose uses the same gentle curve as the feed/share roses (ROSE_GAMMA): it's a sums-to-1
-// distribution that rebalances proportionally when you drag. buildRoseShare inverts the curve so the
-// dragged wedge's tip tracks your finger.
-function buildRoseShare(frac){ return Math.pow(Math.max(0,Math.min(1,frac)), 1/ROSE_GAMMA); }
+// The builder rose uses the same convex, max-normalized curve as the feed/share roses (ROSE_GAMMA).
+// Because the render normalizes to the top muscle, changing any wedge rescales all the others —
+// "drag one, the rest move proportionally". The drag logic lives in the pointer handlers below.
 function drawEmphasisRadar(){
   const c=$("buildRadar"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const G=BUILD_GROUPS, cx=W/2, cy=H/2, R=W*0.30, n=G.length;
@@ -5439,20 +5438,22 @@ function updateBuildPreview(){
   const nearestSpoke=(ev)=>{ const r=c.getBoundingClientRect(); const px=(ev.clientX-r.left)/r.width*c.width, py=(ev.clientY-r.top)/r.height*c.height;
     const G=BUILD_GROUPS, n=G.length, cx=c.width/2, cy=c.height/2, ang=Math.atan2(py-cy,px-cx)*180/Math.PI;
     let bestI=0,bestD=999; for(let i=0;i<n;i++){ const a=-90+i*360/n, d=Math.abs(((ang-a+540)%360)-180); if(d<bestD){bestD=d;bestI=i;} } return bestI; };
-  // Set muscle g to a target SHARE of the distribution; the others keep their current weights, so the
-  // render (share = weight/Σweight) rescales them all proportionally and the rose stays summed to 1.
-  const setShare=(g, s)=>{ s=Math.max(0.02, Math.min(0.9, s));
-    const others=BUILD_GROUPS.reduce((a,m)=> a+(m===g?0:(build.emphasis[m]!=null?build.emphasis[m]:0.5)), 0)||0.0001;
-    build.emphasis[g]=s/(1-s)*others; build.focus=[]; syncEmphasisChips(); updateBuildPreview(); };
+  // Render is max-normalized: radius = (e/maxE)^ROSE_GAMMA. setFromFrac sets muscle g so its wedge
+  // tracks the finger; dragged to the rim it overtakes the field and the others recede (changing the
+  // max rescales everyone — "drag one, the rest move proportionally").
+  const maxOther=(g)=> Math.max(0.04, ...BUILD_GROUPS.filter(m=>m!==g).map(m=> build.emphasis[m]!=null?build.emphasis[m]:0.5));
+  const setFromFrac=(g, frac)=>{ frac=Math.max(0.05, Math.min(1, frac)); const mo=maxOther(g);
+    let e = mo*Math.pow(frac, 1/ROSE_GAMMA);                  // below the top: wedge displays at `frac`
+    if(frac>0.97) e = mo*(1 + (frac-0.97)/0.03*1.3);          // near the rim: overtake to dominate
+    build.emphasis[g]=Math.max(0.04, e); build.focus=[]; syncEmphasisChips(); updateBuildPreview(); };
   const applyDrag=(ev)=>{ const r=c.getBoundingClientRect(); const px=(ev.clientX-r.left)/r.width*c.width, py=(ev.clientY-r.top)/r.height*c.height;
-    const cx=c.width/2, cy=c.height/2, R=c.width*0.30, frac=Math.max(0.05,Math.min(0.98,Math.hypot(px-cx,py-cy)/R)), i=nearestSpoke(ev);
-    setShare(BUILD_GROUPS[i], buildRoseShare(frac)); };   // invert the display curve so the tip tracks the finger
+    const cx=c.width/2, cy=c.height/2, R=c.width*0.30, i=nearestSpoke(ev);
+    setFromFrac(BUILD_GROUPS[i], Math.hypot(px-cx,py-cy)/R); };
   c.addEventListener("pointerdown", e=>{ dragging=true; downX=e.clientX; downY=e.clientY; moved=false; try{ c.setPointerCapture(e.pointerId); }catch(_){} e.preventDefault(); });
   c.addEventListener("pointermove", e=>{ if(!dragging) return; if(Math.hypot(e.clientX-downX,e.clientY-downY)>7){ moved=true; applyDrag(e); } });
-  c.addEventListener("pointerup", e=>{ if(dragging && !moved){    // a tap toggles that muscle between even and boosted
-      const g=BUILD_GROUPS[nearestSpoke(e)], n=BUILD_GROUPS.length;
-      const tot=BUILD_GROUPS.reduce((a,m)=>a+(build.emphasis[m]||0),0)||1, sh=(build.emphasis[g]||0)/tot;
-      setShare(g, sh > 1.5/n ? 1/n : 0.4); }
+  c.addEventListener("pointerup", e=>{ if(dragging && !moved){    // a tap toggles a muscle between boosted and matching the field
+      const g=BUILD_GROUPS[nearestSpoke(e)], mo=maxOther(g);
+      build.emphasis[g] = (build.emphasis[g]||0) > mo*1.05 ? mo : mo*1.8; build.focus=[]; syncEmphasisChips(); updateBuildPreview(); }
     dragging=false; });
   c.addEventListener("pointercancel", ()=>{ dragging=false; });
 })();
