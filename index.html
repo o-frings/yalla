@@ -4231,19 +4231,20 @@ function drawRadar(totals, canvasId, target, noLabels){
   const lab=(cs.getPropertyValue("--l2")||"#888").trim();
   const grid="rgba(128,128,128,.22)";
   const max=Math.max(1, ...MGROUPS.map(g=>totals[g]||0));
-  const norm = target ? (g=>Math.min(1.08,(totals[g]||0)/target)) : (g=>(totals[g]||0)/max);
-  const pt=(i,rr)=>{ const a=(-90+i*360/n)*Math.PI/180; return [cx+rr*Math.cos(a), cy+rr*Math.sin(a)]; };
+  const norm = target ? (g=>Math.min(1,(totals[g]||0)/target)) : (g=>(totals[g]||0)/max);
+  // Coxcomb rose — same wedge style as the feed/builder. In target mode the rim is the weekly
+  // "enough volume" line, so short wedges are the muscles still under target (gaps stay visible).
   ctx.strokeStyle=grid; ctx.lineWidth=1.5;
   [0.5,1].forEach(f=>{ ctx.beginPath(); ctx.arc(cx,cy,R*f,0,Math.PI*2); ctx.stroke(); });
-  // in target mode, emphasise the outer ring — it's the "enough volume" line
   if(target){ ctx.strokeStyle=accent; ctx.globalAlpha=.45; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; }
-  for(let i=0;i<n;i++){ const [x,y]=pt(i,R); ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(x,y); ctx.stroke(); }
-  ctx.beginPath(); MGROUPS.forEach((g,i)=>{ const v=norm(g), [x,y]=pt(i,R*v); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.closePath();
-  ctx.fillStyle=accent; ctx.globalAlpha=.22; ctx.fill(); ctx.globalAlpha=1; ctx.lineWidth=4; ctx.strokeStyle=accent; ctx.stroke();
-  MGROUPS.forEach((g,i)=>{ const v=norm(g), [x,y]=pt(i,R*v); ctx.beginPath(); ctx.arc(x,y,9,0,Math.PI*2); ctx.fillStyle=MCOLOR[g]||accent; ctx.fill(); ctx.lineWidth=2.5; ctx.strokeStyle="#fff"; ctx.stroke(); });
+  const half=Math.PI/n - 0.05;
+  MGROUPS.forEach((g,i)=>{ const rr=R*norm(g); if(rr<=0.5) return;
+    const a=(-90+i*360/n)*Math.PI/180, col=MCOLOR[g]||accent;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rr,a-half,a+half); ctx.closePath();
+    ctx.fillStyle=col; ctx.globalAlpha=.30; ctx.fill(); ctx.globalAlpha=1; ctx.lineWidth=2; ctx.strokeStyle=col; ctx.stroke(); });
   if(noLabels) return;
   ctx.fillStyle=lab; ctx.font="600 29px -apple-system,sans-serif"; ctx.textBaseline="middle";
-  MGROUPS.forEach((g,i)=>{ const [x,y]=pt(i,R+52), co=Math.cos((-90+i*360/n)*Math.PI/180);
+  MGROUPS.forEach((g,i)=>{ const a=(-90+i*360/n)*Math.PI/180, x=cx+(R+52)*Math.cos(a), y=cy+(R+52)*Math.sin(a), co=Math.cos(a);
     ctx.textAlign = Math.abs(co)<0.3 ? "center" : (co>0?"left":"right"); ctx.fillText(MSHORT[g], x, y); });
 }
 // dynamic intervention: when a muscle is over/under-trained, suggest adding or trimming an exercise in the current plan
