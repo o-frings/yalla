@@ -1703,7 +1703,7 @@ const ALTS = {
   "Goblet Squat":["Leg Press","Back Squat","Hack Squat"],
   "Leg Extension":["Step-Up","Sissy Squat","Front-Foot-Elevated Split Squat"],
   "Chest Press":["Dumbbell Bench Press","Push-Ups","Incline Press"],
-  "Face Pulls":["Band Pull-Apart","Reverse Pec-Deck","Rear-Delt Fly"],
+  "Face Pulls":["Band Pull-Apart","Reverse Pec-Deck","Rear Delt Fly"],
   "Walking Lunges":["Reverse Lunge","Step-Up","Bulgarian Split Squat"],
   "Single-Leg Hip Thrust":["Glute Bridge","Step-Up","Hip Thrust"],
   "Calf Raises":["Seated Calf Raise","Leg-Press Calf Raise","Single-Leg Calf Raise"],
@@ -5523,7 +5523,7 @@ function familyKey(name){
   const n=String(name).toLowerCase();
   if(/pull-?up|chin-?up|pulldown|lat pull/.test(n)) return "vpull";
   if(/push-?up/.test(n)) return "pushup";
-  if(/(rear delt|reverse pec|face pull|bent-over lateral|pull-?apart|prone y|reverse snow)/.test(n)) return "reardelt";
+  if(/(rear[ -]?delt|reverse pec|face pull|bent-?over lateral|pull-?apart|prone y|reverse snow)/.test(n)) return "reardelt";
   if(/upright row/.test(n)) return "upright";
   if(/lateral raise/.test(n)) return "latraise";
   if(/calf raise/.test(n)) return "calf";
