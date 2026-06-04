@@ -2392,7 +2392,7 @@ function agoStr(ts){ const s=Math.max(0,(Date.now()-ts)/1000);
 // the rest follow a mild convex curve (radius = (value/max)^ROSE_GAMMA) so emphasised muscles clearly
 // lead — but never below ROSE_FLOOR, so background muscles stay readable instead of collapsing to a
 // blob. A muscle with no volume stays empty.
-const ROSE_GAMMA=1.6, ROSE_FLOOR=0.17;
+const ROSE_GAMMA=1.0, ROSE_FLOOR=0.32;
 function roseRadii(G, tot){
   let mx=0; G.forEach(g=>{ const v=tot[g]||0; if(v>mx) mx=v; });
   if(mx<=0) return G.map(()=>0);
