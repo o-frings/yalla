@@ -10,6 +10,16 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
+// Strip control chars / newlines and clamp length, so a crafted display_name or
+// workout name can't shape a misleading or oversized push-notification body.
+const clean = (s: unknown, max = 40) =>
+  [...String(s ?? "")].filter((c) => { const n = c.charCodeAt(0); return n >= 32 && n !== 127; })
+    .join("").trim().slice(0, max);
+
+// All "nothing to do" outcomes return this single opaque body — never reveal WHY
+// (record missing / not a friend / no subscription) to avoid an enumeration oracle.
+const OK = () => new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("method", { status: 405 });
 
@@ -32,7 +42,7 @@ Deno.serve(async (req) => {
 
   // Actor's display name (used in every message).
   const { data: aprof } = await sb.from("profiles").select("display_name").eq("user_id", actor.id).maybeSingle();
-  const who = aprof?.display_name || "A friend";
+  const who = clean(aprof?.display_name) || "A friend";
 
   // Resolve who to notify (`recipient`) and the message, per event kind.
   let recipient: string | null = null;
@@ -41,17 +51,17 @@ Deno.serve(async (req) => {
   if (kind === "follow" || kind === "follow_accept") {
     // Follow events: `target` is the user to notify. Verify the edge exists so a caller
     // can't spam arbitrary users.
-    if (!target || target === actor.id) return new Response(JSON.stringify({ ok: true, skipped: true }));
+    if (!target || target === actor.id) return OK();
     if (kind === "follow") {
       const { data: edge } = await sb.from("follows").select("status")
         .eq("follower", actor.id).eq("followee", target).maybeSingle();
-      if (!edge) return new Response(JSON.stringify({ ok: true, noEdge: true }));
+      if (!edge) return OK();
       recipient = target;
       msg = edge.status === "accepted" ? `${who} started following you 👋` : `${who} wants to follow you`;
     } else { // follow_accept: actor accepted target's request → tell the requester
       const { data: edge } = await sb.from("follows").select("status")
         .eq("follower", target).eq("followee", actor.id).eq("status", "accepted").maybeSingle();
-      if (!edge) return new Response(JSON.stringify({ ok: true, noEdge: true }));
+      if (!edge) return OK();
       recipient = target;
       msg = `${who} accepted your follow request 🤝`;
     }
@@ -59,23 +69,32 @@ Deno.serve(async (req) => {
     // Activity events (cheer / comment): require activityId.
     if (!activityId) return new Response(JSON.stringify({ ok: false }), { status: 400 });
     const { data: act } = await sb.from("activity").select("user_id, summary").eq("id", activityId).maybeSingle();
-    if (!act || act.user_id === actor.id) return new Response(JSON.stringify({ ok: true, skipped: true }));
+    if (!act || act.user_id === actor.id) return OK();
     // Only an accepted follower of the owner may trigger a notification (mirrors feed visibility).
     const { data: edge } = await sb.from("follows").select("status")
       .eq("follower", actor.id).eq("followee", act.user_id).eq("status", "accepted").maybeSingle();
-    if (!edge) return new Response(JSON.stringify({ ok: true, notFriend: true }));
+    if (!edge) return OK();
     recipient = act.user_id;
-    const workout = (act.summary && act.summary.name) || "your workout";
+    const workout = clean(act.summary && act.summary.name) || "your workout";
+    const note = clean(text, 80);
     msg = kind === "comment"
-      ? `${who} commented on ${workout}${text ? `: “${String(text).slice(0, 80)}”` : ""}`
+      ? `${who} commented on ${workout}${note ? `: “${note}”` : ""}`
       : `${who} cheered ${workout} 🔥`;
   }
 
-  if (!recipient) return new Response(JSON.stringify({ ok: true, skipped: true }));
+  if (!recipient) return OK();
+
+  // Rate limit: at most one push per (actor → recipient → kind) per minute, so an
+  // accepted friend can't replay the invoke to hammer someone with notifications.
+  const since = new Date(Date.now() - 60_000).toISOString();
+  const { data: recent } = await sb.from("notify_log").select("sent_at")
+    .eq("actor", actor.id).eq("recipient", recipient).eq("kind", kind)
+    .gte("sent_at", since).limit(1);
+  if (recent && recent.length) return OK();
 
   // Recipient's push subscription (only if they have one).
   const { data: sub } = await sb.from("push_subscriptions").select("subscription").eq("user_id", recipient).maybeSingle();
-  if (!sub?.subscription) return new Response(JSON.stringify({ ok: true, noSub: true }));
+  if (!sub?.subscription) return OK();
 
   webpush.setVapidDetails(
     Deno.env.get("VAPID_SUBJECT") || "mailto:hello@yalla.app",
@@ -86,10 +105,11 @@ Deno.serve(async (req) => {
 
   try {
     await webpush.sendNotification(sub.subscription, payload);
+    // Record the send so the rate-limit window above can see it (best-effort).
+    await sb.from("notify_log").insert({ actor: actor.id, recipient, kind });
   } catch (e) {
     const code = (e && ((e as any).statusCode || (e as any).status)) || 0;
     if (code === 404 || code === 410) await sb.from("push_subscriptions").delete().eq("user_id", recipient);
-    return new Response(JSON.stringify({ ok: false, code }), { headers: { "content-type": "application/json" } });
   }
-  return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+  return OK();
 });

@@ -12,9 +12,10 @@ import webpush from "npm:web-push@3.6.7";
 const DAY = 86_400_000;
 
 Deno.serve(async (req) => {
-  // Simple shared-secret guard so the public URL can't be triggered by anyone.
+  // Shared-secret guard so the public URL can't be triggered by anyone. Fail CLOSED:
+  // if the secret is missing/empty (deploy slip), deny rather than run wide open.
   const secret = Deno.env.get("CRON_SECRET");
-  if (secret && req.headers.get("x-cron-secret") !== secret) {
+  if (!secret || req.headers.get("x-cron-secret") !== secret) {
     return new Response("forbidden", { status: 403 });
   }
 
@@ -27,6 +28,9 @@ Deno.serve(async (req) => {
     Deno.env.get("VAPID_PUBLIC")!,
     Deno.env.get("VAPID_PRIVATE")!,
   );
+
+  // Opportunistic housekeeping: keep the social-notify rate-limit log small.
+  await sb.from("notify_log").delete().lt("sent_at", new Date(Date.now() - 2 * DAY).toISOString());
 
   const cutoff = new Date(Date.now() - 2 * DAY).toISOString();
   const { data: rows, error } = await sb

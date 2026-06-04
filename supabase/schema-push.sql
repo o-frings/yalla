@@ -19,3 +19,18 @@ create policy "own subscription" on public.push_subscriptions
   for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- Throttle log for the social-notify Edge Function: one row per push it sends, used to
+-- rate-limit (max 1 push per actor→recipient→kind per minute) so an accepted friend
+-- can't replay the invoke to spam someone. Written only by the service-role function;
+-- RLS is enabled with NO policies, so clients can neither read nor write it. The
+-- send-reminders cron prunes rows older than 2 days.
+create table if not exists public.notify_log (
+  actor     uuid not null references auth.users on delete cascade,
+  recipient uuid not null references auth.users on delete cascade,
+  kind      text not null,
+  sent_at   timestamptz not null default now()
+);
+alter table public.notify_log enable row level security;
+create index if not exists notify_log_lookup_idx
+  on public.notify_log (actor, recipient, kind, sent_at desc);
