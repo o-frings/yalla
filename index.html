@@ -1005,15 +1005,12 @@
             <div class="s" data-vis="public">Public</div>
           </div>
           <p class="levelcap" id="visHint" style="margin:8px 4px 0; line-height:1.4;"></p>
-          <div class="ed-label" style="margin-top:18px;">Your friend code</div>
-          <div class="row" style="gap:8px; align-items:center;">
-            <input id="myCode" type="text" readonly style="flex:1; font-weight:700; letter-spacing:2px; text-align:center;">
-            <button class="btn sm" id="copyCode" style="flex:0 0 auto;">Copy</button>
-          </div>
-          <p class="levelcap" style="margin:6px 4px 0; line-height:1.4;">Share this code so a friend can add you.</p>
-          <div class="ed-label" style="margin-top:18px;">Add a friend</div>
+          <div class="ed-label" style="margin-top:18px;">Invite friends</div>
+          <button class="btn wide" id="inviteBtn">📨 Share my invite link</button>
+          <p class="levelcap" style="margin:6px 4px 0; line-height:1.4;">Send the link — your friend just taps it to follow you. Or share your code: <b id="myCode">—</b> <span id="copyCode" style="color:var(--accent); cursor:pointer; text-decoration:underline;">copy</span></p>
+          <div class="ed-label" style="margin-top:18px;">Add by code</div>
           <div class="row" style="gap:8px;">
-            <input id="addCode" type="text" autocapitalize="characters" placeholder="Their friend code" style="flex:1; text-transform:uppercase;">
+            <input id="addCode" type="text" autocapitalize="characters" placeholder="Paste a friend's code" style="flex:1; text-transform:uppercase;">
             <button class="btn sm" id="addFriendBtn" style="flex:0 0 auto;">Add</button>
           </div>
           <div id="reqList"></div>
@@ -2133,6 +2130,13 @@ let sb=null, cloudUser=null, _syncMeta={}, _pushTimers={};
 // detected by probing the `follows` table. Until then the activity table is world-readable, so
 // the client publishes SUMMARY ONLY (never exercises/weights) and hides the friends/visibility UI.
 let dbHardened=false;
+// A tap-to-follow invite link (?add=CODE) stashes the code here until we're signed in + hardened.
+let pendingAddCode=null;
+try{ const _p=new URLSearchParams(location.search);
+  if(_p.has("add")){ pendingAddCode=(_p.get("add")||"").trim().toUpperCase();
+    _p.delete("add"); const _qs=_p.toString();
+    history.replaceState(null,"", location.pathname+(_qs?"?"+_qs:"")+location.hash); }
+}catch(e){}
 async function detectHardened(){
   if(!cloudReady()){ dbHardened=false; return; }
   try{ const { error } = await sb.from("follows").select("follower").limit(1); dbHardened = !error; }
@@ -2166,9 +2170,12 @@ async function handleAuth(user){
     await ensureProfile();
     await detectHardened();        // does this project have the friends-only schema yet?
     renderAccount(); renderFriends();
+    processPendingAdd();           // act on a tap-to-follow invite link, if any
     await cloudReconcile();
     if(!settings.displayName) askDisplayName();   // first thing after signing in: how should I address you?
-  } else if(!cloudUser){ dbHardened=false; }
+  } else if(!cloudUser){ dbHardened=false;
+    if(pendingAddCode){ toast("Sign in to follow your friend."); goAccount(); }
+  }
 }
 function askDisplayName(){
   const w=$("nameWrap"), i=$("nameInput2"); if(!w||!i) return;
@@ -5550,7 +5557,7 @@ async function renderFriends(){
     if(data){ vis=data.visibility||"private"; _myCode=data.follow_code||""; } }catch(e){}
   document.querySelectorAll("#visSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.vis===vis));
   const vh=$("visHint"); if(vh) vh.textContent=VIS_HINTS[vis]||"";
-  const mc=$("myCode"); if(mc) mc.value=_myCode||"—";
+  const mc=$("myCode"); if(mc) mc.textContent=_myCode||"—";
   // incoming requests + following
   let reqs=[], following=[];
   try{ const { data } = await sb.rpc("incoming_requests"); reqs=data||[]; }catch(e){}
@@ -5601,12 +5608,32 @@ document.querySelectorAll("#visSeg .s").forEach(s=>{
 if($("copyCode")) $("copyCode").onclick=async()=>{ if(!_myCode) return;
   try{ await navigator.clipboard.writeText(_myCode); toast("Friend code copied."); }catch(e){ toast("Your code: "+_myCode); } };
 if($("addFriendBtn")) $("addFriendBtn").onclick=async()=>{
-  const inp=$("addCode"); const code=((inp&&inp.value)||"").trim(); if(!code || !cloudReady()) return;
-  let res=null; try{ const { data } = await sb.rpc("request_follow",{ code }); res=data; }catch(e){ toast("Couldn't add — try again."); return; }
-  if(res==="not_found") toast("No one has that code.");
-  else if(res==="self") toast("That's your own code 🙂");
-  else { if(inp) inp.value=""; toast("Added "+res+" — they'll appear once accepted (instant if they're public)."); renderFriends(); renderFeed(); }
+  const inp=$("addCode"); const code=((inp&&inp.value)||"").trim(); if(!code) return;
+  if(inp) inp.value="";
+  await followByCode(code);
 };
+// shared follow path — used by the manual code box and by tap-to-follow invite links
+async function followByCode(code){
+  if(!cloudReady()){ pendingAddCode=(code||"").trim().toUpperCase(); toast("Sign in to follow your friend."); goAccount&&goAccount(); return; }
+  let res=null; try{ const { data } = await sb.rpc("request_follow",{ code }); res=data; }catch(e){ toast("Couldn't add — try again."); return; }
+  if(res==="not_found") toast("That code didn't match anyone.");
+  else if(res==="self") toast("That's your own code 🙂");
+  else { toast("Added "+res+" — instant if they're public, otherwise once they accept."); renderFriends(); renderFeed(); }
+}
+// a tap-to-follow link: friend opens it, signs in if needed, and follows you in one tap
+function inviteLink(){ return location.origin + location.pathname + "?add=" + encodeURIComponent(_myCode||""); }
+if($("inviteBtn")) $("inviteBtn").onclick=async()=>{
+  if(!_myCode){ toast("Your code isn't ready yet — reopen this screen."); return; }
+  const url=inviteLink(), text=(settings.displayName||settings.name||"A friend")+" invited you to follow them on Yalla 💪";
+  try{ if(navigator.share){ await navigator.share({ title:"Yalla", text, url }); return; } }catch(e){ if(e&&e.name==="AbortError") return; }
+  try{ await navigator.clipboard.writeText(url); toast("Invite link copied — paste it to a friend."); }catch(e){ toast(url); }
+};
+// process an ?add=CODE invite once we're signed in and the friends schema is live
+async function processPendingAdd(){
+  if(!pendingAddCode || !cloudReady() || !dbHardened) return;
+  const code=pendingAddCode; pendingAddCode=null;
+  await followByCode(code);
+}
 if($("remindToggle")) $("remindToggle").onchange=async(e)=>{
   if(e.target.checked){ const ok=await pushSubscribe(); e.target.checked=ok; settings.remindersOn=ok; if(ok) toast("Reminders on — we’ll nudge you after 2 quiet days."); }
   else { await pushDisable(); settings.remindersOn=false; toast("Reminders off."); }
