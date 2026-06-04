@@ -149,11 +149,19 @@
   .restadj{ display:inline-flex; gap:6px; }
   .restadj button{ background:var(--card); border:.5px solid var(--line); color:var(--ink); border-radius:8px; padding:12px 16px; font-size:13px; font-weight:600; cursor:pointer; transition:transform .12s; }
   /* live workout sharing */
-  .liverow{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:-4px 0 16px; cursor:pointer; }
-  .liveswitch{ font-weight:600; font-size:14px; color:var(--ink); }
+  .liverow{ display:flex; align-items:center; gap:11px; margin:2px 0 16px; padding:11px 14px; border-radius:14px; background:var(--row); border:.5px solid var(--line); cursor:pointer; transition:background .15s, border-color .15s; }
+  .liverow:active{ transform:scale(.99); }
+  .liverow .livedot{ width:9px; height:9px; background:var(--l3); animation:none; transition:background .15s; }
+  .liverow-col{ display:flex; flex-direction:column; gap:2px; min-width:0; flex:1; }
+  .liveswitch{ font-weight:600; font-size:14px; color:var(--ink); line-height:1.2; }
+  .livehint{ font-size:12px; color:var(--l2); line-height:1.35; margin:0; }
+  .livesw{ position:relative; flex:0 0 auto; width:42px; height:26px; -webkit-appearance:none; appearance:none; background:var(--line); border-radius:13px; cursor:pointer; transition:background .2s; }
+  .livesw::after{ content:""; position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .2s; }
+  .livesw:checked{ background:var(--red); }
+  .livesw:checked::after{ transform:translateX(16px); }
+  .liverow.on{ background:rgba(255,59,48,.10); border-color:rgba(255,59,48,.32); }
   .liverow.on .liveswitch{ color:var(--red); }
-  .liverow input[type=checkbox]{ margin-left:auto; flex:0 0 auto; width:20px; height:20px; accent-color:var(--red); }
-  .livehint{ flex-basis:100%; font-size:12.5px; color:var(--l2); line-height:1.4; margin:0; }
+  .liverow.on .livedot{ background:var(--red); animation:livepulse 1.6s infinite; }
   .livecard{ display:flex; align-items:center; gap:12px; padding:12px 14px; margin:8px 0; border-radius:14px; background:var(--accent-soft); cursor:pointer; }
   .livedot{ width:10px; height:10px; border-radius:50%; background:var(--red); flex:0 0 auto; animation:livepulse 1.6s infinite; }
   .livego{ color:var(--accent); font-weight:600; flex:0 0 auto; }
@@ -806,9 +814,12 @@
 <!-- Live share: broadcast this session to friends you've allowed (Settings → Friends). Shown only
      once signed in + the friends schema is live; wired by updateLiveRow() / goLive() / endLive(). -->
 <label class="liverow" id="liveRow" style="display:none;">
-  <span class="liveswitch" id="liveLbl">🔴 Share workout live</span>
-  <input type="checkbox" id="liveToggle">
-  <span class="livehint" id="liveHint"></span>
+  <span class="livedot"></span>
+  <span class="liverow-col">
+    <span class="liveswitch" id="liveLbl">Share workout live</span>
+    <span class="livehint" id="liveHint"></span>
+  </span>
+  <input type="checkbox" class="livesw" id="liveToggle">
 </label>
 <div class="injbanner" id="injBanner" style="display:none;"></div>
 <div id="exlist"></div>
@@ -2459,12 +2470,12 @@ function updateLiveRow(){
   const row=$("liveRow"); if(!row) return;
   row.style.display = liveAvailable() ? "flex" : "none";
   const tog=$("liveToggle"); if(tog) tog.checked=liveOn;
-  const lbl=$("liveLbl"); if(lbl) lbl.textContent = liveOn ? "🔴 Sharing live" : "🔴 Share workout live";
+  const lbl=$("liveLbl"); if(lbl) lbl.textContent = liveOn ? "Sharing live" : "Share workout live";
   row.classList.toggle("on", liveOn);
   const hint=$("liveHint");
   if(hint) hint.textContent = liveOn
-    ? "You're live — friends you've allowed can watch & cheer you on."
-    : "Broadcast this session in real time to friends you've allowed (Settings → Friends).";
+    ? "Friends you've allowed can watch & cheer."
+    : "Broadcast in real time to allowed friends.";
 }
 async function goLive(){
   if(!liveAvailable()){ toast("Sign in to share your workout live."); return false; }
