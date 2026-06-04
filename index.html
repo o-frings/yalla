@@ -1202,12 +1202,12 @@
 
     <div class="ed-label">Supersets <span class="subhint">— pair moves to save time</span></div>
     <div class="seg appearance bopt" data-k="supersets">
-      <div class="s active" data-v="on">On</div><div class="s" data-v="off">Off</div>
+      <div class="s" data-v="off">Off</div><div class="s active" data-v="on">On</div>
     </div>
 
     <div class="ed-label">Variety <span class="subhint">— auto-rotate accessories each session</span></div>
     <div class="seg appearance bopt" data-k="vary">
-      <div class="s active" data-v="off">Off</div><div class="s" data-v="on">On</div>
+      <div class="s" data-v="off">Off</div><div class="s active" data-v="on">On</div>
     </div>
 
     <div class="ed-label">Areas to protect <span class="subhint">— optional, select any</span></div>
@@ -1748,13 +1748,13 @@ const MUSCLES = {
   "Ab Wheel Rollout":["Core"],"Weighted Plank":["Core"],"Plank":["Core"],"Hollow Hold (sec)":["Core"],"Hollow Hold":["Core"],
   "Hollow Hold + Leg Raises":["Core"],"Leg Raises":["Core"],"Dead Bug":["Core"],"Pallof Press":["Core"],
   // posture / corrective
-  "Chin Tuck":["Rear Delts"],"Chin Tucks":["Rear Delts"],"Wall Slide":["Rear Delts","Back"],"Wall Slides":["Rear Delts","Back"],
+  "Chin Tuck":["Neck"],"Chin Tucks":["Neck"],"Wall Slide":["Rear Delts","Back"],"Wall Slides":["Rear Delts","Back"],
   "Scapular Wall Slide":["Rear Delts","Back"],"Wall Angels":["Rear Delts","Back"],"Prone Y-T-W":["Rear Delts","Back"],
   "Prone T-Raise":["Rear Delts"],"Superman":["Back","Glutes"],"Bird Dog":["Core"],"Cat-Cow":["Core"],
 };
 const MCOLOR={ Chest:"#ff6b6b", Back:"#4dabf7", Shoulders:"#f59f00", Biceps:"#9775fa", Triceps:"#ff8787",
   Quads:"#20c997", Hamstrings:"#51cf66", Glutes:"#f783ac", Calves:"#74c0fc", Core:"#ffd43b", Other:"#adb5bd",
-  "Front Delts":"#f59f00", "Side Delts":"#ffa94d", "Rear Delts":"#e8590c" };
+  "Front Delts":"#f59f00", "Side Delts":"#ffa94d", "Rear Delts":"#e8590c", Neck:"#15aabf" };
 function muscleFor(name){
   if(MUSCLES[name]) return MUSCLES[name];
   const n=String(name).toLowerCase();
@@ -2600,22 +2600,23 @@ function teardownLive(){
   _liveRecvChan=_liveFeedChan=_liveViewChan=_liveViewOwner=null;
   updateLiveRow();
 }
-if($("liveToggle")) $("liveToggle").onchange=async(e)=>{ if(e.target.checked){ const ok=await goLive(); e.target.checked=ok; } else endLive(false); };
-if($("liveClose")) $("liveClose").onclick=()=>{ if(_liveViewChan){ try{ sb.removeChannel(_liveViewChan); }catch(e){} _liveViewChan=null; } _liveViewOwner=null; closeSheet("Live"); };
-if($("scrimLive")) $("scrimLive").onclick=()=>{ if($("liveClose")) $("liveClose").onclick(); };
+// NB: the live-sheet wiring (liveToggle/liveClose/scrimLive) lives just after `const $` is defined,
+// further down — binding it here would run before `$` exists and abort the whole script on load.
 
 function agoStr(ts){ const s=Math.max(0,(Date.now()-ts)/1000);
   if(s<90) return "just now"; const m=s/60; if(m<60) return Math.round(m)+"m ago";
   const h=m/60; if(h<24) return Math.round(h)+"h ago"; const d=h/24; return d<7?Math.round(d)+"d ago":new Date(ts).toLocaleDateString(undefined,{month:"short",day:"numeric"}); }
 
-// Rose / coxcomb chart of a workout's muscle split: each muscle is a wedge sized by its share of the
-// session's volume. Radius for share s is s^ROSE_GAMMA — a gentle curve (well below √) that lifts
-// small shares so the rosette is big and legible (and, in the builder, easy to grab); a single-muscle
-// workout still fills its wedge to the rim, untrained muscles stay empty, nothing crosses the ring.
-const ROSE_GAMMA=0.25;
+// Rose / coxcomb chart of a muscle split. Normalized to the AVERAGE worked muscle: a perfectly
+// balanced split is a uniform mid-size rosette (radius ROSE_MID) — not a maxed-out circle you could
+// never actually create — while above-average muscles grow toward the rim and below-average ones
+// shrink (never below ROSE_FLOOR, so they stay readable). Untrained muscles stay empty.
+const ROSE_MID=0.62, ROSE_GAMMA=1.0, ROSE_FLOOR=0.30;
 function roseRadii(G, tot){
-  const total=G.reduce((a,g)=>a+(tot[g]||0),0);
-  return G.map(g=> total ? Math.pow((tot[g]||0)/total, ROSE_GAMMA) : 0);   // radius fraction in [0,1]
+  let sum=0, k=0; G.forEach(g=>{ const v=tot[g]||0; if(v>0){ sum+=v; k++; } });
+  if(!k) return G.map(()=>0);
+  const mean=sum/k;
+  return G.map(g=>{ const v=tot[g]||0; return v>0 ? Math.max(ROSE_FLOOR, Math.min(1, ROSE_MID*Math.pow(v/mean, ROSE_GAMMA))) : 0; });
 }
 function drawRose(x, cx, cy, R, G, tot, o){
   o=o||{}; const n=G.length, frac=roseRadii(G,tot);
@@ -2786,6 +2787,11 @@ let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
 const $=id=>document.getElementById(id);
+// live-sheet wiring — must come after `$` is defined (moved here from the live block above, where it
+// ran before `const $` and crashed boot with "Cannot access '$' before initialization").
+if($("liveToggle")) $("liveToggle").onchange=async(e)=>{ if(e.target.checked){ const ok=await goLive(); e.target.checked=ok; } else endLive(false); };
+if($("liveClose")) $("liveClose").onclick=()=>{ if(_liveViewChan){ try{ sb.removeChannel(_liveViewChan); }catch(e){} _liveViewChan=null; } _liveViewOwner=null; closeSheet("Live"); };
+if($("scrimLive")) $("scrimLive").onclick=()=>{ if($("liveClose")) $("liveClose").onclick(); };
 $("cNo").onclick=confirmClose;
 $("cScrim").onclick=confirmClose;
 $("cYes").onclick=()=>{ const fn=_confirmYes; confirmClose(); if(fn) fn(); };
@@ -3075,7 +3081,7 @@ function ovUnderMuscles(){
   if(!Object.keys(hist).length) return [];                            // nothing logged yet — don't nag
   const scope=planScopeMuscles(activePlan());
   const wk=weeklyEquiv(muscleVolume(28,"sets").totals, 28);
-  return scope.filter(g=> (wk[g]||0) < WEEKLY_SET_MIN);               // plan targets it, but logs are under the growth threshold
+  return scope.filter(g=> !NO_TARGET.has(g) && (wk[g]||0) < WEEKLY_SET_MIN);   // plan targets it, but logs are under the growth threshold (Neck exempt)
 }
 // a small, fading deck for the overview — surfaces only tips you haven't read yet, a few at a time.
 // feature tips drop off automatically once you've used the feature; evergreen ones you dismiss.
@@ -3573,7 +3579,7 @@ function growthStatus(){
   let activeWeeks=0; for(let i=0;i<N;i++){ if(MGROUPS.some(g=>setsS[g][i]>0)) activeWeeks++; }
   const per=[];
   MGROUPS.forEach(g=>{
-    if(!setsS[g].some(v=>v>0)) return;                 // never trained in the window → not shown
+    if(NO_TARGET.has(g) || !setsS[g].some(v=>v>0)) return;   // exempt (Neck) or never trained → not shown
     const sets=recent(setsS[g]);                       // current weekly-set dose (last-3-week mean)
     const rv=recent(volS[g]), ev=earlier(volS[g]);
     const trend = ev>0 ? rv/ev : null;                 // null = no earlier baseline (just started this muscle)
@@ -4396,8 +4402,12 @@ $("importBtn").onclick=async()=>{
 };
 
 // ================= muscle volume =================
-const MGROUPS=["Chest","Back","Front Delts","Side Delts","Rear Delts","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves","Core"];
-const MSHORT={Chest:"Chest",Back:"Back",Shoulders:"Delts",Biceps:"Biceps",Triceps:"Triceps",Quads:"Quads",Hamstrings:"Hams",Glutes:"Glutes",Calves:"Calves",Core:"Core","Front Delts":"F·Delt","Side Delts":"S·Delt","Rear Delts":"R·Delt"};
+const MGROUPS=["Chest","Back","Front Delts","Side Delts","Rear Delts","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves","Core","Neck"];
+// Neck is a home for posture/neck moves (e.g. chin tucks) on every radar, but it carries NO weekly-
+// volume target: it shows a wedge when trained and is never flagged as under-trained / chased by the
+// plan builder or growth signal. Add muscles here to exempt them from the volume model.
+const NO_TARGET=new Set(["Neck"]);
+const MSHORT={Chest:"Chest",Back:"Back",Shoulders:"Delts",Biceps:"Biceps",Triceps:"Triceps",Quads:"Quads",Hamstrings:"Hams",Glutes:"Glutes",Calves:"Calves",Core:"Core","Front Delts":"F·Delt","Side Delts":"S·Delt","Rear Delts":"R·Delt",Neck:"Neck"};
 let musWindow=7, musMetric="sets", musSrc="log", musVolMode="total";
 // Evidence-based weekly volume targets (fractional sets per muscle per week).
 // Dose-response meta-regressions: benefits accrue across ~10+ hard sets/muscle/wk; ~4–6 is a rough
@@ -4495,19 +4505,20 @@ function drawRadar(totals, canvasId, target, noLabels){
   const lab=(cs.getPropertyValue("--l2")||"#888").trim();
   const grid="rgba(128,128,128,.22)";
   const max=Math.max(1, ...MGROUPS.map(g=>totals[g]||0));
-  const norm = target ? (g=>Math.min(1.08,(totals[g]||0)/target)) : (g=>(totals[g]||0)/max);
-  const pt=(i,rr)=>{ const a=(-90+i*360/n)*Math.PI/180; return [cx+rr*Math.cos(a), cy+rr*Math.sin(a)]; };
+  const norm = target ? (g=>Math.min(1,(totals[g]||0)/target)) : (g=>(totals[g]||0)/max);
+  // Coxcomb rose — same wedge style as the feed/builder. In target mode the rim is the weekly
+  // "enough volume" line, so short wedges are the muscles still under target (gaps stay visible).
   ctx.strokeStyle=grid; ctx.lineWidth=1.5;
   [0.5,1].forEach(f=>{ ctx.beginPath(); ctx.arc(cx,cy,R*f,0,Math.PI*2); ctx.stroke(); });
-  // in target mode, emphasise the outer ring — it's the "enough volume" line
   if(target){ ctx.strokeStyle=accent; ctx.globalAlpha=.45; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; }
-  for(let i=0;i<n;i++){ const [x,y]=pt(i,R); ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(x,y); ctx.stroke(); }
-  ctx.beginPath(); MGROUPS.forEach((g,i)=>{ const v=norm(g), [x,y]=pt(i,R*v); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.closePath();
-  ctx.fillStyle=accent; ctx.globalAlpha=.22; ctx.fill(); ctx.globalAlpha=1; ctx.lineWidth=4; ctx.strokeStyle=accent; ctx.stroke();
-  MGROUPS.forEach((g,i)=>{ const v=norm(g), [x,y]=pt(i,R*v); ctx.beginPath(); ctx.arc(x,y,9,0,Math.PI*2); ctx.fillStyle=MCOLOR[g]||accent; ctx.fill(); ctx.lineWidth=2.5; ctx.strokeStyle="#fff"; ctx.stroke(); });
+  const half=Math.PI/n - 0.05;
+  MGROUPS.forEach((g,i)=>{ const rr=R*norm(g); if(rr<=0.5) return;
+    const a=(-90+i*360/n)*Math.PI/180, col=MCOLOR[g]||accent;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rr,a-half,a+half); ctx.closePath();
+    ctx.fillStyle=col; ctx.globalAlpha=.30; ctx.fill(); ctx.globalAlpha=1; ctx.lineWidth=2; ctx.strokeStyle=col; ctx.stroke(); });
   if(noLabels) return;
   ctx.fillStyle=lab; ctx.font="600 29px -apple-system,sans-serif"; ctx.textBaseline="middle";
-  MGROUPS.forEach((g,i)=>{ const [x,y]=pt(i,R+52), co=Math.cos((-90+i*360/n)*Math.PI/180);
+  MGROUPS.forEach((g,i)=>{ const a=(-90+i*360/n)*Math.PI/180, x=cx+(R+52)*Math.cos(a), y=cy+(R+52)*Math.sin(a), co=Math.cos(a);
     ctx.textAlign = Math.abs(co)<0.3 ? "center" : (co>0?"left":"right"); ctx.fillText(MSHORT[g], x, y); });
 }
 // dynamic intervention: when a muscle is over/under-trained, suggest adding or trimming an exercise in the current plan
@@ -5349,7 +5360,7 @@ function progressInsight(){
     return { v:"training", title:"Training consistency is the brake", text:"You've averaged under ~1.5 sessions a week this month. Before touching nutrition, the biggest lever is simply training regularly — consistent progressive overload is what drives the adaptation.", src:["sch16","sch17"] };
   // You're training often enough — but are the muscles actually getting enough weekly volume to grow?
   const wk28=weeklyEquiv(muscleVolume(28,"sets").totals, 28);
-  const trained=MGROUPS.filter(g=>(wk28[g]||0)>0), under=trained.filter(g=>wk28[g]<WEEKLY_SET_MIN);
+  const trained=MGROUPS.filter(g=>(wk28[g]||0)>0), under=trained.filter(g=> !NO_TARGET.has(g) && wk28[g]<WEEKLY_SET_MIN);
   if(trained.length>=4 && under.length>=Math.ceil(trained.length/2))
     return { v:"training", title:"Training volume is the brake", text:"You're training regularly, but over the last month "+under.length+" of "+trained.length+" muscle groups are getting fewer than ~"+WEEKLY_SET_MIN+" hard sets a week — under the volume most people need to grow. Adding sets to the under-dosed groups (open Muscle balance to see which) is the most direct lever before changing nutrition.", src:["sch17","drr"] };
   if(dir==="gain"){
@@ -5417,7 +5428,7 @@ const COMPOUND_GROUPS=["chest","back","quads","hamstrings","shoulders"];
 // the emphasis radar's spokes — identical to the app-wide analytics groups
 const BUILD_GROUPS=MGROUPS;
 function buildKey(m){ return ({"Front Delts":"shoulders","Side Delts":"sidedelts","Rear Delts":"reardelts"}[m]) || m.toLowerCase(); }
-let build={ exp:"intermediate", obj:"muscle", focus:["balanced"], bias:"balanced", time:60, freq:4, injuries:[], access:"gym", supersets:"on", vary:"off",
+let build={ exp:"intermediate", obj:"muscle", focus:["balanced"], bias:"balanced", time:60, freq:4, injuries:[], access:"gym", supersets:"on", vary:"on",
   emphasis:(function(){ const e={}; BUILD_GROUPS.forEach(m=>e[m]=0.5); return e; })() };
 function emphasisPreset(focus){
   const e={}; BUILD_GROUPS.forEach(m=>e[m]=0.5);
@@ -5625,26 +5636,33 @@ function buildPlan(b){
     return {wk, comps};
   };
   const vary = b.vary==="on";
-  const workouts=[];
+  const aWorkouts=[], bWorkouts=[], fixedWorkouts=[];
   dayDefs.forEach((d)=>{
     const sig=d.groups.slice().sort().join(",")+"|"+d.lvl, offset=seen[sig]||0;
-    seen[sig]=offset+1;
-    const built=buildVariant(d, offset, d.name);
-    // Variety: one template per slot; tag each accessory with a same-muscle rotation pool so the
-    // session view cycles it automatically (compounds stay fixed for progression). Replaces the old
-    // doubled A/B templates — see planSessionsPerWeek / applyRotation.
-    if(vary && d.rot!==false) built.wk.ex.forEach((e,i)=>{
-      const m=built.wk._meta[i]; if(!m || m.comp) return;
-      const others=built.wk.ex.filter((_,j)=>j!==i);   // don't rotate into a move (or family) already in this session
-      const taken={ names:new Set(others.map(x=>x.n)), fams:new Set(others.map(x=>familyKey(x.n))) };
-      const pool=rotationPool(e.n, built.wk._lvl, b.injuries, b.exp, taken);
-      if(pool.length>1) e.rot=pool;
-    });
-    workouts.push(built.wk);
+    if(d.rot!==false){
+      seen[sig]=offset+1;
+      const built=buildVariant(d, offset, d.name);
+      // Variety: one template per slot, with each accessory tagged with a same-muscle rotation pool
+      // so the session view cycles it automatically (compounds stay fixed for progression) — instead
+      // of doubling into A/B templates. See planSessionsPerWeek / applyRotation.
+      if(vary) built.wk.ex.forEach((e,i)=>{
+        const m=built.wk._meta[i]; if(!m || m.comp) return;
+        const others=built.wk.ex.filter((_,j)=>j!==i);   // don't rotate into a move (or family) already in this session
+        const taken={ names:new Set(others.map(x=>x.n)), fams:new Set(others.map(x=>familyKey(x.n))) };
+        const pool=rotationPool(e.n, built.wk._lvl, b.injuries, b.exp, taken);
+        if(pool.length>1) e.rot=pool;
+      });
+      aWorkouts.push(built.wk);
+    } else {
+      fixedWorkouts.push(buildVariant(d, offset, d.name).wk);   // non-rotating replacement → keep last
+    }
   });
+  // rotating days first, then any non-rotating replacement day last (bWorkouts is unused now that
+  // Variety rotates accessories in place rather than emitting separate B templates).
+  const workouts=aWorkouts.concat(bWorkouts, fixedWorkouts);
   // coverage: any muscle the user hasn't dialled to zero should get at least some work somewhere in the plan
   BUILD_GROUPS.forEach(m=>{
-    if((emph[m]!=null?emph[m]:0.5) < 0.2) return;                 // dragged to the centre = excluded
+    if(NO_TARGET.has(m) || (emph[m]!=null?emph[m]:0.5) < 0.2) return;   // exempt (Neck) or dragged to the centre = excluded
     if((planVolume({workouts}).totals[m]||0) > 0) return;          // already hit (primary or secondary)
     const key=buildKey(m); let bestI=-1, bestLen=99;
     workouts.forEach((wk,i)=>{ if(dayDomain(wk.name).indexOf(key)>=0 && wk.ex.length<bestLen){ bestLen=wk.ex.length; bestI=i; } });
@@ -5684,10 +5702,9 @@ document.querySelectorAll("#sheetBuild .bchips.multi").forEach(grp=>{ const k=gr
   c.classList.toggle("on"); build[k]=[].map.call(grp.querySelectorAll(".chip.on"),x=>x.dataset.v); updateBuildPreview(); }); });
 function syncEmphasisChips(){ const sel=Array.isArray(build.focus)?build.focus:(build.focus?[build.focus]:[]);
   document.querySelectorAll('#sheetBuild .bchips[data-k="focus"] .chip').forEach(c=> c.classList.toggle("on", sel.indexOf(c.dataset.v)>=0)); }
-// The builder rose uses the same gentle curve as the feed/share roses (ROSE_GAMMA): it's a sums-to-1
-// distribution that rebalances proportionally when you drag. buildRoseShare inverts the curve so the
-// dragged wedge's tip tracks your finger.
-function buildRoseShare(frac){ return Math.pow(Math.max(0,Math.min(1,frac)), 1/ROSE_GAMMA); }
+// The builder rose uses the same average-normalized curve as the feed/share roses (ROSE_MID/GAMMA).
+// Because the render normalizes to the average worked muscle, changing any wedge rescales the others —
+// "drag one, the rest move proportionally". The drag logic lives in the pointer handlers below.
 function drawEmphasisRadar(){
   const c=$("buildRadar"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const G=BUILD_GROUPS, cx=W/2, cy=H/2, R=W*0.30, n=G.length;
@@ -5716,20 +5733,22 @@ function updateBuildPreview(){
   const nearestSpoke=(ev)=>{ const r=c.getBoundingClientRect(); const px=(ev.clientX-r.left)/r.width*c.width, py=(ev.clientY-r.top)/r.height*c.height;
     const G=BUILD_GROUPS, n=G.length, cx=c.width/2, cy=c.height/2, ang=Math.atan2(py-cy,px-cx)*180/Math.PI;
     let bestI=0,bestD=999; for(let i=0;i<n;i++){ const a=-90+i*360/n, d=Math.abs(((ang-a+540)%360)-180); if(d<bestD){bestD=d;bestI=i;} } return bestI; };
-  // Set muscle g to a target SHARE of the distribution; the others keep their current weights, so the
-  // render (share = weight/Σweight) rescales them all proportionally and the rose stays summed to 1.
-  const setShare=(g, s)=>{ s=Math.max(0.02, Math.min(0.9, s));
-    const others=BUILD_GROUPS.reduce((a,m)=> a+(m===g?0:(build.emphasis[m]!=null?build.emphasis[m]:0.5)), 0)||0.0001;
-    build.emphasis[g]=s/(1-s)*others; build.focus=[]; syncEmphasisChips(); updateBuildPreview(); };
+  // Render is average-normalized: radius ≈ ROSE_MID·(e/mean). setFromFrac sets muscle g so its wedge
+  // tracks the finger — at the rim it sits well above the field; at ROSE_MID it matches the average.
+  // (Using the OTHER muscles' mean as the reference; changing one wedge rescales the rest.)
+  const meanOther=(g)=>{ const o=BUILD_GROUPS.filter(m=>m!==g).map(m=> build.emphasis[m]!=null?build.emphasis[m]:0.5);
+    return Math.max(0.0001, o.reduce((a,b)=>a+b,0)/Math.max(1,o.length)); };
+  const setFromFrac=(g, frac)=>{ frac=Math.max(0.05, Math.min(1, frac)); const mo=meanOther(g);
+    const e = mo*Math.pow(Math.max(0.001,frac)/ROSE_MID, 1/ROSE_GAMMA);   // invert radius=ROSE_MID·(e/mean)
+    build.emphasis[g]=Math.max(0.04, e); build.focus=[]; syncEmphasisChips(); updateBuildPreview(); };
   const applyDrag=(ev)=>{ const r=c.getBoundingClientRect(); const px=(ev.clientX-r.left)/r.width*c.width, py=(ev.clientY-r.top)/r.height*c.height;
-    const cx=c.width/2, cy=c.height/2, R=c.width*0.30, frac=Math.max(0.05,Math.min(0.98,Math.hypot(px-cx,py-cy)/R)), i=nearestSpoke(ev);
-    setShare(BUILD_GROUPS[i], buildRoseShare(frac)); };   // invert the display curve so the tip tracks the finger
+    const cx=c.width/2, cy=c.height/2, R=c.width*0.30, i=nearestSpoke(ev);
+    setFromFrac(BUILD_GROUPS[i], Math.hypot(px-cx,py-cy)/R); };
   c.addEventListener("pointerdown", e=>{ dragging=true; downX=e.clientX; downY=e.clientY; moved=false; try{ c.setPointerCapture(e.pointerId); }catch(_){} e.preventDefault(); });
   c.addEventListener("pointermove", e=>{ if(!dragging) return; if(Math.hypot(e.clientX-downX,e.clientY-downY)>7){ moved=true; applyDrag(e); } });
-  c.addEventListener("pointerup", e=>{ if(dragging && !moved){    // a tap toggles that muscle between even and boosted
-      const g=BUILD_GROUPS[nearestSpoke(e)], n=BUILD_GROUPS.length;
-      const tot=BUILD_GROUPS.reduce((a,m)=>a+(build.emphasis[m]||0),0)||1, sh=(build.emphasis[g]||0)/tot;
-      setShare(g, sh > 1.5/n ? 1/n : 0.4); }
+  c.addEventListener("pointerup", e=>{ if(dragging && !moved){    // a tap toggles a muscle between boosted and matching the field
+      const g=BUILD_GROUPS[nearestSpoke(e)], mo=meanOther(g);
+      build.emphasis[g] = (build.emphasis[g]||0) > mo*1.25 ? mo : mo*1.8; build.focus=[]; syncEmphasisChips(); updateBuildPreview(); }
     dragging=false; });
   c.addEventListener("pointercancel", ()=>{ dragging=false; });
 })();
