@@ -2388,14 +2388,15 @@ function agoStr(ts){ const s=Math.max(0,(Date.now()-ts)/1000);
   if(s<90) return "just now"; const m=s/60; if(m<60) return Math.round(m)+"m ago";
   const h=m/60; if(h<24) return Math.round(h)+"h ago"; const d=h/24; return d<7?Math.round(d)+"d ago":new Date(ts).toLocaleDateString(undefined,{month:"short",day:"numeric"}); }
 
-// Rose / coxcomb chart of a workout's muscle split. Normalized so the muscle with the MOST volume
-// reaches the rim and the rest fall away on a CONVEX curve: radius = (value/max)^ROSE_GAMMA, exponent
-// > 1 so the decay is steepest near the outer ring — emphasised muscles shoot to the edge and the
-// background muscles drop right back, giving strong contrast. Untrained muscles stay empty.
-const ROSE_GAMMA=2.5;
+// Rose / coxcomb chart of a workout's muscle split. Normalized to the top muscle (it reaches the rim);
+// the rest follow a mild convex curve (radius = (value/max)^ROSE_GAMMA) so emphasised muscles clearly
+// lead — but never below ROSE_FLOOR, so background muscles stay readable instead of collapsing to a
+// blob. A muscle with no volume stays empty.
+const ROSE_GAMMA=1.6, ROSE_FLOOR=0.17;
 function roseRadii(G, tot){
   let mx=0; G.forEach(g=>{ const v=tot[g]||0; if(v>mx) mx=v; });
-  return G.map(g=> mx>0 ? Math.pow((tot[g]||0)/mx, ROSE_GAMMA) : 0);   // radius fraction in [0,1]
+  if(mx<=0) return G.map(()=>0);
+  return G.map(g=>{ const v=tot[g]||0; return v>0 ? ROSE_FLOOR+(1-ROSE_FLOOR)*Math.pow(v/mx, ROSE_GAMMA) : 0; });
 }
 function drawRose(x, cx, cy, R, G, tot, o){
   o=o||{}; const n=G.length, frac=roseRadii(G,tot);
@@ -5443,7 +5444,8 @@ function updateBuildPreview(){
   // max rescales everyone — "drag one, the rest move proportionally").
   const maxOther=(g)=> Math.max(0.04, ...BUILD_GROUPS.filter(m=>m!==g).map(m=> build.emphasis[m]!=null?build.emphasis[m]:0.5));
   const setFromFrac=(g, frac)=>{ frac=Math.max(0.05, Math.min(1, frac)); const mo=maxOther(g);
-    let e = mo*Math.pow(frac, 1/ROSE_GAMMA);                  // below the top: wedge displays at `frac`
+    const t=Math.max(0,(frac-ROSE_FLOOR)/(1-ROSE_FLOOR));     // undo the display floor so the tip tracks
+    let e = mo*Math.pow(t, 1/ROSE_GAMMA);                     // below the top: wedge displays at `frac`
     if(frac>0.97) e = mo*(1 + (frac-0.97)/0.03*1.3);          // near the rim: overtake to dominate
     build.emphasis[g]=Math.max(0.04, e); build.focus=[]; syncEmphasisChips(); updateBuildPreview(); };
   const applyDrag=(ev)=>{ const r=c.getBoundingClientRect(); const px=(ev.clientX-r.left)/r.width*c.width, py=(ev.clientY-r.top)/r.height*c.height;
