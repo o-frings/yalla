@@ -1016,16 +1016,6 @@
           <div id="reqList"></div>
           <div id="suggList"></div>
           <div id="followList"></div>
-          <!-- live workout sharing: a master switch + per-follower "allow live" grants (shown if schema-live.sql is live) -->
-          <div id="liveBox" style="display:none;">
-            <div class="ed-label" style="margin-top:18px;">Live workouts</div>
-            <label class="row" style="justify-content:space-between; align-items:center;">
-              <span class="levelcap" style="margin:0;">Share my workouts live</span>
-              <input type="checkbox" id="liveToggle">
-            </label>
-            <p class="levelcap" style="margin:6px 4px 0; line-height:1.4;">While you train, the friends you allow below can watch in real time.</p>
-            <div id="liveGrants"></div>
-          </div>
         </div>
 
         <label class="row" style="justify-content:space-between; align-items:center; margin-top:12px;">
@@ -1077,14 +1067,6 @@
   <div class="grabber"></div>
   <div class="sheethdr"><span class="t" id="woWho">Workout</span><button class="btn plain sm" id="woClose">Done</button></div>
   <div class="sheetbody" id="woBody"></div>
-</div>
-
-<!-- LIVE WORKOUT VIEW (feed) -->
-<div class="scrim" id="scrimLive"></div>
-<div class="sheet" id="sheetLive">
-  <div class="grabber"></div>
-  <div class="sheethdr"><span class="t" id="liveWho">Live</span><button class="btn plain sm" id="liveClose">Done</button></div>
-  <div class="sheetbody" id="liveBody"></div>
 </div>
 
 <!-- OTHER TRAINING SHEET -->
@@ -2156,14 +2138,10 @@ try{ const _p=new URLSearchParams(location.search);
     _p.delete("add"); const _qs=_p.toString();
     history.replaceState(null,"", location.pathname+(_qs?"?"+_qs:"")+location.hash); }
 }catch(e){}
-// Live workout sharing (schema-live.sql): broadcast state + realtime channel handles.
-let liveReady=false, _liveActive=false, _liveT=null, _liveChan=null;
 async function detectHardened(){
-  if(!cloudReady()){ dbHardened=false; liveReady=false; return; }
+  if(!cloudReady()){ dbHardened=false; return; }
   try{ const { error } = await sb.from("follows").select("follower").limit(1); dbHardened = !error; }
   catch(e){ dbHardened=false; }
-  try{ const { error } = await sb.from("live_sessions").select("user_id").limit(1); liveReady = !error; }
-  catch(e){ liveReady=false; }
 }
 
 function cloudConfigured(){ return !!(SUPA.url && SUPA.key); }
@@ -2452,16 +2430,11 @@ async function renderFeed(){
     const { data, error } = await sb.from("activity").select("id,user_id,created_at,summary").order("created_at",{ascending:false}).limit(30);
     if(error) throw error; rows=data||[];
   }catch(e){ list.innerHTML='<div class="levelcap" style="margin:0 4px;">Couldn\'t load the feed.</div>'; return; }
-  // friends training live right now — RLS returns only sessions you've been granted (+ your own, filtered out);
-  // drop stale rows (>3 min without an update) so a crashed session doesn't linger as "live".
-  let lives=[];
-  try{ const { data } = await sb.from("live_sessions").select("user_id,state,updated_at").eq("active",true);
-    lives=(data||[]).filter(L=> L.user_id!==cloudUser.id && (Date.now()-Date.parse(L.updated_at) < 180000)); }catch(e){}
-  if(!rows.length && !lives.length){ list.innerHTML='<div class="levelcap" style="margin:0 4px;">No activity yet. Finish a workout to be the first.</div>'; return; }
+  if(!rows.length){ list.innerHTML='<div class="levelcap" style="margin:0 4px;">No activity yet. Finish a workout to be the first.</div>'; return; }
   let names={};
-  try{ const ids=[...new Set([...rows.map(r=>r.user_id), ...lives.map(L=>L.user_id)])];
-    if(ids.length){ const { data } = await sb.from("profiles").select("user_id,display_name").in("user_id",ids);
-      (data||[]).forEach(p=>{ names[p.user_id]=p.display_name; }); }
+  try{ const ids=[...new Set(rows.map(r=>r.user_id))];
+    const { data } = await sb.from("profiles").select("user_id,display_name").in("user_id",ids);
+    (data||[]).forEach(p=>{ names[p.user_id]=p.display_name; });
   }catch(e){}
   // batch-load cheers + comment counts for the visible activities (degrades gracefully if those tables aren't set up)
   const aids=rows.map(r=>r.id).filter(Boolean), cheerN={}, cheered={}, commN={};
@@ -2472,14 +2445,6 @@ async function renderFeed(){
       (data||[]).forEach(c=>{ commN[c.activity_id]=(commN[c.activity_id]||0)+1; }); }catch(e){}
   }
   list.innerHTML="";
-  // live sessions first — a tappable "training live" banner per granted friend
-  lives.forEach(L=>{ const who=names[L.user_id]||"A friend", st=L.state||{};
-    const card=document.createElement("div"); card.style.cssText="padding:12px 4px; border-bottom:.5px solid var(--line); cursor:pointer;";
-    card.innerHTML='<div style="display:flex; align-items:center; gap:8px;"><span style="color:#ff3b30; font-size:18px; line-height:1;">●</span><b>'+esc(who)+' is training live</b></div>'
-      +'<div class="levelcap" style="margin:4px 0 0;">'+esc((st.name||"Workout")+" · "+(st.doneSets||0)+"/"+(st.totalSets||0)+" sets · "+(st.mins||0)+" min")+' · tap to watch ›</div>';
-    card.onclick=()=>openLiveView(L.user_id, who);
-    list.appendChild(card);
-  });
   rows.forEach(r=>{
     const s=r.summary||{}, mine=r.user_id===cloudUser.id;
     const who = mine ? "You" : (names[r.user_id] || "A friend");
@@ -2597,7 +2562,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi]||e.n; }
-let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false, shareLevel:null, liveShare:false, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[] };
+let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[] };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -3570,7 +3535,6 @@ function captureDraft(){
   if(Object.keys(map).length===0) return; // nothing on screen (e.g. mid-unload) — don't clobber a saved draft
   draft[sig]={ t:Date.now(), s:map };
   clearTimeout(_draftTimer); _draftTimer=setTimeout(()=>{ sset("draft", draft); }, 350);
-  scheduleLiveSync();   // broadcast in-progress workout to friends you've allowed (if live sharing is on)
 }
 // restore a workout's in-progress entries (values + added/removed set rows) after a render
 function applyDraft(){
@@ -3592,7 +3556,7 @@ function applyDraft(){
   });
 }
 // persist immediately when the app is hidden/closed (iOS may suspend before the debounced save fires)
-function flushDraft(){ try{ captureDraft(); clearTimeout(_draftTimer); sset("draft", draft); liveEnd(); }catch(e){} }
+function flushDraft(){ try{ captureDraft(); clearTimeout(_draftTimer); sset("draft", draft); }catch(e){} }
 window.addEventListener("pagehide", flushDraft);
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden") flushDraft(); });
 function renderWorkout(){
@@ -3732,7 +3696,6 @@ $("saveBtn").onclick=async()=>{
     toast("Logged "+session.sets+" set"+(session.sets===1?"":"s")+" — "+more+" more and it counts as a full session this week.");
   }
   cloudTouchWorkout();     // reset the 2-day "train at home" reminder timer (any movement keeps the streak alive)
-  liveEnd();               // workout finished — close the live broadcast
   if(fresh.length) setTimeout(()=>celebrateAch(fresh), beaten>0?1300:1200);
 };
 
@@ -3798,7 +3761,6 @@ document.querySelectorAll("#onboardWrap .obopt").forEach(b=> b.onclick=()=> setO
 
 // ================= pages / bottom tab bar =================
 function showTab(name){
-  if(name!=="workout") liveEnd();                          // leaving the workout screen ends any live broadcast
   if(typeof cancelPending==="function") cancelPending();   // drop any unconfirmed objective/focus change on navigation
   if(window.__revealBar) window.__revealBar();             // always show the tab bar when switching tabs
   document.querySelectorAll(".page").forEach(p=> p.classList.toggle("active", p.dataset.tab===name));
@@ -5676,88 +5638,7 @@ async function renderFriends(){
       : "";
     sugBox.querySelectorAll(".sugFollow").forEach(b=> b.onclick=()=>{ const row=b.closest("[data-uid]"); followUser(row.dataset.uid, row.dataset.nm); });
   }
-  // live workout sharing — master toggle + per-follower "allow live" grants
-  const liveB=$("liveBox");
-  if(liveB){
-    liveB.style.display = liveReady ? "" : "none";
-    const lt=$("liveToggle"); if(lt) lt.checked = settings.liveShare===true;
-    const gBox=$("liveGrants");
-    if(gBox && liveReady && settings.liveShare){
-      let followers=[]; try{ const { data } = await sb.rpc("my_followers"); followers=data||[]; }catch(e){}
-      gBox.innerHTML = followers.length
-        ? '<div class="ed-label" style="margin-top:14px;">Allow live for</div>'+followers.map(u=>
-            '<label class="row" data-uid="'+esc(u.user_id)+'" style="justify-content:space-between; align-items:center; margin-top:8px;">'
-            +'<span style="font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis;">'+esc(u.display_name||"A lifter")+'</span>'
-            +'<input type="checkbox" class="livegrant"'+(u.live?" checked":"")+'></label>').join('')
-        : '<p class="levelcap" style="margin:8px 4px 0;">No followers yet — share your invite code so friends can follow you.</p>';
-      gBox.querySelectorAll(".livegrant").forEach(cb=> cb.onchange=()=> setLiveGrant(cb.closest("[data-uid]").dataset.uid, cb.checked));
-    } else if(gBox){ gBox.innerHTML=""; }
-  }
 }
-async function setLiveGrant(viewerId, on){
-  if(!cloudReady()) return;
-  try{ await sb.from("follows").update({ live:!!on }).eq("follower", viewerId).eq("followee", cloudUser.id); }catch(e){}
-}
-if($("liveToggle")) $("liveToggle").onchange=async(e)=>{ settings.liveShare=!!e.target.checked; await sset("settings",settings);
-  if(!settings.liveShare) liveEnd(); renderFriends();
-  toast(settings.liveShare?"Live sharing on — pick who can watch below.":"Live sharing off."); };
-
-// ---- live broadcast (broadcaster side) ----
-// Build the current workout's state from the on-screen set rows (mirrors the Finish scan).
-function liveStateFromDOM(){
-  const ex=[]; let doneSets=0, totalSets=0, vol=0, top=null, curName=""; const mtot={};
-  document.querySelectorAll("#exlist .group").forEach(g=>{ const name=g.dataset.ex; if(!name) return;
-    const sets=[]; let any=false;
-    g.querySelectorAll(".setrow").forEach(r=>{ const w=((r.querySelector(".w")||{}).value||"").trim(), rp=((r.querySelector(".r")||{}).value||"").trim();
-      totalSets++; if(rp!==""){ doneSets++; any=true; sets.push({w, r:rp}); const vv=setVol(name,w,rp); vol+=vv;
-        muscleFor(name).forEach((grp,gi)=> mtot[grp]=(mtot[grp]||0)+vv*(gi===0?1:0.5));
-        const tw=parseFloat(w)||0; if(!top || tw>top.w) top={name, w:tw, r:parseInt(rp)||0}; } });
-    if(sets.length) ex.push({name, sets}); if(any) curName=name;
-  });
-  const p=activePlan(), w=freeMode?null:(p&&p.workouts[curWk]);
-  return { name: freeMode?"Free workout":(w?w.name:"Workout"), exName:curName, doneSets, totalSets,
-           mins:Math.round(tmrElapsed()/60), vol:Math.round(vol), mtot, ex, top };
-}
-async function liveSync(){
-  if(!cloudReady() || !liveReady || !settings.liveShare) return;
-  const st=liveStateFromDOM(); if(st.doneSets<1) return;     // nothing logged yet — don't broadcast an empty session
-  _liveActive=true;
-  try{ await sb.from("live_sessions").upsert({ user_id:cloudUser.id, active:true, state:st, updated_at:new Date().toISOString() }); }catch(e){}
-}
-function scheduleLiveSync(){ if(!cloudReady()||!liveReady||!settings.liveShare) return; clearTimeout(_liveT); _liveT=setTimeout(liveSync, 3000); }
-async function liveEnd(){ clearTimeout(_liveT); if(!_liveActive || !cloudReady()) return; _liveActive=false;
-  try{ await sb.from("live_sessions").update({ active:false, updated_at:new Date().toISOString() }).eq("user_id", cloudUser.id); }catch(e){} }
-
-// ---- live view (viewer side) ----
-function renderLiveState(st){
-  const body=$("liveBody"); if(!body || !st) return;
-  const mt=st.mtot||{}, topM=MGROUPS.slice().sort((a,b)=>(mt[b]||0)-(mt[a]||0)).filter(g=>(mt[g]||0)>0).slice(0,2).map(g=>MSHORT[g]||g);
-  let h='<div class="ovbig" style="font-size:22px;">'+esc(st.name||"Workout")+' <span style="color:#ff3b30; font-size:14px; vertical-align:middle;">● LIVE</span></div>';
-  h+='<div class="levelcap" style="margin:4px 0 0;">'+(st.exName?("on "+esc(st.exName)+" · "):"")+esc((st.doneSets||0)+" of "+(st.totalSets||0)+" sets · "+(st.mins||0)+" min")+'</div>';
-  h+='<div style="text-align:center; margin:14px 0 2px;"><canvas id="liveRadar" width="320" height="320" style="width:190px; height:190px;"></canvas></div>';
-  if(topM.length) h+='<div class="levelcap" style="text-align:center; margin:0 0 6px;">mostly '+esc(topM.join(" · "))+'</div>';
-  h+='<div class="ed-label">Exercises so far</div>';
-  h+=(st.ex||[]).map(e=>{ const setsTxt=(e.sets||[]).map(s=> (s.w!==""&&s.w!=null? s.w+"kg×"+(s.r||0) : (s.r||0)+" reps")).join(" · ");
-    return '<div style="padding:10px 4px; border-bottom:.5px solid var(--line);"><div style="font-weight:600;">'+esc(e.name)+'</div><div class="levelcap" style="margin-top:3px;">'+esc(setsTxt)+'</div></div>'; }).join('');
-  body.innerHTML=h;
-  const cv=$("liveRadar"); if(cv) miniRadar(cv, mt);
-}
-function openLiveView(uid, who){
-  $("liveWho").textContent = who||"Live"; $("liveBody").innerHTML='<div class="levelcap" style="margin:0 4px;">Loading…</div>';
-  openSheet("Live");
-  sb.from("live_sessions").select("state,active").eq("user_id",uid).maybeSingle()
-    .then(({data})=>{ if(data && data.active) renderLiveState(data.state); else $("liveBody").innerHTML='<p class="levelcap" style="margin:8px 4px;">This workout has ended.</p>'; })
-    .catch(()=>{ $("liveBody").innerHTML='<p class="levelcap" style="margin:8px 4px;">Couldn\'t load.</p>'; });
-  if(_liveChan){ try{ sb.removeChannel(_liveChan); }catch(e){} _liveChan=null; }
-  try{ _liveChan = sb.channel("live:"+uid)
-    .on("postgres_changes", { event:"*", schema:"public", table:"live_sessions", filter:"user_id=eq."+uid }, p=>{
-      const n=p.new; if(!n || !n.active){ $("liveBody").innerHTML='<p class="levelcap" style="margin:8px 4px;">Workout ended. 💪</p>'; return; }
-      renderLiveState(n.state); })
-    .subscribe(); }catch(e){}
-}
-function closeLiveView(){ if(_liveChan){ try{ sb.removeChannel(_liveChan); }catch(e){} _liveChan=null; } closeSheet("Live"); }
-if($("liveClose")) $("liveClose").onclick=closeLiveView;
-if($("scrimLive")) $("scrimLive").onclick=closeLiveView;
 // follow a suggested person directly by id (the insert RLS allows follower = me; the
 // trigger auto-accepts if they're public, otherwise it's a pending request)
 async function followUser(uid, name){
