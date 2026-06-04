@@ -2388,21 +2388,33 @@ function agoStr(ts){ const s=Math.max(0,(Date.now()-ts)/1000);
   if(s<90) return "just now"; const m=s/60; if(m<60) return Math.round(m)+"m ago";
   const h=m/60; if(h<24) return Math.round(h)+"h ago"; const d=h/24; return d<7?Math.round(d)+"d ago":new Date(ts).toLocaleDateString(undefined,{month:"short",day:"numeric"}); }
 
-// Small radar (shape only, no labels) for a feed card.
+// Rose / coxcomb chart of a workout's muscle split. Each muscle is a wedge whose AREA equals its
+// share of the session's volume — so the total filled area is identical for EVERY workout
+// (area = π·R²/n), and nothing ever crosses the ring. Radius for share s is R·√s: a single-muscle
+// workout fills one wedge to the rim; a balanced one is an even little rosette. Pure shape, size-independent.
+function roseRadii(G, tot){
+  const total=G.reduce((a,g)=>a+(tot[g]||0),0);
+  return G.map(g=> total ? Math.sqrt((tot[g]||0)/total) : 0);   // radius fraction in [0,1]
+}
+function drawRose(x, cx, cy, R, G, tot, o){
+  o=o||{}; const n=G.length, frac=roseRadii(G,tot);
+  x.strokeStyle=o.grid||"rgba(127,127,127,.30)"; x.lineWidth=o.gridW||1;
+  (o.rings||[1]).forEach(f=>{ x.beginPath(); x.arc(cx,cy,R*f,0,Math.PI*2); x.stroke(); });
+  const half=Math.PI/n - (o.gap!=null?o.gap:0.06)/2;
+  for(let i=0;i<n;i++){
+    const rr=R*frac[i]; if(rr<=0.5) continue;
+    const a=(-90+i*360/n)*Math.PI/180;
+    x.beginPath(); x.moveTo(cx,cy); x.arc(cx,cy,rr,a-half,a+half); x.closePath();
+    const col=o.color ? (typeof o.color==="function"?o.color(G[i],i):o.color) : "#f08020";
+    x.fillStyle=col; x.globalAlpha=o.alpha!=null?o.alpha:0.85; x.fill(); x.globalAlpha=1;
+    if(o.stroke){ x.lineWidth=o.strokeW||1; x.strokeStyle=o.stroke; x.stroke(); }
+  }
+}
+// Small rose (no labels) for a feed card.
 function miniRadar(cv, tot){
   const W=cv.width, H=cv.height, x=cv.getContext("2d"), cx=W/2, cy=H/2, R=Math.min(W,H)/2-4;
-  const G=MGROUPS, n=G.length, pt=(i,rr)=>{ const a=(-90+i*360/n)*Math.PI/180; return [cx+rr*Math.cos(a), cy+rr*Math.sin(a)]; };
-  // Proportional fingerprint: each axis is this muscle's SHARE of the session's volume (relative to
-  // itself, never to targets), scaled by muscle count so an even split sits mid-radius. The plotted
-  // total is therefore constant regardless of how big or small the session was.
-  const sum=G.reduce((a,g)=>a+(tot[g]||0),0);
   x.clearRect(0,0,W,H);
-  x.strokeStyle="rgba(127,127,127,.30)"; x.lineWidth=1;
-  x.beginPath(); x.arc(cx,cy,R,0,Math.PI*2); x.stroke();
-  for(let i=0;i<n;i++){ const [px,py]=pt(i,R); x.beginPath(); x.moveTo(cx,cy); x.lineTo(px,py); x.stroke(); }
-  const rv=g=> sum ? Math.min(1, 0.08+0.30*(n*(tot[g]||0)/sum)) : 0;
-  x.beginPath(); G.forEach((g,i)=>{ const [px,py]=pt(i,R*rv(g)); i?x.lineTo(px,py):x.moveTo(px,py); }); x.closePath();
-  x.fillStyle="rgba(240,128,32,.30)"; x.fill(); x.lineWidth=2; x.strokeStyle="#f08020"; x.stroke();
+  drawRose(x, cx, cy, R, MGROUPS, tot, { color:g=>MCOLOR[g]||"#f08020", alpha:.55, rings:[0.5,1], grid:"rgba(127,127,127,.28)" });
 }
 
 async function renderFeed(){
@@ -5678,18 +5690,11 @@ $("importFile").onchange=(e)=>{ const f=e.target.files&&e.target.files[0]; if(!f
 function fmtKgShort(v){ v=Math.round(v); return v>=1000 ? (v/1000).toFixed(v>=10000?0:1).replace(/\.0$/,"")+"k kg" : v+" kg"; }
 function rrect(x,X,Y,w,h,r){ x.beginPath(); x.moveTo(X+r,Y); x.arcTo(X+w,Y,X+w,Y+h,r); x.arcTo(X+w,Y+h,X,Y+h,r); x.arcTo(X,Y+h,X,Y,r); x.arcTo(X,Y,X+w,Y,r); x.closePath(); }
 function tileRadar(x,cx,cy,R,tot){
-  const G=MGROUPS, n=G.length, pt=(i,rr)=>{ const a=(-90+i*360/n)*Math.PI/180; return [cx+rr*Math.cos(a), cy+rr*Math.sin(a)]; };
-  // Proportional fingerprint (see miniRadar): share-of-session, self-relative, constant total.
-  const sum=G.reduce((a,g)=>a+(tot[g]||0),0);
-  x.strokeStyle="rgba(255,255,255,.30)"; x.lineWidth=2;
-  [0.5,1].forEach(f=>{ x.beginPath(); x.arc(cx,cy,R*f,0,Math.PI*2); x.stroke(); });
-  for(let i=0;i<n;i++){ const [px,py]=pt(i,R); x.beginPath(); x.moveTo(cx,cy); x.lineTo(px,py); x.stroke(); }
-  const rv=g=> sum ? Math.min(1, 0.06+0.30*(n*(tot[g]||0)/sum)) : 0;
-  x.beginPath(); G.forEach((g,i)=>{ const [px,py]=pt(i,R*rv(g)); i?x.lineTo(px,py):x.moveTo(px,py); }); x.closePath();
-  x.fillStyle="rgba(255,255,255,.32)"; x.fill(); x.lineWidth=5; x.strokeStyle="#fff"; x.stroke();
-  G.forEach((g,i)=>{ const [px,py]=pt(i,R*rv(g)); x.beginPath(); x.arc(px,py,8,0,Math.PI*2); x.fillStyle="#fff"; x.fill(); });
+  const G=MGROUPS, n=G.length;
+  // rose: each wedge's area = that muscle's share of the session (see drawRose) — constant total area.
+  drawRose(x, cx, cy, R, G, tot, { color:"rgba(255,255,255,.88)", alpha:1, stroke:"#fff", strokeW:2, gap:0.08, rings:[0.5,1], grid:"rgba(255,255,255,.30)", gridW:2 });
   x.fillStyle="rgba(255,255,255,.92)"; x.font="600 22px -apple-system,system-ui,sans-serif"; x.textBaseline="middle";
-  G.forEach((g,i)=>{ const [px,py]=pt(i,R+34), co=Math.cos((-90+i*360/n)*Math.PI/180);
+  G.forEach((g,i)=>{ const a=(-90+i*360/n)*Math.PI/180, px=cx+(R+34)*Math.cos(a), py=cy+(R+34)*Math.sin(a), co=Math.cos(a);
     x.textAlign=Math.abs(co)<0.3?"center":(co>0?"left":"right"); x.fillText(MSHORT[g]||g, px, py); });
 }
 function renderShareTile(s){
