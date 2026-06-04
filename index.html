@@ -1177,7 +1177,7 @@
 
     <div class="ed-label">Variety <span class="subhint">— rotate accessories across A/B days</span></div>
     <div class="seg appearance bopt" data-k="vary">
-      <div class="s active" data-v="off">Off</div><div class="s" data-v="on">On</div>
+      <div class="s active" data-v="on">On</div><div class="s" data-v="off">Off</div>
     </div>
 
     <div class="ed-label">Areas to protect <span class="subhint">— optional, select any</span></div>
@@ -2388,15 +2388,16 @@ function agoStr(ts){ const s=Math.max(0,(Date.now()-ts)/1000);
   if(s<90) return "just now"; const m=s/60; if(m<60) return Math.round(m)+"m ago";
   const h=m/60; if(h<24) return Math.round(h)+"h ago"; const d=h/24; return d<7?Math.round(d)+"d ago":new Date(ts).toLocaleDateString(undefined,{month:"short",day:"numeric"}); }
 
-// Rose / coxcomb chart of a workout's muscle split. Normalized to the top muscle (it reaches the rim);
-// the rest follow a mild convex curve (radius = (value/max)^ROSE_GAMMA) so emphasised muscles clearly
-// lead — but never below ROSE_FLOOR, so background muscles stay readable instead of collapsing to a
-// blob. A muscle with no volume stays empty.
-const ROSE_GAMMA=1.0, ROSE_FLOOR=0.32;
+// Rose / coxcomb chart of a muscle split. Normalized to the AVERAGE worked muscle: a perfectly
+// balanced split is a uniform mid-size rosette (radius ROSE_MID) — not a maxed-out circle you could
+// never actually create — while above-average muscles grow toward the rim and below-average ones
+// shrink (never below ROSE_FLOOR, so they stay readable). Untrained muscles stay empty.
+const ROSE_MID=0.62, ROSE_GAMMA=1.0, ROSE_FLOOR=0.30;
 function roseRadii(G, tot){
-  let mx=0; G.forEach(g=>{ const v=tot[g]||0; if(v>mx) mx=v; });
-  if(mx<=0) return G.map(()=>0);
-  return G.map(g=>{ const v=tot[g]||0; return v>0 ? ROSE_FLOOR+(1-ROSE_FLOOR)*Math.pow(v/mx, ROSE_GAMMA) : 0; });
+  let sum=0, k=0; G.forEach(g=>{ const v=tot[g]||0; if(v>0){ sum+=v; k++; } });
+  if(!k) return G.map(()=>0);
+  const mean=sum/k;
+  return G.map(g=>{ const v=tot[g]||0; return v>0 ? Math.max(ROSE_FLOOR, Math.min(1, ROSE_MID*Math.pow(v/mean, ROSE_GAMMA))) : 0; });
 }
 function drawRose(x, cx, cy, R, G, tot, o){
   o=o||{}; const n=G.length, frac=roseRadii(G,tot);
@@ -5147,7 +5148,7 @@ const COMPOUND_GROUPS=["chest","back","quads","hamstrings","shoulders"];
 // the emphasis radar's spokes — identical to the app-wide analytics groups
 const BUILD_GROUPS=MGROUPS;
 function buildKey(m){ return ({"Front Delts":"shoulders","Side Delts":"sidedelts","Rear Delts":"reardelts"}[m]) || m.toLowerCase(); }
-let build={ exp:"intermediate", obj:"muscle", focus:["balanced"], bias:"balanced", time:60, freq:4, injuries:[], access:"gym", supersets:"on", vary:"off",
+let build={ exp:"intermediate", obj:"muscle", focus:["balanced"], bias:"balanced", time:60, freq:4, injuries:[], access:"gym", supersets:"on", vary:"on",
   emphasis:(function(){ const e={}; BUILD_GROUPS.forEach(m=>e[m]=0.5); return e; })() };
 function emphasisPreset(focus){
   const e={}; BUILD_GROUPS.forEach(m=>e[m]=0.5);
@@ -5439,14 +5440,13 @@ function updateBuildPreview(){
   const nearestSpoke=(ev)=>{ const r=c.getBoundingClientRect(); const px=(ev.clientX-r.left)/r.width*c.width, py=(ev.clientY-r.top)/r.height*c.height;
     const G=BUILD_GROUPS, n=G.length, cx=c.width/2, cy=c.height/2, ang=Math.atan2(py-cy,px-cx)*180/Math.PI;
     let bestI=0,bestD=999; for(let i=0;i<n;i++){ const a=-90+i*360/n, d=Math.abs(((ang-a+540)%360)-180); if(d<bestD){bestD=d;bestI=i;} } return bestI; };
-  // Render is max-normalized: radius = (e/maxE)^ROSE_GAMMA. setFromFrac sets muscle g so its wedge
-  // tracks the finger; dragged to the rim it overtakes the field and the others recede (changing the
-  // max rescales everyone — "drag one, the rest move proportionally").
-  const maxOther=(g)=> Math.max(0.04, ...BUILD_GROUPS.filter(m=>m!==g).map(m=> build.emphasis[m]!=null?build.emphasis[m]:0.5));
-  const setFromFrac=(g, frac)=>{ frac=Math.max(0.05, Math.min(1, frac)); const mo=maxOther(g);
-    const t=Math.max(0,(frac-ROSE_FLOOR)/(1-ROSE_FLOOR));     // undo the display floor so the tip tracks
-    let e = mo*Math.pow(t, 1/ROSE_GAMMA);                     // below the top: wedge displays at `frac`
-    if(frac>0.97) e = mo*(1 + (frac-0.97)/0.03*1.3);          // near the rim: overtake to dominate
+  // Render is average-normalized: radius ≈ ROSE_MID·(e/mean). setFromFrac sets muscle g so its wedge
+  // tracks the finger — at the rim it sits well above the field; at ROSE_MID it matches the average.
+  // (Using the OTHER muscles' mean as the reference; changing one wedge rescales the rest.)
+  const meanOther=(g)=>{ const o=BUILD_GROUPS.filter(m=>m!==g).map(m=> build.emphasis[m]!=null?build.emphasis[m]:0.5);
+    return Math.max(0.0001, o.reduce((a,b)=>a+b,0)/Math.max(1,o.length)); };
+  const setFromFrac=(g, frac)=>{ frac=Math.max(0.05, Math.min(1, frac)); const mo=meanOther(g);
+    const e = mo*Math.pow(Math.max(0.001,frac)/ROSE_MID, 1/ROSE_GAMMA);   // invert radius=ROSE_MID·(e/mean)
     build.emphasis[g]=Math.max(0.04, e); build.focus=[]; syncEmphasisChips(); updateBuildPreview(); };
   const applyDrag=(ev)=>{ const r=c.getBoundingClientRect(); const px=(ev.clientX-r.left)/r.width*c.width, py=(ev.clientY-r.top)/r.height*c.height;
     const cx=c.width/2, cy=c.height/2, R=c.width*0.30, i=nearestSpoke(ev);
@@ -5454,8 +5454,8 @@ function updateBuildPreview(){
   c.addEventListener("pointerdown", e=>{ dragging=true; downX=e.clientX; downY=e.clientY; moved=false; try{ c.setPointerCapture(e.pointerId); }catch(_){} e.preventDefault(); });
   c.addEventListener("pointermove", e=>{ if(!dragging) return; if(Math.hypot(e.clientX-downX,e.clientY-downY)>7){ moved=true; applyDrag(e); } });
   c.addEventListener("pointerup", e=>{ if(dragging && !moved){    // a tap toggles a muscle between boosted and matching the field
-      const g=BUILD_GROUPS[nearestSpoke(e)], mo=maxOther(g);
-      build.emphasis[g] = (build.emphasis[g]||0) > mo*1.05 ? mo : mo*1.8; build.focus=[]; syncEmphasisChips(); updateBuildPreview(); }
+      const g=BUILD_GROUPS[nearestSpoke(e)], mo=meanOther(g);
+      build.emphasis[g] = (build.emphasis[g]||0) > mo*1.25 ? mo : mo*1.8; build.focus=[]; syncEmphasisChips(); updateBuildPreview(); }
     dragging=false; });
   c.addEventListener("pointercancel", ()=>{ dragging=false; });
 })();
