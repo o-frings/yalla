@@ -5406,14 +5406,21 @@ document.querySelectorAll("#sheetBuild .bchips.multi").forEach(grp=>{ const k=gr
   c.classList.toggle("on"); build[k]=[].map.call(grp.querySelectorAll(".chip.on"),x=>x.dataset.v); updateBuildPreview(); }); });
 function syncEmphasisChips(){ const sel=Array.isArray(build.focus)?build.focus:(build.focus?[build.focus]:[]);
   document.querySelectorAll('#sheetBuild .bchips[data-k="focus"] .chip').forEach(c=> c.classList.toggle("on", sel.indexOf(c.dataset.v)>=0)); }
+// The builder rose uses a gentler radius curve than √share so wedges are large and easy to drag
+// (a balanced split sits at ~half the ring instead of ~0.29). It still represents a sums-to-1
+// distribution and rebalances proportionally; exact constant-area is traded for editability here.
+// The feed/share roses keep true √share. buildRoseShare inverts the curve so a drag tip tracks the finger.
+const BUILD_GAMMA=0.34;
+function buildRoseRadius(share){ return Math.pow(Math.max(0,Math.min(1,share)), BUILD_GAMMA); }
+function buildRoseShare(frac){ return Math.pow(Math.max(0,Math.min(1,frac)), 1/BUILD_GAMMA); }
 function drawEmphasisRadar(){
   const c=$("buildRadar"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const G=BUILD_GROUPS, cx=W/2, cy=H/2, R=W*0.30, n=G.length;
   const cs=getComputedStyle(document.documentElement), accent=(cs.getPropertyValue("--accent")||"#0a84ff").trim(), lab=(cs.getPropertyValue("--l2")||"#888").trim();
   const pt=(i,rr)=>{ const a=(-90+i*360/n)*Math.PI/180; return [cx+rr*Math.cos(a), cy+rr*Math.sin(a)]; };
-  // A distribution that sums to 1: each wedge's AREA = that muscle's share of total emphasis, so the
-  // rose is constant-area. Dragging one wedge rescales the rest proportionally (see applyDrag).
-  const frac=roseRadii(G, build.emphasis);   // radius fraction = √share
+  // Sums-to-1 distribution; radius is a gentle curve of each muscle's share (see BUILD_GAMMA above).
+  const tot=G.reduce((a,g)=>a+(build.emphasis[g]||0),0)||1;
+  const frac=G.map(g=> buildRoseRadius((build.emphasis[g]||0)/tot));
   ctx.strokeStyle="rgba(128,128,128,.22)"; ctx.lineWidth=1.5;
   [0.5,1].forEach(f=>{ ctx.beginPath(); ctx.arc(cx,cy,R*f,0,Math.PI*2); ctx.stroke(); });
   const half=Math.PI/n - 0.05;
@@ -5441,8 +5448,8 @@ function updateBuildPreview(){
     const others=BUILD_GROUPS.reduce((a,m)=> a+(m===g?0:(build.emphasis[m]!=null?build.emphasis[m]:0.5)), 0)||0.0001;
     build.emphasis[g]=s/(1-s)*others; build.focus=[]; syncEmphasisChips(); updateBuildPreview(); };
   const applyDrag=(ev)=>{ const r=c.getBoundingClientRect(); const px=(ev.clientX-r.left)/r.width*c.width, py=(ev.clientY-r.top)/r.height*c.height;
-    const cx=c.width/2, cy=c.height/2, R=c.width*0.30, frac=Math.max(0.05,Math.min(0.95,Math.hypot(px-cx,py-cy)/R)), i=nearestSpoke(ev);
-    setShare(BUILD_GROUPS[i], frac*frac); };   // radius = √share, so share = (dist/R)²
+    const cx=c.width/2, cy=c.height/2, R=c.width*0.30, frac=Math.max(0.05,Math.min(0.98,Math.hypot(px-cx,py-cy)/R)), i=nearestSpoke(ev);
+    setShare(BUILD_GROUPS[i], buildRoseShare(frac)); };   // invert the display curve so the tip tracks the finger
   c.addEventListener("pointerdown", e=>{ dragging=true; downX=e.clientX; downY=e.clientY; moved=false; try{ c.setPointerCapture(e.pointerId); }catch(_){} e.preventDefault(); });
   c.addEventListener("pointermove", e=>{ if(!dragging) return; if(Math.hypot(e.clientX-downX,e.clientY-downY)>7){ moved=true; applyDrag(e); } });
   c.addEventListener("pointerup", e=>{ if(dragging && !moved){    // a tap toggles that muscle between even and boosted
