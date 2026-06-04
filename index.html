@@ -192,6 +192,17 @@
   .largeTitle .ltmain .titleBtn{ flex:1; min-width:0; line-height:1.08; }
   .largeTitle .ltmain .iconbtn{ flex:0 0 auto; align-self:flex-start; margin-top:2px; }
   .largeTitle small{ display:block; font-size:15px; font-weight:500; color:var(--l2); letter-spacing:0; margin-top:8px; }
+  /* Overview header → Friends destination: a tappable people chip with a request badge */
+  .friendschip{ flex:0 0 auto; align-self:flex-start; margin-top:2px; position:relative; background:var(--row); border:none; color:var(--accent); cursor:pointer; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:transform .12s, opacity .12s; }
+  .friendschip:active{ transform:scale(.86); opacity:.7; }
+  .friendschip svg{ width:22px; height:22px; }
+  .fbadge{ position:absolute; top:-3px; right:-3px; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--red); color:#fff; font-size:11px; font-weight:700; line-height:1; display:flex; align-items:center; justify-content:center; box-sizing:border-box; border:2px solid var(--bg); }
+  .fbadge[hidden]{ display:none; }   /* [hidden] alone can't beat display:flex above */
+  /* a row that navigates somewhere (Friends sheet ⇄ Settings) */
+  .navlink{ display:flex; align-items:center; justify-content:space-between; width:100%; background:var(--row); border:none; color:var(--ink); cursor:pointer; padding:14px 16px; border-radius:12px; font-size:16px; font-weight:600; transition:opacity .12s; }
+  .navlink:active{ opacity:.6; }
+  .navlink .nlsub{ color:var(--l2); font-weight:500; font-size:14px; margin-left:8px; }
+  .navlink .ovchev{ color:var(--l3); }
   /* backdrop behind the status-bar clock — slightly translucent (no blur, to match the tab bar and avoid scroll flicker) */
  .statusbar-bg{ position:fixed; top:0; left:0; right:0; height:env(safe-area-inset-top); z-index:40; pointer-events:none;
     background:color-mix(in srgb, var(--bg) 88%, transparent); }
@@ -877,7 +888,9 @@
 <!-- ME SHEET -->
 <!-- ===== FEED PAGE ===== -->
 <div class="page active" id="pageFeed" data-tab="overview">
-  <div class="largeTitle"><div class="ltmain"><span class="titleBtn" style="cursor:default;"><span id="ovGreet">Overview</span></span></div><small id="ovDate"></small></div>
+  <div class="largeTitle"><div class="ltmain"><span class="titleBtn" style="cursor:default;"><span id="ovGreet">Overview</span></span>
+    <button class="friendschip" id="ovFriends" aria-label="Friends" style="display:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c0-3 2.5-4.6 5.5-4.6s5.5 1.6 5.5 4.6"/><path d="M16 5.2a3.2 3.2 0 0 1 0 6"/><path d="M17.5 14.6c2.4.4 4 1.9 4 4.4"/></svg><span class="fbadge" id="friendsBadge" hidden></span></button>
+  </div><small id="ovDate"></small></div>
   <div id="ovBody"></div>
   <div class="ed-label" id="ovFeedLabel" style="display:none;">Friends</div>
   <div id="feedCTA" class="group ovtap" style="display:none; cursor:pointer;" onclick="goAccount()"><div class="pad"><p style="font-size:14px;color:var(--l2);line-height:1.5;margin:2px 0;">Tap to sign in under <b>Settings ⚙ → Account &amp; sync</b> to share your workouts and see what your friends are training.<span class="ovchev">›</span></p></div></div>
@@ -1040,7 +1053,12 @@
           <label for="acctName">What should I call you?</label>
           <div class="meinput"><input id="acctName" type="text" autocapitalize="words" placeholder="Your name or alias" style="width:140px;text-align:right;"></div>
         </div>
-        <div class="ed-label" style="margin-top:16px;">Sharing with friends</div>
+        <!-- Friends: the people (requests, your friends, find friends) live on the dedicated Friends
+             sheet, opened from here or the Overview header. This section keeps only the controls. -->
+        <div class="ed-label" style="margin-top:16px;">Friends</div>
+        <button class="navlink" id="manageFriends" style="margin-bottom:6px;"><span>Manage friends<span class="nlsub" id="manageFriendsSub"></span></span><span class="ovchev">›</span></button>
+
+        <div class="ed-label" style="margin-top:18px;">Sharing with friends</div>
         <div class="seg appearance" id="shareSeg">
           <div class="s" data-lvl="0">Off</div>
           <div class="s" data-lvl="1">Summary</div>
@@ -1049,26 +1067,15 @@
         </div>
         <p class="levelcap" id="shareSegHint" style="margin:8px 4px 0; line-height:1.4;"></p>
 
-        <!-- Friends: profile visibility, your share code, requests, following. Shown only once the
-             friends-only schema is live (dbHardened); built by renderFriends(). -->
+        <!-- Privacy + live-watch controls. Shown only once the friends-only schema is live
+             (dbHardened); built by renderFriends(). -->
         <div id="friendsBox" style="display:none;">
-          <div class="ed-label" style="margin-top:18px;">Profile</div>
+          <div class="ed-label" style="margin-top:18px;">Profile visibility</div>
           <div class="seg appearance" id="visSeg">
             <div class="s" data-vis="private">Private</div>
             <div class="s" data-vis="public">Public</div>
           </div>
           <p class="levelcap" id="visHint" style="margin:8px 4px 0; line-height:1.4;"></p>
-          <div class="ed-label" style="margin-top:18px;">Invite friends</div>
-          <button class="btn wide" id="inviteBtn">📨 Share my invite link</button>
-          <p class="levelcap" style="margin:6px 4px 0; line-height:1.4;">Send the link — your friend just taps it to follow you. Or share your code: <b id="myCode">—</b> <span id="copyCode" style="color:var(--accent); cursor:pointer; text-decoration:underline;">copy</span></p>
-          <div class="ed-label" style="margin-top:18px;">Add by code</div>
-          <div class="row" style="gap:8px;">
-            <input id="addCode" type="text" autocapitalize="characters" placeholder="Paste a friend's code" style="flex:1; text-transform:uppercase;">
-            <button class="btn sm" id="addFriendBtn" style="flex:0 0 auto;">Add</button>
-          </div>
-          <div id="reqList"></div>
-          <div id="suggList"></div>
-          <div id="followList"></div>
           <div id="liveGrantList"></div>
         </div>
 
@@ -1099,6 +1106,33 @@
   <div class="grabber"></div>
   <div class="sheethdr"><span class="t">Settings</span><button class="btn plain sm" id="settingsClose">Done</button></div>
   <div class="sheetbody" id="settingsBody"></div>
+</div>
+
+<!-- FRIENDS SHEET (the people: requests, your friends, find friends) — opened from the Overview
+     header chip or Settings → Friends. The privacy/sharing controls stay in Settings. -->
+<div class="scrim" id="scrimFriends"></div>
+<div class="sheet" id="sheetFriends">
+  <div class="grabber"></div>
+  <div class="sheethdr"><span class="t">Friends</span><button class="btn plain sm" id="friendsClose">Done</button></div>
+  <div class="sheetbody">
+    <!-- shown when signed out / the friends schema isn't live yet -->
+    <div id="friendsCTA" class="group ovtap" style="display:none; cursor:pointer;"><div class="pad"><p style="font-size:14px;color:var(--l2);line-height:1.5;margin:2px 0;">Sign in under <b>Settings ⚙ → Account &amp; sync</b> to add friends and see what they're training.<span class="ovchev">›</span></p></div></div>
+    <!-- the friend graph; built by renderFriends() -->
+    <div id="friendsPeople" style="display:none;">
+      <div id="reqList"></div>
+      <div id="followList"></div>
+      <p class="levelcap" id="friendsEmpty" style="display:none; margin:10px 4px 0; line-height:1.5;">No friends yet — share your invite link or add a friend's code below to get started.</p>
+      <div class="ed-label" style="margin-top:18px;">Find friends</div>
+      <button class="btn wide" id="inviteBtn">📨 Share my invite link</button>
+      <p class="levelcap" style="margin:6px 4px 0; line-height:1.4;">Send the link — your friend just taps it to follow you. Or share your code: <b id="myCode">—</b> <span id="copyCode" style="color:var(--accent); cursor:pointer; text-decoration:underline;">copy</span></p>
+      <div class="row" style="gap:8px; margin-top:12px;">
+        <input id="addCode" type="text" autocapitalize="characters" placeholder="Paste a friend's code" style="flex:1; text-transform:uppercase;">
+        <button class="btn sm" id="addFriendBtn" style="flex:0 0 auto;">Add</button>
+      </div>
+      <div id="suggList"></div>
+      <button class="navlink" id="friendsToSharing" style="margin-top:22px;"><span>Sharing &amp; privacy<span class="nlsub">choose who can see you</span></span><span class="ovchev">›</span></button>
+    </div>
+  </div>
 </div>
 
 <!-- WORKOUT SHARE SHEET -->
@@ -2373,9 +2407,10 @@ async function reloadFromStore(){
 
 function renderAccount(){
   const lbl=$("acctLabel"), box=$("acctBox");
-  const cta=$("feedCTA"), list=$("feedList"), flbl=$("ovFeedLabel");
+  const cta=$("feedCTA"), list=$("feedList"), flbl=$("ovFeedLabel"), chip=$("ovFriends");
   const setFeed=(signedIn)=>{ if(cta) cta.style.display = signedIn ? "none" : ""; if(list) list.style.display = signedIn ? "" : "none"; };
   if(flbl) flbl.style.display = cloudConfigured() ? "" : "none";
+  if(chip) chip.style.display = cloudConfigured() ? "" : "none";
   if(!lbl||!box) return;
   if(!cloudConfigured()){ lbl.style.display="none"; box.style.display="none"; setFeed(false); return; }
   lbl.style.display=""; box.style.display="";
@@ -2392,6 +2427,7 @@ function renderAccount(){
   } else {
     outB.style.display=""; inB.style.display="none";
     setFeed(false);
+    renderFriends();   // applies the signed-out state to the Friends sheet + clears the badge
   }
 }
 
@@ -4095,6 +4131,15 @@ function placeGoalBlock(){
 $("openSettings").onclick=()=>{ renderDash(); renderAccount(); openSheet("Settings"); };
 $("settingsClose").onclick=()=>closeSheet("Settings");
 $("scrimSettings").onclick=()=>closeSheet("Settings");
+// Friends sheet (the people) — opened from the Overview header chip or Settings → Friends
+function openFriends(){ renderFriends(); openSheet("Friends"); }
+if($("ovFriends")) $("ovFriends").onclick=openFriends;
+if($("friendsClose")) $("friendsClose").onclick=()=>closeSheet("Friends");
+if($("scrimFriends")) $("scrimFriends").onclick=()=>closeSheet("Friends");
+if($("manageFriends")) $("manageFriends").onclick=()=>{ closeSheet("Settings"); openFriends(); };
+// the signed-out CTA and the "Sharing & privacy" link both route into Settings → Account & sync
+if($("friendsCTA")) $("friendsCTA").onclick=()=>{ closeSheet("Friends"); goAccount(); };
+if($("friendsToSharing")) $("friendsToSharing").onclick=()=>{ closeSheet("Friends"); goAccount(); };
 $("goalSave").onclick=async()=>{ const s=parseFloat($("goalStart").value),g=parseFloat($("goalTarget").value);
   if(isNaN(s)||isNaN(g)||g<=s){ toast("Goal must be above start"); return; }
   const wasOnMe = $("goalBlock") && $("goalBlock").parentElement===$("goalHomeMe");
@@ -5959,11 +6004,20 @@ document.querySelectorAll("#shareSeg .s").forEach(s=>{
 const VIS_HINTS={ private:"Private — only friends you accept can follow you and see your workouts.",
                   public:"Public — anyone can follow you without approval and see what you share." };
 let _myCode="";
+// reflect the incoming-request count on the Overview header chip + the Settings "Manage friends" row
+function setFriendsBadge(n){
+  const b=$("friendsBadge");
+  if(b){ b.textContent=n>0?String(n):""; b.hidden=!(n>0); }
+  const sub=$("manageFriendsSub");
+  if(sub) sub.textContent = n>0 ? (n+" request"+(n>1?"s":"")) : "";
+}
 async function renderFriends(){
-  const box=$("friendsBox"); if(!box) return;
   const on = cloudReady() && dbHardened;
-  box.style.display = on ? "" : "none";
-  if(!on) return;
+  const box=$("friendsBox"), people=$("friendsPeople"), cta=$("friendsCTA");
+  if(box) box.style.display = on ? "" : "none";
+  if(people) people.style.display = on ? "" : "none";
+  if(cta) cta.style.display = on ? "none" : "";
+  if(!on){ setFriendsBadge(0); return; }
   // profile visibility + my follow code
   let vis="private";
   try{ const { data } = await sb.from("profiles").select("visibility,follow_code").eq("user_id",cloudUser.id).maybeSingle();
@@ -5976,6 +6030,8 @@ async function renderFriends(){
   try{ const { data } = await sb.rpc("incoming_requests"); reqs=data||[]; }catch(e){}
   try{ const { data } = await sb.rpc("my_following"); following=data||[]; }catch(e){}
   try{ const { data } = await sb.rpc("suggested_follows"); sugg=data||[]; }catch(e){}
+  setFriendsBadge(reqs.length);
+  const emptyHint=$("friendsEmpty"); if(emptyHint) emptyHint.style.display=(!reqs.length && !following.length)?"":"none";
   const reqBox=$("reqList");
   if(reqBox){
     reqBox.innerHTML = reqs.length
@@ -5990,7 +6046,7 @@ async function renderFriends(){
   const folBox=$("followList");
   if(folBox){
     folBox.innerHTML = following.length
-      ? '<div class="ed-label" style="margin-top:18px;">Following</div>'+following.map(u=>
+      ? '<div class="ed-label" style="margin-top:18px;">Your friends</div>'+following.map(u=>
           '<div class="row" data-uid="'+esc(u.user_id)+'" style="justify-content:space-between; align-items:center; margin-top:8px;">'
           +'<span style="font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis;">'+esc(u.display_name||"A lifter")+(u.status==="pending"?' <span class="levelcap" style="font-weight:400;">· pending</span>':'')+'</span>'
           +'<button class="btn tinted sm unfol" style="flex:0 0 auto;">Remove</button></div>').join('')
