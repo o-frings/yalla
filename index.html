@@ -123,7 +123,13 @@
   .calcrow .cv small{ font-size:13px; font-weight:500; color:var(--l2); margin-left:8px; }
   .calc .empty{ font-size:13px; color:var(--l2); padding:8px 2px; line-height:1.45; }
   .titleBtn{ cursor:pointer; -webkit-tap-highlight-color:transparent; }
-  .timerbar{ display:flex; align-items:center; gap:10px; padding:2px 2px; margin:-2px 0 16px; background:transparent; border:none; box-shadow:none; }
+  /* session + rest timers pin to the top of the workout page once a session is underway. .stick (JS,
+     when active) turns on sticky; .stuck (IntersectionObserver, only while actually pinned) adds the
+     blurred full-bleed backdrop — so there's no visual change until you actually scroll. */
+  .timersbar{ margin:-2px 0 16px; }
+  .timersbar.stick{ position:sticky; top:env(safe-area-inset-top); z-index:25; }
+  .timersbar.stick.stuck{ margin-left:-16px; margin-right:-16px; padding:6px 16px; background:color-mix(in srgb, var(--bg) 92%, transparent); -webkit-backdrop-filter:saturate(160%) blur(16px); backdrop-filter:saturate(160%) blur(16px); box-shadow:0 .5px 0 var(--line); }
+  .timerbar{ display:flex; align-items:center; gap:10px; padding:2px 2px; margin:0; background:transparent; border:none; box-shadow:none; }
   .tmrbtn{ width:40px; height:40px; flex:0 0 auto; border-radius:50%; border:none; cursor:pointer; background:var(--accent-soft); color:var(--accent); display:inline-flex; align-items:center; justify-content:center; transition:transform .12s; }
   .tmrbtn svg{ width:18px; height:18px; }
   .tmrtime{ font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.5px; min-width:52px; }
@@ -136,7 +142,7 @@
   .tmrreset{ background:none; border:none; color:var(--l3); font-size:13px; font-weight:600; cursor:pointer; padding:12px 8px; margin:-4px -4px; }
   .tmrrepeat{ background:var(--accent-soft); border:none; color:var(--accent); font-size:13px; font-weight:600; cursor:pointer; padding:8px 12px; border-radius:16px; flex:0 0 auto; }
   .tmrrepeat:active{ opacity:.6; }
-  .restbar{ display:none; position:relative; align-items:center; gap:9px; padding:12px 16px; margin:-8px 0 16px; border-radius:14px; overflow:hidden;
+  .restbar{ display:none; position:relative; align-items:center; gap:9px; padding:12px 16px; margin:6px 0 0; border-radius:14px; overflow:hidden;
     background:var(--accent-soft); border:.5px solid var(--accent-soft); }
   .restbar.show{ display:flex; }
   .restbar.done{ animation:restpulse .6s ease; }
@@ -149,9 +155,9 @@
   .restadj{ display:inline-flex; gap:6px; }
   .restadj button{ background:var(--card); border:.5px solid var(--line); color:var(--ink); border-radius:8px; padding:12px 16px; font-size:13px; font-weight:600; cursor:pointer; transition:transform .12s; }
   /* live workout sharing */
-  .liverow{ display:flex; align-items:center; gap:11px; margin:2px 0 16px; padding:11px 14px; border-radius:14px; background:var(--row); border:.5px solid var(--line); cursor:pointer; transition:background .15s, border-color .15s; }
+  .livewrap{ margin:2px 0 16px; }
+  .liverow{ display:flex; align-items:center; gap:11px; padding:11px 14px; border-radius:14px; background:var(--row); border:.5px solid var(--line); cursor:pointer; transition:background .15s, border-color .15s; }
   .liverow:active{ transform:scale(.99); }
-  .liverow .livedot{ width:9px; height:9px; background:var(--l3); animation:none; transition:background .15s; }
   .liverow-col{ display:flex; flex-direction:column; gap:2px; min-width:0; flex:1; }
   .liveswitch{ font-weight:600; font-size:14px; color:var(--ink); line-height:1.2; }
   .livehint{ font-size:12px; color:var(--l2); line-height:1.35; margin:0; }
@@ -160,14 +166,16 @@
   .liveswui::after{ content:""; position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .2s; }
   .livesw:checked + .liveswui{ background:var(--red); }
   .livesw:checked + .liveswui::after{ transform:translateX(18px); }
-  .liverow.on{ background:rgba(255,59,48,.10); border-color:rgba(255,59,48,.32); }
-  .liverow.on .liveswitch{ color:var(--red); }
-  .liverow.on .livedot{ background:var(--red); animation:livepulse 1.6s infinite; }
-  .liveshrow{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:10px; cursor:pointer; }
-  .liveshname{ font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; }
-  .liveshtag{ font-weight:600; font-size:11px; color:var(--red); background:rgba(255,59,48,.12); padding:1px 7px; border-radius:8px; margin-left:6px; }
-  .liveshpick{ flex:0 0 auto; width:20px; height:20px; accent-color:var(--red); }
-  .liveshpick:disabled{ opacity:.65; }
+  .livewrap.on .liverow{ background:rgba(255,59,48,.10); border-color:rgba(255,59,48,.32); }
+  .livewrap.on .liveswitch{ color:var(--red); }
+  .livepick-btn{ display:flex; align-items:center; gap:4px; width:100%; background:none; border:none; cursor:pointer; color:var(--accent); font:inherit; font-size:13px; font-weight:600; padding:9px 6px 2px; }
+  .lpchev{ transition:transform .15s; }
+  .livepick-btn.open .lpchev{ transform:rotate(90deg); }
+  .livepick{ display:flex; flex-wrap:wrap; gap:8px; padding:8px 4px 0; }
+  .livepick[hidden]{ display:none; }
+  .livechip{ font-size:13px; font-weight:600; padding:6px 12px; border-radius:13px; border:.5px solid var(--line); background:var(--row); color:var(--ink); cursor:pointer; transition:background .12s, border-color .12s, color .12s; }
+  .livechip.on{ background:rgba(255,59,48,.12); border-color:rgba(255,59,48,.4); color:var(--red); }
+  .livechip.always{ background:rgba(255,59,48,.12); border-color:rgba(255,59,48,.4); color:var(--red); opacity:.7; cursor:default; }
   .livecard{ display:flex; align-items:center; gap:12px; padding:12px 14px; margin:8px 0; border-radius:14px; background:var(--accent-soft); cursor:pointer; }
   .livedot{ width:10px; height:10px; border-radius:50%; background:var(--red); flex:0 0 auto; animation:livepulse 1.6s infinite; }
   .livego{ color:var(--accent); font-weight:600; flex:0 0 auto; }
@@ -803,31 +811,37 @@
 
 <!-- WORKOUT -->
 <div class="seg" id="seg"></div>
-<div class="timerbar" id="timerBar">
-  <button class="tmrbtn" id="tmrToggle" aria-label="Start timer"></button>
-  <span class="tmrtime" id="tmrTime">0:00</span>
-  <span class="tmrlbl" id="tmrLbl">session timer</span>
-  <button class="tmrrepeat" id="repeatBtn" title="Fill in last session" style="display:none;">↻ Last time</button>
-  <button class="tmrreset" id="tmrReset" title="Reset">reset</button>
+<!-- session timer + rest ("pause") timer: pinned to the top of the page once a workout's underway -->
+<div class="timersbar" id="timersBar">
+  <div class="timerbar" id="timerBar">
+    <button class="tmrbtn" id="tmrToggle" aria-label="Start timer"></button>
+    <span class="tmrtime" id="tmrTime">0:00</span>
+    <span class="tmrlbl" id="tmrLbl">session timer</span>
+    <button class="tmrrepeat" id="repeatBtn" title="Fill in last session" style="display:none;">↻ Last time</button>
+    <button class="tmrreset" id="tmrReset" title="Reset">reset</button>
+  </div>
+  <div class="restbar" id="restBar">
+    <div class="restprog" id="restProg"></div>
+    <button class="restx" id="restSkip" aria-label="Skip rest">✕</button>
+    <span class="restlbl">Rest</span>
+    <span class="resttime" id="restTime">0:00</span>
+    <span class="restadj"><button id="restMinus">−15</button><button id="restPlus">+15</button></span>
+  </div>
 </div>
-<div class="restbar" id="restBar">
-  <div class="restprog" id="restProg"></div>
-  <button class="restx" id="restSkip" aria-label="Skip rest">✕</button>
-  <span class="restlbl">Rest</span>
-  <span class="resttime" id="restTime">0:00</span>
-  <span class="restadj"><button id="restMinus">−15</button><button id="restPlus">+15</button></span>
+<!-- Live share: broadcast this session to allowed friends + any you tick below. Shown only once
+     signed in + the friends schema is live; wired by updateLiveRow() / goLive() / endLive(). -->
+<div class="livewrap" id="liveRow" style="display:none;">
+  <label class="liverow">
+    <span class="liverow-col">
+      <span class="liveswitch" id="liveLbl">Share workout live</span>
+      <span class="livehint" id="liveHint"></span>
+    </span>
+    <input type="checkbox" class="livesw" id="liveToggle">
+    <span class="liveswui" aria-hidden="true"></span>
+  </label>
+  <button class="livepick-btn" id="livePickBtn" type="button">Choose who can watch<span class="lpchev">›</span></button>
+  <div class="livepick" id="livePick" hidden></div>
 </div>
-<!-- Live share: broadcast this session to friends you've allowed (Settings → Friends). Shown only
-     once signed in + the friends schema is live; wired by updateLiveRow() / goLive() / endLive(). -->
-<label class="liverow" id="liveRow" style="display:none;">
-  <span class="livedot"></span>
-  <span class="liverow-col">
-    <span class="liveswitch" id="liveLbl">Share workout live</span>
-    <span class="livehint" id="liveHint"></span>
-  </span>
-  <input type="checkbox" class="livesw" id="liveToggle">
-  <span class="liveswui" aria-hidden="true"></span>
-</label>
 <div class="injbanner" id="injBanner" style="display:none;"></div>
 <div id="exlist"></div>
 <button class="btn wide" id="saveBtn" style="margin-top:12px;">Finish &amp; Save Workout</button>
@@ -1098,18 +1112,6 @@
       <button class="btn wide" id="shareImgBtn">Share image</button>
       <button class="btn tinted wide" id="saveImgBtn">Save image</button>
     </div>
-  </div>
-</div>
-
-<!-- LIVE SHARE PICKER (opens when you flip the workout-page live toggle on) -->
-<div class="scrim" id="scrimLiveShare"></div>
-<div class="sheet" id="sheetLiveShare">
-  <div class="grabber"></div>
-  <div class="sheethdr"><span class="t">Share live</span><button class="btn plain sm" id="liveShareCancel">Cancel</button></div>
-  <div class="sheetbody">
-    <p class="levelcap" style="margin:0 4px 12px; line-height:1.4;">Pick who watches this session. Friends you’ve set to always-on (Settings → Friends) are included automatically.</p>
-    <div id="liveShareList"></div>
-    <button class="btn wide" id="liveShareGo" style="margin-top:16px;">🔴 Go live</button>
   </div>
 </div>
 
@@ -2487,33 +2489,53 @@ function buildLiveState(){
 }
 function updateLiveRow(){
   const row=$("liveRow"); if(!row) return;
-  row.style.display = liveAvailable() ? "flex" : "none";
+  row.style.display = liveAvailable() ? "" : "none";
   const tog=$("liveToggle"); if(tog) tog.checked=liveOn;
   const lbl=$("liveLbl"); if(lbl) lbl.textContent = liveOn ? "Sharing live" : "Share workout live";
   row.classList.toggle("on", liveOn);
   const hint=$("liveHint");
   if(hint) hint.textContent = liveOn
-    ? "Friends you've allowed can watch & cheer."
+    ? "Friends you've allowed + anyone ticked can watch."
     : "Broadcast in real time to allowed friends.";
 }
-// Picker shown when you flip the live toggle on: always-on grantees are pre-checked & locked (they
-// always see you live); tick others to include them for this session only. Cancel reverts the toggle.
-async function openLiveShare(){
-  if(!liveAvailable()){ toast("Sign in to share your workout live."); const t=$("liveToggle"); if(t) t.checked=false; updateLiveRow(); return; }
-  const list=$("liveShareList"); if(list) list.innerHTML='<div class="levelcap" style="margin:0 4px;">Loading…</div>';
-  openSheet("LiveShare");
-  let followers=[]; try{ const { data } = await sb.rpc("my_followers"); followers=data||[]; }catch(e){}
-  if(!list) return;
-  if(!followers.length){ list.innerHTML='<p class="levelcap" style="margin:0 4px; line-height:1.4;">No friends to share with yet — add some in Settings → Friends. You can still go live; they’ll see it once you allow them.</p>'; return; }
-  list.innerHTML = followers.map(u=>
-    '<label class="liveshrow" data-uid="'+esc(u.user_id)+'">'
-    +'<span class="liveshname">'+esc(u.display_name||"A lifter")+(u.live?' <span class="liveshtag">always</span>':'')+'</span>'
-    +'<input type="checkbox" class="liveshpick"'+(u.live?' checked disabled':'')+'>'
-    +'</label>').join('');
+// Inline per-session picker: tick friends to share THIS session with, independently of the start
+// toggle. Always-on grantees (Settings → Friends) are shown locked-on — they always see you live.
+let _liveFollowers=null;
+function toggleLivePick(){
+  const box=$("livePick"), btn=$("livePickBtn"); if(!box||!btn) return;
+  const open=box.hasAttribute("hidden");
+  box.toggleAttribute("hidden", !open); btn.classList.toggle("open", open);
+  if(open && _liveFollowers===null) loadLivePicks();
+}
+async function loadLivePicks(){
+  const box=$("livePick"); if(!box) return;
+  box.innerHTML='<span class="levelcap" style="padding:2px 4px;">Loading…</span>';
+  let followers=[]; try{ if(cloudReady()){ const { data } = await sb.rpc("my_followers"); followers=data||[]; } }catch(e){}
+  _liveFollowers=followers; renderLivePicks();
+}
+function renderLivePicks(){
+  const box=$("livePick"); if(!box || _liveFollowers===null) return;
+  if(!_liveFollowers.length){ box.innerHTML='<span class="levelcap" style="padding:2px 4px; line-height:1.4;">No friends yet — add some in Settings → Friends.</span>'; return; }
+  box.innerHTML=_liveFollowers.map(u=>{
+    const always=!!u.live, sel=_liveViewers.indexOf(u.user_id)>=0;
+    const cls = always ? "livechip always" : ("livechip"+(sel?" on":""));
+    return '<button type="button" class="'+cls+'" data-uid="'+esc(u.user_id)+'"'+(always?' disabled':'')+'>'+esc(u.display_name||"A lifter")+(always?' ✓':'')+'</button>';
+  }).join('');
+  box.querySelectorAll('.livechip:not(.always)').forEach(c=> c.onclick=()=>{
+    const uid=c.dataset.uid, i=_liveViewers.indexOf(uid);
+    if(i>=0) _liveViewers.splice(i,1); else _liveViewers.push(uid);
+    c.classList.toggle("on", i<0);
+    if(liveOn) pushLiveViewers();   // already broadcasting → update who can watch + ping the new picks
+  });
+}
+async function pushLiveViewers(){
+  if(!liveOn || !cloudReady()) return;
+  try{ await sb.from("live_sessions").update({ viewers:_liveViewers, updated_at:new Date().toISOString() }).eq("user_id",cloudUser.id); }catch(e){}
+  notifyLive(_liveViewers);   // the edge function's 10-min mute dedupes anyone already pinged
 }
 async function goLive(viewers){
   if(!liveAvailable()){ toast("Sign in to share your workout live."); return false; }
-  _liveViewers = Array.isArray(viewers) ? viewers.filter(Boolean) : [];   // per-session extras, beyond always-on grants
+  if(Array.isArray(viewers)) _liveViewers = viewers.filter(Boolean);   // else keep the inline tick selection
   liveOn=true; updateLiveRow();
   try{ await sb.from("live_sessions").upsert({ user_id:cloudUser.id, active:true, viewers:_liveViewers,
         started_at:new Date().toISOString(), updated_at:new Date().toISOString(), state:buildLiveState() }); }
@@ -2531,7 +2553,7 @@ function liveTick(){
   try{ sb.from("live_sessions").upsert({ user_id:cloudUser.id, active:true, updated_at:new Date().toISOString(), state:buildLiveState() }); }catch(e){}
 }
 async function endLive(silent){
-  if(!liveOn) return; liveOn=false; _liveViewers=[]; clearTimeout(_liveTimer); updateLiveRow();
+  if(!liveOn) return; liveOn=false; _liveViewers=[]; clearTimeout(_liveTimer); updateLiveRow(); renderLivePicks();
   try{ if(cloudReady()) await sb.from("live_sessions").update({ active:false, updated_at:new Date().toISOString() }).eq("user_id",cloudUser.id); }catch(e){}
   if(_liveRecvChan){ try{ sb.removeChannel(_liveRecvChan); }catch(e){} _liveRecvChan=null; }
   if(!silent) toast("Live session ended.");
@@ -2835,16 +2857,10 @@ let editing=null;       // plan object being edited (working copy)
 const $=id=>document.getElementById(id);
 // live-sheet wiring — must come after `$` is defined (moved here from the live block above, where it
 // ran before `const $` and crashed boot with "Cannot access '$' before initialization").
-// flip on → choose who watches this session (picker); flip off → stop broadcasting
-if($("liveToggle")) $("liveToggle").onchange=(e)=>{ if(e.target.checked){ openLiveShare(); } else endLive(false); };
-if($("liveShareCancel")) $("liveShareCancel").onclick=()=>{ closeSheet("LiveShare"); const t=$("liveToggle"); if(t) t.checked=false; updateLiveRow(); };
-if($("scrimLiveShare")) $("scrimLiveShare").onclick=()=>{ if($("liveShareCancel")) $("liveShareCancel").onclick(); };
-if($("liveShareGo")) $("liveShareGo").onclick=async()=>{
-  const viewers=[...document.querySelectorAll('#liveShareList .liveshpick:checked:not([disabled])')].map(cb=>cb.closest('[data-uid]').dataset.uid);
-  closeSheet("LiveShare");
-  const ok=await goLive(viewers);
-  const t=$("liveToggle"); if(t) t.checked=ok; updateLiveRow();
-};
+// flip on → broadcast to allowed friends + anyone ticked below; flip off → stop. The "Choose who can
+// watch" list ticks friends independently of the toggle (loaded lazily on first expand).
+if($("liveToggle")) $("liveToggle").onchange=async(e)=>{ if(e.target.checked){ const ok=await goLive(); e.target.checked=ok; updateLiveRow(); } else endLive(false); };
+if($("livePickBtn")) $("livePickBtn").onclick=toggleLivePick;
 if($("liveClose")) $("liveClose").onclick=()=>{ if(_liveViewChan){ try{ sb.removeChannel(_liveViewChan); }catch(e){} _liveViewChan=null; } _liveViewOwner=null; closeSheet("Live"); };
 if($("scrimLive")) $("scrimLive").onclick=()=>{ if($("liveClose")) $("liveClose").onclick(); };
 $("cNo").onclick=confirmClose;
@@ -2861,7 +2877,26 @@ function tmrRender(){
   $("tmrToggle").innerHTML = timer.running ? ICON.pause : ICON.play;
   $("tmrLbl").textContent = timer.running ? "running" : (timer.elapsed>0?"paused":"Start session timer");
   $("tmrReset").style.visibility = (timer.elapsed>0||timer.running) ? "visible" : "hidden";
+  updateTimerStick();
 }
+// Pin the session + rest timers to the top while a workout's underway (active timer OR a running
+// rest). .stick enables position:sticky; an IntersectionObserver adds .stuck (the backdrop) only once
+// the bar actually reaches the top, so nothing changes visually until you scroll.
+function updateTimerStick(){
+  const w=$("timersBar"); if(!w) return;
+  const rb=$("restBar");
+  const active = timer.running || timer.elapsed>0 || (rb && rb.classList.contains("show"));
+  w.classList.toggle("stick", !!active);
+  if(!active) w.classList.remove("stuck");
+}
+(function(){
+  const w=$("timersBar"); if(!w || !("IntersectionObserver" in window)) return;
+  const sentinel=document.createElement("div"); sentinel.style.cssText="height:0;width:100%;";
+  w.parentNode.insertBefore(sentinel, w);
+  const page=w.closest(".page");
+  new IntersectionObserver((es)=>{ w.classList.toggle("stuck", w.classList.contains("stick") && !es[0].isIntersecting); },
+    { root:page||null, threshold:0 }).observe(sentinel);
+})();
 function tmrStart(){ if(timer.running) return; timer.startedAt=Date.now(); timer.running=true; timer.iv=setInterval(tmrRender,1000); tmrRender(); }
 function tmrPause(){ if(!timer.running) return; timer.elapsed=tmrElapsed(); timer.running=false; timer.startedAt=null; if(timer.iv){clearInterval(timer.iv);timer.iv=null;} tmrRender(); }
 function tmrReset(){ timer.elapsed=0; timer.running=false; timer.startedAt=null; if(timer.iv){clearInterval(timer.iv);timer.iv=null;} tmrRender(); }
@@ -2879,10 +2914,10 @@ function restRender(){ const t=rest.elapsed; $("restTime").textContent=tmrFmt(t)
   $("restProg").style.width=(rest.target?Math.max(0,Math.min(100,(t/rest.target)*100)):0)+"%"; }
 // counts UP from 0; called fresh every time a set is finished so rest never carries over between sets
 function restStart(sec){ rest.target=Math.max(5, sec||settings.restSec||90); rest.elapsed=0; rest.startedAt=Date.now(); rest.alerted=false; ensureNotifyPerm();
-  $("restBar").classList.add("show"); $("restBar").classList.remove("done"); restRender();
+  $("restBar").classList.add("show"); $("restBar").classList.remove("done"); restRender(); updateTimerStick();
   if(rest.iv) clearInterval(rest.iv);
   rest.iv=setInterval(()=>{ rest.elapsed=Math.max(0,Math.round((Date.now()-rest.startedAt)/1000)); restRender(); if(!rest.alerted && rest.elapsed>=rest.target) restReached(); }, 250); }
-function restStop(){ if(rest.iv){ clearInterval(rest.iv); rest.iv=null; } rest.startedAt=null; $("restBar").classList.remove("show","done"); }
+function restStop(){ if(rest.iv){ clearInterval(rest.iv); rest.iv=null; } rest.startedAt=null; $("restBar").classList.remove("show","done"); updateTimerStick(); }
 function restReached(){ rest.alerted=true;
   if(navigator.vibrate) try{ navigator.vibrate([0,220,120,220]); }catch(e){}
   try{ if(window.Notification && Notification.permission==="granted") new Notification("Rest done 💪", {body:"Time for your next set.", tag:"yalla-rest", renotify:true}); }catch(e){}
