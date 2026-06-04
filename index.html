@@ -2459,10 +2459,19 @@ async function cloudDeleteData(){
 async function ensureProfile(){
   if(!cloudReady()) return;
   try{
-    const { data } = await sb.from("profiles").select("user_id").eq("user_id", cloudUser.id).maybeSingle();
-    if(!data){
+    let row=null;
+    // pull my saved avatar from the canonical profile row (degrades if columns aren't migrated yet)
+    try{ const { data, error } = await sb.from("profiles").select("user_id,avatar_color,avatar_emoji,avatar_icon,avatar_style").eq("user_id", cloudUser.id).maybeSingle(); if(error) throw error; row=data; }
+    catch(e){ const { data } = await sb.from("profiles").select("user_id").eq("user_id", cloudUser.id).maybeSingle(); row=data; }
+    if(!row){
       const name = settings.displayName || (cloudUser.email||"Lifter").split("@")[0];
       await sb.from("profiles").upsert({ user_id: cloudUser.id, display_name: name });
+    } else {
+      if(row.avatar_color!=null) settings.avatarColor=row.avatar_color;
+      if(row.avatar_emoji!=null) settings.avatarEmoji=row.avatar_emoji;
+      if(row.avatar_icon!=null)  settings.avatarIcon=row.avatar_icon;
+      if(row.avatar_style!=null) settings.avatarStyle=row.avatar_style;
+      if(typeof syncSelfAvatar==="function") syncSelfAvatar();
     }
   }catch(e){}
 }
@@ -2509,6 +2518,10 @@ async function reloadFromStore(){
   if(!plans.length) plans=DEFAULT_PLANS.map(p=>JSON.parse(JSON.stringify(p)));
   if(!plans.find(p=>p.id===settings.activePlanId)) settings.activePlanId=plans[0].id;
   applyTheme(); renderAll();
+  // adopted settings can include avatar/display prefs synced from another device — refresh those surfaces
+  if(typeof syncSelfAvatar==="function") syncSelfAvatar();
+  if(typeof renderMeProfile==="function") renderMeProfile();
+  if(typeof renderPresenceRail==="function") renderPresenceRail();
 }
 
 function renderAccount(){
@@ -6201,7 +6214,11 @@ function openAvatarEditor(){
 async function saveAvatar(){
   settings.avatarColor=_avEditColor||null; settings.avatarEmoji=_avEditEmoji||null; settings.avatarStyle=_avEditStyle||"solid"; settings.avatarIcon=_avEditIcon||null;
   await sset("settings",settings); syncSelfAvatar(); renderAvatarEditor();
-  if(cloudReady()){ try{ await sb.from("profiles").upsert({ user_id:cloudUser.id, avatar_color:settings.avatarColor, avatar_emoji:settings.avatarEmoji, avatar_icon:settings.avatarIcon, avatar_style:settings.avatarStyle }); }catch(e){} }
+  if(cloudReady()){
+    // full write; if the DB is only partially migrated (missing icon/style cols), fall back to the legacy pair
+    try{ const { error } = await sb.from("profiles").upsert({ user_id:cloudUser.id, avatar_color:settings.avatarColor, avatar_emoji:settings.avatarEmoji, avatar_icon:settings.avatarIcon, avatar_style:settings.avatarStyle }); if(error) throw error; }
+    catch(e){ try{ await sb.from("profiles").upsert({ user_id:cloudUser.id, avatar_color:settings.avatarColor, avatar_emoji:settings.avatarEmoji }); }catch(e2){} }
+  }
   renderMeProfile(); renderPresenceRail();
   if($("sheetFriends") && $("sheetFriends").classList.contains("show")) renderFriends();
 }
