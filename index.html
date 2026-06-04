@@ -229,6 +229,23 @@
   .profhdr{ display:flex; flex-direction:column; align-items:center; text-align:center; gap:12px; padding:6px 0 2px; }
   .profhdr .pname{ font-size:23px; font-weight:700; letter-spacing:-.4px; }
   .profmeta{ font-size:13px; color:var(--l2); margin-top:-4px; }
+  /* code-first sharing: your follow code as the hero */
+  .codecard{ display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--row); border:1px dashed var(--line); border-radius:14px; padding:14px 16px; }
+  .codeval{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:25px; font-weight:700; letter-spacing:4px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; }
+  /* editable own-avatar: a little pencil overlay */
+  .avwrap{ position:relative; flex:0 0 auto; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .avwrap .avedit{ position:absolute; right:-2px; bottom:-2px; width:20px; height:20px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 0 0 2px var(--card); }
+  .avwrap .avedit svg{ width:11px; height:11px; }
+  /* avatar editor */
+  .avpreview{ display:flex; justify-content:center; padding:6px 0 14px; }
+  .swatches{ display:flex; flex-wrap:wrap; gap:12px; }
+  .swatch{ width:36px; height:36px; border-radius:50%; cursor:pointer; box-shadow:inset 0 0 0 .5px rgba(255,255,255,.22); transition:transform .12s; }
+  .swatch:active{ transform:scale(.88); }
+  .swatch.sel{ box-shadow:0 0 0 2.5px var(--card), 0 0 0 5px var(--accent); }
+  .emojigrid{ display:flex; flex-wrap:wrap; gap:10px; }
+  .emojibtn{ width:42px; height:42px; border-radius:12px; border:none; background:var(--row); font-size:22px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:transform .12s; }
+  .emojibtn:active{ transform:scale(.9); }
+  .emojibtn.sel{ box-shadow:inset 0 0 0 2px var(--accent); }
   /* backdrop behind the status-bar clock — slightly translucent (no blur, to match the tab bar and avoid scroll flicker) */
  .statusbar-bg{ position:fixed; top:0; left:0; right:0; height:env(safe-area-inset-top); z-index:40; pointer-events:none;
     background:color-mix(in srgb, var(--bg) 88%, transparent); }
@@ -1149,14 +1166,19 @@
       <div id="liveNowRow"></div>
       <div id="reqList"></div>
       <div id="followList"></div>
-      <p class="levelcap" id="friendsEmpty" style="display:none; margin:10px 4px 0; line-height:1.5;">No friends yet — share your invite link or add a friend's code below to get started.</p>
-      <div class="ed-label" style="margin-top:18px;">Find friends</div>
-      <button class="btn wide" id="inviteBtn">📨 Share my invite link</button>
-      <p class="levelcap" style="margin:6px 4px 0; line-height:1.4;">Send the link — your friend just taps it to follow you. Or share your code: <b id="myCode">—</b> <span id="copyCode" style="color:var(--accent); cursor:pointer; text-decoration:underline;">copy</span></p>
-      <div class="row" style="gap:8px; margin-top:12px;">
-        <input id="addCode" type="text" autocapitalize="characters" placeholder="Paste a friend's code" style="flex:1; text-transform:uppercase;">
+      <p class="levelcap" id="friendsEmpty" style="display:none; margin:10px 4px 0; line-height:1.5;">No friends yet — swap codes with a friend below to get started.</p>
+      <!-- code-first: add by code is the primary action, your code is the hero, link is secondary -->
+      <div class="ed-label" style="margin-top:18px;">Add a friend</div>
+      <div class="row" style="gap:8px;">
+        <input id="addCode" type="text" autocapitalize="characters" placeholder="Enter a friend's code" style="flex:1; text-transform:uppercase;">
         <button class="btn sm" id="addFriendBtn" style="flex:0 0 auto;">Add</button>
       </div>
+      <div class="ed-label" style="margin-top:18px;">Your code</div>
+      <div class="codecard">
+        <span class="codeval" id="myCode">—</span>
+        <button class="btn tinted sm" id="copyCode" style="flex:0 0 auto;">Copy</button>
+      </div>
+      <p class="levelcap" style="margin:8px 4px 0; line-height:1.45;">Give this code to a friend — they enter it above to follow you. <span id="inviteBtn" style="color:var(--accent); cursor:pointer;">Share a link instead ›</span></p>
       <div id="suggList"></div>
       <button class="navlink" id="friendsToSharing" style="margin-top:22px;"><span>Sharing &amp; privacy<span class="nlsub">choose who can see you</span></span><span class="ovchev">›</span></button>
     </div>
@@ -1169,6 +1191,21 @@
   <div class="grabber"></div>
   <div class="sheethdr"><span class="t" id="profTitle">Profile</span><button class="btn plain sm" id="profClose">Done</button></div>
   <div class="sheetbody" id="profBody"></div>
+</div>
+
+<!-- AVATAR EDITOR SHEET (tap your own avatar) — built by openAvatarEditor() -->
+<div class="scrim" id="scrimAvatar"></div>
+<div class="sheet" id="sheetAvatar">
+  <div class="grabber"></div>
+  <div class="sheethdr"><span class="t">Your avatar</span><button class="btn plain sm" id="avatarClose">Done</button></div>
+  <div class="sheetbody">
+    <div class="avpreview" id="avPreview"></div>
+    <div class="ed-label">Colour</div>
+    <div class="swatches" id="avSwatches"></div>
+    <div class="ed-label" style="margin-top:18px;">Symbol</div>
+    <div class="emojigrid" id="avEmojis"></div>
+    <p class="levelcap" style="margin:10px 4px 0;">Pick an emoji, or choose <b id="avInitials" style="color:var(--accent); cursor:pointer;">your initials</b> instead.</p>
+  </div>
 </div>
 
 <!-- WORKOUT SHARE SHEET -->
@@ -2658,13 +2695,16 @@ async function renderLiveCards(){
   const fresh=rows.filter(r=> r.user_id!==cloudUser.id && (Date.now()-Date.parse(r.updated_at)) < 15*60*1000);
   if(!fresh.length){ strip.innerHTML=""; return; }
   let names={};
-  try{ const ids=fresh.map(r=>r.user_id); const { data } = await sb.from("profiles").select("user_id,display_name").in("user_id",ids);
-    (data||[]).forEach(p=>{ names[p.user_id]=p.display_name; _nameCache[p.user_id]=p.display_name; }); }catch(e){}
+  { const ids=fresh.map(r=>r.user_id); let profs=[];
+    try{ const { data, error } = await sb.from("profiles").select("user_id,display_name,avatar_color,avatar_emoji").in("user_id",ids); if(error) throw error; profs=data||[]; }
+    catch(e){ try{ const { data } = await sb.from("profiles").select("user_id,display_name").in("user_id",ids); profs=data||[]; }catch(e2){} }
+    profs.forEach(p=>{ names[p.user_id]=p.display_name; _nameCache[p.user_id]=p.display_name; }); recordAvatars(profs);
+  }
   strip.innerHTML='<div class="ed-label" style="margin-top:4px;">Live now</div>';
   fresh.forEach(r=>{
     const s=r.state||{}, who=names[r.user_id]||"A friend";
     const card=document.createElement("div"); card.className="livecard";
-    card.innerHTML=avatarHTML(who,{size:44,live:true,seed:r.user_id})+'<div style="flex:1; min-width:0;"><div style="font-weight:700;">'+esc(who)+' is training live</div>'
+    card.innerHTML=avatarHTML(who,{size:44,live:true,uid:r.user_id})+'<div style="flex:1; min-width:0;"><div style="font-weight:700;">'+esc(who)+' is training live</div>'
       +'<div class="levelcap" style="margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">'+esc(s.name||"Workout")+(s.exName?' · '+esc(s.exName):'')+' · '+(s.doneSets||0)+' sets</div></div><span class="livego">Watch ›</span>';
     card.onclick=()=>openLiveView(r.user_id, who);
     strip.appendChild(card);
@@ -2792,10 +2832,11 @@ async function renderFeed(){
   }catch(e){ list.innerHTML='<div class="levelcap" style="margin:0 4px;">Couldn\'t load the feed.</div>'; return; }
   if(!rows.length){ list.innerHTML='<div class="levelcap" style="margin:0 4px;">No activity yet. Finish a workout to be the first.</div>'; return; }
   let names={};
-  try{ const ids=[...new Set(rows.map(r=>r.user_id))];
-    const { data } = await sb.from("profiles").select("user_id,display_name").in("user_id",ids);
-    (data||[]).forEach(p=>{ names[p.user_id]=p.display_name; });
-  }catch(e){}
+  { const ids=[...new Set(rows.map(r=>r.user_id))]; let profs=[];
+    try{ const { data, error } = await sb.from("profiles").select("user_id,display_name,avatar_color,avatar_emoji").in("user_id",ids); if(error) throw error; profs=data||[]; }
+    catch(e){ try{ const { data } = await sb.from("profiles").select("user_id,display_name").in("user_id",ids); profs=data||[]; }catch(e2){} }
+    profs.forEach(p=>{ names[p.user_id]=p.display_name; }); recordAvatars(profs);
+  }
   // batch-load cheers + comment counts for the visible activities (degrades gracefully if those tables aren't set up)
   const aids=rows.map(r=>r.id).filter(Boolean), cheerN={}, cheered={}, commN={};
   if(aids.length){
@@ -2824,7 +2865,7 @@ async function renderFeed(){
       (hl?'<div class="levelcap" style="margin:2px 0 0; opacity:.85;">'+esc(hl)+'</div>':'')+
       '<div class="levelcap" style="margin:2px 0 0; opacity:.7;">'+esc(agoStr(Date.parse(r.created_at)))+(canOpen?' · tap for detail ›':'')+'</div>';
     const cv=document.createElement("canvas"); cv.width=72; cv.height=72; cv.style.cssText="flex:0 0 auto; width:60px; height:60px;";
-    const avt=document.createElement("div"); avt.style.cssText="flex:0 0 auto;"+(mine?"":" cursor:pointer;"); avt.innerHTML=avatarHTML(who,{size:44,seed:r.user_id});
+    const avt=document.createElement("div"); avt.style.cssText="flex:0 0 auto;"+(mine?"":" cursor:pointer;"); avt.innerHTML=avatarHTML(who,{size:44,uid:r.user_id});
     if(!mine) avt.onclick=(e)=>{ e.stopPropagation(); openProfile(r.user_id, who); };
     top.appendChild(avt); top.appendChild(txt); top.appendChild(cv); card.appendChild(top);
     if(canOpen){ top.style.cursor="pointer"; top.onclick=()=>openWorkoutDetail(r, who, viewLvl); }
@@ -4171,6 +4212,10 @@ if($("friendsToSharing")) $("friendsToSharing").onclick=()=>{ closeSheet("Friend
 // friend profile sheet
 if($("profClose")) $("profClose").onclick=()=>closeSheet("Profile");
 if($("scrimProfile")) $("scrimProfile").onclick=()=>closeSheet("Profile");
+// avatar editor sheet
+if($("avatarClose")) $("avatarClose").onclick=()=>closeSheet("Avatar");
+if($("scrimAvatar")) $("scrimAvatar").onclick=()=>closeSheet("Avatar");
+if($("avInitials")) $("avInitials").onclick=()=>{ _avEditEmoji=null; saveAvatar(); };
 $("goalSave").onclick=async()=>{ const s=parseFloat($("goalStart").value),g=parseFloat($("goalTarget").value);
   if(isNaN(s)||isNaN(g)||g<=s){ toast("Goal must be above start"); return; }
   const wasOnMe = $("goalBlock") && $("goalBlock").parentElement===$("goalHomeMe");
@@ -6043,11 +6088,47 @@ function setFriendsBadge(n){
   if(sub) sub.textContent = n>0 ? (n+" request"+(n>1?"s":"")) : "";
 }
 
-// ---- avatars: a deterministic initials-avatar so friends read as people, not text rows ----
+// ---- avatars: friends read as people. A user's chosen colour+emoji (from their profile) wins;
+// otherwise a deterministic monogram. Per-user prefs are cached as we load them from RPCs/profiles.
+const _avatarCache={};   // uid -> { color, emoji }
+function recordAvatars(rows){ (rows||[]).forEach(r=>{ if(r && r.user_id && ("avatar_color" in r || "avatar_emoji" in r))
+  _avatarCache[r.user_id]={ color:r.avatar_color||null, emoji:r.avatar_emoji||null }; }); }
 function avatarColor(seed){ let h=0; const s=String(seed||"?"); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return "hsl("+(h%360)+",55%,50%)"; }
 function initials(name){ const p=String(name||"").trim().split(/\s+/).filter(Boolean); if(!p.length) return "🙂"; return (p[0][0]+(p[1]?p[1][0]:"")).toUpperCase(); }
-function avatarHTML(name, opts){ opts=opts||{}; const sz=opts.size||40, seed=opts.seed||name||"?";
-  return '<span class="avatar'+(opts.live?" live":"")+'" style="width:'+sz+'px;height:'+sz+'px;font-size:'+Math.round(sz*0.4)+'px;background:'+avatarColor(seed)+';">'+esc(initials(name))+'</span>'; }
+function avatarHTML(name, opts){ opts=opts||{}; const sz=opts.size||40, uid=opts.uid, pref=(uid&&_avatarCache[uid])||{};
+  const color = opts.color || pref.color || avatarColor(opts.seed||uid||name||"?");
+  const emoji = opts.emoji!==undefined ? opts.emoji : pref.emoji;
+  const inner = emoji ? esc(emoji) : esc(initials(name));
+  return '<span class="avatar'+(opts.live?" live":"")+'" style="width:'+sz+'px;height:'+sz+'px;font-size:'+Math.round(sz*(emoji?0.52:0.4))+'px;background:'+color+';">'+inner+'</span>'; }
+// keep my own cached avatar in sync with my saved prefs (so it shows on my feed posts / Me card)
+function syncSelfAvatar(){ if(cloudUser) _avatarCache[cloudUser.id]={ color:settings.avatarColor||null, emoji:settings.avatarEmoji||null }; }
+
+// palette + symbol options for the editor
+const AV_COLORS=["#e8551c","#ff3b30","#ff9500","#ffcc00","#34c759","#00c7be","#30b0c7","#007aff","#5856d6","#af52de","#ff2d55","#8e8e93"];
+const AV_EMOJIS=["🔥","💪","⚡","🏋️","🤸","🧠","🦁","🐺","🦅","😈","☠️","🎯","🚀","🥇","⭐","❤️","🌶️","🍑"];
+let _avEditColor=null, _avEditEmoji=null;
+function renderAvatarEditor(){
+  const nm=settings.displayName||settings.name||"You";
+  const prev=$("avPreview"); if(prev) prev.innerHTML=avatarHTML(nm,{size:92,color:_avEditColor,emoji:_avEditEmoji||undefined});
+  const sw=$("avSwatches");
+  if(sw){ sw.innerHTML=AV_COLORS.map(c=>'<span class="swatch'+(c===_avEditColor?" sel":"")+'" data-c="'+c+'" style="background:'+c+';"></span>').join('');
+    sw.querySelectorAll(".swatch").forEach(s=> s.onclick=()=>{ _avEditColor=s.dataset.c; saveAvatar(); }); }
+  const eg=$("avEmojis");
+  if(eg){ eg.innerHTML=AV_EMOJIS.map(e=>'<button class="emojibtn'+(e===_avEditEmoji?" sel":"")+'" data-e="'+e+'">'+e+'</button>').join('');
+    eg.querySelectorAll(".emojibtn").forEach(b=> b.onclick=()=>{ _avEditEmoji=b.dataset.e; saveAvatar(); }); }
+}
+function openAvatarEditor(){
+  _avEditColor = settings.avatarColor || avatarColor((cloudUser&&cloudUser.id)||settings.displayName||"you");
+  _avEditEmoji = settings.avatarEmoji || null;
+  renderAvatarEditor(); openSheet("Avatar");
+}
+async function saveAvatar(){
+  settings.avatarColor=_avEditColor||null; settings.avatarEmoji=_avEditEmoji||null;
+  await sset("settings",settings); syncSelfAvatar(); renderAvatarEditor();
+  if(cloudReady()){ try{ await sb.from("profiles").upsert({ user_id:cloudUser.id, avatar_color:settings.avatarColor, avatar_emoji:settings.avatarEmoji }); }catch(e){} }
+  renderMeProfile(); renderPresenceRail();
+  if($("sheetFriends") && $("sheetFriends").classList.contains("show")) renderFriends();
+}
 const RAIL_USERS_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c0-3 2.5-4.6 5.5-4.6s5.5 1.6 5.5 4.6"/><path d="M16 5.2a3.2 3.2 0 0 1 0 6"/><path d="M17.5 14.6c2.4.4 4 1.9 4 4.4"/></svg>';
 
 // ---- Overview presence rail: friends as faces, live ones ringed; tap to watch or open a profile ----
@@ -6055,7 +6136,7 @@ async function renderPresenceRail(){
   const rail=$("presenceRail"); if(!rail) return;
   if(!(cloudReady() && dbHardened)){ rail.style.display="none"; rail.innerHTML=""; return; }
   let following=[], live={}, reqN=0;
-  try{ const { data } = await sb.rpc("my_following"); following=(data||[]).filter(u=>u.status==="accepted"); }catch(e){}
+  try{ const { data } = await sb.rpc("my_following"); following=(data||[]).filter(u=>u.status==="accepted"); recordAvatars(following); }catch(e){}
   try{ const { data } = await sb.from("live_sessions").select("user_id,updated_at").eq("active",true);
     (data||[]).forEach(r=>{ if(r.user_id!==cloudUser.id && (Date.now()-Date.parse(r.updated_at))<15*60*1000) live[r.user_id]=true; }); }catch(e){}
   try{ const { data } = await sb.rpc("incoming_requests"); reqN=(data||[]).length; }catch(e){}
@@ -6065,7 +6146,7 @@ async function renderPresenceRail(){
   following.slice(0,14).forEach(u=>{ const nm=u.display_name||"Friend", isLive=!!live[u.user_id];
     _nameCache[u.user_id]=nm;
     h+='<div class="pr-item" data-uid="'+esc(u.user_id)+'" data-nm="'+esc(nm)+'" data-live="'+(isLive?1:0)+'">'
-      +avatarHTML(nm,{size:56,live:isLive,seed:u.user_id})
+      +avatarHTML(nm,{size:56,live:isLive,uid:u.user_id})
       +'<span class="'+(isLive?"pr-live":"pr-name")+'">'+esc(isLive?"Live":nm.split(" ")[0])+'</span></div>'; });
   h+='<div class="pr-item pr-add" id="railAll"><span class="avatar" style="width:56px;height:56px;">'+RAIL_USERS_SVG+'</span>'
     +'<span class="pr-badge" id="railBadge"'+(reqN>0?"":" hidden")+'>'+(reqN>0?reqN:"")+'</span>'
@@ -6082,11 +6163,14 @@ async function openProfile(uid, name){
   const body=$("profBody"); if(!body) return;
   name = name || _nameCache[uid] || "Lifter";
   $("profTitle").textContent=name;
-  body.innerHTML='<div class="profhdr">'+avatarHTML(name,{size:84,seed:uid})+'<div class="pname">'+esc(name)+'</div><div class="profmeta" id="profMeta">…</div></div>'
+  body.innerHTML='<div class="profhdr"><span id="profAv">'+avatarHTML(name,{size:84,uid:uid})+'</span><div class="pname">'+esc(name)+'</div><div class="profmeta" id="profMeta">…</div></div>'
     +'<div id="profAction" style="margin:14px 0 6px;"></div><div id="profActivity"></div>';
   openSheet("Profile");
+  // pull their chosen avatar (degrades to monogram if the columns aren't there yet)
+  try{ const { data, error } = await sb.from("profiles").select("user_id,avatar_color,avatar_emoji").eq("user_id",uid).maybeSingle();
+    if(!error && data){ recordAvatars([data]); const pa=$("profAv"); if(pa) pa.innerHTML=avatarHTML(name,{size:84,uid:uid}); } }catch(e){}
   let rel=null, live=false;
-  try{ const { data } = await sb.rpc("my_following"); rel=(data||[]).find(u=>u.user_id===uid)||null; }catch(e){}
+  try{ const { data } = await sb.rpc("my_following"); rel=(data||[]).find(u=>u.user_id===uid)||null; recordAvatars(data); }catch(e){}
   try{ const { data } = await sb.from("live_sessions").select("active,updated_at").eq("user_id",uid).maybeSingle();
     live = !!(data && data.active!==false && (Date.now()-Date.parse(data.updated_at))<15*60*1000); }catch(e){}
   const meta=$("profMeta"); if(meta) meta.textContent = rel ? (rel.status==="pending"?"Request pending":"You're friends") : "You're not following yet";
@@ -6114,12 +6198,14 @@ async function openProfile(uid, name){
 }
 
 // ---- Me: your own profile card (avatar + name + follower/following counts) ----
+const PENCIL_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 5l5 5M4 20l1-4L16 5l3 3L8 19z"/></svg>';
 async function renderMeProfile(){
   const card=$("meProfile"); if(!card) return;
   const nm=settings.displayName||settings.name||"";
   if(!cloudConfigured() && !nm){ card.style.display="none"; return; }
   card.style.display="";
-  const av=avatarHTML(nm||"You",{size:60,seed:(cloudUser&&cloudUser.id)||nm||"you"});
+  syncSelfAvatar();
+  const av='<span class="avwrap" id="meAvatar">'+avatarHTML(nm||"You",{size:60,uid:(cloudUser&&cloudUser.id),seed:nm||"you"})+'<span class="avedit">'+PENCIL_SVG+'</span></span>';
   if(cloudReady() && dbHardened){
     let fr=0, fo=0;
     try{ const { data } = await sb.rpc("my_following"); fo=(data||[]).filter(u=>u.status==="accepted").length; }catch(e){}
@@ -6133,6 +6219,7 @@ async function renderMeProfile(){
       +'<div class="pchint">'+(cloudReady()?"Friends features warming up…":"Sign in to connect with friends ›")+'</div></div>';
     card.onclick=()=> (cloudReady()?openFriends():goAccount());
   }
+  const avEl=$("meAvatar"); if(avEl) avEl.onclick=(e)=>{ e.stopPropagation(); openAvatarEditor(); };
 }
 
 async function renderFriends(){
@@ -6143,18 +6230,23 @@ async function renderFriends(){
   if(people) people.style.display = on ? "" : "none";
   if(cta) cta.style.display = on ? "none" : "";
   if(!on){ setFriendsBadge(0); return; }
-  // profile visibility + my follow code
+  // profile visibility + my follow code + my saved avatar (avatar cols degrade if not migrated yet)
   let vis="private";
-  try{ const { data } = await sb.from("profiles").select("visibility,follow_code").eq("user_id",cloudUser.id).maybeSingle();
-    if(data){ vis=data.visibility||"private"; _myCode=data.follow_code||""; } }catch(e){}
+  try{ const { data, error } = await sb.from("profiles").select("visibility,follow_code,avatar_color,avatar_emoji").eq("user_id",cloudUser.id).maybeSingle();
+    if(error) throw error;
+    if(data){ vis=data.visibility||"private"; _myCode=data.follow_code||"";
+      if(data.avatar_color!=null) settings.avatarColor=data.avatar_color;
+      if(data.avatar_emoji!=null) settings.avatarEmoji=data.avatar_emoji; syncSelfAvatar(); } }
+  catch(e){ try{ const { data } = await sb.from("profiles").select("visibility,follow_code").eq("user_id",cloudUser.id).maybeSingle();
+    if(data){ vis=data.visibility||"private"; _myCode=data.follow_code||""; } }catch(e2){} }
   document.querySelectorAll("#visSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.vis===vis));
   const vh=$("visHint"); if(vh) vh.textContent=VIS_HINTS[vis]||"";
   const mc=$("myCode"); if(mc) mc.textContent=_myCode||"—";
-  // incoming requests + following + suggestions
+  // incoming requests + following + suggestions (each carries the person's chosen avatar)
   let reqs=[], following=[], sugg=[];
-  try{ const { data } = await sb.rpc("incoming_requests"); reqs=data||[]; }catch(e){}
-  try{ const { data } = await sb.rpc("my_following"); following=data||[]; }catch(e){}
-  try{ const { data } = await sb.rpc("suggested_follows"); sugg=data||[]; }catch(e){}
+  try{ const { data } = await sb.rpc("incoming_requests"); reqs=data||[]; recordAvatars(reqs); }catch(e){}
+  try{ const { data } = await sb.rpc("my_following"); following=data||[]; recordAvatars(following); }catch(e){}
+  try{ const { data } = await sb.rpc("suggested_follows"); sugg=data||[]; recordAvatars(sugg); }catch(e){}
   setFriendsBadge(reqs.length);
   const emptyHint=$("friendsEmpty"); if(emptyHint) emptyHint.style.display=(!reqs.length && !following.length)?"":"none";
   // LIVE NOW — friends training right now, as ringed avatars at the top of the hub
@@ -6167,7 +6259,7 @@ async function renderFriends(){
     liveBox.innerHTML = liveRows.length
       ? '<div class="ed-label" style="margin-top:6px;">Live now</div><div class="prail" style="padding-bottom:8px;">'
         + liveRows.map(r=>{ const nm=ln[r.user_id]||_nameCache[r.user_id]||"A friend";
-            return '<div class="pr-item" data-uid="'+esc(r.user_id)+'" data-nm="'+esc(nm)+'">'+avatarHTML(nm,{size:56,live:true,seed:r.user_id})+'<span class="pr-live">Live</span></div>'; }).join('')
+            return '<div class="pr-item" data-uid="'+esc(r.user_id)+'" data-nm="'+esc(nm)+'">'+avatarHTML(nm,{size:56,live:true,uid:r.user_id})+'<span class="pr-live">Live</span></div>'; }).join('')
         + '</div>'
       : "";
     liveBox.querySelectorAll(".pr-item[data-uid]").forEach(el=> el.onclick=()=>openLiveView(el.dataset.uid, el.dataset.nm));
@@ -6177,7 +6269,7 @@ async function renderFriends(){
     reqBox.innerHTML = reqs.length
       ? '<div class="ed-label" style="margin-top:18px;">Requests</div>'+reqs.map(u=>
           '<div class="row" data-uid="'+esc(u.user_id)+'" style="justify-content:space-between; align-items:center; margin-top:10px;">'
-          +'<span class="frow" style="min-width:0;">'+avatarHTML(u.display_name,{size:40,seed:u.user_id})+'<span class="fname">'+esc(u.display_name||"A lifter")+'</span></span>'
+          +'<span class="frow" style="min-width:0;">'+avatarHTML(u.display_name,{size:40,uid:u.user_id})+'<span class="fname">'+esc(u.display_name||"A lifter")+'</span></span>'
           +'<span style="flex:0 0 auto; display:flex; gap:8px;"><button class="btn sm reqYes">Accept</button><button class="btn tinted sm reqNo">Decline</button></span></div>').join('')
       : "";
     reqBox.querySelectorAll(".reqYes").forEach(b=> b.onclick=()=>acceptFollow(b.closest("[data-uid]").dataset.uid));
@@ -6188,7 +6280,7 @@ async function renderFriends(){
     folBox.innerHTML = following.length
       ? '<div class="ed-label" style="margin-top:18px;">Your friends</div>'+following.map(u=>
           '<div class="row" data-uid="'+esc(u.user_id)+'" data-nm="'+esc(u.display_name||"")+'" style="justify-content:space-between; align-items:center; margin-top:10px;">'
-          +'<span class="frow folopen" style="min-width:0; cursor:pointer;">'+avatarHTML(u.display_name,{size:40,seed:u.user_id})+'<span class="fname">'+esc(u.display_name||"A lifter")+(u.status==="pending"?' <span class="levelcap" style="font-weight:400;">· pending</span>':'')+'</span></span>'
+          +'<span class="frow folopen" style="min-width:0; cursor:pointer;">'+avatarHTML(u.display_name,{size:40,uid:u.user_id})+'<span class="fname">'+esc(u.display_name||"A lifter")+(u.status==="pending"?' <span class="levelcap" style="font-weight:400;">· pending</span>':'')+'</span></span>'
           +'<button class="btn tinted sm unfol" style="flex:0 0 auto;">Remove</button></div>').join('')
       : "";
     folBox.querySelectorAll(".unfol").forEach(b=> b.onclick=()=>removeFollow(b.closest("[data-uid]").dataset.uid, "followee"));
@@ -6197,13 +6289,13 @@ async function renderFriends(){
   // live-watch grants: which of your accepted followers may watch you train in real time
   const grantBox=$("liveGrantList");
   if(grantBox){
-    let followers=[]; try{ const { data } = await sb.rpc("my_followers"); followers=data||[]; }catch(e){}
+    let followers=[]; try{ const { data } = await sb.rpc("my_followers"); followers=data||[]; recordAvatars(followers); }catch(e){}
     grantBox.innerHTML = followers.length
       ? '<div class="ed-label" style="margin-top:18px;">Allow to watch me live</div>'
         +'<p class="levelcap" style="margin:0 4px 4px; line-height:1.4;">Pick who can watch your workout in real time and cheer you on. Toggle one friend or your whole crew.</p>'
         + followers.map(u=>
           '<label class="row" data-uid="'+esc(u.user_id)+'" style="justify-content:space-between; align-items:center; margin-top:10px;">'
-          +'<span class="frow" style="min-width:0;">'+avatarHTML(u.display_name,{size:36,seed:u.user_id})+'<span class="fname">'+esc(u.display_name||"A lifter")+'</span></span>'
+          +'<span class="frow" style="min-width:0;">'+avatarHTML(u.display_name,{size:36,uid:u.user_id})+'<span class="fname">'+esc(u.display_name||"A lifter")+'</span></span>'
           +'<input type="checkbox" class="livegrant" style="flex:0 0 auto; width:20px; height:20px; accent-color:var(--red);"'+(u.live?" checked":"")+'></label>').join('')
       : "";
     grantBox.querySelectorAll(".livegrant").forEach(cb=> cb.onchange=()=>{ const row=cb.closest("[data-uid]"); grantLive(row.dataset.uid, cb.checked, cb); });
@@ -6216,7 +6308,7 @@ async function renderFriends(){
                        : u.follows_you ? "follows you"
                        : (u.visibility==="public" ? "public profile" : "");
           return '<div class="row" data-uid="'+esc(u.user_id)+'" data-nm="'+esc(u.display_name||"")+'" style="justify-content:space-between; align-items:center; margin-top:10px;">'
-            +'<span class="frow" style="min-width:0;">'+avatarHTML(u.display_name,{size:40,seed:u.user_id})+'<span style="min-width:0; overflow:hidden;"><b style="display:block; overflow:hidden; text-overflow:ellipsis;">'+esc(u.display_name||"A lifter")+'</b>'+(label?'<span class="levelcap">'+esc(label)+'</span>':'')+'</span></span>'
+            +'<span class="frow" style="min-width:0;">'+avatarHTML(u.display_name,{size:40,uid:u.user_id})+'<span style="min-width:0; overflow:hidden;"><b style="display:block; overflow:hidden; text-overflow:ellipsis;">'+esc(u.display_name||"A lifter")+'</b>'+(label?'<span class="levelcap">'+esc(label)+'</span>':'')+'</span></span>'
             +'<button class="btn sm sugFollow" style="flex:0 0 auto;">Follow</button></div>';
         }).join('')
       : "";
