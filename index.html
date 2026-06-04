@@ -155,10 +155,11 @@
   .liverow-col{ display:flex; flex-direction:column; gap:2px; min-width:0; flex:1; }
   .liveswitch{ font-weight:600; font-size:14px; color:var(--ink); line-height:1.2; }
   .livehint{ font-size:12px; color:var(--l2); line-height:1.35; margin:0; }
-  .livesw{ position:relative; flex:0 0 auto; width:42px; height:26px; -webkit-appearance:none; appearance:none; background:var(--line); border-radius:13px; cursor:pointer; transition:background .2s; }
-  .livesw::after{ content:""; position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .2s; }
-  .livesw:checked{ background:var(--red); }
-  .livesw:checked::after{ transform:translateX(16px); }
+  .livesw{ position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+  .liveswui{ position:relative; flex:0 0 auto; box-sizing:border-box; width:44px; height:26px; border-radius:13px; background:var(--line); transition:background .2s; }
+  .liveswui::after{ content:""; position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .2s; }
+  .livesw:checked + .liveswui{ background:var(--red); }
+  .livesw:checked + .liveswui::after{ transform:translateX(18px); }
   .liverow.on{ background:rgba(255,59,48,.10); border-color:rgba(255,59,48,.32); }
   .liverow.on .liveswitch{ color:var(--red); }
   .liverow.on .livedot{ background:var(--red); animation:livepulse 1.6s infinite; }
@@ -820,6 +821,7 @@
     <span class="livehint" id="liveHint"></span>
   </span>
   <input type="checkbox" class="livesw" id="liveToggle">
+  <span class="liveswui" aria-hidden="true"></span>
 </label>
 <div class="injbanner" id="injBanner" style="display:none;"></div>
 <div id="exlist"></div>
