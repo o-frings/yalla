@@ -5411,13 +5411,17 @@ function drawEmphasisRadar(){
   const G=BUILD_GROUPS, cx=W/2, cy=H/2, R=W*0.30, n=G.length;
   const cs=getComputedStyle(document.documentElement), accent=(cs.getPropertyValue("--accent")||"#0a84ff").trim(), lab=(cs.getPropertyValue("--l2")||"#888").trim();
   const pt=(i,rr)=>{ const a=(-90+i*360/n)*Math.PI/180; return [cx+rr*Math.cos(a), cy+rr*Math.sin(a)]; };
+  // A distribution that sums to 1: each wedge's AREA = that muscle's share of total emphasis, so the
+  // rose is constant-area. Dragging one wedge rescales the rest proportionally (see applyDrag).
+  const frac=roseRadii(G, build.emphasis);   // radius fraction = √share
   ctx.strokeStyle="rgba(128,128,128,.22)"; ctx.lineWidth=1.5;
   [0.5,1].forEach(f=>{ ctx.beginPath(); ctx.arc(cx,cy,R*f,0,Math.PI*2); ctx.stroke(); });
-  for(let i=0;i<n;i++){ const [x,y]=pt(i,R); ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(x,y); ctx.stroke(); }
-  const val=g=>Math.max(0.08, Math.min(1, build.emphasis[g]!=null?build.emphasis[g]:0.5));
-  ctx.beginPath(); G.forEach((g,i)=>{ const [x,y]=pt(i,R*val(g)); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.closePath();
-  ctx.fillStyle=accent; ctx.globalAlpha=.20; ctx.fill(); ctx.globalAlpha=1; ctx.lineWidth=4; ctx.strokeStyle=accent; ctx.stroke();
-  G.forEach((g,i)=>{ const [x,y]=pt(i,R*val(g)); ctx.beginPath(); ctx.arc(x,y,14,0,Math.PI*2); ctx.fillStyle=MCOLOR[g]||accent; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle="#fff"; ctx.stroke(); });
+  const half=Math.PI/n - 0.05;
+  G.forEach((g,i)=>{ const a=(-90+i*360/n)*Math.PI/180, rr=R*frac[i], col=MCOLOR[g]||accent;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rr,a-half,a+half); ctx.closePath();
+    ctx.fillStyle=col; ctx.globalAlpha=.28; ctx.fill(); ctx.globalAlpha=1; ctx.lineWidth=2.5; ctx.strokeStyle=col; ctx.stroke(); });
+  // grab handle at each wedge tip
+  G.forEach((g,i)=>{ const [x,y]=pt(i,R*frac[i]); ctx.beginPath(); ctx.arc(x,y,14,0,Math.PI*2); ctx.fillStyle=MCOLOR[g]||accent; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle="#fff"; ctx.stroke(); });
   ctx.fillStyle=lab; ctx.font="600 26px -apple-system,sans-serif"; ctx.textBaseline="middle";
   G.forEach((g,i)=>{ const [x,y]=pt(i,R+50), co=Math.cos((-90+i*360/n)*Math.PI/180); ctx.textAlign=Math.abs(co)<0.3?"center":(co>0?"left":"right"); ctx.fillText(MSHORT[g]||g, x, y); });
 }
@@ -5431,14 +5435,20 @@ function updateBuildPreview(){
   const nearestSpoke=(ev)=>{ const r=c.getBoundingClientRect(); const px=(ev.clientX-r.left)/r.width*c.width, py=(ev.clientY-r.top)/r.height*c.height;
     const G=BUILD_GROUPS, n=G.length, cx=c.width/2, cy=c.height/2, ang=Math.atan2(py-cy,px-cx)*180/Math.PI;
     let bestI=0,bestD=999; for(let i=0;i<n;i++){ const a=-90+i*360/n, d=Math.abs(((ang-a+540)%360)-180); if(d<bestD){bestD=d;bestI=i;} } return bestI; };
+  // Set muscle g to a target SHARE of the distribution; the others keep their current weights, so the
+  // render (share = weight/Σweight) rescales them all proportionally and the rose stays summed to 1.
+  const setShare=(g, s)=>{ s=Math.max(0.02, Math.min(0.9, s));
+    const others=BUILD_GROUPS.reduce((a,m)=> a+(m===g?0:(build.emphasis[m]!=null?build.emphasis[m]:0.5)), 0)||0.0001;
+    build.emphasis[g]=s/(1-s)*others; build.focus=[]; syncEmphasisChips(); updateBuildPreview(); };
   const applyDrag=(ev)=>{ const r=c.getBoundingClientRect(); const px=(ev.clientX-r.left)/r.width*c.width, py=(ev.clientY-r.top)/r.height*c.height;
-    const cx=c.width/2, cy=c.height/2, R=c.width*0.30, dist=Math.hypot(px-cx,py-cy), i=nearestSpoke(ev);
-    build.emphasis[BUILD_GROUPS[i]]=Math.max(0.12, Math.min(1, dist/R)); build.focus=[]; syncEmphasisChips(); updateBuildPreview(); };
+    const cx=c.width/2, cy=c.height/2, R=c.width*0.30, frac=Math.max(0.05,Math.min(0.95,Math.hypot(px-cx,py-cy)/R)), i=nearestSpoke(ev);
+    setShare(BUILD_GROUPS[i], frac*frac); };   // radius = √share, so share = (dist/R)²
   c.addEventListener("pointerdown", e=>{ dragging=true; downX=e.clientX; downY=e.clientY; moved=false; try{ c.setPointerCapture(e.pointerId); }catch(_){} e.preventDefault(); });
   c.addEventListener("pointermove", e=>{ if(!dragging) return; if(Math.hypot(e.clientX-downX,e.clientY-downY)>7){ moved=true; applyDrag(e); } });
-  c.addEventListener("pointerup", e=>{ if(dragging && !moved){    // a tap toggles that muscle's emphasis on/off
-      const g=BUILD_GROUPS[nearestSpoke(e)], cur=build.emphasis[g]!=null?build.emphasis[g]:0.5;
-      build.emphasis[g] = cur>=0.85 ? 0.5 : 0.92; build.focus=[]; syncEmphasisChips(); updateBuildPreview(); }
+  c.addEventListener("pointerup", e=>{ if(dragging && !moved){    // a tap toggles that muscle between even and boosted
+      const g=BUILD_GROUPS[nearestSpoke(e)], n=BUILD_GROUPS.length;
+      const tot=BUILD_GROUPS.reduce((a,m)=>a+(build.emphasis[m]||0),0)||1, sh=(build.emphasis[g]||0)/tot;
+      setShare(g, sh > 1.5/n ? 1/n : 0.4); }
     dragging=false; });
   c.addEventListener("pointercancel", ()=>{ dragging=false; });
 })();
@@ -5467,7 +5477,7 @@ $("buildGo").onclick=async()=>{
 };
 
 // ================= utils =================
-function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function hexAlpha(hex,a){ const h=hex.replace('#',''); return 'rgba('+parseInt(h.slice(0,2),16)+','+parseInt(h.slice(2,4),16)+','+parseInt(h.slice(4,6),16)+','+a+')'; }
 function accentHex(){ return (getComputedStyle(document.documentElement).getPropertyValue('--accent')||'#c96810').trim(); }
 // ===== backup / restore =====
