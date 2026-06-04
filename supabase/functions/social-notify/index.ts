@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
 
   let body: any = {};
   try { body = await req.json(); } catch (_) {}
-  const { activityId, kind, text, target } = body || {};
+  const { activityId, kind, text, target, viewers } = body || {};
 
   const sb = createClient(url, service);
 
@@ -56,17 +56,22 @@ Deno.serve(async (req) => {
     );
     const { data: grants } = await sb.from("follows").select("follower")
       .eq("followee", actor.id).eq("status", "accepted").eq("live", true);
-    const followers = (grants ?? []).map((g: any) => g.follower);
-    if (!followers.length) return OK();
+    const granted = (grants ?? []).map((g: any) => g.follower);
+    // Plus any one-off viewers the actor picked for this session (client passes accepted-follower
+    // uuids; sanitize to uuid shape and drop self). Union with the persistent grants, de-duped.
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const picked = Array.isArray(viewers) ? viewers.filter((v: unknown) => typeof v === "string" && UUID.test(v)) : [];
+    const recipients = [...new Set([...granted, ...picked])].filter((id) => id && id !== actor.id);
+    if (!recipients.length) return OK();
 
-    // Don't re-push a go-live to the same follower within 10 minutes (re-entering the workout, etc.).
+    // Don't re-push a go-live to the same recipient within 10 minutes (re-entering the workout, etc.).
     const since = new Date(Date.now() - 600_000).toISOString();
     const { data: recent } = await sb.from("notify_log").select("recipient")
-      .eq("actor", actor.id).eq("kind", "live").gte("sent_at", since).in("recipient", followers);
+      .eq("actor", actor.id).eq("kind", "live").gte("sent_at", since).in("recipient", recipients);
     const muted = new Set((recent ?? []).map((r: any) => r.recipient));
 
     const { data: subs } = await sb.from("push_subscriptions")
-      .select("user_id, subscription").in("user_id", followers);
+      .select("user_id, subscription").in("user_id", recipients);
     const payload = JSON.stringify({
       title: "Yalla",
       body: `${who} is training live 🔴 — tap to watch & cheer`,

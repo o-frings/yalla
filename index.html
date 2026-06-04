@@ -163,6 +163,11 @@
   .liverow.on{ background:rgba(255,59,48,.10); border-color:rgba(255,59,48,.32); }
   .liverow.on .liveswitch{ color:var(--red); }
   .liverow.on .livedot{ background:var(--red); animation:livepulse 1.6s infinite; }
+  .liveshrow{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:10px; cursor:pointer; }
+  .liveshname{ font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+  .liveshtag{ font-weight:600; font-size:11px; color:var(--red); background:rgba(255,59,48,.12); padding:1px 7px; border-radius:8px; margin-left:6px; }
+  .liveshpick{ flex:0 0 auto; width:20px; height:20px; accent-color:var(--red); }
+  .liveshpick:disabled{ opacity:.65; }
   .livecard{ display:flex; align-items:center; gap:12px; padding:12px 14px; margin:8px 0; border-radius:14px; background:var(--accent-soft); cursor:pointer; }
   .livedot{ width:10px; height:10px; border-radius:50%; background:var(--red); flex:0 0 auto; animation:livepulse 1.6s infinite; }
   .livego{ color:var(--accent); font-weight:600; flex:0 0 auto; }
@@ -1093,6 +1098,18 @@
       <button class="btn wide" id="shareImgBtn">Share image</button>
       <button class="btn tinted wide" id="saveImgBtn">Save image</button>
     </div>
+  </div>
+</div>
+
+<!-- LIVE SHARE PICKER (opens when you flip the workout-page live toggle on) -->
+<div class="scrim" id="scrimLiveShare"></div>
+<div class="sheet" id="sheetLiveShare">
+  <div class="grabber"></div>
+  <div class="sheethdr"><span class="t">Share live</span><button class="btn plain sm" id="liveShareCancel">Cancel</button></div>
+  <div class="sheetbody">
+    <p class="levelcap" style="margin:0 4px 12px; line-height:1.4;">Pick who watches this session. Friends you’ve set to always-on (Settings → Friends) are included automatically.</p>
+    <div id="liveShareList"></div>
+    <button class="btn wide" id="liveShareGo" style="margin-top:16px;">🔴 Go live</button>
   </div>
 </div>
 
@@ -2435,7 +2452,7 @@ async function cloudTouchWorkout(){ try{ if(cloudReady()) await sb.from("push_su
 // Broadcaster writes a row to live_sessions (RLS-gated to granted followers); watchers read it over
 // Realtime. Going live pushes the granted followers (social-notify kind "live"). Watchers cheer /
 // comment into live_reactions, streamed back to the broadcaster. See supabase/LIVE-SHARING.md.
-let liveOn=false, _liveTimer=null, _liveLast=0, _liveRecvChan=null, _liveFeedChan=null, _liveFeedT=null, _liveViewChan=null, _liveViewOwner=null;
+let liveOn=false, _liveTimer=null, _liveLast=0, _liveRecvChan=null, _liveFeedChan=null, _liveFeedT=null, _liveViewChan=null, _liveViewOwner=null, _liveViewers=[];
 const _nameCache={};
 function liveAvailable(){ return cloudReady() && dbHardened; }
 async function liveName(uid){
@@ -2479,15 +2496,31 @@ function updateLiveRow(){
     ? "Friends you've allowed can watch & cheer."
     : "Broadcast in real time to allowed friends.";
 }
-async function goLive(){
+// Picker shown when you flip the live toggle on: always-on grantees are pre-checked & locked (they
+// always see you live); tick others to include them for this session only. Cancel reverts the toggle.
+async function openLiveShare(){
+  if(!liveAvailable()){ toast("Sign in to share your workout live."); const t=$("liveToggle"); if(t) t.checked=false; updateLiveRow(); return; }
+  const list=$("liveShareList"); if(list) list.innerHTML='<div class="levelcap" style="margin:0 4px;">Loading…</div>';
+  openSheet("LiveShare");
+  let followers=[]; try{ const { data } = await sb.rpc("my_followers"); followers=data||[]; }catch(e){}
+  if(!list) return;
+  if(!followers.length){ list.innerHTML='<p class="levelcap" style="margin:0 4px; line-height:1.4;">No friends to share with yet — add some in Settings → Friends. You can still go live; they’ll see it once you allow them.</p>'; return; }
+  list.innerHTML = followers.map(u=>
+    '<label class="liveshrow" data-uid="'+esc(u.user_id)+'">'
+    +'<span class="liveshname">'+esc(u.display_name||"A lifter")+(u.live?' <span class="liveshtag">always</span>':'')+'</span>'
+    +'<input type="checkbox" class="liveshpick"'+(u.live?' checked disabled':'')+'>'
+    +'</label>').join('');
+}
+async function goLive(viewers){
   if(!liveAvailable()){ toast("Sign in to share your workout live."); return false; }
+  _liveViewers = Array.isArray(viewers) ? viewers.filter(Boolean) : [];   // per-session extras, beyond always-on grants
   liveOn=true; updateLiveRow();
-  try{ await sb.from("live_sessions").upsert({ user_id:cloudUser.id, active:true,
+  try{ await sb.from("live_sessions").upsert({ user_id:cloudUser.id, active:true, viewers:_liveViewers,
         started_at:new Date().toISOString(), updated_at:new Date().toISOString(), state:buildLiveState() }); }
   catch(e){ liveOn=false; updateLiveRow(); toast("Couldn't go live — is live sharing set up on the server?"); return false; }
   subscribeLiveReactions();
-  notifyLive();   // push the granted followers
-  toast("You're live 🔴 — your allowed friends just got a heads-up.", true);
+  notifyLive(_liveViewers);   // push the always-on grantees + this session's picked viewers
+  toast("You're live 🔴 — your friends just got a heads-up.", true);
   return true;
 }
 function liveTick(){
@@ -2498,12 +2531,12 @@ function liveTick(){
   try{ sb.from("live_sessions").upsert({ user_id:cloudUser.id, active:true, updated_at:new Date().toISOString(), state:buildLiveState() }); }catch(e){}
 }
 async function endLive(silent){
-  if(!liveOn) return; liveOn=false; clearTimeout(_liveTimer); updateLiveRow();
+  if(!liveOn) return; liveOn=false; _liveViewers=[]; clearTimeout(_liveTimer); updateLiveRow();
   try{ if(cloudReady()) await sb.from("live_sessions").update({ active:false, updated_at:new Date().toISOString() }).eq("user_id",cloudUser.id); }catch(e){}
   if(_liveRecvChan){ try{ sb.removeChannel(_liveRecvChan); }catch(e){} _liveRecvChan=null; }
   if(!silent) toast("Live session ended.");
 }
-async function notifyLive(){ try{ if(sb && sb.functions) await sb.functions.invoke("social-notify",{ body:{ kind:"live" } }); }catch(e){} }
+async function notifyLive(viewers){ try{ if(sb && sb.functions) await sb.functions.invoke("social-notify",{ body:{ kind:"live", viewers:viewers||[] } }); }catch(e){} }
 // broadcaster: surface cheers/comments as they arrive
 function subscribeLiveReactions(){
   if(!cloudReady() || _liveRecvChan) return;
@@ -2802,7 +2835,16 @@ let editing=null;       // plan object being edited (working copy)
 const $=id=>document.getElementById(id);
 // live-sheet wiring — must come after `$` is defined (moved here from the live block above, where it
 // ran before `const $` and crashed boot with "Cannot access '$' before initialization").
-if($("liveToggle")) $("liveToggle").onchange=async(e)=>{ if(e.target.checked){ const ok=await goLive(); e.target.checked=ok; } else endLive(false); };
+// flip on → choose who watches this session (picker); flip off → stop broadcasting
+if($("liveToggle")) $("liveToggle").onchange=(e)=>{ if(e.target.checked){ openLiveShare(); } else endLive(false); };
+if($("liveShareCancel")) $("liveShareCancel").onclick=()=>{ closeSheet("LiveShare"); const t=$("liveToggle"); if(t) t.checked=false; updateLiveRow(); };
+if($("scrimLiveShare")) $("scrimLiveShare").onclick=()=>{ if($("liveShareCancel")) $("liveShareCancel").onclick(); };
+if($("liveShareGo")) $("liveShareGo").onclick=async()=>{
+  const viewers=[...document.querySelectorAll('#liveShareList .liveshpick:checked:not([disabled])')].map(cb=>cb.closest('[data-uid]').dataset.uid);
+  closeSheet("LiveShare");
+  const ok=await goLive(viewers);
+  const t=$("liveToggle"); if(t) t.checked=ok; updateLiveRow();
+};
 if($("liveClose")) $("liveClose").onclick=()=>{ if(_liveViewChan){ try{ sb.removeChannel(_liveViewChan); }catch(e){} _liveViewChan=null; } _liveViewOwner=null; closeSheet("Live"); };
 if($("scrimLive")) $("scrimLive").onclick=()=>{ if($("liveClose")) $("liveClose").onclick(); };
 $("cNo").onclick=confirmClose;

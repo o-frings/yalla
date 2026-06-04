@@ -11,20 +11,24 @@ create table if not exists public.live_sessions (
   started_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   active     boolean not null default true,
+  viewers    uuid[] not null default '{}',   -- per-session ad-hoc watchers chosen at go-live (beyond always-on grants)
   state      jsonb not null   -- { name, exName, doneSets, totalSets, mins, vol, mtot, ex:[{name,sets:[{w,r}]}], top }
 );
 alter table public.live_sessions enable row level security;
+alter table public.live_sessions add column if not exists viewers uuid[] not null default '{}';   -- for existing deployments
 
 drop policy if exists "own live" on public.live_sessions;
 create policy "own live" on public.live_sessions for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- a viewer may READ a live session only if the owner granted them live access (accepted follow + live)
+-- a viewer may READ a live session if the owner gave them a persistent grant (accepted follow +
+-- follows.live) OR picked them as a one-off watcher for this session (auth.uid() in viewers).
 drop policy if exists "watch granted live" on public.live_sessions;
 create policy "watch granted live" on public.live_sessions for select using (
-  exists (select 1 from public.follows f
-          where f.follower = auth.uid() and f.followee = user_id
-            and f.status = 'accepted' and f.live = true)
+  auth.uid() = any(viewers)
+  or exists (select 1 from public.follows f
+             where f.follower = auth.uid() and f.followee = user_id
+               and f.status = 'accepted' and f.live = true)
 );
 
 -- 3. your accepted followers + whether each is granted live (definer: you can't otherwise read the
@@ -41,7 +45,8 @@ grant execute on function public.my_followers() to authenticated;
 
 -- 4. live cheers / comments during a session. Short-lived (the cron prunes them); the finished
 --    workout's permanent cheers/comments still live on the `activity` row. A reaction is visible to
---    the owner and to anyone the owner granted live access; only a granted watcher may post one.
+--    the owner and to anyone who can watch (persistent grant OR this session's picked viewers); only
+--    a watcher may post one.
 create table if not exists public.live_reactions (
   id         bigint generated always as identity primary key,
   owner      uuid not null references auth.users on delete cascade,   -- the broadcaster
@@ -53,12 +58,15 @@ create table if not exists public.live_reactions (
 alter table public.live_reactions enable row level security;
 create index if not exists live_reactions_owner_idx on public.live_reactions (owner, created_at desc);
 
--- helper: is the current user a watcher the given owner has granted live access to?
+-- helper: may the current user watch the given owner's live session? True for a persistent live grant
+-- OR for a one-off viewer the owner picked for their currently-active session.
 create or replace function public.can_watch_live(owner_id uuid)
 returns boolean language sql stable security definer set search_path = '' as $$
   select exists (select 1 from public.follows f
                  where f.follower = auth.uid() and f.followee = owner_id
-                   and f.status = 'accepted' and f.live = true);
+                   and f.status = 'accepted' and f.live = true)
+      or exists (select 1 from public.live_sessions s
+                 where s.user_id = owner_id and s.active = true and auth.uid() = any(s.viewers));
 $$;
 grant execute on function public.can_watch_live(uuid) to authenticated;
 
