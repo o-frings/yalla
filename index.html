@@ -1014,6 +1014,7 @@
             <button class="btn sm" id="addFriendBtn" style="flex:0 0 auto;">Add</button>
           </div>
           <div id="reqList"></div>
+          <div id="suggList"></div>
           <div id="followList"></div>
         </div>
 
@@ -5558,10 +5559,11 @@ async function renderFriends(){
   document.querySelectorAll("#visSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.vis===vis));
   const vh=$("visHint"); if(vh) vh.textContent=VIS_HINTS[vis]||"";
   const mc=$("myCode"); if(mc) mc.textContent=_myCode||"—";
-  // incoming requests + following
-  let reqs=[], following=[];
+  // incoming requests + following + suggestions
+  let reqs=[], following=[], sugg=[];
   try{ const { data } = await sb.rpc("incoming_requests"); reqs=data||[]; }catch(e){}
   try{ const { data } = await sb.rpc("my_following"); following=data||[]; }catch(e){}
+  try{ const { data } = await sb.rpc("suggested_follows"); sugg=data||[]; }catch(e){}
   const reqBox=$("reqList");
   if(reqBox){
     reqBox.innerHTML = reqs.length
@@ -5583,6 +5585,29 @@ async function renderFriends(){
       : "";
     folBox.querySelectorAll(".unfol").forEach(b=> b.onclick=()=>removeFollow(b.closest("[data-uid]").dataset.uid, "followee"));
   }
+  const sugBox=$("suggList");
+  if(sugBox){
+    sugBox.innerHTML = sugg.length
+      ? '<div class="ed-label" style="margin-top:18px;">Suggested</div>'+sugg.map(u=>{
+          const label = u.mutuals>0 ? ("followed by "+u.mutuals+" "+(u.mutuals>1?"friends":"friend"))
+                       : u.follows_you ? "follows you"
+                       : (u.visibility==="public" ? "public profile" : "");
+          return '<div class="row" data-uid="'+esc(u.user_id)+'" data-nm="'+esc(u.display_name||"")+'" style="justify-content:space-between; align-items:center; margin-top:8px;">'
+            +'<span style="min-width:0; overflow:hidden;"><b style="display:block; overflow:hidden; text-overflow:ellipsis;">'+esc(u.display_name||"A lifter")+'</b>'+(label?'<span class="levelcap">'+esc(label)+'</span>':'')+'</span>'
+            +'<button class="btn sm sugFollow" style="flex:0 0 auto;">Follow</button></div>';
+        }).join('')
+      : "";
+    sugBox.querySelectorAll(".sugFollow").forEach(b=> b.onclick=()=>{ const row=b.closest("[data-uid]"); followUser(row.dataset.uid, row.dataset.nm); });
+  }
+}
+// follow a suggested person directly by id (the insert RLS allows follower = me; the
+// trigger auto-accepts if they're public, otherwise it's a pending request)
+async function followUser(uid, name){
+  if(!cloudReady() || !uid) return;
+  try{ await sb.from("follows").insert({ follower:cloudUser.id, followee:uid }); }catch(e){}
+  notifyFollow(uid, "follow");
+  toast("Added "+(name||"friend")+" — instant if public, otherwise once they accept.");
+  renderFriends(); renderFeed();
 }
 async function acceptFollow(uid){
   if(!cloudReady()) return;
