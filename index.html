@@ -203,7 +203,8 @@
   .navlink .nlsub{ color:var(--l2); font-weight:500; font-size:14px; margin-left:8px; }
   .navlink .ovchev{ color:var(--l3); }
   /* ===== social layer: avatars, presence rail, profiles ===== */
-  .avatar{ position:relative; flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; color:#fff; font-weight:700; line-height:1; letter-spacing:.3px; box-shadow:inset 0 0 0 .5px rgba(255,255,255,.22); user-select:none; }
+  .avatar{ position:relative; flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; overflow:hidden; color:#fff; font-weight:700; line-height:1; letter-spacing:.3px; box-shadow:inset 0 0 0 .5px rgba(255,255,255,.22); user-select:none; }
+  .avatar svg{ display:block; }
   .avatar.live{ box-shadow:0 0 0 2.5px var(--bg), 0 0 0 5px var(--accent); }
   .avatar.r-ring::after{ content:""; position:absolute; inset:3px; border-radius:50%; box-shadow:inset 0 0 0 2px rgba(255,255,255,.55); pointer-events:none; }
   .prail{ display:flex; gap:14px; overflow-x:auto; padding:2px 0 18px; scrollbar-width:none; -ms-overflow-style:none; }
@@ -257,6 +258,11 @@
   .emojibtn{ width:42px; height:42px; border-radius:12px; border:none; background:var(--row); font-size:22px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:transform .12s; }
   .emojibtn:active{ transform:scale(.9); }
   .emojibtn.sel{ box-shadow:inset 0 0 0 2px var(--accent); }
+  /* generative-art thumbnails */
+  .artbtn{ width:46px; height:46px; border-radius:50%; border:none; background:none; padding:0; cursor:pointer; transition:transform .12s; }
+  .artbtn:active{ transform:scale(.9); }
+  .artbtn .avatar{ box-shadow:none; }
+  .artbtn.sel{ border-radius:50%; box-shadow:0 0 0 2.5px var(--card), 0 0 0 5px var(--accent); }
   /* backdrop behind the status-bar clock — slightly translucent (no blur, to match the tab bar and avoid scroll flicker) */
  .statusbar-bg{ position:fixed; top:0; left:0; right:0; height:env(safe-area-inset-top); z-index:40; pointer-events:none;
     background:color-mix(in srgb, var(--bg) 88%, transparent); }
@@ -1211,7 +1217,12 @@
   <div class="sheethdr"><span class="t">Your avatar</span><button class="btn plain sm" id="avatarClose">Done</button></div>
   <div class="sheetbody">
     <div class="avpreview" id="avPreview"></div>
-    <div class="ed-label">Quick characters</div>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <span class="ed-label" style="margin-top:0;">Generated art</span>
+      <span id="avShuffle" style="color:var(--accent); font-weight:600; cursor:pointer; font-size:14px;">🎲 Shuffle</span>
+    </div>
+    <div class="emojigrid" id="avArt"></div>
+    <div class="ed-label" style="margin-top:18px;">Quick characters</div>
     <div class="emojigrid" id="avPresets"></div>
     <div class="ed-label" style="margin-top:18px;">Style</div>
     <div class="seg appearance" id="avStyleSeg">
@@ -2718,7 +2729,7 @@ async function renderLiveCards(){
   if(!fresh.length){ strip.innerHTML=""; return; }
   let names={};
   { const ids=fresh.map(r=>r.user_id); let profs=[];
-    try{ const { data, error } = await sb.from("profiles").select("user_id,display_name,avatar_color,avatar_emoji,avatar_style,last_seen").in("user_id",ids); if(error) throw error; profs=data||[]; }
+    try{ const { data, error } = await sb.from("profiles").select("user_id,display_name,avatar_color,avatar_emoji,avatar_icon,avatar_style,last_seen").in("user_id",ids); if(error) throw error; profs=data||[]; }
     catch(e){ try{ const { data } = await sb.from("profiles").select("user_id,display_name").in("user_id",ids); profs=data||[]; }catch(e2){} }
     profs.forEach(p=>{ names[p.user_id]=p.display_name; _nameCache[p.user_id]=p.display_name; }); recordAvatars(profs);
   }
@@ -2855,7 +2866,7 @@ async function renderFeed(){
   if(!rows.length){ list.innerHTML='<div class="levelcap" style="margin:0 4px;">No activity yet. Finish a workout to be the first.</div>'; return; }
   let names={};
   { const ids=[...new Set(rows.map(r=>r.user_id))]; let profs=[];
-    try{ const { data, error } = await sb.from("profiles").select("user_id,display_name,avatar_color,avatar_emoji,avatar_style,last_seen").in("user_id",ids); if(error) throw error; profs=data||[]; }
+    try{ const { data, error } = await sb.from("profiles").select("user_id,display_name,avatar_color,avatar_emoji,avatar_icon,avatar_style,last_seen").in("user_id",ids); if(error) throw error; profs=data||[]; }
     catch(e){ try{ const { data } = await sb.from("profiles").select("user_id,display_name").in("user_id",ids); profs=data||[]; }catch(e2){} }
     profs.forEach(p=>{ names[p.user_id]=p.display_name; }); recordAvatars(profs);
   }
@@ -4237,7 +4248,7 @@ if($("scrimProfile")) $("scrimProfile").onclick=()=>closeSheet("Profile");
 // avatar editor sheet
 if($("avatarClose")) $("avatarClose").onclick=()=>closeSheet("Avatar");
 if($("scrimAvatar")) $("scrimAvatar").onclick=()=>closeSheet("Avatar");
-if($("avInitials")) $("avInitials").onclick=()=>{ _avEditEmoji=null; saveAvatar(); };
+if($("avInitials")) $("avInitials").onclick=()=>{ _avEditEmoji=null; _avEditIcon=null; saveAvatar(); };
 $("goalSave").onclick=async()=>{ const s=parseFloat($("goalStart").value),g=parseFloat($("goalTarget").value);
   if(isNaN(s)||isNaN(g)||g<=s){ toast("Goal must be above start"); return; }
   const wasOnMe = $("goalBlock") && $("goalBlock").parentElement===$("goalHomeMe");
@@ -6112,9 +6123,9 @@ function setFriendsBadge(n){
 
 // ---- avatars: friends read as people. A user's chosen colour+emoji (from their profile) wins;
 // otherwise a deterministic monogram. Per-user prefs are cached as we load them from RPCs/profiles.
-const _avatarCache={};   // uid -> { color, emoji, style }
-function recordAvatars(rows){ (rows||[]).forEach(r=>{ if(r && r.user_id && ("avatar_color" in r || "avatar_emoji" in r || "avatar_style" in r))
-  _avatarCache[r.user_id]={ color:r.avatar_color||null, emoji:r.avatar_emoji||null, style:r.avatar_style||null }; }); }
+const _avatarCache={};   // uid -> { color, emoji, icon, style }
+function recordAvatars(rows){ (rows||[]).forEach(r=>{ if(r && r.user_id && ("avatar_color" in r || "avatar_emoji" in r || "avatar_icon" in r || "avatar_style" in r))
+  _avatarCache[r.user_id]={ color:r.avatar_color||null, emoji:r.avatar_emoji||null, icon:r.avatar_icon||null, style:r.avatar_style||null }; }); }
 function avatarColor(seed){ let h=0; const s=String(seed||"?"); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return "hsl("+(h%360)+",55%,50%)"; }
 function initials(name){ const p=String(name||"").trim().split(/\s+/).filter(Boolean); if(!p.length) return "🙂"; return (p[0][0]+(p[1]?p[1][0]:"")).toUpperCase(); }
 // background per style — solid colour, a deeper gradient, a hue-shifted duotone, or solid (ring adds a class)
@@ -6123,14 +6134,31 @@ function avatarBg(color, style){
   if(style==="duotone")  return "linear-gradient(135deg,"+color+", color-mix(in srgb,"+color+" 45%, var(--accent)))";
   return color;
 }
+// ---- generative art avatars: a seeded PRNG paints abstract, deterministic art (colour blends,
+// diagonal bands, or facets). Same seed → same art for everyone, so friends see what you picked. ----
+function _seedHash(s){ let h=2166136261>>>0; s=String(s); for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+function _rng(seed){ let a=_seedHash(seed)||1; return function(){ a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function genAvatarSVG(seed){
+  const r=_rng(seed), rnd=(a,b)=>a+(b-a)*r(), ri=(a,b)=>Math.floor(rnd(a,b+1));
+  const baseHue=ri(0,359), sat=ri(62,86), lig=ri(46,60);
+  const hue=o=>'hsl('+(((baseHue+o)%360+360)%360)+','+sat+'%,'+lig+'%)';
+  const pal=[hue(0),hue(ri(20,55)),hue(ri(-55,-20)),hue(ri(120,210))];
+  const v=ri(0,2); let s='<rect width="100" height="100" fill="'+pal[0]+'"/>';
+  if(v===0){ for(let i=0;i<4;i++) s+='<circle cx="'+ri(8,92)+'" cy="'+ri(8,92)+'" r="'+ri(26,54)+'" fill="'+pal[1+(i%3)]+'" fill-opacity="0.55"/>'; }
+  else if(v===1){ s+='<g transform="rotate('+ri(-42,42)+' 50 50)">'; let x=-40,i=0; while(x<140){ const w=ri(9,24); s+='<rect x="'+x+'" y="-40" width="'+w+'" height="180" fill="'+pal[1+(i%3)]+'" fill-opacity="0.85"/>'; x+=w; i++; } s+='</g>'; }
+  else { for(let i=0;i<5;i++){ const p=[[ri(0,100),ri(0,100)],[ri(0,100),ri(0,100)],[ri(0,100),ri(0,100)]]; s+='<polygon points="'+p.map(q=>q.join(',')).join(' ')+'" fill="'+pal[1+(i%3)]+'" fill-opacity="0.72"/>'; } }
+  return s;
+}
 function avatarHTML(name, opts){ opts=opts||{}; const sz=opts.size||40, uid=opts.uid, pref=(uid&&_avatarCache[uid])||{};
-  const color = opts.color || pref.color || avatarColor(opts.seed||uid||name||"?");
+  const icon  = opts.icon!==undefined ? opts.icon : pref.icon;
   const emoji = opts.emoji!==undefined ? opts.emoji : pref.emoji;
   const style = opts.style!==undefined ? opts.style : pref.style;
-  const inner = emoji ? esc(emoji) : esc(initials(name));
-  return '<span class="avatar'+(opts.live?" live":"")+(style==="ring"?" r-ring":"")+'" style="width:'+sz+'px;height:'+sz+'px;font-size:'+Math.round(sz*(emoji?0.52:0.4))+'px;background:'+avatarBg(color,style)+';">'+inner+'</span>'; }
+  let inner, bg;
+  if(icon){ inner='<svg viewBox="0 0 100 100" width="'+sz+'" height="'+sz+'" preserveAspectRatio="xMidYMid slice" style="display:block">'+genAvatarSVG(icon)+'</svg>'; bg='transparent'; }
+  else { const color = opts.color || pref.color || avatarColor(opts.seed||uid||name||"?"); inner = emoji ? esc(emoji) : esc(initials(name)); bg=avatarBg(color,style); }
+  return '<span class="avatar'+(opts.live?" live":"")+(style==="ring"&&!icon?" r-ring":"")+'" style="width:'+sz+'px;height:'+sz+'px;font-size:'+Math.round(sz*(emoji?0.52:0.4))+'px;background:'+bg+';">'+inner+'</span>'; }
 // keep my own cached avatar in sync with my saved prefs (so it shows on my feed posts / Me card)
-function syncSelfAvatar(){ if(cloudUser) _avatarCache[cloudUser.id]={ color:settings.avatarColor||null, emoji:settings.avatarEmoji||null, style:settings.avatarStyle||null }; }
+function syncSelfAvatar(){ if(cloudUser) _avatarCache[cloudUser.id]={ color:settings.avatarColor||null, emoji:settings.avatarEmoji||null, icon:settings.avatarIcon||null, style:settings.avatarStyle||null }; }
 
 // palette + symbol options for the editor
 const AV_COLORS=["#e8551c","#ff3b30","#ff9500","#ffcc00","#34c759","#00c7be","#30b0c7","#007aff","#5856d6","#af52de","#ff2d55","#8e8e93"];
@@ -6141,35 +6169,44 @@ const AV_PRESETS=[
   {emoji:"🔥",color:"#ff3b30",style:"gradient"}, {emoji:"🦅",color:"#5856d6",style:"solid"},
   {emoji:"🐉",color:"#34c759",style:"duotone"},  {emoji:"🦄",color:"#af52de",style:"gradient"},
   {emoji:"🏋️",color:"#007aff",style:"ring"},     {emoji:"🥇",color:"#ffcc00",style:"solid"} ];
-let _avEditColor=null, _avEditEmoji=null, _avEditStyle="solid";
+let _avEditColor=null, _avEditEmoji=null, _avEditStyle="solid", _avEditIcon=null, _avArtSeeds=[];
+function freshArtSeeds(){ _avArtSeeds=Array.from({length:12},()=> Math.random().toString(36).slice(2,9)); }
 function renderAvatarEditor(){
   const nm=settings.displayName||settings.name||"You";
-  const prev=$("avPreview"); if(prev) prev.innerHTML=avatarHTML(nm,{size:92,color:_avEditColor,emoji:_avEditEmoji||undefined,style:_avEditStyle});
+  const prev=$("avPreview"); if(prev) prev.innerHTML=avatarHTML(nm,{size:92,color:_avEditColor,emoji:_avEditEmoji||undefined,style:_avEditStyle,icon:_avEditIcon});
+  // generated art — current pick first, then the shuffled set
+  const ag=$("avArt");
+  if(ag){ const seeds=[]; if(_avEditIcon) seeds.push(_avEditIcon); _avArtSeeds.forEach(s=>{ if(seeds.indexOf(s)<0) seeds.push(s); });
+    ag.innerHTML=seeds.slice(0,12).map(s=>'<button class="artbtn'+(s===_avEditIcon?" sel":"")+'" data-s="'+esc(s)+'">'+avatarHTML("",{size:46,icon:s})+'</button>').join('');
+    ag.querySelectorAll(".artbtn").forEach(b=> b.onclick=()=>{ _avEditIcon=b.dataset.s; saveAvatar(); }); }
   const ps=$("avPresets");
   if(ps){ ps.innerHTML=AV_PRESETS.map((p,i)=>'<button class="emojibtn" data-i="'+i+'" style="background:'+avatarBg(p.color,p.style)+';">'+p.emoji+'</button>').join('');
-    ps.querySelectorAll(".emojibtn").forEach(b=> b.onclick=()=>{ const p=AV_PRESETS[+b.dataset.i]; _avEditColor=p.color; _avEditEmoji=p.emoji; _avEditStyle=p.style; saveAvatar(); }); }
-  document.querySelectorAll("#avStyleSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.st===_avEditStyle));
+    ps.querySelectorAll(".emojibtn").forEach(b=> b.onclick=()=>{ const p=AV_PRESETS[+b.dataset.i]; _avEditColor=p.color; _avEditEmoji=p.emoji; _avEditStyle=p.style; _avEditIcon=null; saveAvatar(); }); }
+  document.querySelectorAll("#avStyleSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.st===_avEditStyle && !_avEditIcon));
   const sw=$("avSwatches");
-  if(sw){ sw.innerHTML=AV_COLORS.map(c=>'<span class="swatch'+(c===_avEditColor?" sel":"")+'" data-c="'+c+'" style="background:'+c+';"></span>').join('');
-    sw.querySelectorAll(".swatch").forEach(s=> s.onclick=()=>{ _avEditColor=s.dataset.c; saveAvatar(); }); }
+  if(sw){ sw.innerHTML=AV_COLORS.map(c=>'<span class="swatch'+(c===_avEditColor && !_avEditIcon?" sel":"")+'" data-c="'+c+'" style="background:'+c+';"></span>').join('');
+    sw.querySelectorAll(".swatch").forEach(s=> s.onclick=()=>{ _avEditColor=s.dataset.c; _avEditIcon=null; saveAvatar(); }); }
   const eg=$("avEmojis");
-  if(eg){ eg.innerHTML=AV_EMOJIS.map(e=>'<button class="emojibtn'+(e===_avEditEmoji?" sel":"")+'" data-e="'+e+'">'+e+'</button>').join('');
-    eg.querySelectorAll(".emojibtn").forEach(b=> b.onclick=()=>{ _avEditEmoji=b.dataset.e; saveAvatar(); }); }
+  if(eg){ eg.innerHTML=AV_EMOJIS.map(e=>'<button class="emojibtn'+(e===_avEditEmoji && !_avEditIcon?" sel":"")+'" data-e="'+e+'">'+e+'</button>').join('');
+    eg.querySelectorAll(".emojibtn").forEach(b=> b.onclick=()=>{ _avEditEmoji=b.dataset.e; _avEditIcon=null; saveAvatar(); }); }
 }
 function openAvatarEditor(){
   _avEditColor = settings.avatarColor || avatarColor((cloudUser&&cloudUser.id)||settings.displayName||"you");
   _avEditEmoji = settings.avatarEmoji || null;
   _avEditStyle = settings.avatarStyle || "solid";
+  _avEditIcon  = settings.avatarIcon || null;
+  if(!_avArtSeeds.length) freshArtSeeds();
   renderAvatarEditor(); openSheet("Avatar");
 }
 async function saveAvatar(){
-  settings.avatarColor=_avEditColor||null; settings.avatarEmoji=_avEditEmoji||null; settings.avatarStyle=_avEditStyle||"solid";
+  settings.avatarColor=_avEditColor||null; settings.avatarEmoji=_avEditEmoji||null; settings.avatarStyle=_avEditStyle||"solid"; settings.avatarIcon=_avEditIcon||null;
   await sset("settings",settings); syncSelfAvatar(); renderAvatarEditor();
-  if(cloudReady()){ try{ await sb.from("profiles").upsert({ user_id:cloudUser.id, avatar_color:settings.avatarColor, avatar_emoji:settings.avatarEmoji, avatar_style:settings.avatarStyle }); }catch(e){} }
+  if(cloudReady()){ try{ await sb.from("profiles").upsert({ user_id:cloudUser.id, avatar_color:settings.avatarColor, avatar_emoji:settings.avatarEmoji, avatar_icon:settings.avatarIcon, avatar_style:settings.avatarStyle }); }catch(e){} }
   renderMeProfile(); renderPresenceRail();
   if($("sheetFriends") && $("sheetFriends").classList.contains("show")) renderFriends();
 }
-document.querySelectorAll("#avStyleSeg .s").forEach(s=> s.onclick=()=>{ _avEditStyle=s.dataset.st; saveAvatar(); });
+document.querySelectorAll("#avStyleSeg .s").forEach(s=> s.onclick=()=>{ _avEditStyle=s.dataset.st; _avEditIcon=null; saveAvatar(); });
+if($("avShuffle")) $("avShuffle").onclick=()=>{ freshArtSeeds(); renderAvatarEditor(); };
 // ---- presence: am I/are they online? heartbeat keeps my last_seen fresh while the app is visible ----
 function isOnline(ts){ try{ return !!(ts && (Date.now()-Date.parse(ts))<2*60*1000); }catch(e){ return false; } }
 function statusAvatar(name, opts, online){ return '<span class="av-st">'+avatarHTML(name,opts)+(online?'<span class="pr-dot online"></span>':'')+'</span>'; }
@@ -6224,7 +6261,7 @@ async function openProfile(uid, name){
   openSheet("Profile");
   // pull their chosen avatar + last_seen (degrades to monogram / no-dot if the columns aren't there yet)
   let online=false;
-  try{ const { data, error } = await sb.from("profiles").select("user_id,avatar_color,avatar_emoji,avatar_style,last_seen").eq("user_id",uid).maybeSingle();
+  try{ const { data, error } = await sb.from("profiles").select("user_id,avatar_color,avatar_emoji,avatar_icon,avatar_style,last_seen").eq("user_id",uid).maybeSingle();
     if(error) throw error;
     if(data){ recordAvatars([data]); online=isOnline(data.last_seen); const pa=$("profAv"); if(pa) pa.innerHTML=statusAvatar(name,{size:84,uid:uid},online); } }
   catch(e){ try{ const { data } = await sb.from("profiles").select("user_id,avatar_color,avatar_emoji").eq("user_id",uid).maybeSingle();
@@ -6293,11 +6330,12 @@ async function renderFriends(){
   if(!on){ setFriendsBadge(0); return; }
   // profile visibility + my follow code + my saved avatar (avatar cols degrade if not migrated yet)
   let vis="private";
-  try{ const { data, error } = await sb.from("profiles").select("visibility,follow_code,avatar_color,avatar_emoji,avatar_style").eq("user_id",cloudUser.id).maybeSingle();
+  try{ const { data, error } = await sb.from("profiles").select("visibility,follow_code,avatar_color,avatar_emoji,avatar_icon,avatar_style").eq("user_id",cloudUser.id).maybeSingle();
     if(error) throw error;
     if(data){ vis=data.visibility||"private"; _myCode=data.follow_code||"";
       if(data.avatar_color!=null) settings.avatarColor=data.avatar_color;
       if(data.avatar_emoji!=null) settings.avatarEmoji=data.avatar_emoji;
+      if(data.avatar_icon!=null)  settings.avatarIcon=data.avatar_icon;
       if(data.avatar_style!=null) settings.avatarStyle=data.avatar_style; syncSelfAvatar(); } }
   catch(e){ try{ const { data } = await sb.from("profiles").select("visibility,follow_code").eq("user_id",cloudUser.id).maybeSingle();
     if(data){ vis=data.visibility||"private"; _myCode=data.follow_code||""; } }catch(e2){} }
