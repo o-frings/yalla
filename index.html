@@ -845,7 +845,7 @@
 <div class="injbanner" id="injBanner" style="display:none;"></div>
 <div id="exlist"></div>
 <button class="btn wide" id="saveBtn" style="margin-top:12px;">Finish &amp; Save Workout</button>
-<div class="foot">On-device only · keep a backup · lift safely<span id="appVer"></span></div>
+<div class="foot">On-device only · keep a backup · lift safely · build <span id="appVer">v61</span></div>
 </div><!-- /pageWorkout -->
 
 <div class="exmenu-pop" id="exMenu"></div>
@@ -6190,11 +6190,6 @@ if("serviceWorker" in navigator && location.protocol==="https:"){
   // an installed PWA resumes without re-firing "load"; re-check for a new version when it regains focus
   document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible")
     navigator.serviceWorker.getRegistration().then(reg=>reg&&reg.update()).catch(()=>{}); });
-  // surface the running build (= the active SW cache name) in the footer, so "am I current?" is unambiguous
-  if("caches" in window) caches.keys().then(ks=>{
-    const v=(ks.find(k=>/^yalla-v\d+/.test(k))||"").replace("yalla-","");
-    const el=document.getElementById("appVer"); if(el && v) el.textContent=" · "+v;
-  }).catch(()=>{});
 }
 </script>
 </body>
