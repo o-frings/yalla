@@ -1172,12 +1172,12 @@
 
     <div class="ed-label">Supersets <span class="subhint">— pair moves to save time</span></div>
     <div class="seg appearance bopt" data-k="supersets">
-      <div class="s active" data-v="on">On</div><div class="s" data-v="off">Off</div>
+      <div class="s" data-v="off">Off</div><div class="s active" data-v="on">On</div>
     </div>
 
     <div class="ed-label">Variety <span class="subhint">— rotate accessories across A/B days</span></div>
     <div class="seg appearance bopt" data-k="vary">
-      <div class="s active" data-v="on">On</div><div class="s" data-v="off">Off</div>
+      <div class="s" data-v="off">Off</div><div class="s active" data-v="on">On</div>
     </div>
 
     <div class="ed-label">Areas to protect <span class="subhint">— optional, select any</span></div>
@@ -5356,17 +5356,22 @@ function buildPlan(b){
     return {wk, comps};
   };
   const vary = b.vary==="on";
-  const workouts=[];
+  const aWorkouts=[], bWorkouts=[], fixedWorkouts=[];
   dayDefs.forEach((d)=>{
     const sig=d.groups.slice().sort().join(",")+"|"+d.lvl, offset=seen[sig]||0;
     if(vary && d.rot!==false){
       const A=buildVariant(d, offset, d.name+" A");
       const B=buildVariant(d, offset+3, d.name+" B", A.comps);   // same compounds, fresh accessories
-      seen[sig]=offset+2; workouts.push(A.wk, B.wk);
+      seen[sig]=offset+2; aWorkouts.push(A.wk); bWorkouts.push(B.wk);
+    } else if(d.rot!==false){
+      seen[sig]=offset+1; aWorkouts.push(buildVariant(d, offset, d.name).wk);
     } else {
-      seen[sig]=offset+1; workouts.push(buildVariant(d, offset, d.name).wk);
+      fixedWorkouts.push(buildVariant(d, offset, d.name).wk);   // non-rotating replacement → keep last
     }
   });
+  // all "A" days, then all "B" days (then any non-rotating replacement), so the rotation runs
+  // Push A, Pull A, Legs A, Push B, Pull B, Legs B, … rather than Push A, Push B, Pull A, …
+  const workouts=aWorkouts.concat(bWorkouts, fixedWorkouts);
   // coverage: any muscle the user hasn't dialled to zero should get at least some work somewhere in the plan
   BUILD_GROUPS.forEach(m=>{
     if((emph[m]!=null?emph[m]:0.5) < 0.2) return;                 // dragged to the centre = excluded
