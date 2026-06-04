@@ -35,6 +35,12 @@ Deno.serve(async (req) => {
   const { data: act } = await sb.from("activity").select("user_id, summary").eq("id", activityId).maybeSingle();
   if (!act || act.user_id === actor.id) return new Response(JSON.stringify({ ok: true, skipped: true }));
 
+  // Only an accepted follower of the owner may trigger a notification (mirrors the feed's
+  // visibility rule). Skips silently if the friends schema isn't deployed yet.
+  const { data: edge } = await sb.from("follows").select("status")
+    .eq("follower", actor.id).eq("followee", act.user_id).eq("status", "accepted").maybeSingle();
+  if (!edge) return new Response(JSON.stringify({ ok: true, notFriend: true }));
+
   // Owner's push subscription (only if they have one).
   const { data: sub } = await sb.from("push_subscriptions").select("subscription").eq("user_id", act.user_id).maybeSingle();
   if (!sub?.subscription) return new Response(JSON.stringify({ ok: true, noSub: true }));

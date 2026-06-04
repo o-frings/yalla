@@ -995,6 +995,31 @@
           <div class="s" data-lvl="3">Full</div>
         </div>
         <p class="levelcap" id="shareSegHint" style="margin:8px 4px 0; line-height:1.4;"></p>
+
+        <!-- Friends: profile visibility, your share code, requests, following. Shown only once the
+             friends-only schema is live (dbHardened); built by renderFriends(). -->
+        <div id="friendsBox" style="display:none;">
+          <div class="ed-label" style="margin-top:18px;">Profile</div>
+          <div class="seg appearance" id="visSeg">
+            <div class="s" data-vis="private">Private</div>
+            <div class="s" data-vis="public">Public</div>
+          </div>
+          <p class="levelcap" id="visHint" style="margin:8px 4px 0; line-height:1.4;"></p>
+          <div class="ed-label" style="margin-top:18px;">Your friend code</div>
+          <div class="row" style="gap:8px; align-items:center;">
+            <input id="myCode" type="text" readonly style="flex:1; font-weight:700; letter-spacing:2px; text-align:center;">
+            <button class="btn sm" id="copyCode" style="flex:0 0 auto;">Copy</button>
+          </div>
+          <p class="levelcap" style="margin:6px 4px 0; line-height:1.4;">Share this code so a friend can add you.</p>
+          <div class="ed-label" style="margin-top:18px;">Add a friend</div>
+          <div class="row" style="gap:8px;">
+            <input id="addCode" type="text" autocapitalize="characters" placeholder="Their friend code" style="flex:1; text-transform:uppercase;">
+            <button class="btn sm" id="addFriendBtn" style="flex:0 0 auto;">Add</button>
+          </div>
+          <div id="reqList"></div>
+          <div id="followList"></div>
+        </div>
+
         <label class="row" style="justify-content:space-between; align-items:center; margin-top:12px;">
           <span class="levelcap" style="margin:0;">Remind me to train after 2 quiet days</span>
           <input type="checkbox" id="remindToggle">
@@ -2104,6 +2129,15 @@ const SUPA = {
 };
 const CLOUD_KEYS = ["plans","lastsets","bodyweight","history","extlog","settings"]; // draft stays device-only
 let sb=null, cloudUser=null, _syncMeta={}, _pushTimers={};
+// True once the friends-only hardening migration (supabase/schema-hardening.sql) is live —
+// detected by probing the `follows` table. Until then the activity table is world-readable, so
+// the client publishes SUMMARY ONLY (never exercises/weights) and hides the friends/visibility UI.
+let dbHardened=false;
+async function detectHardened(){
+  if(!cloudReady()){ dbHardened=false; return; }
+  try{ const { error } = await sb.from("follows").select("follower").limit(1); dbHardened = !error; }
+  catch(e){ dbHardened=false; }
+}
 
 function cloudConfigured(){ return !!(SUPA.url && SUPA.key); }
 function cloudReady(){ return !!(sb && cloudUser); }
@@ -2130,9 +2164,11 @@ async function handleAuth(user){
   renderAccount();
   if(cloudUser && cloudUser.id !== was){
     await ensureProfile();
+    await detectHardened();        // does this project have the friends-only schema yet?
+    renderAccount(); renderFriends();
     await cloudReconcile();
     if(!settings.displayName) askDisplayName();   // first thing after signing in: how should I address you?
-  }
+  } else if(!cloudUser){ dbHardened=false; }
 }
 function askDisplayName(){
   const w=$("nameWrap"), i=$("nameInput2"); if(!w||!i) return;
@@ -2275,6 +2311,7 @@ function renderAccount(){
     $("acctWho").textContent=cloudUser.email||"Signed in";
     const an=$("acctName"); if(an && document.activeElement!==an) an.value=settings.displayName||settings.name||"";
     renderShareSeg();
+    renderFriends();
     const rtog=$("remindToggle"); if(rtog) rtog.checked = settings.remindersOn===true;
     setFeed(true);
     renderFeed();
@@ -2290,12 +2327,17 @@ async function cloudPublish(session){
   if(!cloudReady() || lvl<1) return;
   const ex=session.exercises||[];
   // Detail rises with the sharer's chosen level — weights are shared ONLY at level 3 (Full).
-  // `lvl` rides along so the viewer can clamp to min(theirs, ours): you only see what you share.
+  // SAFETY: until the friends-only RLS is live (dbHardened), the activity table is world-readable,
+  // so we cap the published detail at Summary regardless of the chosen level. No exercises/weights
+  // ever reach a world-readable table; once hardened, the full chosen level is published.
+  const eff = dbHardened ? lvl : 1;
   const summary={ name:session.name, sub:session.sub, sets:session.sets, mins:session.mins||0,
-    prs:session.beaten||0, mtot:session.mtot||{}, vol:Math.round(session.totalVol||0), exN:ex.length, lvl };
-  if(session.top) summary.top = lvl>=3 ? {name:session.top.name, w:session.top.w, r:session.top.r} : {name:session.top.name};
-  if(lvl>=2) summary.ex = ex.map(e=>({ name:e.name, sets:(e.sets||[]).map(s=> lvl>=3 ? {w:s.w, r:s.r} : {r:s.r}) }));
-  try{ await sb.from("activity").insert({ user_id:cloudUser.id, kind:"workout", summary }); }catch(e){}
+    prs:session.beaten||0, mtot:session.mtot||{}, vol:Math.round(session.totalVol||0), exN:ex.length, lvl:eff };
+  if(session.top) summary.top = eff>=3 ? {name:session.top.name, w:session.top.w, r:session.top.r} : {name:session.top.name};
+  if(eff>=2) summary.ex = ex.map(e=>({ name:e.name, sets:(e.sets||[]).map(s=> eff>=3 ? {w:s.w, r:s.r} : {r:s.r}) }));
+  const row={ user_id:cloudUser.id, kind:"workout", summary };
+  if(dbHardened) row.level=eff;     // the level column only exists post-migration
+  try{ await sb.from("activity").insert(row); }catch(e){}
 }
 // auto-post when all three weekly rings are closed (once per week; needs sign-in + sharing on)
 function weekKey(d){ d=d?new Date(d):new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-((d.getDay()+6)%7)); return d.toDateString(); }
@@ -2303,8 +2345,10 @@ async function shareRingsClosed(sets){
   if(!cloudReady() || (settings.shareLevel||0)<1) return;
   const wk=weekKey(); if(settings.ringsSharedWk===wk) return;     // once per week
   settings.ringsSharedWk=wk; await sset("settings",settings);
-  try{ await sb.from("activity").insert({ user_id:cloudUser.id, kind:"rings",
-    summary:{ name:"Closed all 3 rings this week 🎯", sets:Math.round(sets)||0, mins:0, prs:0, mtot:{}, lvl:1 } }); }catch(e){}
+  const row={ user_id:cloudUser.id, kind:"rings",
+    summary:{ name:"Closed all 3 rings this week 🎯", sets:Math.round(sets)||0, mins:0, prs:0, mtot:{}, lvl:1 } };
+  if(dbHardened) row.level=1;
+  try{ await sb.from("activity").insert(row); }catch(e){}
   toast("All rings closed — shared with your crew! 🎯", true);
 }
 
@@ -2355,12 +2399,8 @@ function miniRadar(cv, tot){
 
 async function renderFeed(){
   const list=$("feedList"); if(!list || !cloudReady()) return;
-  const myLvl=settings.shareLevel||0;
-  if(myLvl<1){   // the feed is reciprocal — share nothing, see nothing
-    list.innerHTML='<div class="levelcap" style="margin:0 4px; line-height:1.5;">The feed is reciprocal — you only see what you share. Turn on sharing under <b>Me → Account</b> to see your friends\' workouts.</div>';
-    const host=$("ovBody"); if(host){ const old=host.querySelector(".ovfriend"); if(old) old.remove(); }
-    return;
-  }
+  // Liberal viewing: you see friends' posts even if you share nothing yourself. Each post shows at
+  // the level its author published (s.lvl); your own level only governs what you publish.
   list.innerHTML='<div class="levelcap" style="margin:0 4px;">Loading…</div>';
   let rows=[];
   try{
@@ -2385,7 +2425,7 @@ async function renderFeed(){
   rows.forEach(r=>{
     const s=r.summary||{}, mine=r.user_id===cloudUser.id;
     const who = mine ? "You" : (names[r.user_id] || "A friend");
-    const viewLvl=Math.min(myLvl, s.lvl||1);   // clamp the post to your own level — you only see what you share
+    const viewLvl=s.lvl||1;   // you see the post at the level its author chose to share
     const card=document.createElement("div"); card.style.cssText="padding:12px 4px; border-bottom:.5px solid var(--line);";
     const top=document.createElement("div"); top.style.cssText="display:flex; gap:12px; align-items:center;";
     const txt=document.createElement("div"); txt.style.cssText="flex:1; min-width:0;";
@@ -2428,8 +2468,8 @@ async function renderFeed(){
   }
 }
 
-// Full-workout view for a feed post. `viewLvl` is the already-clamped level (min of yours and the
-// sharer's): 2 shows exercises + sets×reps, 3 also shows the weights lifted.
+// Full-workout view for a feed post. `viewLvl` is the level the author published: 2 shows
+// exercises + sets×reps, 3 also shows the weights lifted.
 function openWorkoutDetail(r, who, viewLvl){
   const s=r.summary||{}, body=$("woBody"); if(!body) return;
   $("woWho").textContent = who||"Workout";
@@ -2448,7 +2488,7 @@ function openWorkoutDetail(r, who, viewLvl){
         return (hasW ? st.w+"kg×"+(st.r||0) : (st.r||0)+" reps"); }).join(" · ");
       return '<div style="padding:10px 4px; border-bottom:.5px solid var(--line);"><div style="font-weight:600;">'+esc(e.name)+'</div><div class="levelcap" style="margin-top:3px;">'+esc(setsTxt)+'</div></div>';
     }).join('');
-    if(viewLvl<3) h+='<p class="levelcap" style="margin:10px 4px 0; opacity:.75;">Share at <b>Full</b> intensity to see the weights friends lifted — you only see the detail you share.</p>';
+    if(viewLvl<3) h+='<p class="levelcap" style="margin:10px 4px 0; opacity:.75;">'+esc(who)+' shared sets &amp; reps but not the weights.</p>';
   }
   body.innerHTML=h;
   const cv=$("woRadar"); if(cv) miniRadar(cv, mt);
@@ -5475,22 +5515,98 @@ if($("acctPush")) $("acctPush").onclick=cloudForcePush;
 if($("nameSave")) $("nameSave").onclick=saveDisplayName;
 if($("acctDelete")) $("acctDelete").onclick=cloudDeleteData;
 // Sharing intensity: 0 off · 1 summary · 2 detail (sets×reps) · 3 full (incl. weights).
-// "You only see what you share" — the feed clamps every post to your own level (see renderFeed).
+// This level governs only what YOU publish; you always see friends' posts at the level they chose.
 const SHARE_HINTS=[
-  "Off — your workouts stay private, and the friends feed stays hidden.",
-  "Summary — friends see your counts, volume and a muscle map. You see their summaries too.",
-  "Detail — also shares each exercise with sets & reps (no weights). You see friends' detail.",
-  "Full — shares everything, including the weights you lifted. You see friends' full logs." ];
+  "Off — you don't publish anything. You can still see friends' workouts.",
+  "Summary — accepted friends see your counts, volume and a muscle map.",
+  "Detail — friends also see each exercise with sets & reps (no weights).",
+  "Full — friends see everything, including the weights you lifted." ];
 function renderShareSeg(){
   const lvl=settings.shareLevel||0;
   document.querySelectorAll("#shareSeg .s").forEach(s=> s.classList.toggle("active", (+s.dataset.lvl)===lvl));
-  const hint=$("shareSegHint"); if(hint) hint.textContent=SHARE_HINTS[lvl]||"";
+  const hint=$("shareSegHint");
+  if(hint) hint.textContent = (SHARE_HINTS[lvl]||"")
+    + (!dbHardened && lvl>=2 ? " (Publishing summary-only until the friends features are enabled.)" : "");
 }
 document.querySelectorAll("#shareSeg .s").forEach(s=>{
   s.onclick=async()=>{ const lvl=+s.dataset.lvl; settings.shareLevel=lvl; settings.shareActivity=lvl>0;
-    await sset("settings",settings); renderShareSeg(); renderFeed();
-    toast(lvl===0?"Sharing off — your workouts stay private." : "Sharing on — "+["","summaries","detail (sets & reps)","full detail incl. weights"][lvl]+"."); };
+    await sset("settings",settings); renderShareSeg();
+    toast(lvl===0?"Sharing off — you won't publish anything." : "Sharing on — "+["","summaries","detail (sets & reps)","full detail incl. weights"][lvl]+"."); };
 });
+
+// ---- Friends (visibility, share code, requests, following) ----
+// Whole surface depends on the friends-only schema being live (dbHardened); built dynamically.
+const VIS_HINTS={ private:"Private — only friends you accept can follow you and see your workouts.",
+                  public:"Public — anyone can follow you without approval and see what you share." };
+let _myCode="";
+async function renderFriends(){
+  const box=$("friendsBox"); if(!box) return;
+  const on = cloudReady() && dbHardened;
+  box.style.display = on ? "" : "none";
+  if(!on) return;
+  // profile visibility + my follow code
+  let vis="private";
+  try{ const { data } = await sb.from("profiles").select("visibility,follow_code").eq("user_id",cloudUser.id).maybeSingle();
+    if(data){ vis=data.visibility||"private"; _myCode=data.follow_code||""; } }catch(e){}
+  document.querySelectorAll("#visSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.vis===vis));
+  const vh=$("visHint"); if(vh) vh.textContent=VIS_HINTS[vis]||"";
+  const mc=$("myCode"); if(mc) mc.value=_myCode||"—";
+  // incoming requests + following
+  let reqs=[], following=[];
+  try{ const { data } = await sb.rpc("incoming_requests"); reqs=data||[]; }catch(e){}
+  try{ const { data } = await sb.rpc("my_following"); following=data||[]; }catch(e){}
+  const reqBox=$("reqList");
+  if(reqBox){
+    reqBox.innerHTML = reqs.length
+      ? '<div class="ed-label" style="margin-top:18px;">Requests</div>'+reqs.map(u=>
+          '<div class="row" data-uid="'+esc(u.user_id)+'" style="justify-content:space-between; align-items:center; margin-top:8px;">'
+          +'<span style="font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis;">'+esc(u.display_name||"A lifter")+'</span>'
+          +'<span style="flex:0 0 auto; display:flex; gap:8px;"><button class="btn sm reqYes">Accept</button><button class="btn tinted sm reqNo">Decline</button></span></div>').join('')
+      : "";
+    reqBox.querySelectorAll(".reqYes").forEach(b=> b.onclick=()=>acceptFollow(b.closest("[data-uid]").dataset.uid));
+    reqBox.querySelectorAll(".reqNo").forEach(b=> b.onclick=()=>removeFollow(b.closest("[data-uid]").dataset.uid, "follower"));
+  }
+  const folBox=$("followList");
+  if(folBox){
+    folBox.innerHTML = following.length
+      ? '<div class="ed-label" style="margin-top:18px;">Following</div>'+following.map(u=>
+          '<div class="row" data-uid="'+esc(u.user_id)+'" style="justify-content:space-between; align-items:center; margin-top:8px;">'
+          +'<span style="font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis;">'+esc(u.display_name||"A lifter")+(u.status==="pending"?' <span class="levelcap" style="font-weight:400;">· pending</span>':'')+'</span>'
+          +'<button class="btn tinted sm unfol" style="flex:0 0 auto;">Remove</button></div>').join('')
+      : "";
+    folBox.querySelectorAll(".unfol").forEach(b=> b.onclick=()=>removeFollow(b.closest("[data-uid]").dataset.uid, "followee"));
+  }
+}
+async function acceptFollow(uid){
+  if(!cloudReady()) return;
+  try{ await sb.from("follows").update({status:"accepted"}).eq("follower",uid).eq("followee",cloudUser.id); }catch(e){}
+  toast("Friend accepted."); renderFriends(); renderFeed();
+}
+// dir 'follower' = decline/remove an incoming follower; 'followee' = unfollow someone you follow
+async function removeFollow(uid, dir){
+  if(!cloudReady()) return;
+  try{ const q=sb.from("follows").delete();
+    if(dir==="follower"){ await q.eq("follower",uid).eq("followee",cloudUser.id); }
+    else { await q.eq("follower",cloudUser.id).eq("followee",uid); }
+  }catch(e){}
+  renderFriends(); renderFeed();
+}
+document.querySelectorAll("#visSeg .s").forEach(s=>{
+  s.onclick=async()=>{ if(!cloudReady()) return; const vis=s.dataset.vis;
+    document.querySelectorAll("#visSeg .s").forEach(x=> x.classList.toggle("active", x===s));
+    const vh=$("visHint"); if(vh) vh.textContent=VIS_HINTS[vis]||"";
+    try{ await sb.from("profiles").upsert({ user_id:cloudUser.id, visibility:vis }); }catch(e){}
+    toast(vis==="public"?"Profile public — anyone can follow you.":"Profile private — you approve followers."); };
+});
+if($("copyCode")) $("copyCode").onclick=async()=>{ if(!_myCode) return;
+  try{ await navigator.clipboard.writeText(_myCode); toast("Friend code copied."); }catch(e){ toast("Your code: "+_myCode); } };
+if($("addFriendBtn")) $("addFriendBtn").onclick=async()=>{
+  const inp=$("addCode"); const code=((inp&&inp.value)||"").trim(); if(!code || !cloudReady()) return;
+  let res=null; try{ const { data } = await sb.rpc("request_follow",{ code }); res=data; }catch(e){ toast("Couldn't add — try again."); return; }
+  if(res==="not_found") toast("No one has that code.");
+  else if(res==="self") toast("That's your own code 🙂");
+  else { if(inp) inp.value=""; toast("Added "+res+" — they'll appear once accepted (instant if they're public)."); renderFriends(); renderFeed(); }
+};
 if($("remindToggle")) $("remindToggle").onchange=async(e)=>{
   if(e.target.checked){ const ok=await pushSubscribe(); e.target.checked=ok; settings.remindersOn=ok; if(ok) toast("Reminders on — we’ll nudge you after 2 quiet days."); }
   else { await pushDisable(); settings.remindersOn=false; toast("Reminders off."); }

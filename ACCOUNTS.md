@@ -64,17 +64,18 @@ create table public.profiles (
 
 alter table public.profiles enable row level security;
 
--- Anyone signed in can read names (needed to label the feed); you edit only your own.
+-- Base policy (superseded by the hardening migration, which scopes reads to public
+-- profiles + self + accepted followers and adds visibility + follow_code columns).
 create policy "read all profiles"  on public.profiles for select using (auth.role() = 'authenticated');
 create policy "write own profile"  on public.profiles for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 ```
 
-### Table 3 — `activity` (the shared feed — summaries only, opt-in)
+### Table 3 — `activity` (the shared feed — opt-in, friends-only)
 
-This table only ever holds what a user *chose* to publish: a derived summary
-("trained Push — 18 sets"), **never** raw weights or full history. Detailed data
-lives in `user_data` and is never exposed here.
+This table holds what a user *chose* to publish at their chosen detail level: a summary
+("trained Push — 18 sets"), and at higher levels the exercise list and (at Full) the
+weights lifted. **Visibility is friends-only** — see the hardening migration below.
 
 ```sql
 create table public.activity (
@@ -82,23 +83,22 @@ create table public.activity (
   user_id    uuid not null references auth.users on delete cascade,
   created_at timestamptz not null default now(),
   kind       text not null,         -- e.g. 'workout'
-  summary    jsonb not null         -- { workout:'Push', sets:18, durationMin:52 } — derived only
+  summary    jsonb not null,        -- derived payload; detail depends on the sharer's level
+  level      int not null default 1 -- 1 summary / 2 +sets·reps / 3 +weights (added by hardening)
 );
 
 alter table public.activity enable row level security;
-
--- "Shared circle" model for now: any signed-in user can READ the feed.
--- You can only INSERT/DELETE your own rows.
--- LATER (commercial): replace the read policy with a friends-table join. One line.
-create policy "read feed"     on public.activity for select using (auth.role() = 'authenticated');
 create policy "insert own"    on public.activity for insert with check (auth.uid() = user_id);
 create policy "delete own"    on public.activity for delete using (auth.uid() = user_id);
+-- READ policy is set by the hardening migration (friends-only) — NOT auth.role()='authenticated'.
 ```
 
-> **The one line that scales to commercial:** the `read feed` policy is the only
-> "everyone sees everyone" concession, and it's isolated to *summaries the user
-> opted to share*. To go public, swap `auth.role() = 'authenticated'` for a check
-> against a `friends` table. Personal data in `user_data` never changes.
+> **⚠️ Hardening is mandatory before sharing exercise/weight detail.** The original
+> "any signed-in user can read the feed" policy is **unsafe** now that posts can carry
+> weights — see **`supabase/schema-hardening.sql`** (rationale in `SECURITY-HARDENING.md`).
+> It adds a `follows` table, public/private profiles, and a friends-only read policy
+> (`self OR accepted follower`). The client auto-detects whether that migration is live and
+> publishes **summary-only** until it is, so detail never lands in a world-readable table.
 
 ---
 
