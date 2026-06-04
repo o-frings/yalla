@@ -8,7 +8,7 @@
  * Bump CACHE (v1 → v2 → …) only if you ever need to force-clear old caches; the network-first
  * strategy already picks up new versions on its own, so you usually won't need to touch this.
  */
-const CACHE = "yalla-v48";
+const CACHE = "yalla-v49";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-1024.png", "./evidence.json"];
 
 self.addEventListener("install", (e) => {

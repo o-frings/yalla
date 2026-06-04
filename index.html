@@ -1718,13 +1718,13 @@ const MUSCLES = {
   "Ab Wheel Rollout":["Core"],"Weighted Plank":["Core"],"Plank":["Core"],"Hollow Hold (sec)":["Core"],"Hollow Hold":["Core"],
   "Hollow Hold + Leg Raises":["Core"],"Leg Raises":["Core"],"Dead Bug":["Core"],"Pallof Press":["Core"],
   // posture / corrective
-  "Chin Tuck":["Rear Delts"],"Chin Tucks":["Rear Delts"],"Wall Slide":["Rear Delts","Back"],"Wall Slides":["Rear Delts","Back"],
+  "Chin Tuck":["Neck"],"Chin Tucks":["Neck"],"Wall Slide":["Rear Delts","Back"],"Wall Slides":["Rear Delts","Back"],
   "Scapular Wall Slide":["Rear Delts","Back"],"Wall Angels":["Rear Delts","Back"],"Prone Y-T-W":["Rear Delts","Back"],
   "Prone T-Raise":["Rear Delts"],"Superman":["Back","Glutes"],"Bird Dog":["Core"],"Cat-Cow":["Core"],
 };
 const MCOLOR={ Chest:"#ff6b6b", Back:"#4dabf7", Shoulders:"#f59f00", Biceps:"#9775fa", Triceps:"#ff8787",
   Quads:"#20c997", Hamstrings:"#51cf66", Glutes:"#f783ac", Calves:"#74c0fc", Core:"#ffd43b", Other:"#adb5bd",
-  "Front Delts":"#f59f00", "Side Delts":"#ffa94d", "Rear Delts":"#e8590c" };
+  "Front Delts":"#f59f00", "Side Delts":"#ffa94d", "Rear Delts":"#e8590c", Neck:"#15aabf" };
 function muscleFor(name){
   if(MUSCLES[name]) return MUSCLES[name];
   const n=String(name).toLowerCase();
@@ -2822,7 +2822,7 @@ function ovUnderMuscles(){
   if(!Object.keys(hist).length) return [];                            // nothing logged yet — don't nag
   const scope=planScopeMuscles(activePlan());
   const wk=weeklyEquiv(muscleVolume(28,"sets").totals, 28);
-  return scope.filter(g=> (wk[g]||0) < WEEKLY_SET_MIN);               // plan targets it, but logs are under the growth threshold
+  return scope.filter(g=> !NO_TARGET.has(g) && (wk[g]||0) < WEEKLY_SET_MIN);   // plan targets it, but logs are under the growth threshold (Neck exempt)
 }
 // a small, fading deck for the overview — surfaces only tips you haven't read yet, a few at a time.
 // feature tips drop off automatically once you've used the feature; evergreen ones you dismiss.
@@ -3320,7 +3320,7 @@ function growthStatus(){
   let activeWeeks=0; for(let i=0;i<N;i++){ if(MGROUPS.some(g=>setsS[g][i]>0)) activeWeeks++; }
   const per=[];
   MGROUPS.forEach(g=>{
-    if(!setsS[g].some(v=>v>0)) return;                 // never trained in the window → not shown
+    if(NO_TARGET.has(g) || !setsS[g].some(v=>v>0)) return;   // exempt (Neck) or never trained → not shown
     const sets=recent(setsS[g]);                       // current weekly-set dose (last-3-week mean)
     const rv=recent(volS[g]), ev=earlier(volS[g]);
     const trend = ev>0 ? rv/ev : null;                 // null = no earlier baseline (just started this muscle)
@@ -4132,8 +4132,12 @@ $("importBtn").onclick=async()=>{
 };
 
 // ================= muscle volume =================
-const MGROUPS=["Chest","Back","Front Delts","Side Delts","Rear Delts","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves","Core"];
-const MSHORT={Chest:"Chest",Back:"Back",Shoulders:"Delts",Biceps:"Biceps",Triceps:"Triceps",Quads:"Quads",Hamstrings:"Hams",Glutes:"Glutes",Calves:"Calves",Core:"Core","Front Delts":"F·Delt","Side Delts":"S·Delt","Rear Delts":"R·Delt"};
+const MGROUPS=["Chest","Back","Front Delts","Side Delts","Rear Delts","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves","Core","Neck"];
+// Neck is a home for posture/neck moves (e.g. chin tucks) on every radar, but it carries NO weekly-
+// volume target: it shows a wedge when trained and is never flagged as under-trained / chased by the
+// plan builder or growth signal. Add muscles here to exempt them from the volume model.
+const NO_TARGET=new Set(["Neck"]);
+const MSHORT={Chest:"Chest",Back:"Back",Shoulders:"Delts",Biceps:"Biceps",Triceps:"Triceps",Quads:"Quads",Hamstrings:"Hams",Glutes:"Glutes",Calves:"Calves",Core:"Core","Front Delts":"F·Delt","Side Delts":"S·Delt","Rear Delts":"R·Delt",Neck:"Neck"};
 let musWindow=7, musMetric="sets", musSrc="log", musVolMode="total";
 // Evidence-based weekly volume targets (fractional sets per muscle per week).
 // Dose-response meta-regressions: benefits accrue across ~10+ hard sets/muscle/wk; ~4–6 is a rough
@@ -5081,7 +5085,7 @@ function progressInsight(){
     return { v:"training", title:"Training consistency is the brake", text:"You've averaged under ~1.5 sessions a week this month. Before touching nutrition, the biggest lever is simply training regularly — consistent progressive overload is what drives the adaptation.", src:["sch16","sch17"] };
   // You're training often enough — but are the muscles actually getting enough weekly volume to grow?
   const wk28=weeklyEquiv(muscleVolume(28,"sets").totals, 28);
-  const trained=MGROUPS.filter(g=>(wk28[g]||0)>0), under=trained.filter(g=>wk28[g]<WEEKLY_SET_MIN);
+  const trained=MGROUPS.filter(g=>(wk28[g]||0)>0), under=trained.filter(g=> !NO_TARGET.has(g) && wk28[g]<WEEKLY_SET_MIN);
   if(trained.length>=4 && under.length>=Math.ceil(trained.length/2))
     return { v:"training", title:"Training volume is the brake", text:"You're training regularly, but over the last month "+under.length+" of "+trained.length+" muscle groups are getting fewer than ~"+WEEKLY_SET_MIN+" hard sets a week — under the volume most people need to grow. Adding sets to the under-dosed groups (open Muscle balance to see which) is the most direct lever before changing nutrition.", src:["sch17","drr"] };
   if(dir==="gain"){
@@ -5375,7 +5379,7 @@ function buildPlan(b){
   const workouts=aWorkouts.concat(bWorkouts, fixedWorkouts);
   // coverage: any muscle the user hasn't dialled to zero should get at least some work somewhere in the plan
   BUILD_GROUPS.forEach(m=>{
-    if((emph[m]!=null?emph[m]:0.5) < 0.2) return;                 // dragged to the centre = excluded
+    if(NO_TARGET.has(m) || (emph[m]!=null?emph[m]:0.5) < 0.2) return;   // exempt (Neck) or dragged to the centre = excluded
     if((planVolume({workouts}).totals[m]||0) > 0) return;          // already hit (primary or secondary)
     const key=buildKey(m); let bestI=-1, bestLen=99;
     workouts.forEach((wk,i)=>{ if(dayDomain(wk.name).indexOf(key)>=0 && wk.ex.length<bestLen){ bestLen=wk.ex.length; bestI=i; } });
