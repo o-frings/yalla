@@ -7,16 +7,17 @@ You'll do it in the Supabase dashboard for project **`sukuuhoglitaeidplhns`**. N
 
 ---
 
-## 1–2. VAPID keys — ✅ DONE
+## 1–2. VAPID keys — ✅ DONE (and secrets set)
 
-The keypair has been generated and the **public** key is already wired into the app
-(`SUPA.vapidPublic` in `index.html`) and pushed. You only need the **private** key for step 5 —
-it was given to you in chat (it is intentionally NOT committed to the repo).
+A fresh keypair was generated on 2026-06-04; the **public** key is wired into the app
+(`SUPA.vapidPublic` in `index.html`) and all three secrets (`VAPID_PUBLIC`, `VAPID_PRIVATE`,
+`VAPID_SUBJECT`) are set on the Supabase project via the CLI. Server push is live.
 
-- Public key (in app, safe to share): `BERYQqqs6l7n2w8n51Zol7fTOc4VxFpyqjykiVrxEkF6H4qHT-eB5IDdK7euu_lPHA2YY4N5dP2Fve-YUX6eZyQ`
-- Private key: see chat → paste into the `VAPID_PRIVATE` secret in step 5.
+- Public key (in app, safe to share): `BI6G-Tfh8TMp9wK5N4vFc1w_z9zkGNUekzNo31HM8J9zofn25ZVp7f3bVqd_m2LhwIl89Azb7FjSNjdDGiBYUG4`
+- Private key: NOT committed; stored only as the `VAPID_PRIVATE` secret.
 
-> Lost the private key? Just ask me to generate a fresh pair; I'll re-wire the public key and give you the new private key.
+> Note: the prior keypair's secrets were never actually set, so this fresh pair replaced it.
+> Anyone who had enabled reminders on the old key must toggle reminders off/on once to re-subscribe.
 
 ---
 
