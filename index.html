@@ -5587,8 +5587,11 @@ async function renderFriends(){
 async function acceptFollow(uid){
   if(!cloudReady()) return;
   try{ await sb.from("follows").update({status:"accepted"}).eq("follower",uid).eq("followee",cloudUser.id); }catch(e){}
+  notifyFollow(uid, "follow_accept");   // tell them you accepted
   toast("Friend accepted."); renderFriends(); renderFeed();
 }
+// fire a follow / accept push to the other person (best-effort; no-op if the function isn't deployed)
+async function notifyFollow(target, kind){ try{ if(sb && sb.functions && target) await sb.functions.invoke("social-notify",{ body:{ target, kind } }); }catch(e){} }
 // dir 'follower' = decline/remove an incoming follower; 'followee' = unfollow someone you follow
 async function removeFollow(uid, dir){
   if(!cloudReady()) return;
@@ -5615,10 +5618,12 @@ if($("addFriendBtn")) $("addFriendBtn").onclick=async()=>{
 // shared follow path — used by the manual code box and by tap-to-follow invite links
 async function followByCode(code){
   if(!cloudReady()){ pendingAddCode=(code||"").trim().toUpperCase(); toast("Sign in to follow your friend."); goAccount&&goAccount(); return; }
-  let res=null; try{ const { data } = await sb.rpc("request_follow",{ code }); res=data; }catch(e){ toast("Couldn't add — try again."); return; }
-  if(res==="not_found") toast("That code didn't match anyone.");
-  else if(res==="self") toast("That's your own code 🙂");
-  else { toast("Added "+res+" — instant if they're public, otherwise once they accept."); renderFriends(); renderFeed(); }
+  let res={}; try{ const { data } = await sb.rpc("request_follow",{ code }); res=data||{}; }catch(e){ toast("Couldn't add — try again."); return; }
+  if(res.status==="not_found") toast("That code didn't match anyone.");
+  else if(res.status==="self") toast("That's your own code 🙂");
+  else { notifyFollow(res.id, "follow");
+    toast(res.status==="following" ? "Now following "+res.name+" 🎉" : "Request sent to "+res.name+" — they'll get a heads-up to accept.");
+    renderFriends(); renderFeed(); }
 }
 // a tap-to-follow link: friend opens it, signs in if needed, and follows you in one tap
 function inviteLink(){ return location.origin + location.pathname + "?add=" + encodeURIComponent(_myCode||""); }

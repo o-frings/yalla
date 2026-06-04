@@ -123,17 +123,22 @@ create policy "read profiles" on public.profiles for select
 
 -- 7. add a friend by their share code (resolves the code → inserts the edge) --
 --    Definer so the follower can find a not-yet-friend without open profile reads.
+--    Returns { status: not_found|self|following|requested, id, name } so the client can
+--    fire a follow notification to the followee.
+drop function if exists public.request_follow(text);
 create or replace function public.request_follow(code text)
-returns text language plpgsql security definer set search_path = '' as $$
-declare target uuid; nm text;
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare target uuid; nm text; pub boolean;
 begin
-  select user_id, coalesce(display_name,'Friend') into target, nm
+  select user_id, coalesce(display_name,'Friend'), (visibility = 'public')
+    into target, nm, pub
     from public.profiles where follow_code = upper(trim(code));
-  if target is null      then return 'not_found'; end if;
-  if target = auth.uid() then return 'self';      end if;
+  if target is null      then return jsonb_build_object('status','not_found'); end if;
+  if target = auth.uid() then return jsonb_build_object('status','self');      end if;
   insert into public.follows(follower, followee) values (auth.uid(), target)
     on conflict (follower, followee) do nothing;          -- trigger auto-accepts if public
-  return nm;
+  return jsonb_build_object('status', case when pub then 'following' else 'requested' end,
+                            'id', target, 'name', nm);
 end $$;
 grant execute on function public.request_follow(text) to authenticated;
 

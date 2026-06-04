@@ -26,32 +26,56 @@ Deno.serve(async (req) => {
 
   let body: any = {};
   try { body = await req.json(); } catch (_) {}
-  const { activityId, kind, text } = body || {};
-  if (!activityId) return new Response(JSON.stringify({ ok: false }), { status: 400 });
+  const { activityId, kind, text, target } = body || {};
 
   const sb = createClient(url, service);
 
-  // Find the post + its owner.
-  const { data: act } = await sb.from("activity").select("user_id, summary").eq("id", activityId).maybeSingle();
-  if (!act || act.user_id === actor.id) return new Response(JSON.stringify({ ok: true, skipped: true }));
+  // Actor's display name (used in every message).
+  const { data: aprof } = await sb.from("profiles").select("display_name").eq("user_id", actor.id).maybeSingle();
+  const who = aprof?.display_name || "A friend";
 
-  // Only an accepted follower of the owner may trigger a notification (mirrors the feed's
-  // visibility rule). Skips silently if the friends schema isn't deployed yet.
-  const { data: edge } = await sb.from("follows").select("status")
-    .eq("follower", actor.id).eq("followee", act.user_id).eq("status", "accepted").maybeSingle();
-  if (!edge) return new Response(JSON.stringify({ ok: true, notFriend: true }));
+  // Resolve who to notify (`recipient`) and the message, per event kind.
+  let recipient: string | null = null;
+  let msg = "";
 
-  // Owner's push subscription (only if they have one).
-  const { data: sub } = await sb.from("push_subscriptions").select("subscription").eq("user_id", act.user_id).maybeSingle();
+  if (kind === "follow" || kind === "follow_accept") {
+    // Follow events: `target` is the user to notify. Verify the edge exists so a caller
+    // can't spam arbitrary users.
+    if (!target || target === actor.id) return new Response(JSON.stringify({ ok: true, skipped: true }));
+    if (kind === "follow") {
+      const { data: edge } = await sb.from("follows").select("status")
+        .eq("follower", actor.id).eq("followee", target).maybeSingle();
+      if (!edge) return new Response(JSON.stringify({ ok: true, noEdge: true }));
+      recipient = target;
+      msg = edge.status === "accepted" ? `${who} started following you 👋` : `${who} wants to follow you`;
+    } else { // follow_accept: actor accepted target's request → tell the requester
+      const { data: edge } = await sb.from("follows").select("status")
+        .eq("follower", target).eq("followee", actor.id).eq("status", "accepted").maybeSingle();
+      if (!edge) return new Response(JSON.stringify({ ok: true, noEdge: true }));
+      recipient = target;
+      msg = `${who} accepted your follow request 🤝`;
+    }
+  } else {
+    // Activity events (cheer / comment): require activityId.
+    if (!activityId) return new Response(JSON.stringify({ ok: false }), { status: 400 });
+    const { data: act } = await sb.from("activity").select("user_id, summary").eq("id", activityId).maybeSingle();
+    if (!act || act.user_id === actor.id) return new Response(JSON.stringify({ ok: true, skipped: true }));
+    // Only an accepted follower of the owner may trigger a notification (mirrors feed visibility).
+    const { data: edge } = await sb.from("follows").select("status")
+      .eq("follower", actor.id).eq("followee", act.user_id).eq("status", "accepted").maybeSingle();
+    if (!edge) return new Response(JSON.stringify({ ok: true, notFriend: true }));
+    recipient = act.user_id;
+    const workout = (act.summary && act.summary.name) || "your workout";
+    msg = kind === "comment"
+      ? `${who} commented on ${workout}${text ? `: “${String(text).slice(0, 80)}”` : ""}`
+      : `${who} cheered ${workout} 🔥`;
+  }
+
+  if (!recipient) return new Response(JSON.stringify({ ok: true, skipped: true }));
+
+  // Recipient's push subscription (only if they have one).
+  const { data: sub } = await sb.from("push_subscriptions").select("subscription").eq("user_id", recipient).maybeSingle();
   if (!sub?.subscription) return new Response(JSON.stringify({ ok: true, noSub: true }));
-
-  // Actor's display name.
-  const { data: prof } = await sb.from("profiles").select("display_name").eq("user_id", actor.id).maybeSingle();
-  const who = prof?.display_name || "A friend";
-  const workout = (act.summary && act.summary.name) || "your workout";
-  const msg = kind === "comment"
-    ? `${who} commented on ${workout}${text ? `: “${String(text).slice(0, 80)}”` : ""}`
-    : `${who} cheered ${workout} 🔥`;
 
   webpush.setVapidDetails(
     Deno.env.get("VAPID_SUBJECT") || "mailto:hello@yalla.app",
@@ -64,7 +88,7 @@ Deno.serve(async (req) => {
     await webpush.sendNotification(sub.subscription, payload);
   } catch (e) {
     const code = (e && ((e as any).statusCode || (e as any).status)) || 0;
-    if (code === 404 || code === 410) await sb.from("push_subscriptions").delete().eq("user_id", act.user_id);
+    if (code === 404 || code === 410) await sb.from("push_subscriptions").delete().eq("user_id", recipient);
     return new Response(JSON.stringify({ ok: false, code }), { headers: { "content-type": "application/json" } });
   }
   return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
