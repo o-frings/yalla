@@ -2388,13 +2388,14 @@ function agoStr(ts){ const s=Math.max(0,(Date.now()-ts)/1000);
   if(s<90) return "just now"; const m=s/60; if(m<60) return Math.round(m)+"m ago";
   const h=m/60; if(h<24) return Math.round(h)+"h ago"; const d=h/24; return d<7?Math.round(d)+"d ago":new Date(ts).toLocaleDateString(undefined,{month:"short",day:"numeric"}); }
 
-// Rose / coxcomb chart of a workout's muscle split. Each muscle is a wedge whose AREA equals its
-// share of the session's volume — so the total filled area is identical for EVERY workout
-// (area = π·R²/n), and nothing ever crosses the ring. Radius for share s is R·√s: a single-muscle
-// workout fills one wedge to the rim; a balanced one is an even little rosette. Pure shape, size-independent.
+// Rose / coxcomb chart of a workout's muscle split: each muscle is a wedge sized by its share of the
+// session's volume. Radius for share s is s^ROSE_GAMMA — a gentle curve (well below √) that lifts
+// small shares so the rosette is big and legible (and, in the builder, easy to grab); a single-muscle
+// workout still fills its wedge to the rim, untrained muscles stay empty, nothing crosses the ring.
+const ROSE_GAMMA=0.25;
 function roseRadii(G, tot){
   const total=G.reduce((a,g)=>a+(tot[g]||0),0);
-  return G.map(g=> total ? Math.sqrt((tot[g]||0)/total) : 0);   // radius fraction in [0,1]
+  return G.map(g=> total ? Math.pow((tot[g]||0)/total, ROSE_GAMMA) : 0);   // radius fraction in [0,1]
 }
 function drawRose(x, cx, cy, R, G, tot, o){
   o=o||{}; const n=G.length, frac=roseRadii(G,tot);
@@ -5406,21 +5407,17 @@ document.querySelectorAll("#sheetBuild .bchips.multi").forEach(grp=>{ const k=gr
   c.classList.toggle("on"); build[k]=[].map.call(grp.querySelectorAll(".chip.on"),x=>x.dataset.v); updateBuildPreview(); }); });
 function syncEmphasisChips(){ const sel=Array.isArray(build.focus)?build.focus:(build.focus?[build.focus]:[]);
   document.querySelectorAll('#sheetBuild .bchips[data-k="focus"] .chip').forEach(c=> c.classList.toggle("on", sel.indexOf(c.dataset.v)>=0)); }
-// The builder rose uses a gentler radius curve than √share so wedges are large and easy to drag
-// (a balanced split sits at ~half the ring instead of ~0.29). It still represents a sums-to-1
-// distribution and rebalances proportionally; exact constant-area is traded for editability here.
-// The feed/share roses keep true √share. buildRoseShare inverts the curve so a drag tip tracks the finger.
-const BUILD_GAMMA=0.34;
-function buildRoseRadius(share){ return Math.pow(Math.max(0,Math.min(1,share)), BUILD_GAMMA); }
-function buildRoseShare(frac){ return Math.pow(Math.max(0,Math.min(1,frac)), 1/BUILD_GAMMA); }
+// The builder rose uses the same gentle curve as the feed/share roses (ROSE_GAMMA): it's a sums-to-1
+// distribution that rebalances proportionally when you drag. buildRoseShare inverts the curve so the
+// dragged wedge's tip tracks your finger.
+function buildRoseShare(frac){ return Math.pow(Math.max(0,Math.min(1,frac)), 1/ROSE_GAMMA); }
 function drawEmphasisRadar(){
   const c=$("buildRadar"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const G=BUILD_GROUPS, cx=W/2, cy=H/2, R=W*0.30, n=G.length;
   const cs=getComputedStyle(document.documentElement), accent=(cs.getPropertyValue("--accent")||"#0a84ff").trim(), lab=(cs.getPropertyValue("--l2")||"#888").trim();
   const pt=(i,rr)=>{ const a=(-90+i*360/n)*Math.PI/180; return [cx+rr*Math.cos(a), cy+rr*Math.sin(a)]; };
-  // Sums-to-1 distribution; radius is a gentle curve of each muscle's share (see BUILD_GAMMA above).
-  const tot=G.reduce((a,g)=>a+(build.emphasis[g]||0),0)||1;
-  const frac=G.map(g=> buildRoseRadius((build.emphasis[g]||0)/tot));
+  // Sums-to-1 distribution; radius is a gentle curve of each muscle's share (shared roseRadii / ROSE_GAMMA).
+  const frac=roseRadii(G, build.emphasis);
   ctx.strokeStyle="rgba(128,128,128,.22)"; ctx.lineWidth=1.5;
   [0.5,1].forEach(f=>{ ctx.beginPath(); ctx.arc(cx,cy,R*f,0,Math.PI*2); ctx.stroke(); });
   const half=Math.PI/n - 0.05;
