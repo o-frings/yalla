@@ -133,9 +133,10 @@
   .tsoc-btn{ display:inline-flex; align-items:center; gap:4px; background:none; border:none; cursor:pointer; color:var(--l2); padding:6px 5px; border-radius:10px; line-height:1; -webkit-tap-highlight-color:transparent; }
   .tsoc-btn:active{ opacity:.5; }
   .socialic, .socialic2, .liveic{ flex:0 0 auto; width:21px; height:21px; color:var(--l2); transition:color .15s; }
+  #socialBtn{ position:relative; }
   #socialBtn.gym .socialic{ color:#0a84ff; }                                          /* checked in → blue */
-  #socialBtn.live .socialic{ color:var(--red); animation:liveiconpulse 1.6s infinite; } /* live → red, gentle pulse */
-  @keyframes liveiconpulse{ 0%,100%{ opacity:1; } 50%{ opacity:.45; } }
+  #socialBtn.live .socialic{ color:var(--red); }                                      /* live → red icon … */
+  #socialBtn.live::after{ content:""; position:absolute; top:3px; right:3px; width:8px; height:8px; border-radius:50%; background:var(--red); animation:livepulse 1.6s infinite; }  /* …with the glimmer halo */
   /* dropdown menu */
   .socialmenu{ position:absolute; top:100%; right:0; margin-top:8px; z-index:30; min-width:184px; padding:6px; display:flex; flex-direction:column; gap:2px;
     background:var(--card); border:.5px solid var(--line); border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.20); }
@@ -146,10 +147,15 @@
   .socialmenu-item.on .liveic{ color:var(--red); }
   .socialmenu-item.on .socialic2{ color:#0a84ff; }
   /* Share live panel — broadcast toggle + choose-who chips */
-  .livepanel{ padding:8px 2px 2px; }
-  .livepanel[hidden]{ display:none; }
-  .livestart{ display:flex; align-items:center; gap:10px; padding:4px 2px 8px; cursor:pointer; }
-  .livestart>span:first-child{ flex:1; min-width:0; font-weight:600; font-size:15px; color:var(--ink); }
+  /* dismissable panel card (shared by live + gym) */
+  .spanel{ position:relative; margin-top:8px; padding:14px 14px 16px; background:var(--row); border:.5px solid var(--line); border-radius:16px; animation:spanelIn .2s cubic-bezier(.2,1,.4,1); }
+  .spanel[hidden]{ display:none; }
+  @keyframes spanelIn{ from{ opacity:0; transform:translateY(-6px); } to{ opacity:1; transform:translateY(0); } }
+  .spanel-x{ position:absolute; top:8px; right:9px; background:none; border:none; color:var(--l3); font-size:14px; line-height:1; cursor:pointer; padding:6px; }
+  .spanel-x:active{ opacity:.5; }
+  .spanel-title{ font-weight:700; font-size:15px; color:var(--ink); margin:0 0 6px; }
+  .livestart{ display:flex; align-items:center; gap:10px; padding:2px 28px 8px 2px; cursor:pointer; }
+  .livestart>span:first-child{ flex:1; min-width:0; font-weight:700; font-size:15px; color:var(--ink); }
   .livesw{ position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
   .liveswui{ position:relative; flex:0 0 auto; box-sizing:border-box; width:44px; height:26px; border-radius:13px; background:var(--line); transition:background .2s; }
   .liveswui::after{ content:""; position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .2s; }
@@ -173,11 +179,12 @@
   .tsoc .gym-faces{ display:inline-flex; flex:0 0 auto; min-width:0; }
   .tsoc .gym-faces .avatar{ margin-left:-7px; box-shadow:0 0 0 2px var(--bg); }
   .tsoc .gym-faces .avatar:first-child{ margin-left:0; }
-  .gympanel{ padding:10px 4px 2px; }
-  .gympanel[hidden]{ display:none; }
-  .gymhint{ font-size:12px; color:var(--l2); margin:0 4px 8px; line-height:1.4; }
-  .gympanel-row{ display:flex; gap:8px; align-items:center; }
-  .gympanel-row input{ flex:1; min-width:0; }
+  .gymhint{ font-size:12px; color:var(--l2); margin:0 0 10px; line-height:1.4; padding-right:20px; }
+  .gympanel-row{ display:flex; gap:8px; align-items:center; margin-bottom:10px; }
+  .gympanel-row input{ flex:1; min-width:0; height:44px; text-align:center; letter-spacing:3px; font-weight:700; font-size:17px; text-transform:uppercase; }
+  .gymnew{ flex:0 0 auto; width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; border-radius:12px; border:.5px solid var(--line); background:var(--card); color:var(--accent); cursor:pointer; }
+  .gymnew svg{ width:18px; height:18px; }
+  .gymnew:active{ transform:scale(.92); }
   .titleBtn .tchev{ width:22px; height:22px; color:var(--l3); vertical-align:-3px; margin-left:4px; }
   /* compact training-mode toggle in the title (replaces the full-width Strength/Cardio segment) */
   .modebtn{ flex:0 0 auto; align-self:center; display:inline-flex; align-items:center; gap:6px; background:var(--accent-soft); color:var(--accent); border:none; font-family:inherit; font-size:13px; font-weight:600; padding:6px 11px; border-radius:16px; cursor:pointer; line-height:1; transition:transform .12s; }

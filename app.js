@@ -2084,12 +2084,18 @@ const $=id=>document.getElementById(id);
 if($("liveToggle")) $("liveToggle").onchange=async(e)=>{ if(e.target.checked){ const ok=await goLive(); e.target.checked=ok; updateLiveRow(); } else endLive(false); };
 // social dropdown: the two-people icon opens a menu to choose Share live or Train together
 function closeSocialMenu(){ const m=$("socialMenu"); if(m) m.hidden=true; }
-function gymOpenPanel(){ if(_gymCode){ gymCheckOut(); return; }   // checked in → tapping leaves; else open the code panel
-  const p=$("gymPanel"); if(!p) return; p.hidden=false;
+function gymOpenPanel(){
+  if(_gymCode){ gymCheckOut(); return; }                  // checked in → tapping leaves
+  const p=$("gymPanel"); if(!p) return;
+  if(!p.hidden){ p.hidden=true; return; }                 // re-collapsable: toggle it shut
+  const lp=$("livePanel"); if(lp) lp.hidden=true;          // only one panel open at a time
+  p.hidden=false;
   const inp=$("gymCodeInput"); if(inp){ if(!inp.value) inp.value=randGymCode(); inp.focus(); try{ inp.select(); }catch(e){} } }
 if($("socialBtn")) $("socialBtn").onclick=(e)=>{ e.stopPropagation(); const m=$("socialMenu"); if(m) m.hidden=!m.hidden; };
-if($("liveMenuItem")) $("liveMenuItem").onclick=()=>{ closeSocialMenu(); toggleLivePick(); };
+if($("liveMenuItem")) $("liveMenuItem").onclick=()=>{ closeSocialMenu(); const g=$("gymPanel"); if(g) g.hidden=true; toggleLivePick(); };
 if($("gymMenuItem")) $("gymMenuItem").onclick=()=>{ closeSocialMenu(); gymOpenPanel(); };
+if($("gymPanelX")) $("gymPanelX").onclick=()=>{ const p=$("gymPanel"); if(p) p.hidden=true; };
+if($("livePanelX")) $("livePanelX").onclick=()=>{ const p=$("livePanel"); if(p) p.hidden=true; };
 document.addEventListener("click",(e)=>{ const w=$("socialWrap"), m=$("socialMenu"); if(w&&m&&!m.hidden&&!w.contains(e.target)) m.hidden=true; });
 if($("gymNew")) $("gymNew").onclick=()=>{ const inp=$("gymCodeInput"); if(inp){ inp.value=randGymCode(); inp.focus(); } };
 if($("gymGo")) $("gymGo").onclick=()=>{ const inp=$("gymCodeInput"); gymCheckIn(inp?inp.value:""); };
