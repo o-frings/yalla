@@ -1104,7 +1104,7 @@ function updateLiveRow(){
   const row=$("liveRow"); if(!row) return;
   row.style.display = liveAvailable() ? "" : "none";
   const tog=$("liveToggle"); if(tog) tog.checked=liveOn;
-  const lbl=$("liveLbl"); if(lbl) lbl.textContent = liveOn ? "Sharing live" : "Share live";
+  const lbl=$("liveLbl"); if(lbl) lbl.textContent = liveOn ? "Sharing" : "Share live";   // short when on so it doesn't truncate beside the switch
   row.classList.toggle("on", liveOn);
   if(liveAvailable() && _liveFollowers===null) loadLivePicks();   // know the audience up front (powers the summary)
   liveAudienceLabel();
@@ -1243,12 +1243,13 @@ function updateGymRow(){
   row.style.display = gymAvailable() ? "" : "none";
   if(!gymAvailable()) return;
   const on=!!_gymCode; row.classList.toggle("on", on);
-  const lbl=$("gymLbl"), btn=$("gymBtn"), faces=$("gymFaces");
+  const lbl=$("gymLbl"), faces=$("gymFaces");
+  // the whole cell is the button now (icon + label + faces) — label carries the state; tapping when
+  // checked in leaves (see gymBtn handler). "At CODE" stays short so the face-pile has room beside it.
   if(lbl) lbl.textContent = on ? ("At "+_gymCode) : "Train together";
-  if(btn) btn.textContent = on ? "Leave" : "Check in";
   if(faces){
     if(on && _gymBuddies.length){
-      faces.innerHTML=_gymBuddies.slice(0,5).map(u=>'<span class="gymface" data-uid="'+esc(u.user_id)+'" data-nm="'+esc(u.display_name||"Friend")+'">'+avatarHTML(u.display_name,{size:26,uid:u.user_id})+'</span>').join('');
+      faces.innerHTML=_gymBuddies.slice(0,3).map(u=>'<span class="gymface" data-uid="'+esc(u.user_id)+'" data-nm="'+esc(u.display_name||"Friend")+'">'+avatarHTML(u.display_name,{size:22,uid:u.user_id})+'</span>').join('');
       faces.querySelectorAll(".gymface").forEach(el=> bindFriendTap(el, el.dataset.uid, el.dataset.nm));   // tap → profile, long-press → chat
     } else faces.innerHTML="";
   }

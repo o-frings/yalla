@@ -128,30 +128,27 @@
     background:transparent; color:var(--accent); font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; outline:none; }
   .restadj{ display:inline-flex; gap:6px; }
   .restadj button{ background:var(--card); border:.5px solid var(--line); color:var(--ink); border-radius:8px; padding:12px 16px; font-size:13px; font-weight:600; cursor:pointer; transition:transform .12s; }
-  /* live workout sharing */
-  .livewrap{ margin:2px 0 16px; }
-  /* one-line panel: broadcast icon · audience (face-pile + one name) · toggle */
-  .liverow{ display:flex; align-items:center; gap:10px; padding:7px 12px; border-radius:14px; background:var(--row); border:.5px solid var(--line); transition:background .15s, border-color .15s; }
+  /* Share live + Train together — two compact cells on one line; each panel drops full-width below */
+  .socialwrap{ margin:2px 0 16px; }
+  .socialrow{ display:flex; align-items:stretch; gap:8px; }
+  .socialcell{ flex:1 1 0; min-width:0; display:flex; align-items:center; gap:8px; padding:7px 11px; border-radius:14px; background:var(--row); border:.5px solid var(--line); transition:background .15s, border-color .15s; }
+  .socialtap{ display:flex; align-items:center; gap:8px; flex:1; min-width:0; background:none; border:none; cursor:pointer; color:var(--ink); font:inherit; padding:0; text-align:left; -webkit-tap-highlight-color:transparent; }
+  .socialtap:active{ opacity:.55; }
+  .socialic{ flex:0 0 auto; width:22px; height:22px; color:var(--ink); transition:color .15s; }
+  .liveswitch, .gymlbl{ flex:0 1 auto; min-width:0; font-weight:600; font-size:14px; color:var(--ink); line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* live broadcast toggle */
   .livesw{ position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
   .liveswlbl{ flex:0 0 auto; display:inline-flex; align-items:center; cursor:pointer; }
   .liveswui{ position:relative; flex:0 0 auto; box-sizing:border-box; width:44px; height:26px; border-radius:13px; background:var(--line); transition:background .2s; }
   .liveswui::after{ content:""; position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .2s; }
   .livesw:checked + .liveswui{ background:var(--red); }
   .livesw:checked + .liveswui::after{ transform:translateX(18px); }
-  .livebcast{ flex:0 0 auto; width:22px; height:22px; display:flex; align-items:center; justify-content:center; }
+  .livebcast{ flex:0 0 auto; width:20px; height:20px; display:flex; align-items:center; justify-content:center; }
   .ldot{ width:11px; height:11px; border-radius:50%; background:var(--l3); transition:background .2s; }
-  .liveswitch{ flex:0 0 auto; font-weight:600; font-size:14px; color:var(--ink); line-height:1.2; }
-  .livewrap.on .liverow{ background:rgba(255,59,48,.10); border-color:rgba(255,59,48,.32); }
+  .livewrap.on{ background:rgba(255,59,48,.10); border-color:rgba(255,59,48,.32); }
   .livewrap.on .liveswitch{ color:var(--red); }
   /* the glimmer — a pulsating live dot with a radiating halo (livepulse) */
   .livewrap.on .ldot{ background:var(--red); animation:livepulse 1.6s infinite; }
-  .livepick-btn{ display:flex; align-items:center; gap:9px; flex:1; min-width:0; justify-content:flex-end; background:none; border:none; cursor:pointer; color:var(--l2); font:inherit; font-size:13px; font-weight:600; padding:8px 2px; text-align:right; }
-  .lp-faces{ display:inline-flex; flex:0 0 auto; }
-  .lp-faces .avatar{ margin-left:-9px; box-shadow:0 0 0 2px var(--row); }
-  .lp-faces .avatar:first-child{ margin-left:0; }
-  .lp-sum{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .lpchev{ color:var(--l3); transition:transform .15s; }
-  .livepick-btn.open .lpchev{ transform:rotate(90deg); }
   .livepick{ display:flex; flex-wrap:wrap; gap:8px; padding:10px 4px 2px; }
   .livepick[hidden]{ display:none; }
   .livechip{ display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:600; padding:4px 12px 4px 4px; border-radius:18px; border:.5px solid var(--line); background:var(--row); color:var(--ink); cursor:pointer; transition:background .12s, border-color .12s, color .12s; }
@@ -166,17 +163,12 @@
   .livedot{ width:10px; height:10px; border-radius:50%; background:var(--red); flex:0 0 auto; animation:livepulse 1.6s infinite; }
   .livego{ color:var(--accent); font-weight:600; flex:0 0 auto; font-size:14px; }
   @keyframes livepulse{ 0%{ box-shadow:0 0 0 0 rgba(255,55,95,.5);} 70%{ box-shadow:0 0 0 8px rgba(255,55,95,0);} 100%{ box-shadow:0 0 0 0 rgba(255,55,95,0);} }
-  /* Train together — a quiet sibling of the live row: check in with a gym code, friends on the same one appear */
-  .gymwrap{ margin:2px 0 16px; }
-  .gymrow{ display:flex; align-items:center; gap:10px; padding:7px 12px; border-radius:14px; background:var(--row); border:.5px solid var(--line); transition:background .15s, border-color .15s; }
-  .gymicon{ flex:0 0 auto; font-size:15px; line-height:1; filter:grayscale(.2); }
-  .gymlbl{ flex:0 0 auto; font-weight:600; font-size:14px; color:var(--ink); line-height:1.2; }
-  .gym-faces{ display:inline-flex; flex:1; min-width:0; justify-content:flex-end; }
+  /* Train together — sibling cell: check in with a gym code; friends on the same one appear here */
+  .gym-faces{ display:inline-flex; flex:1 1 auto; min-width:0; justify-content:flex-end; overflow:hidden; }
   .gym-faces .avatar{ margin-left:-9px; box-shadow:0 0 0 2px var(--row); }
   .gym-faces .avatar:first-child{ margin-left:0; }
-  .gymbtn{ flex:0 0 auto; font:inherit; font-size:13px; font-weight:600; color:var(--accent); background:none; border:none; cursor:pointer; padding:6px 2px; }
-  .gymwrap.on .gymrow{ background:rgba(10,132,255,.10); border-color:rgba(10,132,255,.30); }
-  .gymwrap.on .gymlbl{ color:var(--accent); }
+  .gymwrap.on{ background:rgba(10,132,255,.10); border-color:rgba(10,132,255,.30); }
+  .gymwrap.on .gymlbl, .gymwrap.on .socialic{ color:#0a84ff; }   /* cohesive blue (matches the tint), distinct from live's red */
   .gympanel{ padding:10px 4px 2px; }
   .gympanel[hidden]{ display:none; }
   .gymhint{ font-size:12px; color:var(--l2); margin:0 4px 8px; line-height:1.4; }
@@ -587,12 +579,12 @@
   .swapcheck{ color:var(--accent); font-weight:800; flex:0 0 auto; font-size:15px; }
   .exmeta{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:14px; color:var(--l2); font-weight:500; padding:0 0 12px; }
   .exmeta .tg{ font-weight:600; font-size:15px; }
-  /* the target tag is now a tap target to edit sets × reps */
-  .exmeta button.tg{ background:var(--accent-soft); color:var(--accent); border:none; font-family:inherit;
-    display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:9px; cursor:pointer; line-height:1.2;
-    transition:transform .12s, filter .12s; }
-  .exmeta button.tg:active{ transform:scale(.94); filter:brightness(.97); }
-  .exmeta button.tg .pen{ width:13px; height:13px; opacity:.8; }
+  /* the target tag edits sets × reps — kept subtle: reads as plain meta text with a faint pencil hint */
+  .exmeta button.tg{ background:none; color:var(--ink); border:none; font-family:inherit;
+    display:inline-flex; align-items:center; gap:5px; padding:2px 0; cursor:pointer; line-height:1.2;
+    transition:opacity .12s; }
+  .exmeta button.tg:active{ opacity:.5; }
+  .exmeta button.tg .pen{ width:11px; height:11px; opacity:.4; }
   .exmeta .dot{ color:var(--l3); }
   /* sets × reps editor popover */
   .tgpop-scrim{ position:fixed; inset:0; z-index:400; background:rgba(0,0,0,.4); display:flex; align-items:flex-end; justify-content:center;
