@@ -1408,9 +1408,19 @@ function subscribeMessages(){
       if(_msgThreadUid && r.sender===_msgThreadUid){ await renderThread(_msgThreadUid); markRead(_msgThreadUid); return; }
       _msgUnread++; setMsgBadge(_msgUnread);
       if(sheetOpen && !_msgThreadUid){ renderConversations(); }
-      else { const nm=await liveName(r.sender), txt=await e2eDecrypt(r.sender,r); toast(nm+(txt?": "+txt:" sent you a message"), true); }
+      else { const nm=await liveName(r.sender), txt=await e2eDecrypt(r.sender,r); showMsgNotif(r.sender, nm, txt||"sent you a message"); }
     }).subscribe();
 }
+// sleek in-app banner for an incoming message — avatar + name + preview, tap to open the chat
+let _notifT=null;
+function showMsgNotif(uid, name, text){
+  const n=$("msgNotif"); if(!n) return;
+  n.innerHTML=avatarHTML(name,{size:40,uid:uid})+'<div class="notif-main"><div class="notif-nm">'+esc(name||"Friend")+'</div><div class="notif-tx">'+esc(text||"")+'</div></div>';
+  n.onclick=()=>{ hideMsgNotif(); openChat(uid, name); };
+  n.classList.add("show"); haptic(10);
+  clearTimeout(_notifT); _notifT=setTimeout(hideMsgNotif, 4200);
+}
+function hideMsgNotif(){ const n=$("msgNotif"); if(n) n.classList.remove("show"); clearTimeout(_notifT); }
 function teardownMessages(){
   [_msgChan,_msgThreadChan].forEach(ch=>{ if(ch){ try{ sb&&sb.removeChannel(ch); }catch(e){} } });
   _msgChan=_msgThreadChan=_msgThreadUid=null; _e2eKeys=null; _e2eNeedsRestore=false;
@@ -1444,10 +1454,13 @@ async function sendMessage(uid,text){
 async function notifyMessage(uid){ try{ if(sb && sb.functions && uid) await sb.functions.invoke("social-notify",{ body:{ kind:"message", target:uid } }); }catch(e){} }
 async function loadThread(uid){
   if(!cloudReady()) return [];
+  const filt="and(sender.eq."+cloudUser.id+",recipient.eq."+uid+"),and(sender.eq."+uid+",recipient.eq."+cloudUser.id+")";
   let rows=[];
-  try{ const { data } = await sb.from("direct_messages").select("id,sender,recipient,ciphertext,iv,salt,created_at,read_at,edited_at")
-      .or("and(sender.eq."+cloudUser.id+",recipient.eq."+uid+"),and(sender.eq."+uid+",recipient.eq."+cloudUser.id+")")
-      .order("created_at",{ascending:true}).limit(500); rows=data||[]; }catch(e){}
+  // edited_at may not exist yet (migration is a separate step) — degrade to the core columns if so,
+  // so loading never silently fails and messages don't vanish.
+  try{ const { data, error } = await sb.from("direct_messages").select("id,sender,recipient,ciphertext,iv,salt,created_at,read_at,edited_at").or(filt).order("created_at",{ascending:true}).limit(500);
+    if(error) throw error; rows=data||[]; }
+  catch(e){ try{ const { data } = await sb.from("direct_messages").select("id,sender,recipient,ciphertext,iv,salt,created_at,read_at").or(filt).order("created_at",{ascending:true}).limit(500); rows=data||[]; }catch(e2){} }
   const out=[];
   for(const r of rows){ const other=r.sender===cloudUser.id?r.recipient:r.sender;
     out.push({ id:r.id, mine:r.sender===cloudUser.id, text:await e2eDecrypt(other,r), at:r.created_at, read:!!r.read_at, edited:!!r.edited_at }); }
@@ -1493,7 +1506,7 @@ function bindFriendTap(el, uid, name){
   el.addEventListener("pointerdown", e=>{
     if(e.target.closest(".factions, button, input, label")){ armed=false; return; }
     armed=true; fired=false; dx=e.clientX; dy=e.clientY;
-    clearTimeout(timer); timer=setTimeout(()=>{ fired=true; try{ navigator.vibrate && navigator.vibrate(8); }catch(_){} openChat(uid, name); }, 450);
+    clearTimeout(timer); timer=setTimeout(()=>{ fired=true; haptic(10); openChat(uid, name); }, 320);
   });
   el.addEventListener("pointermove", e=>{ if(armed && (Math.abs(e.clientX-dx)>10 || Math.abs(e.clientY-dy)>10)) clearTimeout(timer); });
   el.addEventListener("pointercancel", ()=>{ clearTimeout(timer); armed=false; });
@@ -1709,12 +1722,16 @@ function showEditBanner(on){
 async function editMessage(mid, friendUid, text){
   text=(text||"").trim(); if(!text || !cloudReady()) return false;
   const enc=await e2eEncrypt(friendUid, text); if(!enc) return false;
-  try{ await sb.from("direct_messages").update({ ciphertext:enc.ciphertext, iv:enc.iv, salt:enc.salt, edited_at:new Date().toISOString() }).eq("id",mid).eq("sender",cloudUser.id); }
-  catch(e){ toast("Couldn't save the edit."); return false; }
+  const body={ ciphertext:enc.ciphertext, iv:enc.iv, salt:enc.salt };
+  let { error } = await sb.from("direct_messages").update({ ...body, edited_at:new Date().toISOString() }).eq("id",mid).eq("sender",cloudUser.id);
+  if(error){ const r=await sb.from("direct_messages").update(body).eq("id",mid).eq("sender",cloudUser.id); error=r.error; }   // degrade if edited_at/policy not migrated
+  if(error){ toast("Couldn't save the edit — re-run the messages SQL to enable editing."); return false; }
   return true;
 }
 async function deleteMessage(mid){
   if(!cloudReady()) return;
+  let ok=true; try{ ok=window.confirm("Delete this message? It'll be removed for both of you."); }catch(e){ ok=true; }
+  if(!ok) return;   // guard against an accidental tap losing a message
   if(_editingMid===mid) cancelEdit();
   haptic(12);
   const row=document.querySelector('.msg-bubble[data-mid="'+mid+'"]'); if(row){ const r=row.closest(".msg-row"); if(r) r.remove(); }   // optimistic
@@ -1741,7 +1758,7 @@ function attachReactions(box, friendUid){
   box.querySelectorAll(".msg-bubble[data-mid]").forEach(bubble=>{
     const mid=+bubble.dataset.mid;
     bubble.addEventListener("pointerdown",e=>{ lpFired=false; dx=e.clientX; dy=e.clientY;
-      clearTimeout(lpTimer); lpTimer=setTimeout(()=>{ lpFired=true; haptic(12); showReactBar(bubble, mid, friendUid); }, 450); });
+      clearTimeout(lpTimer); lpTimer=setTimeout(()=>{ lpFired=true; haptic(12); showReactBar(bubble, mid, friendUid); }, 320); });
     bubble.addEventListener("pointermove",e=>{ if(Math.abs(e.clientX-dx)>10 || Math.abs(e.clientY-dy)>10) clearTimeout(lpTimer); });
     bubble.addEventListener("pointercancel",()=> clearTimeout(lpTimer));
     bubble.addEventListener("pointerup",()=>{ clearTimeout(lpTimer); if(lpFired) return;   // long-press already handled
