@@ -1100,12 +1100,19 @@ function buildLiveState(){
   if(!curName && groups.length) curName=groups[0].dataset.ex||"";
   return { name, exName:curName, doneSets:sets, totalSets, mins:Math.round(tmrElapsed()/60), vol:Math.round(vol), mtot, top, ex };
 }
+// the single two-people icon shows when either feature is available, and tints by state
+function updateSocialWrap(){
+  const wrap=$("socialWrap"); if(!wrap) return;
+  const live = typeof liveAvailable==="function" && liveAvailable();
+  const gym  = typeof gymAvailable==="function"  && gymAvailable();
+  wrap.style.display = (live||gym) ? "" : "none";
+  const btn=$("socialBtn"); if(btn){ btn.classList.toggle("live", !!liveOn); btn.classList.toggle("gym", !!_gymCode && !liveOn); }
+}
 function updateLiveRow(){
-  const row=$("liveRow"); if(!row) return;
-  row.style.display = liveAvailable() ? "" : "none";
+  const item=$("liveMenuItem"); if(item){ item.style.display = liveAvailable() ? "" : "none"; item.classList.toggle("on", liveOn); }
   const tog=$("liveToggle"); if(tog) tog.checked=liveOn;
-  const lbl=$("liveLbl"); if(lbl) lbl.textContent = liveOn ? "Sharing" : "Share live";   // short when on so it doesn't truncate beside the switch
-  row.classList.toggle("on", liveOn);
+  const lbl=$("liveLbl"); if(lbl) lbl.textContent = liveOn ? "Sharing live" : "Share live";
+  updateSocialWrap();
   if(liveAvailable() && _liveFollowers===null) loadLivePicks();   // know the audience up front (powers the summary)
   liveAudienceLabel();
 }
@@ -1113,9 +1120,9 @@ function updateLiveRow(){
 // toggle. Always-on grantees (Settings → Friends) are shown locked-on — they always see you live.
 let _liveFollowers=null;
 function toggleLivePick(){
-  const box=$("livePanel"), btn=$("livePickBtn"); if(!box||!btn) return;   // tapping the bar icon opens the panel (toggle + choose-who)
+  const box=$("livePanel"); if(!box) return;   // the live panel: broadcast toggle + choose-who
   const open=box.hasAttribute("hidden");
-  box.toggleAttribute("hidden", !open); btn.classList.toggle("open", open);
+  box.toggleAttribute("hidden", !open);
   if(open && _liveFollowers===null) loadLivePicks();
 }
 async function loadLivePicks(){
@@ -1239,14 +1246,12 @@ async function gymCheckOut(silent){
 function startGymPoll(){ stopGymPoll(); if(!_gymCode) return; _gymTimer=setInterval(()=>{ if(document.visibilityState==="visible") loadGymBuddies(); }, 45000); }
 function stopGymPoll(){ if(_gymTimer){ clearInterval(_gymTimer); _gymTimer=null; } }
 function updateGymRow(){
-  const row=$("gymRow"); if(!row) return;
-  row.style.display = gymAvailable() ? "" : "none";
+  const item=$("gymMenuItem"); if(item){ item.style.display = gymAvailable() ? "" : "none"; }
+  updateSocialWrap();
   if(!gymAvailable()) return;
-  const on=!!_gymCode; row.classList.toggle("on", on);
-  const lbl=$("gymLbl"), faces=$("gymFaces");
-  // the whole cell is the button now (icon + label + faces) — label carries the state; tapping when
-  // checked in leaves (see gymBtn handler). "At CODE" stays short so the face-pile has room beside it.
-  if(lbl) lbl.textContent = on ? ("At "+_gymCode) : "Train together";
+  const on=!!_gymCode; if(item) item.classList.toggle("on", on);
+  const lbl=$("gymLbl"), faces=$("gymFaces");   // menu label carries the state; the bar icon shows the face-pile
+  if(lbl) lbl.textContent = on ? ("Leave "+_gymCode) : "Train together";
   if(faces){
     if(on && _gymBuddies.length){
       faces.innerHTML=_gymBuddies.slice(0,2).map(u=>'<span class="gymface" data-uid="'+esc(u.user_id)+'" data-nm="'+esc(u.display_name||"Friend")+'">'+avatarHTML(u.display_name,{size:18,uid:u.user_id})+'</span>').join('');
@@ -1869,8 +1874,18 @@ function roseRadii(G, tot){
   const mean=sum/k;
   return G.map(g=>{ const v=tot[g]||0; return v>0 ? Math.max(ROSE_FLOOR, Math.min(1, ROSE_MID*Math.pow(v/mean, ROSE_GAMMA))) : 0; });
 }
+// sessions logged before muscles were split stored their totals under the old coarse keys
+// ("Back", "Shoulders"). Split them into the detailed groups so those wedges don't silently vanish
+// from old share tiles / feed cards. Fresh data has no such keys, so this is a no-op there.
+function expandLegacyMtot(tot){
+  if(!tot || (tot.Back==null && tot.Shoulders==null)) return tot||{};
+  const t=Object.assign({}, tot);
+  if(t.Back!=null){ const v=t.Back/3; ["Lats","Upper Back","Lower Back"].forEach(m=>t[m]=(t[m]||0)+v); delete t.Back; }
+  if(t.Shoulders!=null){ const v=t.Shoulders/3; ["Front Delts","Side Delts","Rear Delts"].forEach(m=>t[m]=(t[m]||0)+v); delete t.Shoulders; }
+  return t;
+}
 function drawRose(x, cx, cy, R, G, tot, o){
-  o=o||{}; const n=G.length, frac=roseRadii(G,tot);
+  o=o||{}; tot=expandLegacyMtot(tot); const n=G.length, frac=roseRadii(G,tot);
   x.strokeStyle=o.grid||"rgba(127,127,127,.30)"; x.lineWidth=o.gridW||1;
   (o.rings||[1]).forEach(f=>{ x.beginPath(); x.arc(cx,cy,R*f,0,Math.PI*2); x.stroke(); });
   const half=Math.PI/n - (o.gap!=null?o.gap:0.06)/2;
@@ -2067,11 +2082,15 @@ const $=id=>document.getElementById(id);
 // flip on → broadcast to allowed friends + anyone ticked below; flip off → stop. The "Choose who can
 // watch" list ticks friends independently of the toggle (loaded lazily on first expand).
 if($("liveToggle")) $("liveToggle").onchange=async(e)=>{ if(e.target.checked){ const ok=await goLive(); e.target.checked=ok; updateLiveRow(); } else endLive(false); };
-if($("livePickBtn")) $("livePickBtn").onclick=toggleLivePick;
-// train-together: Check in opens the code panel; Leave checks out. New code / Enter confirm.
-if($("gymBtn")) $("gymBtn").onclick=()=>{ if(_gymCode){ gymCheckOut(); return; }
-  const p=$("gymPanel"); if(!p) return; p.hidden=!p.hidden;
-  if(!p.hidden){ const inp=$("gymCodeInput"); if(inp){ if(!inp.value) inp.value=randGymCode(); inp.focus(); try{ inp.select(); }catch(e){} } } };
+// social dropdown: the two-people icon opens a menu to choose Share live or Train together
+function closeSocialMenu(){ const m=$("socialMenu"); if(m) m.hidden=true; }
+function gymOpenPanel(){ if(_gymCode){ gymCheckOut(); return; }   // checked in → tapping leaves; else open the code panel
+  const p=$("gymPanel"); if(!p) return; p.hidden=false;
+  const inp=$("gymCodeInput"); if(inp){ if(!inp.value) inp.value=randGymCode(); inp.focus(); try{ inp.select(); }catch(e){} } }
+if($("socialBtn")) $("socialBtn").onclick=(e)=>{ e.stopPropagation(); const m=$("socialMenu"); if(m) m.hidden=!m.hidden; };
+if($("liveMenuItem")) $("liveMenuItem").onclick=()=>{ closeSocialMenu(); toggleLivePick(); };
+if($("gymMenuItem")) $("gymMenuItem").onclick=()=>{ closeSocialMenu(); gymOpenPanel(); };
+document.addEventListener("click",(e)=>{ const w=$("socialWrap"), m=$("socialMenu"); if(w&&m&&!m.hidden&&!w.contains(e.target)) m.hidden=true; });
 if($("gymNew")) $("gymNew").onclick=()=>{ const inp=$("gymCodeInput"); if(inp){ inp.value=randGymCode(); inp.focus(); } };
 if($("gymGo")) $("gymGo").onclick=()=>{ const inp=$("gymCodeInput"); gymCheckIn(inp?inp.value:""); };
 if($("gymCodeInput")) $("gymCodeInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); gymCheckIn(e.target.value); } });
@@ -3246,7 +3265,11 @@ function renderSessionRose(){
   const has=MGROUPS.some(g=>(mt[g]||0)>0);
   card.style.display = has ? "" : "none";
   if(!has) return;
-  miniRadar(cv, mt);
+  // labelled rose so you can see which muscles you trained (only the trained wedges get a label)
+  const gx=cv.getContext("2d"), W=cv.width, H=cv.height, R=Math.min(W,H)/2-62;   // leave room for edge labels
+  gx.clearRect(0,0,W,H);
+  drawRose(gx, W/2, H/2, R, MGROUPS, mt, { color:g=>MCOLOR[g]||"#f08020", alpha:.72, rings:[0.5,1], grid:"rgba(127,127,127,.28)",
+    labels:true, labelFont:"600 11px -apple-system,system-ui,sans-serif", labelGap:10, labelColor:g=>MCOLOR[g]||"#888" });
   const top=MGROUPS.slice().sort((a,b)=>(mt[b]||0)-(mt[a]||0)).filter(g=>(mt[g]||0)>0).slice(0,3).map(g=>MSHORT[g]||g);
   const sub=$("sessRoseSub"); if(sub) sub.textContent=(st.doneSets||0)+" set"+(st.doneSets===1?"":"s")+" logged · mostly "+top.join(" · ");
 }

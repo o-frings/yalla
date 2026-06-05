@@ -128,15 +128,23 @@
     background:transparent; color:var(--accent); font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; outline:none; }
   .restadj{ display:inline-flex; gap:6px; }
   .restadj button{ background:var(--card); border:.5px solid var(--line); color:var(--ink); border-radius:8px; padding:12px 16px; font-size:13px; font-weight:600; cursor:pointer; transition:transform .12s; }
-  /* Train together + Share live: compact icons folded into the right of the timer bar; panels drop below */
-  .tmrsocial{ display:inline-flex; align-items:center; gap:0; flex:0 0 auto; margin-right:-3px; }
-  .tsoc{ display:inline-flex; align-items:center; }
-  .tsoc-btn{ display:inline-flex; align-items:center; gap:4px; background:none; border:none; cursor:pointer; color:var(--l2); padding:6px 4px; border-radius:10px; line-height:1; -webkit-tap-highlight-color:transparent; }
+  /* Social: one two-people icon on the timer bar → dropdown to pick Share live / Train together */
+  .tmrsocial{ position:relative; display:inline-flex; align-items:center; flex:0 0 auto; margin-right:-3px; }
+  .tsoc-btn{ display:inline-flex; align-items:center; gap:4px; background:none; border:none; cursor:pointer; color:var(--l2); padding:6px 5px; border-radius:10px; line-height:1; -webkit-tap-highlight-color:transparent; }
   .tsoc-btn:active{ opacity:.5; }
-  .socialic, .liveic{ flex:0 0 auto; width:21px; height:21px; color:var(--l2); transition:color .15s; }
-  .gymwrap.on .socialic{ color:#0a84ff; }                                           /* checked in → blue */
-  .livewrap.on .liveic{ color:var(--red); animation:liveiconpulse 1.6s infinite; }  /* live → red, gentle pulse */
+  .socialic, .socialic2, .liveic{ flex:0 0 auto; width:21px; height:21px; color:var(--l2); transition:color .15s; }
+  #socialBtn.gym .socialic{ color:#0a84ff; }                                          /* checked in → blue */
+  #socialBtn.live .socialic{ color:var(--red); animation:liveiconpulse 1.6s infinite; } /* live → red, gentle pulse */
   @keyframes liveiconpulse{ 0%,100%{ opacity:1; } 50%{ opacity:.45; } }
+  /* dropdown menu */
+  .socialmenu{ position:absolute; top:100%; right:0; margin-top:8px; z-index:30; min-width:184px; padding:6px; display:flex; flex-direction:column; gap:2px;
+    background:var(--card); border:.5px solid var(--line); border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.20); }
+  .socialmenu[hidden]{ display:none; }
+  .socialmenu-item{ display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:10px; background:none; border:none; cursor:pointer; color:var(--ink); font:inherit; font-size:15px; font-weight:600; text-align:left; -webkit-tap-highlight-color:transparent; }
+  .socialmenu-item:active{ background:var(--row); }
+  .socialmenu-item .liveic, .socialmenu-item .socialic2{ width:20px; height:20px; }
+  .socialmenu-item.on .liveic{ color:var(--red); }
+  .socialmenu-item.on .socialic2{ color:#0a84ff; }
   /* Share live panel — broadcast toggle + choose-who chips */
   .livepanel{ padding:8px 2px 2px; }
   .livepanel[hidden]{ display:none; }
@@ -583,7 +591,7 @@
   .exmeta{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:14px; color:var(--l2); font-weight:500; padding:0 0 12px; }
   .exmeta .tg{ font-weight:600; font-size:15px; }
   /* the target tag edits sets × reps — kept subtle: reads as plain meta text with a faint pencil hint */
-  .exmeta button.tg{ background:none; color:var(--ink); border:none; font-family:inherit;
+  .exmeta button.tg{ background:none; color:var(--l2); border:none; font-family:inherit;
     display:inline-flex; align-items:center; gap:5px; padding:2px 0; cursor:pointer; line-height:1.2;
     transition:opacity .12s; }
   .exmeta button.tg:active{ opacity:.5; }

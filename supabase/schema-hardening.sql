@@ -149,6 +149,9 @@ grant execute on function public.request_follow(text) to authenticated;
 
 -- 8. enriched lists for the Friends UI (definer: names of pending requesters
 --    aren't otherwise readable until you've accepted them) ---------------------
+-- drop first: Postgres can't CHANGE a function's return columns via CREATE OR REPLACE,
+-- so a rerun after the signature changed errors without these.
+drop function if exists public.incoming_requests();
 create or replace function public.incoming_requests()
 returns table(user_id uuid, display_name text, created_at timestamptz)
 language sql stable security definer set search_path = '' as $$
@@ -159,6 +162,7 @@ language sql stable security definer set search_path = '' as $$
 $$;
 grant execute on function public.incoming_requests() to authenticated;
 
+drop function if exists public.my_following();
 create or replace function public.my_following()
 returns table(user_id uuid, display_name text, status text)
 language sql stable security definer set search_path = '' as $$
