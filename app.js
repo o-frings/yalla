@@ -783,11 +783,12 @@ async function handleAuth(user){
     await detectHardened();        // does this project have the friends-only schema yet?
     renderAccount(); renderFriends(); updateLiveRow();
     if(dbHardened) startPresence();   // heartbeat so friends see me as online
+    if(dbHardened) e2eInit();         // publish my message key + subscribe to incoming DMs
     processPendingAdd();           // act on a tap-to-follow invite link, if any
     if(pendingLiveView && dbHardened){ const id=pendingLiveView; pendingLiveView=null; openLiveView(id); }  // a "watch me live" push
     await cloudReconcile();
     if(!settings.displayName) askDisplayName();   // first thing after signing in: how should I address you?
-  } else if(!cloudUser){ dbHardened=false; teardownLive();
+  } else if(!cloudUser){ dbHardened=false; teardownLive(); teardownMessages();
     if(_presenceTimer){ clearInterval(_presenceTimer); _presenceTimer=null; }
     if(pendingAddCode){ toast("Sign in to follow your friend."); goAccount(); }
   }
@@ -1254,6 +1255,284 @@ function teardownLive(){
   _liveRecvChan=_liveFeedChan=_liveViewChan=_liveViewOwner=null;
   updateLiveRow();
 }
+// ================= end-to-end encrypted direct messages =================
+// 1-on-1 only. Plaintext never leaves the device; Supabase stores ciphertext + IVs + public keys.
+// Crypto: ECDH P-256 identity keys → static shared secret → HKDF-SHA256 per message → AES-256-GCM.
+// Private key lives in IndexedDB (device-local) + an optional passphrase-wrapped cloud backup.
+// Full design + tradeoffs: supabase/MESSAGING.md. Schema: supabase/schema-messages.sql.
+const E2E_DB="yalla-e2e", E2E_STORE="keys", E2E_REC="idkey";
+let _e2eKeys=null;                 // { priv, pub, jwk, pubB64 } once loaded/generated
+const _e2ePubCache={};             // uid -> friend's public CryptoKey
+const _e2eSecretCache={};          // uid -> raw ECDH shared bits (ArrayBuffer)
+let _e2eNeedsRestore=false;        // a cloud backup exists but this device has no key yet
+let _msgChan=null, _msgThreadChan=null, _msgThreadUid=null, _msgUnread=0;
+
+// --- tiny IndexedDB store for the identity private key (never synced, never localStorage) ---
+function _e2eOpen(){
+  return new Promise((res,rej)=>{ let r; try{ r=indexedDB.open(E2E_DB,1); }catch(e){ return rej(e); }
+    r.onupgradeneeded=()=>{ try{ r.result.createObjectStore(E2E_STORE); }catch(e){} };
+    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
+}
+async function _e2eIdbGet(k){ const db=await _e2eOpen(); return new Promise((res,rej)=>{ const rq=db.transaction(E2E_STORE,"readonly").objectStore(E2E_STORE).get(k); rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); }); }
+async function _e2eIdbSet(k,v){ const db=await _e2eOpen(); return new Promise((res,rej)=>{ const rq=db.transaction(E2E_STORE,"readwrite").objectStore(E2E_STORE).put(v,k); rq.onsuccess=()=>res(); rq.onerror=()=>rej(rq.error); }); }
+
+// load the device identity keypair, generating + persisting one on first use
+async function e2eGetKeys(){
+  if(_e2eKeys) return _e2eKeys;
+  let jwk=null; try{ jwk=await _e2eIdbGet(E2E_REC); }catch(e){}
+  if(jwk){
+    try{
+      const priv=await crypto.subtle.importKey("jwk",jwk,{name:"ECDH",namedCurve:"P-256"},true,["deriveBits"]);
+      const pub=await crypto.subtle.importKey("jwk",{crv:jwk.crv,kty:jwk.kty,x:jwk.x,y:jwk.y,ext:true},{name:"ECDH",namedCurve:"P-256"},true,[]);
+      _e2eKeys={priv,pub,jwk}; return _e2eKeys;
+    }catch(e){ jwk=null; }
+  }
+  const kp=await crypto.subtle.generateKey({name:"ECDH",namedCurve:"P-256"},true,["deriveBits"]);
+  const privJwk=await crypto.subtle.exportKey("jwk",kp.privateKey);
+  await _e2eIdbSet(E2E_REC,privJwk);
+  _e2eKeys={priv:kp.privateKey,pub:kp.publicKey,jwk:privJwk};
+  return _e2eKeys;
+}
+async function e2ePublicB64(){ const k=await e2eGetKeys(); if(!k.pubB64) k.pubB64=bufToB64(await crypto.subtle.exportKey("raw",k.pub)); return k.pubB64; }
+// publish my public key so friends can encrypt to me (upsert only when it changed)
+async function e2ePublish(){
+  try{ const pub=await e2ePublicB64();
+    let cur=null; try{ const { data } = await sb.from("e2e_keys").select("public_key").eq("user_id",cloudUser.id).maybeSingle(); cur=data&&data.public_key; }catch(e){}
+    if(cur!==pub) await sb.from("e2e_keys").upsert({ user_id:cloudUser.id, public_key:pub, updated_at:new Date().toISOString() });
+  }catch(e){}
+}
+// per-friend keys → shared secret → per-message AES key (HKDF with the message's own salt)
+async function e2eFriendPub(uid){
+  if(_e2ePubCache[uid]) return _e2ePubCache[uid];
+  let b64=null; try{ const { data } = await sb.from("e2e_keys").select("public_key").eq("user_id",uid).maybeSingle(); b64=data&&data.public_key; }catch(e){}
+  if(!b64) return null;
+  try{ const key=await crypto.subtle.importKey("raw",b64ToBuf(b64),{name:"ECDH",namedCurve:"P-256"},false,[]); _e2ePubCache[uid]=key; return key; }catch(e){ return null; }
+}
+async function e2eShared(uid){
+  if(_e2eSecretCache[uid]) return _e2eSecretCache[uid];
+  const keys=await e2eGetKeys(), pub=await e2eFriendPub(uid); if(!pub) return null;
+  const bits=await crypto.subtle.deriveBits({name:"ECDH",public:pub},keys.priv,256);
+  _e2eSecretCache[uid]=bits; return bits;
+}
+async function e2eMsgKey(uid,salt){
+  const bits=await e2eShared(uid); if(!bits) return null;
+  const hk=await crypto.subtle.importKey("raw",bits,"HKDF",false,["deriveKey"]);
+  return crypto.subtle.deriveKey({name:"HKDF",hash:"SHA-256",salt,info:new TextEncoder().encode("yalla-dm-v1")},hk,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
+}
+async function e2eEncrypt(uid,text){
+  const salt=crypto.getRandomValues(new Uint8Array(16)), iv=crypto.getRandomValues(new Uint8Array(12));
+  const key=await e2eMsgKey(uid,salt); if(!key) return null;
+  const ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,new TextEncoder().encode(text));
+  return { ciphertext:bufToB64(ct), iv:bufToB64(iv), salt:bufToB64(salt) };
+}
+async function e2eDecrypt(uid,row){   // returns null if undecryptable (key rotated / not ours)
+  try{ const key=await e2eMsgKey(uid,b64ToBuf(row.salt)); if(!key) return null;
+    const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64ToBuf(row.iv)},key,b64ToBuf(row.ciphertext));
+    return new TextDecoder().decode(pt);
+  }catch(e){ return null; }
+}
+
+// --- optional passphrase-wrapped backup of the private key (so a new device keeps history) ---
+async function e2eBackupExists(){ if(!cloudReady()) return false; try{ const { data } = await sb.from("key_backups").select("user_id").eq("user_id",cloudUser.id).maybeSingle(); return !!data; }catch(e){ return false; } }
+async function e2eBackup(pass){
+  if(!cloudReady() || !pass) return false;
+  try{ const keys=await e2eGetKeys();
+    const salt=crypto.getRandomValues(new Uint8Array(16)), iv=crypto.getRandomValues(new Uint8Array(12));
+    const key=await deriveKey(pass,salt), ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,new TextEncoder().encode(JSON.stringify(keys.jwk)));
+    await sb.from("key_backups").upsert({ user_id:cloudUser.id, salt:bufToB64(salt), iv:bufToB64(iv), wrapped:bufToB64(ct), updated_at:new Date().toISOString() });
+    return true;
+  }catch(e){ return false; }
+}
+async function e2eRestore(pass){
+  if(!cloudReady() || !pass) return false;
+  let row=null; try{ const { data } = await sb.from("key_backups").select("salt,iv,wrapped").eq("user_id",cloudUser.id).maybeSingle(); row=data; }catch(e){}
+  if(!row) return false;
+  try{
+    const key=await deriveKey(pass,b64ToBuf(row.salt));
+    const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64ToBuf(row.iv)},key,b64ToBuf(row.wrapped));
+    const jwk=JSON.parse(new TextDecoder().decode(pt));
+    await crypto.subtle.importKey("jwk",jwk,{name:"ECDH",namedCurve:"P-256"},true,["deriveBits"]);   // validate
+    await _e2eIdbSet(E2E_REC,jwk);
+    _e2eKeys=null; _e2eNeedsRestore=false;
+    for(const k in _e2eSecretCache) delete _e2eSecretCache[k];
+    await e2eGetKeys(); await e2ePublish();
+    return true;
+  }catch(e){ return false; }   // wrong passphrase / corrupt
+}
+
+// --- transport + state ---
+async function e2eInit(){
+  if(!cloudReady()) return;
+  let jwk=null; try{ jwk=await _e2eIdbGet(E2E_REC); }catch(e){}
+  if(jwk){ try{ await e2eGetKeys(); await e2ePublish(); }catch(e){} _e2eNeedsRestore=false; }
+  else if(await e2eBackupExists()){ _e2eNeedsRestore=true; }   // defer: let the user restore before we mint a new key
+  else { try{ await e2eGetKeys(); await e2ePublish(); }catch(e){} }   // brand-new user → fresh key
+  subscribeMessages();
+  refreshUnread();
+}
+function subscribeMessages(){
+  if(!cloudReady() || _msgChan) return;
+  _msgChan=sb.channel("dm-"+cloudUser.id)
+    .on("postgres_changes",{ event:"INSERT", schema:"public", table:"direct_messages", filter:"recipient=eq."+cloudUser.id }, async (p)=>{
+      const r=p.new||{};
+      const sheetOpen=$("sheetMessages")&&$("sheetMessages").classList.contains("show");
+      if(_msgThreadUid && r.sender===_msgThreadUid){ await renderThread(_msgThreadUid); markRead(_msgThreadUid); return; }
+      _msgUnread++; setMsgBadge(_msgUnread);
+      if(sheetOpen && !_msgThreadUid){ renderConversations(); }
+      else { const nm=await liveName(r.sender), txt=await e2eDecrypt(r.sender,r); toast("💬 "+nm+(txt?": "+txt:""), true); }
+    }).subscribe();
+}
+function teardownMessages(){
+  [_msgChan,_msgThreadChan].forEach(ch=>{ if(ch){ try{ sb&&sb.removeChannel(ch); }catch(e){} } });
+  _msgChan=_msgThreadChan=_msgThreadUid=null; _e2eKeys=null; _e2eNeedsRestore=false;
+  for(const k in _e2ePubCache) delete _e2ePubCache[k];
+  for(const k in _e2eSecretCache) delete _e2eSecretCache[k];
+  _msgUnread=0; setMsgBadge(0);
+}
+function setMsgBadge(n){
+  const b=$("msgRailBadge"); if(b){ b.textContent=n>0?(n>9?"9+":String(n)):""; b.hidden=!(n>0); }
+  const fb=$("friendsMsgBadge"); if(fb){ fb.textContent=n>9?"9+":String(n); fb.style.display=n>0?"":"none"; }
+}
+async function refreshUnread(){
+  if(!cloudReady()){ setMsgBadge(0); return; }
+  try{ const { count } = await sb.from("direct_messages").select("id",{count:"exact",head:true}).eq("recipient",cloudUser.id).is("read_at",null); _msgUnread=count||0; }
+  catch(e){ _msgUnread=0; }
+  setMsgBadge(_msgUnread);
+}
+async function sendMessage(uid,text){
+  text=(text||"").trim(); if(!text || !cloudReady()) return false;
+  if(text.length>4000) text=text.slice(0,4000);
+  const enc=await e2eEncrypt(uid,text);
+  if(!enc){ toast("Can't encrypt yet — your friend hasn't opened messaging."); return false; }
+  try{ await sb.from("direct_messages").insert({ sender:cloudUser.id, recipient:uid, ciphertext:enc.ciphertext, iv:enc.iv, salt:enc.salt }); return true; }
+  catch(e){ toast("Couldn't send — are you still friends?"); return false; }
+}
+async function loadThread(uid){
+  if(!cloudReady()) return [];
+  let rows=[];
+  try{ const { data } = await sb.from("direct_messages").select("id,sender,recipient,ciphertext,iv,salt,created_at,read_at")
+      .or("and(sender.eq."+cloudUser.id+",recipient.eq."+uid+"),and(sender.eq."+uid+",recipient.eq."+cloudUser.id+")")
+      .order("created_at",{ascending:true}).limit(500); rows=data||[]; }catch(e){}
+  const out=[];
+  for(const r of rows){ const other=r.sender===cloudUser.id?r.recipient:r.sender;
+    out.push({ id:r.id, mine:r.sender===cloudUser.id, text:await e2eDecrypt(other,r), at:r.created_at, read:!!r.read_at }); }
+  return out;
+}
+async function loadConversations(){
+  if(!cloudReady()) return [];
+  let rows=[];
+  try{ const { data } = await sb.from("direct_messages").select("id,sender,recipient,ciphertext,iv,salt,created_at,read_at")
+      .or("sender.eq."+cloudUser.id+",recipient.eq."+cloudUser.id).order("created_at",{ascending:false}).limit(400); rows=data||[]; }catch(e){}
+  const byUid={};
+  for(const r of rows){ const other=r.sender===cloudUser.id?r.recipient:r.sender;
+    if(!byUid[other]) byUid[other]={ uid:other, last:r, unread:0 };
+    if(r.recipient===cloudUser.id && !r.read_at) byUid[other].unread++;
+  }
+  const list=Object.values(byUid);   // already recency-ordered (rows were desc)
+  const ids=list.map(c=>c.uid);
+  if(ids.length){ try{ const { data } = await sb.from("profiles").select("user_id,display_name,avatar_color,avatar_emoji,avatar_icon,avatar_style,last_seen").in("user_id",ids); recordAvatars(data);
+    (data||[]).forEach(p=>{ _nameCache[p.user_id]=p.display_name; const c=list.find(x=>x.uid===p.user_id); if(c){ c.name=p.display_name; c.last_seen=p.last_seen; } }); }catch(e){} }
+  for(const c of list) c.preview=await e2eDecrypt(c.uid,c.last);
+  return list;
+}
+async function markRead(uid){
+  if(!cloudReady()) return;
+  try{ await sb.from("direct_messages").update({ read_at:new Date().toISOString() }).eq("recipient",cloudUser.id).eq("sender",uid).is("read_at",null); }catch(e){}
+  refreshUnread();
+}
+
+// --- messaging UI (a single sheet that swaps between the conversation list and an open thread) ---
+async function openMessages(){
+  if(!cloudReady() || !dbHardened){ toast("Sign in to message your friends."); return; }
+  _msgThreadUid=null;
+  if(_msgThreadChan){ try{ sb.removeChannel(_msgThreadChan); }catch(e){} _msgThreadChan=null; }
+  openSheet("Messages");
+  if(_e2eNeedsRestore){ renderRestoreGate(); return; }
+  try{ await e2eGetKeys(); }catch(e){}
+  renderConversations();
+}
+function renderRestoreGate(){
+  const b=$("msgBody"); if(!b) return;
+  $("msgTitle").textContent="Messages"; $("msgBack").style.display="none";
+  b.innerHTML='<div class="msg-empty"><div class="msg-empty-ic">🔒</div>'
+    +'<p>Your encrypted messages are locked on this device. Enter your message passphrase to unlock your history.</p>'
+    +'<input class="comminput" id="msgRestorePass" type="password" placeholder="Message passphrase" style="margin:12px 0; width:100%;">'
+    +'<button class="btn wide" id="msgRestoreBtn">Unlock my messages</button>'
+    +'<button class="btn tinted wide" id="msgFreshBtn" style="margin-top:8px;">Start fresh on this device</button>'
+    +'<p class="levelcap" style="margin-top:12px; line-height:1.45;">Starting fresh makes a new key — older messages stay locked, and friends will message your new key from now on.</p></div>';
+  $("msgRestoreBtn").onclick=async()=>{ const v=$("msgRestorePass").value||""; if(!v) return; const ok=await e2eRestore(v);
+    if(ok){ toast("Messages unlocked 🔓"); renderConversations(); } else toast("Wrong passphrase — try again."); };
+  $("msgFreshBtn").onclick=async()=>{ if(!confirm("Start fresh? Older messages will stay locked on this device.")) return;
+    _e2eNeedsRestore=false; try{ await e2eGetKeys(); await e2ePublish(); }catch(e){} renderConversations(); };
+}
+async function renderConversations(){
+  _msgThreadUid=null; $("msgTitle").textContent="Messages"; $("msgBack").style.display="none";
+  const b=$("msgBody"); if(!b) return;
+  b.innerHTML='<div class="levelcap" style="margin:10px 4px;">Loading…</div>';
+  const convos=await loadConversations();
+  let friends=[]; try{ const { data } = await sb.rpc("my_following"); friends=(data||[]).filter(u=>u.status==="accepted"); recordAvatars(friends); }catch(e){}
+  const have=new Set(convos.map(c=>c.uid));
+  const fresh=friends.filter(f=>!have.has(f.user_id));
+  let h="";
+  if(convos.length){
+    h+=convos.map(c=>{ const nm=c.name||_nameCache[c.uid]||"Friend";
+      const prev=c.preview==null?"🔒 can't decrypt":((c.last.sender===cloudUser.id?"You: ":"")+c.preview);
+      return '<div class="msg-convo" data-uid="'+esc(c.uid)+'" data-nm="'+esc(nm)+'">'+statusAvatar(nm,{size:46,uid:c.uid},isOnline(c.last_seen))
+        +'<div class="msg-convo-main"><div class="msg-convo-top"><span class="msg-convo-nm">'+esc(nm)+'</span><span class="msg-convo-time">'+esc(agoStr(Date.parse(c.last.created_at)))+'</span></div>'
+        +'<div class="msg-convo-prev'+(c.unread?' unread':'')+'">'+esc(prev.length>56?prev.slice(0,56)+"…":prev)+'</div></div>'
+        +(c.unread?'<span class="msg-dot"></span>':'')+'</div>'; }).join('');
+  }
+  if(fresh.length){
+    h+='<div class="ed-label" style="margin-top:16px;">Start a chat</div>'+fresh.map(f=>{ const nm=f.display_name||"Friend";
+      return '<div class="msg-convo" data-uid="'+esc(f.user_id)+'" data-nm="'+esc(nm)+'">'+statusAvatar(nm,{size:46,uid:f.user_id},isOnline(f.last_seen))
+        +'<div class="msg-convo-main"><div class="msg-convo-nm">'+esc(nm)+'</div><div class="msg-convo-prev">Tap to message</div></div></div>'; }).join('');
+  }
+  if(!convos.length && !fresh.length){ h='<div class="msg-empty"><div class="msg-empty-ic">💬</div><p>No friends to message yet. Add friends in the Friends hub, then come back.</p></div>'; }
+  else {
+    const backed=await e2eBackupExists();
+    h+='<div class="msg-foot">'+(backed
+      ? '🔐 Message key backed up · <span class="msg-link" id="msgRebackup">change passphrase</span>'
+      : '<span class="msg-link" id="msgBackupLink">🔐 Back up your message key</span> — so you keep your history on new devices')+'</div>';
+  }
+  b.innerHTML=h;
+  b.querySelectorAll(".msg-convo[data-uid]").forEach(el=> el.onclick=()=>openThread(el.dataset.uid, el.dataset.nm));
+  const bl=$("msgBackupLink"); if(bl) bl.onclick=promptBackup;
+  const rb=$("msgRebackup"); if(rb) rb.onclick=promptBackup;
+}
+async function promptBackup(){
+  let p=""; try{ p=window.prompt("Set a message passphrase to back up your key.\n\nOn a new device you'll enter this to unlock your message history.\n\n⚠️ Forget it with no other device signed in and your history is gone — it can't be recovered.","")||""; }catch(e){ p=""; }
+  if(!p) return;
+  if(p.length<6){ toast("Use at least 6 characters."); return; }
+  const ok=await e2eBackup(p);
+  toast(ok?"Message key backed up 🔐":"Couldn't back up — is messaging set up on the server?");
+  if(ok) renderConversations();
+}
+async function openThread(uid,name){
+  if(!uid) return;
+  _msgThreadUid=uid; name=name||_nameCache[uid]||"Friend";
+  $("msgTitle").textContent=name; $("msgBack").style.display="";
+  const b=$("msgBody");
+  b.innerHTML='<div class="msg-thread" id="msgThread"><div class="levelcap" style="margin:10px 4px;">Loading…</div></div>'
+    +'<div class="msg-compose"><input class="comminput" id="msgInput" placeholder="Message…" maxlength="4000"><button class="btn sm" id="msgSend">Send</button></div>';
+  const send=()=>{ const inp=$("msgInput"), v=(inp.value||"").trim(); if(!v) return; inp.value="";
+    sendMessage(uid,v).then(ok=>{ if(ok) renderThread(uid); }); };
+  $("msgSend").onclick=send;
+  $("msgInput").addEventListener("keydown",e=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); send(); } });
+  const fpub=await e2eFriendPub(uid);
+  if(!fpub){ $("msgThread").innerHTML='<div class="msg-empty"><div class="msg-empty-ic">🔑</div><p>'+esc(name)+" hasn't opened messaging yet, so there's no key to encrypt to. Once they open Messages once, you can chat.</p></div>"; return; }
+  await renderThread(uid);
+  markRead(uid);
+}
+async function renderThread(uid){
+  const box=$("msgThread"); if(!box) return;
+  const msgs=await loadThread(uid);
+  if(!msgs.length){ box.innerHTML='<div class="msg-empty"><p>No messages yet — say hi 👋</p></div>'; return; }
+  box.innerHTML=msgs.map(m=>{ const t=m.text==null?'<span class="msg-locked">🔒 can\'t decrypt (key changed)</span>':esc(m.text);
+    const meta=new Date(Date.parse(m.at)).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})+(m.mine&&m.read?" · read":"");
+    return '<div class="msg-bubble '+(m.mine?"mine":"theirs")+'">'+t+'<span class="msg-time">'+esc(meta)+'</span></div>'; }).join('');
+  box.scrollTop=box.scrollHeight;
+}
+
 // NB: the live-sheet wiring (liveToggle/liveClose/scrimLive) lives just after `const $` is defined,
 // further down — binding it here would run before `$` exists and abort the whole script on load.
 
@@ -2679,6 +2958,12 @@ $("scrimSettings").onclick=()=>closeSheet("Settings");
 function openFriends(){ renderFriends(); openSheet("Friends"); }
 if($("friendsClose")) $("friendsClose").onclick=()=>closeSheet("Friends");
 if($("scrimFriends")) $("scrimFriends").onclick=()=>closeSheet("Friends");
+// end-to-end encrypted messages: open from the Friends hub
+if($("openMessages")) $("openMessages").onclick=openMessages;
+function closeMessages(){ _msgThreadUid=null; if(_msgThreadChan){ try{ sb.removeChannel(_msgThreadChan); }catch(e){} _msgThreadChan=null; } closeSheet("Messages"); }
+if($("msgClose")) $("msgClose").onclick=closeMessages;
+if($("scrimMessages")) $("scrimMessages").onclick=closeMessages;
+if($("msgBack")) $("msgBack").onclick=()=> _msgThreadUid?renderConversations():closeMessages();
 if($("manageFriends")) $("manageFriends").onclick=()=>{ closeSheet("Settings"); openFriends(); };
 // the signed-out CTA and the "Sharing & privacy" link both route into Settings → Account & sync
 if($("friendsCTA")) $("friendsCTA").onclick=()=>{ closeSheet("Friends"); goAccount(); };
@@ -4777,7 +5062,8 @@ async function openProfile(uid, name){
   if(act){
     if(live){ act.innerHTML='<button class="btn wide" id="profWatch">🔴 Watch live now</button>';
       $("profWatch").onclick=()=>{ closeSheet("Profile"); openLiveView(uid, name); }; }
-    else if(rel && rel.status==="accepted"){ act.innerHTML='<button class="btn tinted wide" id="profUnfollow">Remove friend</button>';
+    else if(rel && rel.status==="accepted"){ act.innerHTML='<button class="btn wide" id="profMsg">💬 Message</button><button class="btn tinted wide" id="profUnfollow" style="margin-top:8px;">Remove friend</button>';
+      $("profMsg").onclick=()=>{ closeSheet("Profile"); if(!dbHardened){ toast("Messaging needs the latest server setup."); return; } openSheet("Messages"); if(_e2eNeedsRestore){ renderRestoreGate(); } else { e2eGetKeys().catch(()=>{}); openThread(uid, name); } };
       $("profUnfollow").onclick=async()=>{ await removeFollow(uid,"followee"); closeSheet("Profile"); }; }
     else if(rel && rel.status==="pending"){ act.innerHTML='<button class="btn tinted wide" disabled>Request sent</button>'; }
     else { act.innerHTML='<button class="btn wide" id="profFollow">Follow</button>';

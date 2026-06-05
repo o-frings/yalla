@@ -349,6 +349,7 @@
     <div id="friendsCTA" class="group ovtap" style="display:none; cursor:pointer;"><div class="pad"><p style="font-size:14px;color:var(--l2);line-height:1.5;margin:2px 0;">Sign in under <b>Settings ⚙ → Account &amp; sync</b> to add friends and see what they're training.<span class="ovchev">›</span></p></div></div>
     <!-- the friend graph; built by renderFriends() -->
     <div id="friendsPeople" style="display:none;">
+      <button class="navlink" id="openMessages" style="margin-bottom:4px;"><span>Messages<span class="nlsub">end-to-end encrypted</span></span><span style="display:flex; align-items:center; gap:8px;"><span class="msgbadge" id="friendsMsgBadge" style="display:none;">0</span><span class="ovchev">›</span></span></button>
       <div id="liveNowRow"></div>
       <div id="reqList"></div>
       <div id="followList"></div>
@@ -436,6 +437,18 @@
   <div class="grabber"></div>
   <div class="sheethdr"><span class="t" id="liveWho">Live</span><button class="btn plain sm" id="liveClose">Done</button></div>
   <div class="sheetbody" id="liveBody"></div>
+</div>
+
+<!-- DIRECT MESSAGES SHEET (end-to-end encrypted) — built by openMessages() -->
+<div class="scrim" id="scrimMessages"></div>
+<div class="sheet" id="sheetMessages">
+  <div class="grabber"></div>
+  <div class="sheethdr">
+    <button class="btn plain sm" id="msgBack" style="display:none;">‹ Back</button>
+    <span class="t" id="msgTitle">Messages</span>
+    <button class="btn plain sm" id="msgClose">Done</button>
+  </div>
+  <div class="sheetbody" id="msgBody"></div>
 </div>
 
 <!-- OTHER TRAINING SHEET -->

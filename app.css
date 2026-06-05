@@ -345,6 +345,31 @@
   .commrow b{ color:var(--l2); font-weight:600; margin-right:4px; }
   .commadd{ display:flex; gap:8px; margin-top:8px; }
   .comminput{ flex:1; }
+  /* ===== end-to-end encrypted direct messages ===== */
+  .msgbadge{ background:var(--red); color:#fff; font-size:12px; font-weight:700; min-width:20px; height:20px; padding:0 6px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; }
+  .msg-convo{ display:flex; align-items:center; gap:12px; padding:10px 4px; border-bottom:.5px solid var(--line); cursor:pointer; }
+  .msg-convo:active{ opacity:.6; }
+  .msg-convo-main{ flex:1; min-width:0; }
+  .msg-convo-top{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+  .msg-convo-nm{ font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .msg-convo-time{ font-size:12px; color:var(--l3); flex:0 0 auto; }
+  .msg-convo-prev{ font-size:14px; color:var(--l2); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .msg-convo-prev.unread{ color:var(--ink); font-weight:600; }
+  .msg-dot{ width:9px; height:9px; border-radius:50%; background:var(--accent); flex:0 0 auto; }
+  /* thread: a scrollable bubble list above a fixed compose row */
+  .msg-thread{ display:flex; flex-direction:column; gap:6px; max-height:56vh; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:4px 2px 8px; }
+  .msg-bubble{ max-width:78%; padding:9px 13px; border-radius:18px; font-size:15px; line-height:1.4; word-wrap:break-word; position:relative; }
+  .msg-bubble.mine{ align-self:flex-end; background:var(--accent); color:#fff; border-bottom-right-radius:5px; }
+  .msg-bubble.theirs{ align-self:flex-start; background:var(--row); color:var(--ink); border-bottom-left-radius:5px; }
+  .msg-time{ display:block; font-size:10px; margin-top:3px; opacity:.65; text-align:right; }
+  .msg-bubble.theirs .msg-time{ text-align:left; }
+  .msg-locked{ font-style:italic; opacity:.75; }
+  .msg-compose{ display:flex; gap:8px; align-items:center; padding-top:10px; margin-top:6px; border-top:.5px solid var(--line); }
+  .msg-compose .comminput{ flex:1; }
+  .msg-empty{ text-align:center; color:var(--l2); padding:32px 16px; line-height:1.5; }
+  .msg-empty-ic{ font-size:40px; margin-bottom:8px; }
+  .msg-foot{ font-size:12px; color:var(--l3); line-height:1.5; margin:18px 4px 4px; }
+  .msg-link{ color:var(--accent); font-weight:600; cursor:pointer; }
   /* swipeable discover deck — cards snap, the next one peeks so it reads as swipeable */
   .discwrap{ display:flex; gap:10px; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch;
     scrollbar-width:none; margin:0 -16px; padding:2px 16px; }
