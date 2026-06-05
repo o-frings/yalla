@@ -1595,7 +1595,7 @@ async function openThread(uid,name){
   $("msgBack").style.display="";
   const b=$("msgBody");
   _editingMid=null;
-  b.innerHTML='<div class="msg-thread" id="msgThread"><div class="levelcap" style="margin:10px 4px;">Loading…</div></div>'
+  b.innerHTML='<div class="msg-thread" id="msgThread"></div>'   // no "Loading…" flash; the thread fades in when ready
     +'<div class="msg-compose"><input class="comminput" id="msgInput" placeholder="Message…" maxlength="4000"><button class="btn sm" id="msgSend">Send</button></div>';
   const send=()=>{ const inp=$("msgInput"), v=(inp.value||"").trim(); if(!v) return;
     if(_editingMid){ const mid=_editingMid; cancelEdit(); editMessage(mid, uid, v).then(ok=>{ if(ok) renderThread(uid); }); }
@@ -1617,7 +1617,10 @@ async function openThread(uid,name){
 }
 let _threadReactions={}, _threadMids=[], _threadMsgs={};
 const QUICK_REACT=["👍","❤️","😂","😮","😢","🙏"];
-function haptic(ms){ try{ navigator.vibrate && navigator.vibrate(ms||8); }catch(_){} }   // no-op on iOS (Apple doesn't ship the Vibration API)
+function haptic(ms){
+  try{ if(navigator.vibrate){ navigator.vibrate(ms||8); return; } }catch(_){}
+  try{ const l=document.getElementById("hapticL"); if(l) l.click(); }catch(_){}   // iOS best-effort: toggling an <input switch> buzzes (only in a gesture context)
+}
 async function renderThread(uid){
   const box=$("msgThread"); if(!box) return;
   const msgs=await loadThread(uid);

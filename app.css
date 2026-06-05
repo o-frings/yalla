@@ -156,9 +156,12 @@
   .livechip .lcname{ max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .livechip.on{ background:rgba(255,59,48,.12); border-color:rgba(255,59,48,.45); color:var(--red); }
   .livechip.always{ background:rgba(255,59,48,.12); border-color:rgba(255,59,48,.45); color:var(--red); opacity:.72; cursor:default; }
-  .livecard{ display:flex; align-items:center; gap:12px; padding:12px 14px; margin:8px 0; border-radius:14px; background:var(--accent-soft); cursor:pointer; }
+  /* a live session reads as a feed row (flat, hairline divider) so Live now + Friends are one set;
+     the live ring on the avatar + accent "Watch ›" carry the live cue */
+  .livecard{ display:flex; align-items:center; gap:12px; padding:12px 4px; border-bottom:.5px solid var(--line); cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .livecard:active{ opacity:.6; }
   .livedot{ width:10px; height:10px; border-radius:50%; background:var(--red); flex:0 0 auto; animation:livepulse 1.6s infinite; }
-  .livego{ color:var(--accent); font-weight:600; flex:0 0 auto; }
+  .livego{ color:var(--accent); font-weight:600; flex:0 0 auto; font-size:14px; }
   @keyframes livepulse{ 0%{ box-shadow:0 0 0 0 rgba(255,55,95,.5);} 70%{ box-shadow:0 0 0 8px rgba(255,55,95,0);} 100%{ box-shadow:0 0 0 0 rgba(255,55,95,0);} }
   .titleBtn .tchev{ width:22px; height:22px; color:var(--l3); vertical-align:-3px; margin-left:4px; }
   .ic{ width:16px; height:16px; vertical-align:-3px; }
@@ -373,7 +376,8 @@
   .msg-convo-prev.unread{ color:var(--ink); font-weight:600; }
   .msg-dot{ width:9px; height:9px; border-radius:50%; background:var(--accent); flex:0 0 auto; }
   /* thread: a scrollable bubble list above a fixed compose row */
-  .msg-thread{ display:flex; flex-direction:column; gap:7px; max-height:56vh; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:4px 2px 8px; }
+  .msg-thread{ display:flex; flex-direction:column; gap:7px; max-height:56vh; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:4px 2px 8px; animation:threadIn .3s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes threadIn{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:none; } }
   .msg-row{ display:flex; flex-direction:column; max-width:100%; }
   .msg-row.mine{ align-items:flex-end; }
   .msg-row.theirs{ align-items:flex-start; }
