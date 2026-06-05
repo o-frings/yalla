@@ -84,12 +84,47 @@ drop policy if exists "own backup" on public.key_backups;
 create policy "own backup" on public.key_backups for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- 4. Realtime: stream new direct_messages (RLS still decides who receives each row). Guarded so the whole
---    script stays safely re-runnable.
+-- 4. emoji reactions on a message (WhatsApp-style). One reaction per person per message; the emoji
+--    itself is E2E-encrypted with the conversation key, so the server only ever sees ciphertext.
+create or replace function public.dm_party(mid bigint)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.direct_messages m
+                 where m.id = mid and (m.sender = auth.uid() or m.recipient = auth.uid()));
+$$;
+grant execute on function public.dm_party(bigint) to authenticated;
+
+create table if not exists public.dm_reactions (
+  message_id bigint not null references public.direct_messages(id) on delete cascade,
+  actor      uuid   not null references auth.users on delete cascade,
+  ciphertext text not null,                 -- base64 AES-256-GCM of the emoji
+  iv         text not null,
+  salt       text not null,
+  created_at timestamptz not null default now(),
+  primary key (message_id, actor)           -- re-reacting replaces; removing deletes
+);
+alter table public.dm_reactions enable row level security;
+
+drop policy if exists "read dm reactions" on public.dm_reactions;
+create policy "read dm reactions" on public.dm_reactions for select using (public.dm_party(message_id));
+drop policy if exists "write dm reaction" on public.dm_reactions;
+create policy "write dm reaction" on public.dm_reactions for insert
+  with check (actor = auth.uid() and public.dm_party(message_id));
+drop policy if exists "update dm reaction" on public.dm_reactions;
+create policy "update dm reaction" on public.dm_reactions for update
+  using (actor = auth.uid()) with check (actor = auth.uid() and public.dm_party(message_id));
+drop policy if exists "delete dm reaction" on public.dm_reactions;
+create policy "delete dm reaction" on public.dm_reactions for delete using (actor = auth.uid());
+
+-- 5. Realtime: stream new direct_messages + reactions (RLS still decides who receives each row).
+--    Guarded so the whole script stays safely re-runnable.
 do $$
 begin
   if not exists (select 1 from pg_publication_tables
                  where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'direct_messages') then
     alter publication supabase_realtime add table public.direct_messages;
+  end if;
+  if not exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'dm_reactions') then
+    alter publication supabase_realtime add table public.dm_reactions;
   end if;
 end $$;

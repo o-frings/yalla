@@ -357,13 +357,26 @@
   .msg-convo-prev.unread{ color:var(--ink); font-weight:600; }
   .msg-dot{ width:9px; height:9px; border-radius:50%; background:var(--accent); flex:0 0 auto; }
   /* thread: a scrollable bubble list above a fixed compose row */
-  .msg-thread{ display:flex; flex-direction:column; gap:6px; max-height:56vh; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:4px 2px 8px; }
-  .msg-bubble{ max-width:78%; padding:9px 13px; border-radius:18px; font-size:15px; line-height:1.4; word-wrap:break-word; position:relative; }
-  .msg-bubble.mine{ align-self:flex-end; background:var(--accent); color:#fff; border-bottom-right-radius:5px; }
-  .msg-bubble.theirs{ align-self:flex-start; background:var(--row); color:var(--ink); border-bottom-left-radius:5px; }
+  .msg-thread{ display:flex; flex-direction:column; gap:7px; max-height:56vh; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:4px 2px 8px; }
+  .msg-row{ display:flex; flex-direction:column; max-width:100%; }
+  .msg-row.mine{ align-items:flex-end; }
+  .msg-row.theirs{ align-items:flex-start; }
+  .msg-bubble{ max-width:78%; padding:9px 13px; border-radius:18px; font-size:15px; line-height:1.4; word-wrap:break-word; position:relative; user-select:none; -webkit-user-select:none; touch-action:manipulation; }
+  .msg-row.mine .msg-bubble{ background:var(--accent); color:#fff; border-bottom-right-radius:5px; }
+  .msg-row.theirs .msg-bubble{ background:var(--row); color:var(--ink); border-bottom-left-radius:5px; }
   .msg-time{ display:block; font-size:10px; margin-top:3px; opacity:.65; text-align:right; }
-  .msg-bubble.theirs .msg-time{ text-align:left; }
+  .msg-row.theirs .msg-time{ text-align:left; }
   .msg-locked{ font-style:italic; opacity:.75; }
+  /* emoji reactions: chips under a bubble + the long-press picker bar */
+  .react-chips{ display:flex; flex-wrap:wrap; gap:4px; margin:3px 3px 0; }
+  .react-chip{ font-size:13px; line-height:1.6; background:var(--row); border:.5px solid var(--line); border-radius:12px; padding:0 7px; }
+  .react-chip.mine{ background:var(--accent-soft); border-color:transparent; cursor:pointer; }
+  .react-bar{ position:fixed; z-index:210; display:flex; gap:2px; background:var(--card); border:.5px solid var(--line); border-radius:26px; padding:5px 8px; box-shadow:0 10px 34px rgba(0,0,0,.24); }
+  .react-pick{ background:none; border:none; font-size:25px; line-height:1; cursor:pointer; padding:4px 5px; border-radius:50%; transition:transform .1s; }
+  .react-pick:active{ transform:scale(1.35); }
+  .sheethdr .t.tappable{ cursor:pointer; }
+  #ovMessages{ position:relative; padding:8px; }
+  #ovMessages .railnotch{ position:absolute; top:2px; right:2px; min-width:16px; height:16px; padding:0 4px; font-size:10px; }
   .msg-compose{ display:flex; gap:8px; align-items:center; padding-top:10px; margin-top:6px; border-top:.5px solid var(--line); }
   .msg-compose .comminput{ flex:1; }
   .msg-empty{ text-align:center; color:var(--l2); padding:32px 16px; line-height:1.5; }

@@ -67,6 +67,15 @@ The private key is device-local, so a fresh device/browser starts with **no** ke
   fingerprint verification yet. A malicious server *could* substitute a key. A future "verify safety
   number" screen would close this.
 
+## Emoji reactions
+
+Long-press a message → a quick reaction bar (👍 ❤️ 😂 😮 😢 🙏); double-tap a bubble → ❤️ toggle
+(tap your own chip to remove). One reaction per person per message (`dm_reactions`, PK `(message_id,
+actor)` — re-reacting replaces). The **reaction emoji is itself E2E-encrypted** with the conversation
+key (same per-message salt/iv scheme), so the server only ever stores ciphertext. RLS limits read/write
+to the two participants of the underlying message (`dm_party()`); changes stream over realtime so a
+friend's reaction appears live in the open thread.
+
 ## Push notifications
 
 A new message fires the `social-notify` Edge Function (`kind: "message"`), which sends the recipient

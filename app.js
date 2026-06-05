@@ -1476,14 +1476,15 @@ async function markRead(uid){
 }
 
 // --- messaging UI (a single sheet that swaps between the conversation list and an open thread) ---
-// deep-link target of a "new message" push (?dm=senderId): jump straight into that thread
-async function openDMFromLink(uid){
-  if(!cloudReady() || !dbHardened || !uid) return;
+// open a 1-on-1 chat directly (tapped a friend's avatar, or a "new message" push ?dm=senderId)
+async function openChat(uid, name){
+  if(!cloudReady() || !dbHardened || !uid){ toast("Sign in to message your friends."); return; }
   openSheet("Messages");
   if(_e2eNeedsRestore){ renderRestoreGate(); return; }
   try{ await e2eGetKeys(); }catch(e){}
-  openThread(uid, await liveName(uid));
+  openThread(uid, name || await liveName(uid));
 }
+function openDMFromLink(uid){ return openChat(uid); }   // push deep-link entry
 async function openMessages(){
   if(!cloudReady() || !dbHardened){ toast("Sign in to message your friends."); return; }
   _msgThreadUid=null;
@@ -1508,7 +1509,9 @@ function renderRestoreGate(){
     _e2eNeedsRestore=false; try{ await e2eGetKeys(); await e2ePublish(); }catch(e){} renderConversations(); };
 }
 async function renderConversations(){
-  _msgThreadUid=null; $("msgTitle").textContent="Messages"; $("msgBack").style.display="none";
+  _msgThreadUid=null; closeReactBar();
+  if(_msgThreadChan){ try{ sb.removeChannel(_msgThreadChan); }catch(e){} _msgThreadChan=null; }
+  const ttl=$("msgTitle"); ttl.textContent="Messages"; ttl.classList.remove("tappable"); ttl.onclick=null; $("msgBack").style.display="none";
   const b=$("msgBody"); if(!b) return;
   b.innerHTML='<div class="levelcap" style="margin:10px 4px;">Loading…</div>';
   const convos=await loadConversations();
@@ -1531,25 +1534,24 @@ async function renderConversations(){
         +'<div class="msg-convo-main"><div class="msg-convo-nm">'+esc(nm)+'</div><div class="msg-convo-prev">Tap to message</div></div></div>'; }).join('');
   }
   if(!convos.length && !fresh.length){ h='<div class="msg-empty"><div class="msg-empty-ic">'+ICON.chat+'</div><p>No friends to message yet. Add friends in the Friends hub, then come back.</p></div>'; }
-  else {
-    const backed=await e2eBackupExists();
-    h+='<div class="msg-foot">'+(backed
-      ? ICON.lock+' Message key backed up · <span class="msg-link" id="msgRebackup">change passphrase</span>'
-      : '<span class="msg-link" id="msgBackupLink">'+ICON.lock+' Back up your message key</span> — so you keep your history on new devices')+'</div>';
-  }
-  // one-time opt-in to message notifications (only while the OS permission is still undecided)
+  // A single, dismissible nudge at the top — notifications first, otherwise a one-time offer to back up
+  // the key. Backup stays permanently reachable from the Friends hub, so dismissing loses nothing.
   const canNotif = !!(window.Notification && SUPA.vapidPublic && ("PushManager" in window));
-  const banner = (canNotif && Notification.permission==="default" && !settings.msgNotifDismissed)
-    ? '<div class="msg-notif" id="msgNotifBanner"><span>'+ICON.bell+' Get a ping when a friend messages you?</span>'
-      +'<span class="msg-notif-act"><button class="btn sm" id="msgNotifOn">Turn on</button><button class="msg-notif-x" id="msgNotifNo" aria-label="Not now">×</button></span></div>'
-    : "";
+  let banner="";
+  if(canNotif && Notification.permission==="default" && !settings.msgNotifDismissed){
+    banner='<div class="msg-notif" id="msgNotifBanner"><span>'+ICON.bell+' Get a ping when a friend messages you?</span>'
+      +'<span class="msg-notif-act"><button class="btn sm" id="msgNotifOn">Turn on</button><button class="msg-notif-x" id="msgNotifNo" aria-label="Not now">×</button></span></div>';
+  } else if(!settings.msgBackupDismissed && !(await e2eBackupExists())){
+    banner='<div class="msg-notif" id="msgBackupBanner"><span>'+ICON.lock+' Back up your message key to keep history on new devices</span>'
+      +'<span class="msg-notif-act"><button class="btn sm" id="msgBackupOn">Back up</button><button class="msg-notif-x" id="msgBackupNo" aria-label="Not now">×</button></span></div>';
+  }
   b.innerHTML=banner+h;
   b.querySelectorAll(".msg-convo[data-uid]").forEach(el=> el.onclick=()=>openThread(el.dataset.uid, el.dataset.nm));
-  const bl=$("msgBackupLink"); if(bl) bl.onclick=promptBackup;
-  const rb=$("msgRebackup"); if(rb) rb.onclick=promptBackup;
   const non=$("msgNotifOn"); if(non) non.onclick=async()=>{ const ok=await pushEnsure({ prompt:true, forMessages:true });
     toast(ok?"Notifications on — we'll ping you about new messages.":"Couldn't turn on notifications."); renderConversations(); };
   const nno=$("msgNotifNo"); if(nno) nno.onclick=async()=>{ settings.msgNotifDismissed=true; await sset("settings",settings); const el=$("msgNotifBanner"); if(el) el.remove(); };
+  const bon=$("msgBackupOn"); if(bon) bon.onclick=promptBackup;
+  const bno=$("msgBackupNo"); if(bno) bno.onclick=async()=>{ settings.msgBackupDismissed=true; await sset("settings",settings); const el=$("msgBackupBanner"); if(el) el.remove(); };
 }
 async function promptBackup(){
   let p=""; try{ p=window.prompt("Set a message passphrase to back up your key.\n\nOn a new device you'll enter this to unlock your message history.\n\n⚠️ Forget it with no other device signed in and your history is gone — it can't be recovered.","")||""; }catch(e){ p=""; }
@@ -1562,7 +1564,8 @@ async function promptBackup(){
 async function openThread(uid,name){
   if(!uid) return;
   _msgThreadUid=uid; name=name||_nameCache[uid]||"Friend";
-  $("msgTitle").textContent=name; $("msgBack").style.display="";
+  const ttl=$("msgTitle"); ttl.textContent=name; ttl.classList.add("tappable"); ttl.onclick=()=>openProfile(uid, name);   // name → their profile (workouts, live, remove)
+  $("msgBack").style.display="";
   const b=$("msgBody");
   b.innerHTML='<div class="msg-thread" id="msgThread"><div class="levelcap" style="margin:10px 4px;">Loading…</div></div>'
     +'<div class="msg-compose"><input class="comminput" id="msgInput" placeholder="Message…" maxlength="4000"><button class="btn sm" id="msgSend">Send</button></div>';
@@ -1574,15 +1577,88 @@ async function openThread(uid,name){
   if(!fpub){ $("msgThread").innerHTML='<div class="msg-empty"><div class="msg-empty-ic">'+ICON.key+'</div><p>'+esc(name)+" hasn't opened messaging yet, so there's no key to encrypt to. Once they open Messages once, you can chat.</p></div>"; return; }
   await renderThread(uid);
   markRead(uid);
+  // live reaction updates from this friend (RLS only delivers reactions on messages we share)
+  if(_msgThreadChan){ try{ sb.removeChannel(_msgThreadChan); }catch(e){} }
+  _msgThreadChan=sb.channel("dm-react-"+uid)
+    .on("postgres_changes",{ event:"*", schema:"public", table:"dm_reactions", filter:"actor=eq."+uid }, ()=> refreshThreadReactions(uid))
+    .subscribe();
 }
+let _threadReactions={}, _threadMids=[];
+const QUICK_REACT=["👍","❤️","😂","😮","😢","🙏"];
 async function renderThread(uid){
   const box=$("msgThread"); if(!box) return;
   const msgs=await loadThread(uid);
   if(!msgs.length){ box.innerHTML='<div class="msg-empty"><p>No messages yet — say hi 👋</p></div>'; return; }
+  _threadMids=msgs.map(m=>m.id);
+  await loadThreadReactions(_threadMids, uid);
   box.innerHTML=msgs.map(m=>{ const t=m.text==null?'<span class="msg-locked">'+ICON.lock+' can\'t decrypt (key changed)</span>':esc(m.text);
     const meta=new Date(Date.parse(m.at)).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})+(m.mine&&m.read?" · read":"");
-    return '<div class="msg-bubble '+(m.mine?"mine":"theirs")+'">'+t+'<span class="msg-time">'+esc(meta)+'</span></div>'; }).join('');
+    return '<div class="msg-row '+(m.mine?"mine":"theirs")+'"><div class="msg-bubble" data-mid="'+m.id+'">'+t+'<span class="msg-time">'+esc(meta)+'</span></div>'
+      +'<div class="react-chips" data-chips="'+m.id+'"></div></div>'; }).join('');
+  _threadMids.forEach(renderReactionsFor);
+  attachReactions(box, uid);
   box.scrollTop=box.scrollHeight;
+}
+// --- reactions: encrypted emoji, one per person per message (double-tap ❤️, long-press for the bar) ---
+async function loadThreadReactions(mids, friendUid){
+  _threadReactions={}; if(!mids || !mids.length) return;
+  let rows=[]; try{ const { data } = await sb.from("dm_reactions").select("message_id,actor,ciphertext,iv,salt").in("message_id",mids); rows=data||[]; }catch(e){}
+  for(const r of rows){ const em=await e2eDecrypt(friendUid,r); if(em){ (_threadReactions[r.message_id]=_threadReactions[r.message_id]||{})[r.actor]=em; } }
+}
+async function refreshThreadReactions(friendUid){
+  if(!_msgThreadUid || _msgThreadUid!==friendUid) return;
+  await loadThreadReactions(_threadMids, friendUid);
+  _threadMids.forEach(renderReactionsFor);
+}
+function renderReactionsFor(mid){
+  const host=document.querySelector('[data-chips="'+mid+'"]'); if(!host) return;
+  const map=_threadReactions[mid]||{}, emojis=Object.values(map);
+  if(!emojis.length){ host.innerHTML=""; return; }
+  const counts={}; emojis.forEach(e=> counts[e]=(counts[e]||0)+1);
+  const mine=map[cloudUser.id];
+  host.innerHTML=Object.keys(counts).map(e=>'<span class="react-chip'+(mine===e?' mine':'')+'" data-e="'+e+'">'+e+(counts[e]>1?' '+counts[e]:'')+'</span>').join('');
+  host.querySelectorAll(".react-chip.mine").forEach(c=> c.onclick=()=>removeReaction(mid));   // tap own chip → remove it
+}
+async function setReaction(mid, friendUid, emoji, toggle){
+  if(!cloudReady()) return;
+  const mine=(_threadReactions[mid]||{})[cloudUser.id];
+  if(toggle && mine===emoji){ return removeReaction(mid); }
+  const enc=await e2eEncrypt(friendUid, emoji); if(!enc) return;
+  (_threadReactions[mid]=_threadReactions[mid]||{})[cloudUser.id]=emoji; renderReactionsFor(mid);   // optimistic
+  try{ await sb.from("dm_reactions").upsert({ message_id:mid, actor:cloudUser.id, ciphertext:enc.ciphertext, iv:enc.iv, salt:enc.salt, created_at:new Date().toISOString() }); }catch(e){}
+}
+async function removeReaction(mid){
+  if(_threadReactions[mid]) delete _threadReactions[mid][cloudUser.id];
+  renderReactionsFor(mid);
+  try{ await sb.from("dm_reactions").delete().eq("message_id",mid).eq("actor",cloudUser.id); }catch(e){}
+}
+function closeReactBar(){ const b=$("reactBar"); if(b) b.remove(); }
+function showReactBar(bubble, mid, friendUid){
+  closeReactBar();
+  const bar=document.createElement("div"); bar.className="react-bar"; bar.id="reactBar";
+  bar.innerHTML=QUICK_REACT.map(e=>'<button class="react-pick" data-e="'+e+'">'+e+'</button>').join('');
+  document.body.appendChild(bar);
+  const r=bubble.getBoundingClientRect(), bw=bar.offsetWidth, bh=bar.offsetHeight, vw=window.innerWidth, vh=window.innerHeight;
+  let top=r.top-bh-8; if(top<8) top=r.bottom+8;              // prefer above the bubble, else below
+  top=Math.max(8, Math.min(top, vh-bh-8));                   // keep on-screen vertically
+  bar.style.left=Math.max(8, Math.min(r.left, vw-bw-8))+"px";
+  bar.style.top=top+"px";
+  bar.querySelectorAll(".react-pick").forEach(b=> b.onclick=()=>{ setReaction(mid, friendUid, b.dataset.e); closeReactBar(); });
+  setTimeout(()=> document.addEventListener("pointerdown", function _o(e){ if(!e.target.closest(".react-bar")){ closeReactBar(); document.removeEventListener("pointerdown",_o); } }), 0);
+}
+function attachReactions(box, friendUid){
+  let lastTap=0, lastMid=0, lpTimer=null, lpFired=false, dx=0, dy=0;
+  box.querySelectorAll(".msg-bubble[data-mid]").forEach(bubble=>{
+    const mid=+bubble.dataset.mid;
+    bubble.addEventListener("pointerdown",e=>{ lpFired=false; dx=e.clientX; dy=e.clientY;
+      clearTimeout(lpTimer); lpTimer=setTimeout(()=>{ lpFired=true; showReactBar(bubble, mid, friendUid); }, 450); });
+    bubble.addEventListener("pointermove",e=>{ if(Math.abs(e.clientX-dx)>10 || Math.abs(e.clientY-dy)>10) clearTimeout(lpTimer); });
+    bubble.addEventListener("pointercancel",()=> clearTimeout(lpTimer));
+    bubble.addEventListener("pointerup",()=>{ clearTimeout(lpTimer); if(lpFired) return;   // long-press already handled
+      const now=Date.now();
+      if(lastMid===mid && now-lastTap<300){ lastTap=0; lastMid=0; setReaction(mid, friendUid, "❤️", true); }   // double-tap → ❤️ toggle
+      else { lastTap=now; lastMid=mid; } });
+  });
 }
 
 // NB: the live-sheet wiring (liveToggle/liveClose/scrimLive) lives just after `const $` is defined,
@@ -3012,6 +3088,8 @@ if($("friendsClose")) $("friendsClose").onclick=()=>closeSheet("Friends");
 if($("scrimFriends")) $("scrimFriends").onclick=()=>closeSheet("Friends");
 // end-to-end encrypted messages: open from the Friends hub
 if($("openMessages")) $("openMessages").onclick=openMessages;
+if($("ovMessages")) $("ovMessages").onclick=openMessages;   // prominent chat shortcut on the overview
+if($("msgBackupNav")) $("msgBackupNav").onclick=promptBackup;   // permanent home for key backup / change passphrase
 function closeMessages(){ _msgThreadUid=null; if(_msgThreadChan){ try{ sb.removeChannel(_msgThreadChan); }catch(e){} _msgThreadChan=null; } closeSheet("Messages"); }
 if($("msgClose")) $("msgClose").onclick=closeMessages;
 if($("scrimMessages")) $("scrimMessages").onclick=closeMessages;
@@ -5058,6 +5136,7 @@ const RAIL_USERS_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
 // ---- Overview presence rail: friends as faces, live ones ringed; tap to watch or open a profile ----
 async function renderPresenceRail(){
   const rail=$("presenceRail"); if(!rail) return;
+  const ovm=$("ovMessages"); if(ovm) ovm.style.display=(cloudReady() && dbHardened)?"":"none";   // chat shortcut visible only when messaging is live
   if(!(cloudReady() && dbHardened)){ rail.style.display="none"; rail.innerHTML=""; return; }
   let following=[], live={}, reqN=0;
   try{ const { data } = await sb.rpc("my_following"); following=(data||[]).filter(u=>u.status==="accepted"); recordAvatars(following); }catch(e){}
@@ -5084,7 +5163,7 @@ async function renderPresenceRail(){
     +'<span class="railall" id="railAll">All <span class="ovchev">›</span>'+badge+'</span></div>'
     +'<div class="prail">'+faces+'</div>';
   rail.querySelectorAll(".pr-item[data-uid]").forEach(el=> el.onclick=()=>{
-    if(el.dataset.live==="1") openLiveView(el.dataset.uid, el.dataset.nm); else openProfile(el.dataset.uid, el.dataset.nm); });
+    if(el.dataset.live==="1") openLiveView(el.dataset.uid, el.dataset.nm); else openChat(el.dataset.uid, el.dataset.nm); });
   const all=$("railAll"); if(all) all.onclick=openFriends;
 }
 
@@ -5114,9 +5193,9 @@ async function openProfile(uid, name){
   if(act){
     if(live){ act.innerHTML='<button class="btn wide" id="profWatch">🔴 Watch live now</button>';
       $("profWatch").onclick=()=>{ closeSheet("Profile"); openLiveView(uid, name); }; }
-    else if(rel && rel.status==="accepted"){ act.innerHTML='<button class="btn wide" id="profMsg">'+ICON.chat+'Message</button><button class="btn tinted wide" id="profUnfollow" style="margin-top:8px;">Remove friend</button>';
-      $("profMsg").onclick=()=>{ closeSheet("Profile"); if(!dbHardened){ toast("Messaging needs the latest server setup."); return; } openSheet("Messages"); if(_e2eNeedsRestore){ renderRestoreGate(); } else { e2eGetKeys().catch(()=>{}); openThread(uid, name); } };
-      $("profUnfollow").onclick=async()=>{ await removeFollow(uid,"followee"); closeSheet("Profile"); }; }
+    else if(rel && rel.status==="accepted"){ act.innerHTML='<button class="btn wide" id="profMsg">'+ICON.chat+'Message</button>';
+      // "Remove friend" intentionally lives in the Friends hub ("Your friends" → Remove), not here — keeps the profile message-first.
+      $("profMsg").onclick=()=>{ closeSheet("Profile"); openChat(uid, name); }; }
     else if(rel && rel.status==="pending"){ act.innerHTML='<button class="btn tinted wide" disabled>Request sent</button>'; }
     else { act.innerHTML='<button class="btn wide" id="profFollow">Follow</button>';
       $("profFollow").onclick=async()=>{ await followUser(uid,name); openProfile(uid,name); }; }
@@ -5167,6 +5246,7 @@ async function renderFriends(){
   if(people) people.style.display = on ? "" : "none";
   if(cta) cta.style.display = on ? "none" : "";
   if(!on){ setFriendsBadge(0); return; }
+  const bsub=$("msgBackupSub"); if(bsub){ e2eBackupExists().then(bk=> bsub.textContent = bk ? "backed up — tap to change passphrase" : "protect your chat history"); }
   // profile visibility + my follow code + my saved avatar (avatar cols degrade if not migrated yet)
   let vis="private";
   try{ const { data, error } = await sb.from("profiles").select("visibility,follow_code,avatar_color,avatar_emoji,avatar_icon,avatar_style").eq("user_id",cloudUser.id).maybeSingle();
