@@ -76,6 +76,15 @@ key (same per-message salt/iv scheme), so the server only ever stores ciphertext
 to the two participants of the underlying message (`dm_party()`); changes stream over realtime so a
 friend's reaction appears live in the open thread.
 
+## Edit, delete & haptics
+
+Long-press a message opens the reaction bar plus a small menu: **Copy** (any message), and **Edit** /
+**Delete** on your own. Edit re-encrypts the new text in place and stamps `edited_at` (shown as
+"· edited"); the sender-only `edit own dm` RLS policy gates it. Delete removes the row (sender or
+recipient may delete). Both stream to the other party live via the thread's realtime subscription.
+Subtle haptics (`navigator.vibrate`) fire on long-press, reactions, and send — **no-op on iOS** (Apple
+doesn't implement the web Vibration API), works on Android.
+
 ## Push notifications
 
 A new message fires the `social-notify` Edge Function (`kind: "message"`), which sends the recipient

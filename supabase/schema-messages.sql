@@ -60,10 +60,16 @@ drop policy if exists "send dm" on public.direct_messages;
 create policy "send dm" on public.direct_messages for insert
   with check (auth.uid() = sender and public.are_friends(sender, recipient));
 
--- the recipient may flip read_at (read receipts); nothing else is updatable.
+-- the recipient may flip read_at (read receipts).
 drop policy if exists "mark read dm" on public.direct_messages;
 create policy "mark read dm" on public.direct_messages for update
   using (auth.uid() = recipient) with check (auth.uid() = recipient);
+
+-- the sender may edit their own message (re-encrypt ciphertext + stamp edited_at).
+alter table public.direct_messages add column if not exists edited_at timestamptz;
+drop policy if exists "edit own dm" on public.direct_messages;
+create policy "edit own dm" on public.direct_messages for update
+  using (auth.uid() = sender) with check (auth.uid() = sender);
 
 -- either party may delete a message from the thread (unsend / clear).
 drop policy if exists "delete own dm" on public.direct_messages;

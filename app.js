@@ -1445,12 +1445,12 @@ async function notifyMessage(uid){ try{ if(sb && sb.functions && uid) await sb.f
 async function loadThread(uid){
   if(!cloudReady()) return [];
   let rows=[];
-  try{ const { data } = await sb.from("direct_messages").select("id,sender,recipient,ciphertext,iv,salt,created_at,read_at")
+  try{ const { data } = await sb.from("direct_messages").select("id,sender,recipient,ciphertext,iv,salt,created_at,read_at,edited_at")
       .or("and(sender.eq."+cloudUser.id+",recipient.eq."+uid+"),and(sender.eq."+uid+",recipient.eq."+cloudUser.id+")")
       .order("created_at",{ascending:true}).limit(500); rows=data||[]; }catch(e){}
   const out=[];
   for(const r of rows){ const other=r.sender===cloudUser.id?r.recipient:r.sender;
-    out.push({ id:r.id, mine:r.sender===cloudUser.id, text:await e2eDecrypt(other,r), at:r.created_at, read:!!r.read_at }); }
+    out.push({ id:r.id, mine:r.sender===cloudUser.id, text:await e2eDecrypt(other,r), at:r.created_at, read:!!r.read_at, edited:!!r.edited_at }); }
   return out;
 }
 async function loadConversations(){
@@ -1581,32 +1581,38 @@ async function openThread(uid,name){
   const ttl=$("msgTitle"); ttl.textContent=name; ttl.classList.add("tappable"); ttl.onclick=()=>openProfile(uid, name);   // name → their profile (workouts, live, remove)
   $("msgBack").style.display="";
   const b=$("msgBody");
+  _editingMid=null;
   b.innerHTML='<div class="msg-thread" id="msgThread"><div class="levelcap" style="margin:10px 4px;">Loading…</div></div>'
     +'<div class="msg-compose"><input class="comminput" id="msgInput" placeholder="Message…" maxlength="4000"><button class="btn sm" id="msgSend">Send</button></div>';
-  const send=()=>{ const inp=$("msgInput"), v=(inp.value||"").trim(); if(!v) return; inp.value="";
-    sendMessage(uid,v).then(ok=>{ if(ok) renderThread(uid); }); };
+  const send=()=>{ const inp=$("msgInput"), v=(inp.value||"").trim(); if(!v) return;
+    if(_editingMid){ const mid=_editingMid; cancelEdit(); editMessage(mid, uid, v).then(ok=>{ if(ok) renderThread(uid); }); }
+    else { inp.value=""; haptic(8); sendMessage(uid,v).then(ok=>{ if(ok) renderThread(uid); }); } };
   $("msgSend").onclick=send;
   $("msgInput").addEventListener("keydown",e=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); send(); } });
   const fpub=await e2eFriendPub(uid);
   if(!fpub){ $("msgThread").innerHTML='<div class="msg-empty"><div class="msg-empty-ic">'+ICON.key+'</div><p>'+esc(name)+" hasn't opened messaging yet, so there's no key to encrypt to. Once they open Messages once, you can chat.</p></div>"; return; }
   await renderThread(uid);
   markRead(uid);
-  // live reaction updates from this friend (RLS only delivers reactions on messages we share)
+  // live updates from this friend (RLS only delivers rows we share): their reactions, and their
+  // edits/deletes/sends to the thread.
   if(_msgThreadChan){ try{ sb.removeChannel(_msgThreadChan); }catch(e){} }
-  _msgThreadChan=sb.channel("dm-react-"+uid)
+  _msgThreadChan=sb.channel("dm-thread-"+uid)
     .on("postgres_changes",{ event:"*", schema:"public", table:"dm_reactions", filter:"actor=eq."+uid }, ()=> refreshThreadReactions(uid))
+    .on("postgres_changes",{ event:"*", schema:"public", table:"direct_messages", filter:"sender=eq."+uid }, ()=>{ if(_msgThreadUid===uid){ renderThread(uid); markRead(uid); } })
     .subscribe();
 }
-let _threadReactions={}, _threadMids=[];
+let _threadReactions={}, _threadMids=[], _threadMsgs={};
 const QUICK_REACT=["👍","❤️","😂","😮","😢","🙏"];
+function haptic(ms){ try{ navigator.vibrate && navigator.vibrate(ms||8); }catch(_){} }   // no-op on iOS (Apple doesn't ship the Vibration API)
 async function renderThread(uid){
   const box=$("msgThread"); if(!box) return;
   const msgs=await loadThread(uid);
   if(!msgs.length){ box.innerHTML='<div class="msg-empty"><p>No messages yet — say hi 👋</p></div>'; return; }
-  _threadMids=msgs.map(m=>m.id);
+  _threadMids=msgs.map(m=>m.id); _threadMsgs={};
   await loadThreadReactions(_threadMids, uid);
-  box.innerHTML=msgs.map(m=>{ const t=m.text==null?'<span class="msg-locked">'+ICON.lock+' can\'t decrypt (key changed)</span>':esc(m.text);
-    const meta=new Date(Date.parse(m.at)).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})+(m.mine&&m.read?" · read":"");
+  box.innerHTML=msgs.map(m=>{ _threadMsgs[m.id]={ mine:m.mine, text:m.text };
+    const t=m.text==null?'<span class="msg-locked">'+ICON.lock+' can\'t decrypt (key changed)</span>':esc(m.text);
+    const meta=new Date(Date.parse(m.at)).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})+(m.edited?" · edited":"")+(m.mine&&m.read?" · read":"");
     return '<div class="msg-row '+(m.mine?"mine":"theirs")+'"><div class="msg-bubble" data-mid="'+m.id+'">'+t+'<span class="msg-time">'+esc(meta)+'</span></div>'
       +'<div class="react-chips" data-chips="'+m.id+'"></div></div>'; }).join('');
   _threadMids.forEach(renderReactionsFor);
@@ -1655,15 +1661,20 @@ function quickEmojis(){
   for(const e of QUICK_REACT){ if(out.length>=6) break; if(out.indexOf(e)<0) out.push(e); }
   return out.slice(0,6);
 }
-function pickReaction(mid, friendUid, e){ setReaction(mid, friendUid, e); bumpEmoji(e); closeReactBar(); closeEmojiPicker(); }
+function pickReaction(mid, friendUid, e){ haptic(8); setReaction(mid, friendUid, e); bumpEmoji(e); closeReactUI(); }
 function closeReactBar(){ const b=$("reactBar"); if(b) b.remove(); }
 function closeEmojiPicker(){ const p=$("emojiPicker"); if(p) p.remove(); }
 function closeReactUI(){ closeReactBar(); closeEmojiPicker(); }
 function showReactBar(bubble, mid, friendUid){
   closeReactUI();
+  const info=_threadMsgs[mid]||{}, mine=info.mine, text=info.text;
   const bar=document.createElement("div"); bar.className="react-bar"; bar.id="reactBar";
-  bar.innerHTML=quickEmojis().map(e=>'<button class="react-pick" data-e="'+e+'">'+e+'</button>').join('')
-    +'<button class="react-pick react-more" id="reactMore" aria-label="More emojis">'+ICON.plus+'</button>';
+  let acts='<button class="ract" data-act="copy">Copy</button>';
+  if(mine){ acts+='<button class="ract" data-act="edit">Edit</button><button class="ract del" data-act="delete">Delete</button>'; }
+  bar.innerHTML='<div class="react-row">'
+      +quickEmojis().map(e=>'<button class="react-pick" data-e="'+e+'">'+e+'</button>').join('')
+      +'<button class="react-pick react-more" id="reactMore" aria-label="More emojis">'+ICON.plus+'</button></div>'
+    +'<div class="react-menu">'+acts+'</div>';
   document.body.appendChild(bar);
   const r=bubble.getBoundingClientRect(), bw=bar.offsetWidth, bh=bar.offsetHeight, vw=window.innerWidth, vh=window.innerHeight;
   let top=r.top-bh-8; if(top<8) top=r.bottom+8;              // prefer above the bubble, else below
@@ -1672,7 +1683,42 @@ function showReactBar(bubble, mid, friendUid){
   bar.style.top=top+"px";
   bar.querySelectorAll(".react-pick[data-e]").forEach(b=> b.onclick=()=>pickReaction(mid, friendUid, b.dataset.e));
   bar.querySelector("#reactMore").onclick=()=> openEmojiPicker(mid, friendUid);
+  bar.querySelectorAll(".ract").forEach(b=> b.onclick=()=>{ const a=b.dataset.act; closeReactUI();
+    if(a==="copy" && text!=null){ try{ navigator.clipboard.writeText(text); toast("Copied"); }catch(_){} }
+    else if(a==="edit"){ startEdit(mid, friendUid, text); }
+    else if(a==="delete"){ deleteMessage(mid); } });
   setTimeout(()=> document.addEventListener("pointerdown", function _o(e){ if(!e.target.closest(".react-bar") && !e.target.closest(".emoji-picker")){ closeReactUI(); document.removeEventListener("pointerdown",_o); } }), 0);
+}
+// edit / delete your own messages (RLS: sender may update; sender or recipient may delete)
+let _editingMid=null, _editFriend=null;
+function startEdit(mid, friendUid, text){
+  if(text==null) return; _editingMid=mid; _editFriend=friendUid;
+  const inp=$("msgInput"); if(inp){ inp.value=text; inp.focus(); try{ inp.setSelectionRange(text.length,text.length); }catch(_){} }
+  const send=$("msgSend"); if(send) send.textContent="Save";
+  showEditBanner(true);
+}
+function cancelEdit(){ _editingMid=null; _editFriend=null; const inp=$("msgInput"); if(inp) inp.value=""; const send=$("msgSend"); if(send) send.textContent="Send"; showEditBanner(false); }
+function showEditBanner(on){
+  let b=$("msgEditBar");
+  if(!on){ if(b) b.remove(); return; }
+  if(!b){ b=document.createElement("div"); b.className="msg-editbar"; b.id="msgEditBar";
+    b.innerHTML='<span>Editing message</span><span class="msg-link" id="msgEditCancel">Cancel</span>';
+    const c=$("msgBody").querySelector(".msg-compose"); if(c) c.parentNode.insertBefore(b, c);
+    $("msgEditCancel").onclick=cancelEdit; }
+}
+async function editMessage(mid, friendUid, text){
+  text=(text||"").trim(); if(!text || !cloudReady()) return false;
+  const enc=await e2eEncrypt(friendUid, text); if(!enc) return false;
+  try{ await sb.from("direct_messages").update({ ciphertext:enc.ciphertext, iv:enc.iv, salt:enc.salt, edited_at:new Date().toISOString() }).eq("id",mid).eq("sender",cloudUser.id); }
+  catch(e){ toast("Couldn't save the edit."); return false; }
+  return true;
+}
+async function deleteMessage(mid){
+  if(!cloudReady()) return;
+  if(_editingMid===mid) cancelEdit();
+  haptic(12);
+  const row=document.querySelector('.msg-bubble[data-mid="'+mid+'"]'); if(row){ const r=row.closest(".msg-row"); if(r) r.remove(); }   // optimistic
+  try{ await sb.from("direct_messages").delete().eq("id",mid); }catch(e){}
 }
 // full emoji picker (the "+" on the reaction bar) — a scrollable, categorised grid
 const EMOJI_GROUPS=[
@@ -1695,12 +1741,12 @@ function attachReactions(box, friendUid){
   box.querySelectorAll(".msg-bubble[data-mid]").forEach(bubble=>{
     const mid=+bubble.dataset.mid;
     bubble.addEventListener("pointerdown",e=>{ lpFired=false; dx=e.clientX; dy=e.clientY;
-      clearTimeout(lpTimer); lpTimer=setTimeout(()=>{ lpFired=true; showReactBar(bubble, mid, friendUid); }, 450); });
+      clearTimeout(lpTimer); lpTimer=setTimeout(()=>{ lpFired=true; haptic(12); showReactBar(bubble, mid, friendUid); }, 450); });
     bubble.addEventListener("pointermove",e=>{ if(Math.abs(e.clientX-dx)>10 || Math.abs(e.clientY-dy)>10) clearTimeout(lpTimer); });
     bubble.addEventListener("pointercancel",()=> clearTimeout(lpTimer));
     bubble.addEventListener("pointerup",()=>{ clearTimeout(lpTimer); if(lpFired) return;   // long-press already handled
       const now=Date.now();
-      if(lastMid===mid && now-lastTap<300){ lastTap=0; lastMid=0; setReaction(mid, friendUid, "❤️", true); }   // double-tap → ❤️ toggle
+      if(lastMid===mid && now-lastTap<300){ lastTap=0; lastMid=0; haptic(8); setReaction(mid, friendUid, "❤️", true); }   // double-tap → ❤️ toggle
       else { lastTap=now; lastMid=mid; } });
   });
 }
