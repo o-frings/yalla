@@ -1606,6 +1606,7 @@ async function openThread(uid,name){
   if(!fpub){ $("msgThread").innerHTML='<div class="msg-empty"><div class="msg-empty-ic">'+ICON.key+'</div><p>'+esc(name)+" hasn't opened messaging yet, so there's no key to encrypt to. Once they open Messages once, you can chat.</p></div>"; return; }
   await renderThread(uid);
   markRead(uid);
+  coach("dmThread","Long-press a message to react, edit or delete · double-tap to ❤️.");   // one-time hint
   // live updates from this friend (RLS only delivers rows we share): their reactions, and their
   // edits/deletes/sends to the thread.
   if(_msgThreadChan){ try{ sb.removeChannel(_msgThreadChan); }catch(e){} }
@@ -3190,7 +3191,7 @@ $("openSettings").onclick=()=>{ renderDash(); renderAccount(); openSheet("Settin
 $("settingsClose").onclick=()=>closeSheet("Settings");
 $("scrimSettings").onclick=()=>closeSheet("Settings");
 // Friends sheet (the people) — opened from the Overview presence rail or Settings → Friends
-function openFriends(){ renderFriends(); openSheet("Friends"); }
+function openFriends(){ renderFriends(); openSheet("Friends"); if(cloudReady() && dbHardened) coach("dmFriend","Tap a friend to open their profile · long-press to message them."); }
 if($("friendsClose")) $("friendsClose").onclick=()=>closeSheet("Friends");
 if($("scrimFriends")) $("scrimFriends").onclick=()=>closeSheet("Friends");
 // end-to-end encrypted messages: open from the Friends hub
@@ -5614,6 +5615,10 @@ function coach(id, msg){
   $("coachTxt").textContent=msg; $("coach").classList.add("show");
 }
 $("coachX").onclick=()=>$("coach").classList.remove("show");
+
+// keep the app portrait. The manifest already declares orientation:portrait (honored by installed
+// PWAs / Android); this is a best-effort runtime lock where the API exists. iOS Safari ignores it.
+try{ if(screen.orientation && screen.orientation.lock) screen.orientation.lock("portrait").catch(()=>{}); }catch(e){}
 
 init();
 
