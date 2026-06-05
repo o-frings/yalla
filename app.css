@@ -105,7 +105,7 @@
   .tmrbtn svg{ width:18px; height:18px; }
   .tmrtime{ font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.5px; min-width:52px; }
   .timerbar.run .tmrtime{ color:var(--accent); }
-  .tmrlbl{ font-size:12px; color:var(--l3); flex:1; }
+  .tmrlbl{ font-size:12px; color:var(--l3); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   /* idle (not yet started): hide the 0:00 + reset so it reads as a single small "Start" affordance */
   .timerbar.idle .tmrtime{ display:none; }
   .timerbar.idle .tmrreset{ display:none; }
@@ -128,28 +128,26 @@
     background:transparent; color:var(--accent); font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; outline:none; }
   .restadj{ display:inline-flex; gap:6px; }
   .restadj button{ background:var(--card); border:.5px solid var(--line); color:var(--ink); border-radius:8px; padding:12px 16px; font-size:13px; font-weight:600; cursor:pointer; transition:transform .12s; }
-  /* Share live + Train together — two compact cells on one line; each panel drops full-width below */
-  .socialwrap{ margin:2px 0 16px; }
-  .socialrow{ display:flex; align-items:stretch; gap:8px; }
-  .socialcell{ flex:1 1 0; min-width:0; display:flex; align-items:center; gap:8px; padding:7px 11px; border-radius:14px; background:var(--row); border:.5px solid var(--line); transition:background .15s, border-color .15s; }
-  .socialtap{ display:flex; align-items:center; gap:8px; flex:1; min-width:0; background:none; border:none; cursor:pointer; color:var(--ink); font:inherit; padding:0; text-align:left; -webkit-tap-highlight-color:transparent; }
-  .socialtap:active{ opacity:.55; }
-  .socialic{ flex:0 0 auto; width:22px; height:22px; color:var(--ink); transition:color .15s; }
-  .liveswitch, .gymlbl{ flex:0 1 auto; min-width:0; font-weight:600; font-size:14px; color:var(--ink); line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  /* live broadcast toggle */
+  /* Train together + Share live: compact icons folded into the right of the timer bar; panels drop below */
+  .tmrsocial{ display:inline-flex; align-items:center; gap:0; flex:0 0 auto; margin-right:-3px; }
+  .tsoc{ display:inline-flex; align-items:center; }
+  .tsoc-btn{ display:inline-flex; align-items:center; gap:4px; background:none; border:none; cursor:pointer; color:var(--l2); padding:6px 4px; border-radius:10px; line-height:1; -webkit-tap-highlight-color:transparent; }
+  .tsoc-btn:active{ opacity:.5; }
+  .socialic, .liveic{ flex:0 0 auto; width:21px; height:21px; color:var(--l2); transition:color .15s; }
+  .gymwrap.on .socialic{ color:#0a84ff; }                                           /* checked in → blue */
+  .livewrap.on .liveic{ color:var(--red); animation:liveiconpulse 1.6s infinite; }  /* live → red, gentle pulse */
+  @keyframes liveiconpulse{ 0%,100%{ opacity:1; } 50%{ opacity:.45; } }
+  /* Share live panel — broadcast toggle + choose-who chips */
+  .livepanel{ padding:8px 2px 2px; }
+  .livepanel[hidden]{ display:none; }
+  .livestart{ display:flex; align-items:center; gap:10px; padding:4px 2px 8px; cursor:pointer; }
+  .livestart>span:first-child{ flex:1; min-width:0; font-weight:600; font-size:15px; color:var(--ink); }
   .livesw{ position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
-  .liveswlbl{ flex:0 0 auto; display:inline-flex; align-items:center; cursor:pointer; }
   .liveswui{ position:relative; flex:0 0 auto; box-sizing:border-box; width:44px; height:26px; border-radius:13px; background:var(--line); transition:background .2s; }
   .liveswui::after{ content:""; position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .2s; }
   .livesw:checked + .liveswui{ background:var(--red); }
   .livesw:checked + .liveswui::after{ transform:translateX(18px); }
-  .livebcast{ flex:0 0 auto; width:20px; height:20px; display:flex; align-items:center; justify-content:center; }
-  .ldot{ width:11px; height:11px; border-radius:50%; background:var(--l3); transition:background .2s; }
-  .livewrap.on{ background:rgba(255,59,48,.10); border-color:rgba(255,59,48,.32); }
-  .livewrap.on .liveswitch{ color:var(--red); }
-  /* the glimmer — a pulsating live dot with a radiating halo (livepulse) */
-  .livewrap.on .ldot{ background:var(--red); animation:livepulse 1.6s infinite; }
-  .livepick{ display:flex; flex-wrap:wrap; gap:8px; padding:10px 4px 2px; }
+  .livepick{ display:flex; flex-wrap:wrap; gap:8px; padding:6px 4px 2px; }
   .livepick[hidden]{ display:none; }
   .livechip{ display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:600; padding:4px 12px 4px 4px; border-radius:18px; border:.5px solid var(--line); background:var(--row); color:var(--ink); cursor:pointer; transition:background .12s, border-color .12s, color .12s; }
   .livechip .avatar{ box-shadow:inset 0 0 0 .5px rgba(255,255,255,.18); }
@@ -163,18 +161,23 @@
   .livedot{ width:10px; height:10px; border-radius:50%; background:var(--red); flex:0 0 auto; animation:livepulse 1.6s infinite; }
   .livego{ color:var(--accent); font-weight:600; flex:0 0 auto; font-size:14px; }
   @keyframes livepulse{ 0%{ box-shadow:0 0 0 0 rgba(255,55,95,.5);} 70%{ box-shadow:0 0 0 8px rgba(255,55,95,0);} 100%{ box-shadow:0 0 0 0 rgba(255,55,95,0);} }
-  /* Train together — sibling cell: check in with a gym code; friends on the same one appear here */
-  .gym-faces{ display:inline-flex; flex:1 1 auto; min-width:0; justify-content:flex-end; overflow:hidden; }
-  .gym-faces .avatar{ margin-left:-9px; box-shadow:0 0 0 2px var(--row); }
-  .gym-faces .avatar:first-child{ margin-left:0; }
-  .gymwrap.on{ background:rgba(10,132,255,.10); border-color:rgba(10,132,255,.30); }
-  .gymwrap.on .gymlbl, .gymwrap.on .socialic{ color:#0a84ff; }   /* cohesive blue (matches the tint), distinct from live's red */
+  /* Train together — bar icon + a face-pile of who's checked in; panel holds the gym-code entry */
+  .tsoc .gym-faces{ display:inline-flex; flex:0 0 auto; min-width:0; }
+  .tsoc .gym-faces .avatar{ margin-left:-7px; box-shadow:0 0 0 2px var(--bg); }
+  .tsoc .gym-faces .avatar:first-child{ margin-left:0; }
   .gympanel{ padding:10px 4px 2px; }
   .gympanel[hidden]{ display:none; }
   .gymhint{ font-size:12px; color:var(--l2); margin:0 4px 8px; line-height:1.4; }
   .gympanel-row{ display:flex; gap:8px; align-items:center; }
   .gympanel-row input{ flex:1; min-width:0; }
   .titleBtn .tchev{ width:22px; height:22px; color:var(--l3); vertical-align:-3px; margin-left:4px; }
+  /* compact training-mode toggle in the title (replaces the full-width Strength/Cardio segment) */
+  .modebtn{ flex:0 0 auto; align-self:center; display:inline-flex; align-items:center; gap:6px; background:var(--accent-soft); color:var(--accent); border:none; font-family:inherit; font-size:13px; font-weight:600; padding:6px 11px; border-radius:16px; cursor:pointer; line-height:1; transition:transform .12s; }
+  .modebtn:active{ transform:scale(.95); }
+  .modebtn .mic{ width:16px; height:16px; flex:0 0 auto; }
+  .modebtn .mic-car{ display:none; }
+  .modebtn.cardio .mic-str{ display:none; }
+  .modebtn.cardio .mic-car{ display:inline; }
   .ic{ width:16px; height:16px; vertical-align:-3px; }
   .btn .ic{ margin-right:8px; }
   .swapnote .ic{ width:13px; height:13px; vertical-align:-2px; margin-right:4px; }

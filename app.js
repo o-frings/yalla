@@ -1113,7 +1113,7 @@ function updateLiveRow(){
 // toggle. Always-on grantees (Settings → Friends) are shown locked-on — they always see you live.
 let _liveFollowers=null;
 function toggleLivePick(){
-  const box=$("livePick"), btn=$("livePickBtn"); if(!box||!btn) return;
+  const box=$("livePanel"), btn=$("livePickBtn"); if(!box||!btn) return;   // tapping the bar icon opens the panel (toggle + choose-who)
   const open=box.hasAttribute("hidden");
   box.toggleAttribute("hidden", !open); btn.classList.toggle("open", open);
   if(open && _liveFollowers===null) loadLivePicks();
@@ -1249,7 +1249,7 @@ function updateGymRow(){
   if(lbl) lbl.textContent = on ? ("At "+_gymCode) : "Train together";
   if(faces){
     if(on && _gymBuddies.length){
-      faces.innerHTML=_gymBuddies.slice(0,3).map(u=>'<span class="gymface" data-uid="'+esc(u.user_id)+'" data-nm="'+esc(u.display_name||"Friend")+'">'+avatarHTML(u.display_name,{size:22,uid:u.user_id})+'</span>').join('');
+      faces.innerHTML=_gymBuddies.slice(0,2).map(u=>'<span class="gymface" data-uid="'+esc(u.user_id)+'" data-nm="'+esc(u.display_name||"Friend")+'">'+avatarHTML(u.display_name,{size:18,uid:u.user_id})+'</span>').join('');
       faces.querySelectorAll(".gymface").forEach(el=> bindFriendTap(el, el.dataset.uid, el.dataset.nm));   // tap → profile, long-press → chat
     } else faces.innerHTML="";
   }
@@ -4744,12 +4744,13 @@ function renderCardioLog(){
 }
 function renderCardio(){ renderCardioChips(); updateCardioPreview(); renderCardioLog(); }
 function setTrainMode(m){ trainMode=m;
-  document.querySelectorAll("#trainModeSeg .s").forEach(x=>x.classList.toggle("active", x.dataset.m===m));
+  const b=$("trainModeBtn"); if(b) b.classList.toggle("cardio", m==="cardio");
+  const l=$("trainModeLbl"); if(l) l.textContent = m==="cardio" ? "Cardio" : "Strength";
   $("strengthWrap").style.display = m==="cardio" ? "none" : "";
   $("cardioPanel").style.display  = m==="cardio" ? "" : "none";
   if(m==="cardio") renderCardio();
 }
-document.querySelectorAll("#trainModeSeg .s").forEach(s=> s.onclick=()=> setTrainMode(s.dataset.m));
+if($("trainModeBtn")) $("trainModeBtn").onclick=()=> setTrainMode(trainMode==="cardio" ? "strength" : "cardio");
 ["cdDist","cdTime","cdPace"].forEach(id=> $(id).addEventListener("input", cdRunCalc));
 $("cdMin").addEventListener("input", updateCardioPreview);
 $("cdLog").onclick=()=>{
