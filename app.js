@@ -252,24 +252,26 @@ const MUSCLES = {
   "Machine Shoulder Press":["Front Delts","Side Delts","Triceps"],"Arnold Press":["Front Delts","Side Delts","Triceps"],"Push Press":["Front Delts","Side Delts","Triceps"],
   "Landmine Press":["Front Delts","Chest"],"Shoulder Press":["Front Delts","Side Delts","Triceps"],"Band Overhead Press":["Front Delts","Side Delts","Triceps"],
   "Wall Handstand Hold":["Front Delts","Side Delts"],"Lateral Raise":["Side Delts"],"Cable Lateral Raise":["Side Delts"],
-  "Dumbbell Lateral Raise":["Side Delts"],"Machine Lateral Raise":["Side Delts"],"Upright Row":["Side Delts","Back"],
-  "Face Pulls":["Rear Delts","Back"],"Face Pull":["Rear Delts","Back"],"Band Pull-Apart":["Rear Delts","Back"],"Band Pull-Aparts":["Rear Delts","Back"],
-  "Reverse Pec-Deck":["Rear Delts","Back"],"Reverse Pec Deck":["Rear Delts","Back"],"Rear-Delt Fly":["Rear Delts"],"Rear Delt Fly":["Rear Delts"],
-  "Cable Rear Delt Fly":["Rear Delts"],"Bent-Over Lateral Raise":["Rear Delts"],"Prone Y-Raise":["Rear Delts","Back"],
-  "Bent-Over Row":["Back","Biceps","Rear Delts"],"Chest-Supported Row":["Back","Biceps","Rear Delts"],"One-Arm DB Row":["Back","Biceps","Rear Delts"],
-  "T-Bar Row":["Back","Biceps","Rear Delts"],"Seated Row":["Back","Biceps","Rear Delts"],"Band Row":["Back","Biceps","Rear Delts"],"Towel Row":["Back","Biceps","Rear Delts"],
-  "Backpack Bent-Over Row":["Back","Biceps","Rear Delts"],"Inverted Row":["Back","Biceps","Rear Delts"],"Inverted / Backpack Row":["Back","Biceps","Rear Delts"],
-  "Lat Pulldown":["Back","Biceps"],"Pull-Ups":["Back","Biceps"],"Pull-Up":["Back","Biceps"],"Weighted Pull-Up":["Back","Biceps"],
-  "Assisted Pull-Up":["Back","Biceps"],"Incline DB Curl":["Biceps"],"Hammer Curl":["Biceps"],
+  "Dumbbell Lateral Raise":["Side Delts"],"Machine Lateral Raise":["Side Delts"],"Upright Row":["Side Delts","Upper Back"],
+  "Face Pulls":["Rear Delts","Upper Back"],"Face Pull":["Rear Delts","Upper Back"],"Band Pull-Apart":["Rear Delts","Upper Back"],"Band Pull-Aparts":["Rear Delts","Upper Back"],
+  "Reverse Pec-Deck":["Rear Delts","Upper Back"],"Reverse Pec Deck":["Rear Delts","Upper Back"],"Rear-Delt Fly":["Rear Delts"],"Rear Delt Fly":["Rear Delts"],
+  "Cable Rear Delt Fly":["Rear Delts"],"Bent-Over Lateral Raise":["Rear Delts"],"Prone Y-Raise":["Rear Delts","Upper Back"],
+  // rows hit the upper-back (traps/rhomboids) hardest, with the lats and biceps assisting
+  "Bent-Over Row":["Upper Back","Lats","Biceps"],"Chest-Supported Row":["Upper Back","Lats","Biceps"],"One-Arm DB Row":["Upper Back","Lats","Biceps"],
+  "T-Bar Row":["Upper Back","Lats","Biceps"],"Seated Row":["Upper Back","Lats","Biceps"],"Band Row":["Upper Back","Lats","Biceps"],"Towel Row":["Upper Back","Lats","Biceps"],
+  "Backpack Bent-Over Row":["Upper Back","Lats","Biceps"],"Inverted Row":["Upper Back","Lats","Biceps"],"Inverted / Backpack Row":["Upper Back","Lats","Biceps"],
+  // vertical pulls are lat-dominant
+  "Lat Pulldown":["Lats","Biceps"],"Pull-Ups":["Lats","Biceps"],"Pull-Up":["Lats","Biceps"],"Weighted Pull-Up":["Lats","Biceps"],
+  "Assisted Pull-Up":["Lats","Biceps"],"Incline DB Curl":["Biceps"],"Hammer Curl":["Biceps","Forearms"],
   "EZ-Bar Curl":["Biceps"],"Barbell Curl":["Biceps"],"Cable Curl":["Biceps"],"Preacher Curl":["Biceps"],
   "Triceps Pushdown":["Triceps"],"Overhead Triceps Extension":["Triceps"],
   "Back Squat":["Quads","Glutes"],"Front Squat":["Quads","Glutes"],"Goblet Squat":["Quads","Glutes"],"Hack Squat":["Quads","Glutes"],
   "Leg Press":["Quads","Glutes"],"Sissy Squat":["Quads"],"Leg Extension":["Quads"],"Walking Lunges":["Quads","Glutes"],
   "Walking Lunge":["Quads","Glutes"],"Reverse Lunge":["Quads","Glutes"],"Bulgarian Split Squat":["Quads","Glutes"],
   "Step-Up":["Quads","Glutes"],"Front-Foot-Elevated Split Squat":["Quads","Glutes"],"Pistol Progression":["Quads","Glutes"],
-  "Romanian Deadlift":["Hamstrings","Glutes"],"Single-Leg RDL":["Hamstrings","Glutes"],"Good Morning":["Hamstrings","Glutes"],
-  "Deadlift":["Hamstrings","Glutes","Back"],"Trap-Bar Deadlift":["Quads","Glutes","Back"],"Rack Pull":["Back","Hamstrings"],
-  "Back Extension":["Hamstrings","Glutes"],"Seated Leg Curl":["Hamstrings"],"Lying Leg Curl":["Hamstrings"],"Leg Curl":["Hamstrings"],
+  "Romanian Deadlift":["Hamstrings","Glutes","Lower Back"],"Single-Leg RDL":["Hamstrings","Glutes"],"Good Morning":["Hamstrings","Glutes","Lower Back"],
+  "Deadlift":["Hamstrings","Glutes","Lower Back"],"Trap-Bar Deadlift":["Quads","Glutes","Lower Back"],"Rack Pull":["Upper Back","Lower Back"],
+  "Back Extension":["Lower Back","Glutes","Hamstrings"],"Seated Leg Curl":["Hamstrings"],"Lying Leg Curl":["Hamstrings"],"Leg Curl":["Hamstrings"],
   "Nordic Curl":["Hamstrings"],"Swiss-Ball Curl":["Hamstrings"],"Hip Thrust":["Glutes","Hamstrings"],
   "Single-Leg Hip Thrust":["Glutes","Hamstrings"],"Glute Bridge":["Glutes","Hamstrings"],"Single-Leg Glute Bridge":["Glutes","Hamstrings"],
   "Hip Thrust Machine":["Glutes","Hamstrings"],"Cable Pull-Through":["Glutes","Hamstrings"],"Hip Abduction":["Glutes"],
@@ -280,19 +282,26 @@ const MUSCLES = {
   "Ab Wheel Rollout":["Core"],"Weighted Plank":["Core"],"Plank":["Core"],"Hollow Hold (sec)":["Core"],"Hollow Hold":["Core"],
   "Hollow Hold + Leg Raises":["Core"],"Leg Raises":["Core"],"Dead Bug":["Core"],"Pallof Press":["Core"],
   // posture / corrective
-  "Chin Tuck":["Neck"],"Chin Tucks":["Neck"],"Wall Slide":["Rear Delts","Back"],"Wall Slides":["Rear Delts","Back"],
-  "Scapular Wall Slide":["Rear Delts","Back"],"Wall Angels":["Rear Delts","Back"],"Prone Y-T-W":["Rear Delts","Back"],
-  "Prone T-Raise":["Rear Delts"],"Superman":["Back","Glutes"],"Bird Dog":["Core"],"Cat-Cow":["Core"],
+  "Chin Tuck":["Neck"],"Chin Tucks":["Neck"],"Wall Slide":["Rear Delts","Upper Back"],"Wall Slides":["Rear Delts","Upper Back"],
+  "Scapular Wall Slide":["Rear Delts","Upper Back"],"Wall Angels":["Rear Delts","Upper Back"],"Prone Y-T-W":["Rear Delts","Upper Back"],
+  "Prone T-Raise":["Rear Delts"],"Superman":["Lower Back","Glutes"],"Bird Dog":["Core"],"Cat-Cow":["Core"],
+  // forearm & adductor isolation (new detailed groups)
+  "Wrist Curl":["Forearms"],"Reverse Wrist Curl":["Forearms"],"Farmer's Carry":["Forearms","Core"],
+  "Hip Adduction":["Adductors"],"Cable Adduction (inner)":["Adductors"],"Cossack Squat":["Adductors","Quads","Glutes"],"Copenhagen Plank":["Adductors","Core"],
 };
 const MCOLOR={ Chest:"#ff6b6b", Back:"#4dabf7", Shoulders:"#f59f00", Biceps:"#9775fa", Triceps:"#ff8787",
   Quads:"#20c997", Hamstrings:"#51cf66", Glutes:"#f783ac", Calves:"#74c0fc", Core:"#ffd43b", Other:"#adb5bd",
-  "Front Delts":"#f59f00", "Side Delts":"#ffa94d", "Rear Delts":"#e8590c", Neck:"#15aabf" };
+  "Front Delts":"#f59f00", "Side Delts":"#ffa94d", "Rear Delts":"#e8590c", Neck:"#15aabf",
+  // detailed back split + new auxiliary groups (Back kept above as a legacy alias for old data / cardio chips)
+  Lats:"#4dabf7", "Upper Back":"#3b8fd9", "Lower Back":"#1f6fb2", Forearms:"#b197fc", Adductors:"#38d9a9" };
 function muscleFor(name){
   if(MUSCLES[name]) return MUSCLES[name];
   const n=String(name).toLowerCase();
-  if(/face pull|rear|reverse fly|reverse pec|band pull|bent.?over lateral|prone y/.test(n)) return ["Rear Delts","Back"];
-  if(/\brow\b/.test(n)) return ["Back","Biceps","Rear Delts"];
-  if(/pulldown|pull.?up|chin.?up|\blat\b/.test(n)) return ["Back","Biceps"];
+  if(/face pull|rear|reverse fly|reverse pec|band pull|bent.?over lateral|prone y/.test(n)) return ["Rear Delts","Upper Back"];
+  if(/wrist curl|forearm/.test(n)) return ["Forearms"];
+  if(/adduction|adductor|cossack|copenhagen/.test(n)) return ["Adductors"];
+  if(/\brow\b/.test(n)) return ["Upper Back","Lats","Biceps"];
+  if(/pulldown|pull.?up|chin.?up|\blat\b|pullover/.test(n)) return ["Lats","Biceps"];
   if(/bench|chest|\bpec\b|push.?up|\bdip\b|fly/.test(n)) return ["Chest","Triceps"];
   if(/calf|calves/.test(n)) return ["Calves"];
   if(/leg curl|hamstring|nordic/.test(n)) return ["Hamstrings"];
@@ -318,12 +327,12 @@ function listWords(a){ return a.length<2?(a[0]||""):a.slice(0,-1).join(", ")+" a
 Object.assign(MUSCLES, {
   "Incline Bench Press":["Chest","Front Delts","Triceps"], "Decline Bench Press":["Chest","Triceps"],
   "Cable Fly":["Chest"], "Pec Deck":["Chest"], "Dumbbell Fly":["Chest"], "Incline Dumbbell Fly":["Chest"],
-  "Cable Crossover":["Chest"], "Low-to-High Cable Fly":["Chest"], "Dumbbell Pullover":["Back","Chest"],
-  "Straight-Arm Pulldown":["Back"], "T-Bar Row":["Back","Biceps","Rear Delts"], "Chest-Supported Row":["Back","Biceps","Rear Delts"],
-  "Meadows Row":["Back","Biceps","Rear Delts"], "Front Raise":["Front Delts"], "Upright Row":["Side Delts","Back"],
+  "Cable Crossover":["Chest"], "Low-to-High Cable Fly":["Chest"], "Dumbbell Pullover":["Lats","Chest"],
+  "Straight-Arm Pulldown":["Lats"], "T-Bar Row":["Upper Back","Lats","Biceps"], "Chest-Supported Row":["Upper Back","Lats","Biceps"],
+  "Meadows Row":["Upper Back","Lats","Biceps"], "Front Raise":["Front Delts"], "Upright Row":["Side Delts","Upper Back"],
   "Rear Delt Fly":["Rear Delts"], "Cable Lateral Raise":["Side Delts"],
-  "Dumbbell Lateral Raise":["Side Delts"], "Reverse Pec Deck":["Rear Delts","Back"], "Cable Rear Delt Fly":["Rear Delts"], "Bent-Over Lateral Raise":["Rear Delts"],
-  "Concentration Curl":["Biceps"], "Spider Curl":["Biceps"], "Reverse Curl":["Biceps"],
+  "Dumbbell Lateral Raise":["Side Delts"], "Reverse Pec Deck":["Rear Delts","Upper Back"], "Cable Rear Delt Fly":["Rear Delts"], "Bent-Over Lateral Raise":["Rear Delts"],
+  "Concentration Curl":["Biceps"], "Spider Curl":["Biceps"], "Reverse Curl":["Forearms","Biceps"],
   "Triceps Kickback":["Triceps"], "Skull Crusher":["Triceps"], "Close-Grip Bench Press":["Triceps","Chest"],
   "Sissy Squat":["Quads"], "Hack Squat":["Quads","Glutes"], "Walking Lunge":["Quads","Glutes"],
   "Step-Up":["Quads","Glutes"], "Glute Kickback":["Glutes"], "Cable Pull-Through":["Glutes","Hamstrings"],
@@ -332,23 +341,23 @@ Object.assign(MUSCLES, {
   "Russian Twist":["Core"], "Cable Woodchopper":["Core"], "Pallof Press":["Core"], "Landmine Rotation":["Core"],
   "Cable Rotation":["Core"], "Medicine Ball Rotational Throw":["Core"], "Bicycle Crunch":["Core"],
   "Reverse Crunch":["Core"], "Side Plank":["Core"], "Mountain Climbers":["Core"], "Bird Dog":["Core"],
-  "Dead Bug":["Core"], "Superman":["Back"]
+  "Dead Bug":["Core"], "Superman":["Lower Back"]
 });
 // ---- kettlebell catalogue ----
 // Ballistics (swing/snatch/clean/high-pull) are power/conditioning moves — high-rep or timed, never heavy/low-rep.
 // Grinds (squat/press/RDL/row/lunge/get-up) behave like any weighted move. KB_BALLISTIC gates the first group out
 // of strength / "intensity" days; KB_POOL drives the dedicated Kettlebell-only mode. See buildPlan.
 Object.assign(MUSCLES, {
-  "Two-Hand Kettlebell Swing":["Glutes","Hamstrings","Back"], "One-Arm Kettlebell Swing":["Glutes","Hamstrings","Back"],
+  "Two-Hand Kettlebell Swing":["Glutes","Hamstrings","Lower Back"], "One-Arm Kettlebell Swing":["Glutes","Hamstrings","Lower Back"],
   "Kettlebell Snatch":["Glutes","Hamstrings","Side Delts"], "Kettlebell Clean":["Glutes","Hamstrings","Biceps"],
-  "Kettlebell High Pull":["Side Delts","Back"], "Kettlebell Clean & Press":["Front Delts","Glutes","Triceps"],
+  "Kettlebell High Pull":["Side Delts","Upper Back"], "Kettlebell Clean & Press":["Front Delts","Glutes","Triceps"],
   "Kettlebell Front Squat":["Quads","Glutes"], "Kettlebell Overhead Press":["Front Delts","Triceps"],
   "Kettlebell Push Press":["Front Delts","Side Delts","Triceps"], "Kettlebell Romanian Deadlift":["Hamstrings","Glutes"],
-  "Kettlebell Row":["Back","Biceps","Rear Delts"], "Kettlebell Floor Press":["Chest","Triceps"],
+  "Kettlebell Row":["Upper Back","Lats","Biceps"], "Kettlebell Floor Press":["Chest","Triceps"],
   "Kettlebell Reverse Lunge":["Quads","Glutes"], "Kettlebell Bulgarian Split Squat":["Quads","Glutes"],
   "Turkish Get-Up":["Core","Front Delts","Glutes"], "Kettlebell Windmill":["Core","Hamstrings"],
   "Kettlebell Halo":["Side Delts","Core"], "Kettlebell Suitcase Carry":["Core","Side Delts"],
-  "Kettlebell Farmer's Carry":["Core","Back"]
+  "Kettlebell Farmer's Carry":["Forearms","Core","Upper Back"]
 });
 // ballistic / explosive KB moves — power & conditioning, kept off heavy strength/"intensity" days
 const KB_BALLISTIC=/kettlebell swing|kb swing|snatch|kettlebell clean|kb clean|high pull/;
@@ -364,8 +373,10 @@ const LIBRARY=[
   "Chin-Up","Straight-Arm Pulldown","Dumbbell Pullover","Face Pulls",
   "Seated DB Press","Arnold Press","Machine Shoulder Press","Cable Lateral Raise","Rear Delt Fly","Upright Row","Front Raise",
   "Barbell Curl","EZ-Bar Curl","Cable Curl","Preacher Curl","Concentration Curl","Spider Curl","Hammer Curl","Reverse Curl",
+  "Wrist Curl","Reverse Wrist Curl","Farmer's Carry",
   "Triceps Pushdown","Skull Crusher","Close-Grip Bench Press","Triceps Kickback",
   "Hack Squat","Leg Press","Leg Extension","Goblet Squat","Walking Lunge","Reverse Lunge","Step-Up","Sissy Squat",
+  "Hip Adduction","Cable Adduction (inner)","Cossack Squat","Copenhagen Plank","Back Extension","Rack Pull",
   "Lying Leg Curl","Single-Leg RDL","Nordic Curl","Good Morning","Cable Pull-Through",
   "Glute Bridge","Single-Leg Glute Bridge","Glute Kickback","Hip Abduction","Banded Side Steps",
   "Seated Calf Raise","Single-Leg Calf Raise","Leg-Press Calf Raise",
@@ -581,7 +592,9 @@ function muscleVolume(days, metric, volMode){
     });
   });
   if(metric==="vol"){
-    const splitM=m=> m==="Shoulders" ? ["Front Delts","Side Delts","Rear Delts"] : [m];
+    // expand coarse legacy/cardio muscle tokens into the detailed groups so old logs still land on the radar
+    const splitM=m=> m==="Shoulders" ? ["Front Delts","Side Delts","Rear Delts"]
+                   : m==="Back" ? ["Lats","Upper Back","Lower Back"] : [m];
     // Only resistance work done elsewhere (kind:"muscle") counts toward muscle volume. Cardio/activities
     // (kind:"cardio"/"activity") are a separate training axis tracked by minutes & zone — never the radar.
     (extlog||[]).forEach(e=>{ if(e.kind!=="muscle") return;
@@ -606,13 +619,13 @@ function planScores(plan){
   (plan.workouts||[]).forEach(w=>(w.ex||[]).forEach(e=>{ if(!e.n) return; const s=Math.max(1,parseInt(e.s)||3); sw+=hScore(e.n).s*s; ssum+=s; }));
   const hyp = ssum ? sw/ssum : 0;
   const {totals}=planVolume(plan);
-  const major=["Chest","Back","Front Delts","Side Delts","Rear Delts","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves","Core"];
+  const major=["Chest","Lats","Upper Back","Front Delts","Side Delts","Rear Delts","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves","Core"];
   const vals=major.map(m=>totals[m]||0), nz=vals.filter(v=>v>0);
   const coverage=nz.length/major.length;
   const mean=nz.length?nz.reduce((a,b)=>a+b,0)/nz.length:0;
   const sd=nz.length?Math.sqrt(nz.reduce((a,b)=>a+(b-mean)*(b-mean),0)/nz.length):1;
   const even=mean?Math.max(0,1-(sd/mean)):0;
-  const push=(totals.Chest||0)+(totals["Front Delts"]||0)+(totals["Side Delts"]||0)+(totals.Triceps||0), pull=(totals.Back||0)+(totals["Rear Delts"]||0)+(totals.Biceps||0);
+  const push=(totals.Chest||0)+(totals["Front Delts"]||0)+(totals["Side Delts"]||0)+(totals.Triceps||0), pull=(totals.Lats||0)+(totals["Upper Back"]||0)+(totals["Rear Delts"]||0)+(totals.Biceps||0);
   const ppl=(push&&pull)?Math.min(push,pull)/Math.max(push,pull):0;
   const quad=(totals.Quads||0), post=(totals.Hamstrings||0)+(totals.Glutes||0);
   const ql=(quad&&post)?Math.min(quad,post)/Math.max(quad,post):0;
@@ -2026,9 +2039,28 @@ function restReached(){ rest.alerted=true;
   beep(); toast("Rest target reached — next set!", true);
   $("restBar").classList.add("done"); }  // keep counting up until the next set restarts it (or skip)
 function restAdjust(d){ if(!$("restBar").classList.contains("show")) return; rest.target=Math.max(15,Math.min(1800,rest.target+d)); settings.restSec=rest.target; sset("settings",settings); if(rest.elapsed<rest.target){ rest.alerted=false; $("restBar").classList.remove("done"); } restRender(); }
+// set the rest target to an exact value (also the saved default for next time)
+function restSetTarget(sec){ rest.target=Math.max(5,Math.min(1800,Math.round(sec))); settings.restSec=rest.target; sset("settings",settings);
+  if(rest.elapsed<rest.target){ rest.alerted=false; $("restBar").classList.remove("done"); } restRender(); }
+function parseRest(v){ v=String(v).trim(); if(!v) return 0;
+  if(v.indexOf(":")>=0){ const p=v.split(":"); return (parseInt(p[0])||0)*60+(parseInt(p[1])||0); }
+  return parseInt(v)||0; }
+// tap the time → type an exact rest (mm:ss or seconds). The live counter is paused on the swapped-in input.
+let _restEditing=false;
+function restEdit(){ if(_restEditing || !$("restBar").classList.contains("show")) return; _restEditing=true;
+  const span=$("restTime"), inp=document.createElement("input");
+  inp.type="text"; inp.inputMode="numeric"; inp.className="restedit"; inp.value=tmrFmt(rest.target); inp.setAttribute("aria-label","Set rest time");
+  span.style.display="none"; span.parentNode.insertBefore(inp, span.nextSibling); inp.focus(); inp.select();
+  const done=commit=>{ if(!_restEditing) return; _restEditing=false;
+    if(commit){ const sec=parseRest(inp.value); if(sec) restSetTarget(sec); }
+    inp.remove(); span.style.display=""; restRender(); };
+  inp.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); done(true); } else if(e.key==="Escape"){ done(false); } };
+  inp.onblur=()=>done(true);
+}
 $("restSkip").onclick=restStop;
 $("restMinus").onclick=()=>restAdjust(-15);
 $("restPlus").onclick=()=>restAdjust(15);
+$("restTime").onclick=restEdit;
 $("exlist").addEventListener("change", e=>{ if(!e.target.classList||(!e.target.classList.contains("w")&&!e.target.classList.contains("r"))) return;
   const row=e.target.closest(".setrow"); if(!row) return;
   const wv=row.querySelector(".w").value.trim(), rv=row.querySelector(".r").value.trim();
@@ -2166,7 +2198,7 @@ async function init(){
     // ensure every loaded upper-body day trains the side and rear delts directly (not just as press/row helpers)
     const pp=plans.find(p=>p.id==="pushpull");
     if(pp){
-      const UPPER=["Chest","Back","Front Delts","Side Delts","Rear Delts"];
+      const UPPER=["Chest","Lats","Upper Back","Front Delts","Side Delts","Rear Delts"];
       const addBeforeCore=(w,ex)=>{ if(w.ex.some(e=>e.n===ex.n)) return; const ci=w.ex.findIndex(e=>muscleFor(e.n)[0]==="Core"); if(ci>=0) w.ex.splice(ci,0,ex); else w.ex.push(ex); };
       pp.workouts.forEach(w=>{
         const prims=(w.ex||[]).map(e=>muscleFor(e.n)[0]);
@@ -3180,7 +3212,8 @@ $("saveBtn").onclick=async()=>{
   swaps={};
   if(freeMode){ renderSeg(); renderFree(); renderDash(); }
   else { const ni=nextRotateIndex(p); if(w.rotate!==false && ni>=0) curWk=ni; renderSeg(); renderWorkout(); renderDash(); }
-  if(beaten>0){ celebrate(); if(navigator.vibrate) try{ navigator.vibrate([0,60,40,120]); }catch(e){} toast("New best! You beat "+beaten+" lift"+(beaten>1?"s":"")+" — keep climbing.", true); }
+  if(beaten>0){ celebrate(true); haptic([0,60,40,120]); toast("New best! You beat "+beaten+" lift"+(beaten>1?"s":"")+" — keep climbing.", true); }
+  else if(qualifies){ celebrate(false); haptic([0,30,40,70,40,130]); }   // every finished workout gets a buzz + confetti
   if(qualifies){
     openShareTile(session);
     cloudPublish(session);   // post a summary to the friends feed (no raw weights), if signed in + sharing on
@@ -3192,20 +3225,25 @@ $("saveBtn").onclick=async()=>{
   if(fresh.length) setTimeout(()=>celebrateAch(fresh), beaten>0?1300:1200);
 };
 
-function celebrate(){
+// confetti burst. big=true (a new PR) → more pieces, gold-leaning palette, wider spread, longer fall.
+function celebrate(big){
   if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const colors=["#f08020","#f5a040","#ff375f","#ffd60a","#fb923c","#fbbf24","#e8820c"];
+  const N=big?72:48;
+  const colors=big ? ["#ffd60a","#fbbf24","#f5a040","#fff3c4","#ff9f1c","#ff375f","#e8820c"]
+                   : ["#f08020","#f5a040","#ff375f","#ffd60a","#fb923c","#fbbf24","#e8820c"];
   const c=document.createElement("div"); c.className="confetti";
-  for(let i=0;i<40;i++){ const s=document.createElement("i");
+  for(let i=0;i<N;i++){ const s=document.createElement("i");
     s.style.left=Math.random()*100+"%";
     s.style.background=colors[i%colors.length];
-    s.style.animationDelay=(Math.random()*0.25)+"s";
-    s.style.setProperty("--dx",((Math.random()*2-1)*140)+"px");
+    s.style.animationDelay=(Math.random()*0.3)+"s";
+    s.style.setProperty("--dx",((Math.random()*2-1)*(big?210:150))+"px");
+    s.style.setProperty("--sz",(0.7+Math.random()*(big?1.2:0.8)).toFixed(2));   // size variety = depth
+    s.style.setProperty("--dur",(1.3+Math.random()*0.9).toFixed(2)+"s");        // staggered fall speed
     if(Math.random()>.5) s.style.borderRadius="50%";
     c.appendChild(s);
   }
   document.body.appendChild(c);
-  setTimeout(()=>c.remove(),1900);
+  setTimeout(()=>c.remove(), big?2600:2200);
 }
 
 // ================= plans sheet =================
@@ -3225,8 +3263,9 @@ function placeGoalBlock(){
   if($("goalStart")) $("goalStart").value = settings.goalStart!=null ? settings.goalStart : "";
   if($("goalTarget")) $("goalTarget").value = settings.goalTarget!=null ? settings.goalTarget : "";
 }
-$("openSettings").onclick=()=>{ renderDash(); renderAccount(); openSheet("Settings"); };
+$("openSettings").onclick=()=>{ renderDash(); renderAccount(); if($("setRestDefault")) $("setRestDefault").value=tmrFmt(settings.restSec||90); openSheet("Settings"); };
 $("settingsClose").onclick=()=>closeSheet("Settings");
+if($("setRestDefault")) $("setRestDefault").onchange=e=>{ const sec=parseRest(e.target.value); if(sec){ settings.restSec=Math.max(5,Math.min(1800,Math.round(sec))); sset("settings",settings); } e.target.value=tmrFmt(settings.restSec||90); };
 $("scrimSettings").onclick=()=>closeSheet("Settings");
 // Friends sheet (the people) — opened from the Overview presence rail or Settings → Friends
 function openFriends(){ renderFriends(); openSheet("Friends"); if(cloudReady() && dbHardened) coach("dmFriend","Tap a friend to open their profile · long-press to message them."); }
@@ -3648,12 +3687,14 @@ $("importBtn").onclick=async()=>{
 };
 
 // ================= muscle volume =================
-const MGROUPS=["Chest","Back","Front Delts","Side Delts","Rear Delts","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves","Core","Neck"];
-// Neck is a home for posture/neck moves (e.g. chin tucks) on every radar, but it carries NO weekly-
-// volume target: it shows a wedge when trained and is never flagged as under-trained / chased by the
-// plan builder or growth signal. Add muscles here to exempt them from the volume model.
-const NO_TARGET=new Set(["Neck"]);
-const MSHORT={Chest:"Chest",Back:"Back",Shoulders:"Delts",Biceps:"Biceps",Triceps:"Triceps",Quads:"Quads",Hamstrings:"Hams",Glutes:"Glutes",Calves:"Calves",Core:"Core","Front Delts":"F·Delt","Side Delts":"S·Delt","Rear Delts":"R·Delt",Neck:"Neck"};
+const MGROUPS=["Chest","Lats","Upper Back","Lower Back","Front Delts","Side Delts","Rear Delts","Biceps","Triceps","Forearms","Quads","Adductors","Hamstrings","Glutes","Calves","Core","Neck"];
+// NO_TARGET muscles show a wedge when trained but carry NO weekly-volume target: never flagged as
+// under-trained or chased by the plan builder / growth signal. Neck (posture moves), plus the smaller
+// detail groups — Lower Back (gets ample work from compounds), Forearms and Adductors (grip/inner-thigh
+// accessories most people don't program directly). They're still visible on the radar and emphasizable
+// in the builder; they're just not part of the "are you under-training this?" model.
+const NO_TARGET=new Set(["Neck","Lower Back","Forearms","Adductors"]);
+const MSHORT={Chest:"Chest",Back:"Back",Shoulders:"Delts",Biceps:"Biceps",Triceps:"Triceps",Quads:"Quads",Hamstrings:"Hams",Glutes:"Glutes",Calves:"Calves",Core:"Core","Front Delts":"F·Delt","Side Delts":"S·Delt","Rear Delts":"R·Delt",Neck:"Neck",Lats:"Lats","Upper Back":"U·Back","Lower Back":"L·Back",Forearms:"Forearm",Adductors:"Adduct"};
 let musWindow=7, musMetric="sets", musSrc="log", musVolMode="total";
 // Evidence-based weekly volume targets (fractional sets per muscle per week).
 // Dose-response meta-regressions: benefits accrue across ~10+ hard sets/muscle/wk; ~4–6 is a rough
@@ -3705,7 +3746,7 @@ function splitType(plan){
 function openAbout(plan){
   const obj=planObjective(plan), sc=planScores(plan), sp=splitType(plan), t=planVolume(plan).totals;
   const top=MGROUPS.slice().sort((a,b)=>(t[b]||0)-(t[a]||0)).filter(g=>(t[g]||0)>0).slice(0,3).map(g=>MSHORT[g]||g);
-  const missing=["Chest","Back","Quads","Hamstrings","Glutes"].filter(g=>(t[g]||0)<1);   // major movers with ~no direct work
+  const missing=["Chest","Lats","Upper Back","Quads","Hamstrings","Glutes"].filter(g=>(t[g]||0)<1);   // major movers with ~no direct work
   const balTxt = sc.balance>=4?"well-rounded coverage" : sc.balance>=3?"a deliberate lean toward its focus" : "a strong, narrow focus";
   const hypTxt = sc.hyp>=4?"a high growth stimulus" : sc.hyp>=3?"a solid growth stimulus" : "a lighter, technique-friendly stimulus";
   const look=[];
@@ -4211,9 +4252,9 @@ const INJURY_ADVICE={
     severe:"Severe pain after trauma or a fall, or a visible deformity, can mean a fracture — get it assessed before loading it again. Rest it fully meanwhile." }
 };
 // weak-spot chips (Me) → the analytics-muscle build keys they prioritise
-const WEAK_EXPAND={ chest:["chest"], back:["back"], shoulders:["shoulders","sidedelts","reardelts"], arms:["biceps","triceps"], quads:["quads"], hamstrings:["hamstrings"], glutes:["glutes"], calves:["calves"], core:["core"] };
+const WEAK_EXPAND={ chest:["chest"], back:["upperback","lats"], shoulders:["shoulders","sidedelts","reardelts"], arms:["biceps","triceps"], quads:["quads"], hamstrings:["hamstrings"], glutes:["glutes"], calves:["calves"], core:["core"] };
 // build key → its analytics-muscle (MGROUP) name, for reading weekly volume gaps
-const BUILD_MG={ chest:"Chest", back:"Back", shoulders:"Front Delts", sidedelts:"Side Delts", reardelts:"Rear Delts", biceps:"Biceps", triceps:"Triceps", quads:"Quads", hamstrings:"Hamstrings", glutes:"Glutes", calves:"Calves", core:"Core" };
+const BUILD_MG={ chest:"Chest", lats:"Lats", upperback:"Upper Back", lowerback:"Lower Back", shoulders:"Front Delts", sidedelts:"Side Delts", reardelts:"Rear Delts", biceps:"Biceps", triceps:"Triceps", forearms:"Forearms", quads:"Quads", adductors:"Adductors", hamstrings:"Hamstrings", glutes:"Glutes", calves:"Calves", core:"Core" };
 // Each injury carries its OWN severity: settings.activeInjuries is a map { key: 1|2|3 }.
 function activeInjuries(){                                                                     // the flagged injury keys
   const a=settings.activeInjuries;
@@ -4748,7 +4789,11 @@ function renderInsight(){
 // ================= automatic plan builder =================
 const BUILD_POOL={
   chest:["Barbell Bench Press","Incline DB Press","Machine Chest Press","Weighted Dip","Dumbbell Bench Press","Cable Fly","Pec Deck","Push-Ups","Decline Push-Ups","Diamond Push-Ups","Incline Push-Ups","Kettlebell Floor Press"],
-  back:["Weighted Pull-Up","Pull-Up","Chest-Supported Row","Bent-Over Row","Lat Pulldown","Seated Row","One-Arm DB Row","Face Pulls","Chin-Up","Inverted / Backpack Row","Superman","Kettlebell Row"],
+  lats:["Weighted Pull-Up","Pull-Up","Lat Pulldown","Chin-Up","Straight-Arm Pulldown","Dumbbell Pullover","One-Arm DB Row"],
+  upperback:["Chest-Supported Row","Bent-Over Row","Seated Row","One-Arm DB Row","T-Bar Row","Meadows Row","Face Pulls","Inverted / Backpack Row","Kettlebell Row"],
+  lowerback:["Back Extension","Good Morning","Rack Pull","Superman","Romanian Deadlift"],
+  forearms:["Wrist Curl","Reverse Wrist Curl","Hammer Curl","Reverse Curl","Farmer's Carry"],
+  adductors:["Hip Adduction","Cable Adduction (inner)","Cossack Squat","Copenhagen Plank"],
   shoulders:["Overhead Press","Seated DB Press","Machine Shoulder Press","Arnold Press","Pike Push-Ups","Kettlebell Overhead Press","Kettlebell Push Press","Kettlebell Clean & Press"],
   sidedelts:["Lateral Raise","Cable Lateral Raise","Dumbbell Lateral Raise","Machine Lateral Raise","Upright Row","Kettlebell High Pull"],
   reardelts:["Rear Delt Fly","Face Pulls","Reverse Pec Deck","Cable Rear Delt Fly","Bent-Over Lateral Raise","Band Pull-Aparts","Prone Y-Raise"],
@@ -4760,12 +4805,16 @@ const BUILD_POOL={
   calves:["Standing Calf Raise","Seated Calf Raise","Leg-Press Calf Raise","Single-Leg Calf Raise"],
   core:["Cable Crunch","Hanging Leg Raise","Ab Wheel Rollout","Plank","Hollow Hold (sec)","Side Plank","Bicycle Crunch","Reverse Crunch","Dead Bug","Kettlebell Windmill"]
 };
-const FB_GROUPS=["quads","chest","back","shoulders","sidedelts","hamstrings","glutes","core"];
+const FB_GROUPS=["quads","chest","upperback","lats","shoulders","sidedelts","hamstrings","glutes","core"];
 // Kettlebell-only mode: a dedicated per-muscle pool (rep-based moves only — carries & get-ups stay
 // manual/library picks since they're timed, not "3 × reps"). Drives access==="kb" in buildPlan.
 const KB_POOL={
   chest:["Kettlebell Floor Press"],
-  back:["Kettlebell Row","Kettlebell High Pull"],
+  lats:["Kettlebell Row"],
+  upperback:["Kettlebell Row","Kettlebell High Pull"],
+  lowerback:["Kettlebell Romanian Deadlift","Two-Hand Kettlebell Swing"],
+  forearms:[],   // no rep-based KB forearm isolation — carries are timed/manual
+  adductors:["Goblet Squat"],
   shoulders:["Kettlebell Overhead Press","Kettlebell Push Press","Kettlebell Clean & Press"],
   sidedelts:["Kettlebell High Pull","Kettlebell Halo"],
   reardelts:["Kettlebell High Pull","Kettlebell Row"],
@@ -4780,8 +4829,8 @@ const KB_POOL={
 // kettlebell favours full-body days / complexes over barbell U/L/PPL splits (no isolation machines)
 function kbSplit(freq){
   const V=[
-    {g:["quads","glutes","shoulders","back","core"]},
-    {g:["hamstrings","glutes","back","sidedelts","core"]},
+    {g:["quads","glutes","shoulders","upperback","core"]},
+    {g:["hamstrings","glutes","upperback","sidedelts","core"]},
     {g:["quads","hamstrings","shoulders","biceps","core"]},
   ];
   const days=[]; for(let i=0;i<freq;i++) days.push({name:"Full Body "+String.fromCharCode(65+i), g:V[i%3].g.slice()});
@@ -4806,24 +4855,30 @@ function accessLevels(access, n){
   if(access==="mostly_home"){ const gym=Math.max(1,Math.round(n/4)), a=[]; for(let i=0;i<n;i++) a.push(i>=n-gym?"gym":"none"); return a; }
   return Array(n).fill("gym");
 }
-const COMPOUND_GROUPS=["chest","back","quads","hamstrings","shoulders"];
+const COMPOUND_GROUPS=["chest","upperback","lats","quads","hamstrings","shoulders"];
 // the emphasis radar's spokes — identical to the app-wide analytics groups
 const BUILD_GROUPS=MGROUPS;
-function buildKey(m){ return ({"Front Delts":"shoulders","Side Delts":"sidedelts","Rear Delts":"reardelts"}[m]) || m.toLowerCase(); }
+function buildKey(m){ return ({"Front Delts":"shoulders","Side Delts":"sidedelts","Rear Delts":"reardelts","Upper Back":"upperback","Lower Back":"lowerback"}[m]) || m.toLowerCase(); }
+// "Back" in a focus/preset now means the whole back wall — lats + upper back
+const BACK_M=["Lats","Upper Back"];
+// auxiliary detail groups (NO_TARGET): kept off the default emphasis so plans don't auto-stack forearm/
+// adductor/erector isolation — they only enter a plan when the user explicitly emphasizes them.
+const AUX_EMPH=["Lower Back","Forearms","Adductors","Neck"];
+function baseEmphasis(){ const e={}; BUILD_GROUPS.forEach(m=>e[m]= AUX_EMPH.indexOf(m)>=0 ? 0.12 : 0.5); return e; }
 let build={ exp:"intermediate", obj:"muscle", focus:["balanced"], bias:"balanced", time:60, freq:4, injuries:[], access:"gym", supersets:"on", vary:"on", kb:"off",
-  emphasis:(function(){ const e={}; BUILD_GROUPS.forEach(m=>e[m]=0.5); return e; })() };
+  emphasis:baseEmphasis() };
 function emphasisPreset(focus){
-  const e={}; BUILD_GROUPS.forEach(m=>e[m]=0.5);
+  const e=baseEmphasis();
   const set=(arr,v)=>arr.forEach(m=>e[m]=v);
-  const DELTS=["Front Delts","Side Delts","Rear Delts"], UPPER=["Chest","Back","Front Delts","Side Delts","Rear Delts","Biceps","Triceps"], LOWER=["Quads","Hamstrings","Glutes","Calves"];
+  const DELTS=["Front Delts","Side Delts","Rear Delts"], UPPER=["Chest"].concat(BACK_M,["Front Delts","Side Delts","Rear Delts","Biceps","Triceps"]), LOWER=["Quads","Hamstrings","Glutes","Calves"];
   if(focus==="upper"){ set(UPPER,0.8); set(LOWER,0.32); }
   else if(focus==="lower"){ set(LOWER,0.85); set(UPPER,0.32); }
-  else if(focus==="glutes"){ e.Glutes=1; e.Hamstrings=0.8; e.Quads=0.65; set(["Chest","Back","Biceps","Triceps","Calves","Core"].concat(DELTS),0.4); }
-  else if(focus==="arms"){ e.Biceps=1; e.Triceps=1; set(DELTS,0.6); set(["Chest","Back","Quads","Hamstrings","Glutes","Calves","Core"],0.4); }
-  else if(focus==="shoulders"){ set(DELTS,1); e["Side Delts"]=1; e["Rear Delts"]=0.95; e["Front Delts"]=0.7; set(["Chest","Back","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves","Core"],0.4); }
-  else if(focus==="chest"){ e.Chest=1; e["Front Delts"]=0.65; e.Triceps=0.6; set(["Back","Biceps","Side Delts","Rear Delts","Quads","Hamstrings","Glutes","Calves"],0.4); }
-  else if(focus==="back"){ e.Back=1; e.Biceps=0.65; e["Rear Delts"]=0.7; set(["Chest","Front Delts","Side Delts","Triceps","Quads","Hamstrings","Glutes","Calves"],0.4); }
-  else if(focus==="posture"){ e["Rear Delts"]=1; e.Back=0.85; e.Core=0.65; e["Side Delts"]=0.55; e.Glutes=0.55; set(["Chest","Front Delts","Biceps","Triceps","Quads","Hamstrings","Calves"],0.42); }
+  else if(focus==="glutes"){ e.Glutes=1; e.Hamstrings=0.8; e.Quads=0.65; set(["Chest","Biceps","Triceps","Calves","Core"].concat(BACK_M,DELTS),0.4); }
+  else if(focus==="arms"){ e.Biceps=1; e.Triceps=1; set(DELTS,0.6); set(["Chest","Quads","Hamstrings","Glutes","Calves","Core"].concat(BACK_M),0.4); }
+  else if(focus==="shoulders"){ set(DELTS,1); e["Side Delts"]=1; e["Rear Delts"]=0.95; e["Front Delts"]=0.7; set(["Chest","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves","Core"].concat(BACK_M),0.4); }
+  else if(focus==="chest"){ e.Chest=1; e["Front Delts"]=0.65; e.Triceps=0.6; set(BACK_M.concat(["Biceps","Side Delts","Rear Delts","Quads","Hamstrings","Glutes","Calves"]),0.4); }
+  else if(focus==="back"){ set(BACK_M,1); e.Biceps=0.65; e["Rear Delts"]=0.7; set(["Chest","Front Delts","Side Delts","Triceps","Quads","Hamstrings","Glutes","Calves"],0.4); }
+  else if(focus==="posture"){ e["Rear Delts"]=1; e["Upper Back"]=0.85; e.Lats=0.6; e.Core=0.65; e["Side Delts"]=0.55; e.Glutes=0.55; set(["Chest","Front Delts","Biceps","Triceps","Quads","Hamstrings","Calves"],0.42); }
   return e;
 }
 // Contraindicated movements per injury, tiered by severity (1 mild → 3 severe). Tiers are cumulative:
@@ -4854,7 +4909,7 @@ const INJURY_TIERS={
 const INJURY_REGION={
   ankle:["Quads","Hamstrings","Glutes","Calves"],   // whole lower body — everything is weight-bearing on the ankle
   knees:["Quads","Hamstrings","Glutes"],            // seated calf work spares the knee
-  lowback:["Back"],
+  lowback:["Lats","Upper Back","Lower Back"],
   shoulders:["Front Delts","Side Delts","Rear Delts"],
   elbows:["Biceps","Triceps"]
 };
@@ -4868,12 +4923,12 @@ function injuryBlocks(name, injuries, severity){
     return false; });
 }
 const FOCUS_LABEL={ balanced:"balanced", upper:"upper body", lower:"lower body", glutes:"glutes & legs", arms:"arms", shoulders:"shoulders", chest:"chest", back:"back", posture:"posture" };
-function focusGroups(focus){ return ({ upper:["chest","back","shoulders"], lower:["quads","hamstrings","glutes"],
-  glutes:["glutes","hamstrings"], arms:["biceps","triceps"], chest:["chest"], back:["back"], balanced:[] }[focus])||[]; }
+function focusGroups(focus){ return ({ upper:["chest","upperback","lats","shoulders"], lower:["quads","hamstrings","glutes"],
+  glutes:["glutes","hamstrings"], arms:["biceps","triceps"], chest:["chest"], back:["upperback","lats"], balanced:[] }[focus])||[]; }
 function buildSplit(freq, exp){
-  const P=["chest","shoulders","sidedelts","triceps"], U=["chest","back","shoulders","sidedelts","reardelts","biceps","triceps"], L=["quads","hamstrings","glutes","calves"], PL=["back","reardelts","biceps"];
-  if(freq<=2) return [{name:"Full Body A",g:["quads","chest","back","shoulders","core"]},{name:"Full Body B",g:["hamstrings","back","chest","glutes","sidedelts","core"]}];
-  if(freq===3){ if(exp==="beginner") return [{name:"Full Body A",g:["quads","chest","back","core"]},{name:"Full Body B",g:["hamstrings","shoulders","back","glutes"]},{name:"Full Body C",g:["quads","chest","back","biceps","triceps"]}];
+  const P=["chest","shoulders","sidedelts","triceps"], U=["chest","upperback","lats","shoulders","sidedelts","reardelts","biceps","triceps"], L=["quads","hamstrings","glutes","calves"], PL=["upperback","lats","reardelts","biceps"];
+  if(freq<=2) return [{name:"Full Body A",g:["quads","chest","upperback","shoulders","core"]},{name:"Full Body B",g:["hamstrings","lats","chest","glutes","sidedelts","core"]}];
+  if(freq===3){ if(exp==="beginner") return [{name:"Full Body A",g:["quads","chest","upperback","core"]},{name:"Full Body B",g:["hamstrings","shoulders","lats","glutes"]},{name:"Full Body C",g:["quads","chest","upperback","biceps","triceps"]}];
     return [{name:"Push",g:P},{name:"Pull",g:PL},{name:"Legs",g:L}]; }
   if(freq===4) return [{name:"Upper A",g:U},{name:"Lower A",g:L},{name:"Upper B",g:U},{name:"Lower B",g:L}];
   if(freq===5) return [{name:"Push",g:P},{name:"Pull",g:PL},{name:"Legs",g:L},{name:"Upper",g:U},{name:"Lower",g:L}];
@@ -4892,13 +4947,13 @@ const REPSCHEME={
 const BIAS_CAP={ intensity:"Heavier loads, lower reps, and fewer but harder sets with longer rests — strength-leaning.",
   balanced:"A balanced mix of load and reps at 2–3 sets per move — the evidence-based default.",
   volume:"Lighter loads and higher reps for more total work per muscle." };
-const UPPER_M=["chest","back","shoulders","sidedelts","reardelts","biceps","triceps"], LOWER_M=["quads","hamstrings","glutes","calves"];
+const UPPER_M=["chest","lats","upperback","shoulders","sidedelts","reardelts","biceps","triceps"], LOWER_M=["quads","hamstrings","glutes","calves"];
 function dayDomain(name){ const n=name.toLowerCase();
   if(/full body/.test(n)) return UPPER_M.concat(LOWER_M,["core"]);
   if(/lower|legs/.test(n)) return LOWER_M.concat(["core"]);
   if(/upper/.test(n)) return UPPER_M.concat(["core"]);
   if(/push/.test(n)) return ["chest","shoulders","sidedelts","triceps","core"];
-  if(/pull/.test(n)) return ["back","reardelts","biceps","core"];
+  if(/pull/.test(n)) return ["upperback","lats","reardelts","biceps","core"];
   return UPPER_M.concat(LOWER_M,["core"]); }
 // movement family — variants of the same lift share a key, so a workout won't stack e.g. pull-up + weighted pull-up
 function familyKey(name){
@@ -4931,6 +4986,8 @@ function familyKey(name){
   if(/squat/.test(n)) return "squat";
   if(/\brow\b/.test(n)) return "row";
   if(/(triceps|pushdown|skull|close-grip)/.test(n)) return "tricep";
+  if(/wrist curl/.test(n)) return "wristcurl";
+  if(/adduction|adductor|cossack|copenhagen/.test(n)) return "adductor";
   if(/curl/.test(n)) return "curl";
   if(/(fly|pec deck)/.test(n)) return "chestfly";
   if(/superman|back extension|hyperextension/.test(n)) return "backext";
@@ -5025,7 +5082,7 @@ function buildPlan(b){
   }
   // optional dedicated kettlebell day — a full-body KB session drawn from KB_POOL, added on top of the week
   const kbDay = (b.kb==="day" && !isKB);
-  if(kbDay) dayDefs.push({groups:["quads","hamstrings","glutes","back","shoulders","core"], name:"Kettlebells",
+  if(kbDay) dayDefs.push({groups:["quads","hamstrings","glutes","upperback","shoulders","core"], name:"Kettlebells",
     sub:"Full-body kettlebell session", lvl:"gym", rot:false, pool:KB_POOL});
   // round-robin accessories across muscles within each gym area, so a superset pairs DIFFERENT muscles at one station
   const interleave=(accs)=>{ const byArea={}; accs.forEach(p=>{ const a=exArea(p.n); (byArea[a]=byArea[a]||[]).push(p); });
@@ -5728,9 +5785,13 @@ function tileRadar(x,cx,cy,R,tot){
   G.forEach((g,i)=>{ const a=(-90+i*360/n)*Math.PI/180, px=cx+(R+34)*Math.cos(a), py=cy+(R+34)*Math.sin(a), co=Math.cos(a);
     x.textAlign=Math.abs(co)<0.3?"center":(co>0?"left":"right"); x.fillText(MSHORT[g]||g, px, py); });
 }
+// app URL shown on the share tile — derived from the live location so it stays right under any
+// host (GitHub Pages subpath or a custom domain), minus protocol, trailing file, and trailing slash.
+const SHARE_URL=(()=>{ try{ const p=location.pathname.replace(/\/[^/]*\.[^/]*$/,"/").replace(/\/$/,""); return (location.host+p)||"o-frings.github.io/yalla"; }catch(_){ return "o-frings.github.io/yalla"; } })();
 function renderShareTile(s){
   const W=1080,H=1350,c=document.createElement("canvas"); c.width=W; c.height=H; const x=c.getContext("2d");
-  const g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,"#d3710f"); g.addColorStop(1,"#b3590c"); x.fillStyle=g; x.fillRect(0,0,W,H);
+  // match the app's live brand gradient: linear-gradient(135deg,#ff7a18,#ff2f3d) → diagonal top-left→bottom-right
+  const g=x.createLinearGradient(0,0,W,H); g.addColorStop(0,"#ff7a18"); g.addColorStop(1,"#ff2f3d"); x.fillStyle=g; x.fillRect(0,0,W,H);
   x.fillStyle="#fff"; x.font="800 50px -apple-system,system-ui,sans-serif"; x.textAlign="left"; x.textBaseline="alphabetic";
   x.fillText("yalla", 70, 122); const ww=x.measureText("yalla").width; x.fillStyle="rgba(255,255,255,.7)"; x.fillText(".", 72+ww, 122);
   x.font="600 32px -apple-system,system-ui,sans-serif"; x.textAlign="right"; x.fillStyle="rgba(255,255,255,.82)";
@@ -5745,7 +5806,11 @@ function renderShareTile(s){
     x.font="700 23px -apple-system,system-ui,sans-serif"; x.fillStyle="rgba(255,255,255,.85)"; x.fillText(st[0], bx+bw/2, by+118); });
   if(s.top && s.top.w>0){ x.textAlign="center"; x.fillStyle="rgba(255,255,255,.96)"; x.font="700 33px -apple-system,system-ui,sans-serif";
     let t="Top set · "+s.top.name+" · "+s.top.w+"kg × "+s.top.r; if(t.length>46) t="Top · "+s.top.name; x.fillText(t, W/2, 1205); }
-  x.textAlign="center"; x.fillStyle="rgba(255,255,255,.72)"; x.font="600 26px -apple-system,system-ui,sans-serif"; x.fillText("tracked with yalla", W/2, 1298);
+  // footer: a join call-to-action + the app URL drawn as a pill, so anyone who sees the shared image can grab the app
+  x.textAlign="center"; x.fillStyle="rgba(255,255,255,.82)"; x.font="600 26px -apple-system,system-ui,sans-serif"; x.fillText("Tracked with yalla — join me 💪", W/2, 1262);
+  const url=SHARE_URL; x.font="700 28px -apple-system,system-ui,sans-serif"; const uw=x.measureText(url).width, pw=uw+56, ph=56, px=(W-pw)/2, py=1284;
+  rrect(x,px,py,pw,ph,28); x.fillStyle="rgba(255,255,255,.18)"; x.fill();
+  x.fillStyle="#fff"; x.textBaseline="middle"; x.fillText(url, W/2, py+ph/2+1); x.textBaseline="alphabetic";
   return c;
 }
 let _shareCanvas=null;

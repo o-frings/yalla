@@ -122,7 +122,10 @@
   .restbar > *{ position:relative; z-index:1; }
   .restx{ width:36px; height:36px; flex:0 0 auto; border-radius:50%; border:none; background:transparent; color:var(--accent); font-size:16px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; margin:-8px -4px -8px -8px; }
   .restlbl{ font-size:13px; font-weight:600; color:var(--accent); }
-  .resttime{ font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--accent); flex:1; }
+  .resttime{ font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--accent); flex:1; cursor:pointer; }
+  .resttime:active{ opacity:.6; }
+  input.restedit{ -webkit-appearance:none; appearance:none; flex:1; min-width:0; width:74px; padding:3px 8px; border:1.5px solid var(--accent); border-radius:9px;
+    background:transparent; color:var(--accent); font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; outline:none; }
   .restadj{ display:inline-flex; gap:6px; }
   .restadj button{ background:var(--card); border:.5px solid var(--line); color:var(--ink); border-radius:8px; padding:12px 16px; font-size:13px; font-weight:600; cursor:pointer; transition:transform .12s; }
   /* live workout sharing */
@@ -956,8 +959,8 @@
   @keyframes popin{ 0%{ transform:translate(-50%,0) scale(.82);} 55%{ transform:translate(-50%,0) scale(1.08);} 100%{ transform:translate(-50%,0) scale(1);} }
   .toast.big{ font-size:15px; padding:16px 24px; font-weight:700; animation:popin .45s cubic-bezier(.34,1.56,.64,1); }
   .confetti{ position:fixed; inset:0; pointer-events:none; z-index:200; overflow:hidden; }
-  .confetti i{ position:absolute; top:-14px; width:9px; height:14px; border-radius:2px; opacity:.95;
-    animation:fall 1.5s cubic-bezier(.18,.7,.4,1) forwards; }
+  .confetti i{ position:absolute; top:-14px; width:calc(9px*var(--sz,1)); height:calc(14px*var(--sz,1)); border-radius:2px; opacity:.95;
+    animation:fall var(--dur,1.5s) cubic-bezier(.18,.7,.4,1) forwards; }
   @keyframes fall{ to{ transform:translate(var(--dx,0), 110vh) rotate(620deg); opacity:.85; } }
 
   /* --- tap & feel pass: bigger checkboxes + tactile press feedback --- */
