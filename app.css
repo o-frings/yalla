@@ -373,6 +373,14 @@
   .react-bar{ position:fixed; z-index:210; display:flex; gap:2px; background:var(--card); border:.5px solid var(--line); border-radius:26px; padding:5px 8px; box-shadow:0 10px 34px rgba(0,0,0,.24); }
   .react-pick{ background:none; border:none; font-size:25px; line-height:1; cursor:pointer; padding:4px 5px; border-radius:50%; transition:transform .1s; }
   .react-pick:active{ transform:scale(1.35); }
+  .react-more{ display:inline-flex; align-items:center; justify-content:center; color:var(--l2); border-left:.5px solid var(--line); margin-left:2px; padding-left:8px; }
+  .react-more .ic{ width:20px; height:20px; }
+  /* full emoji picker — scrollable, categorised grid */
+  .emoji-picker{ position:fixed; z-index:215; left:50%; transform:translateX(-50%); bottom:14px; width:min(360px,92vw); max-height:46vh; overflow-y:auto; -webkit-overflow-scrolling:touch; background:var(--card); border:.5px solid var(--line); border-radius:18px; padding:8px 12px 12px; box-shadow:0 12px 40px rgba(0,0,0,.3); }
+  .emoji-cat{ font-size:11px; font-weight:700; color:var(--l3); text-transform:uppercase; letter-spacing:.4px; margin:10px 2px 5px; }
+  .emoji-grid{ display:grid; grid-template-columns:repeat(8,1fr); gap:1px; }
+  .emoji-cell{ background:none; border:none; font-size:23px; line-height:1; cursor:pointer; padding:5px 0; border-radius:8px; }
+  .emoji-cell:active{ background:var(--row); transform:scale(1.2); }
   .sheethdr .t.tappable{ cursor:pointer; }
   #ovMessages{ position:relative; padding:8px; color:var(--l2); }   /* neutral by default… */
   #ovMessages.has-unread{ color:var(--accent); }                   /* …accent only when there's an unread message */

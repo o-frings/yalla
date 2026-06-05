@@ -1510,7 +1510,7 @@ function renderRestoreGate(){
     _e2eNeedsRestore=false; try{ await e2eGetKeys(); await e2ePublish(); }catch(e){} renderConversations(); };
 }
 async function renderConversations(){
-  _msgThreadUid=null; closeReactBar();
+  _msgThreadUid=null; closeReactUI();
   if(_msgThreadChan){ try{ sb.removeChannel(_msgThreadChan); }catch(e){} _msgThreadChan=null; }
   const ttl=$("msgTitle"); ttl.textContent="Messages"; ttl.classList.remove("tappable"); ttl.onclick=null; $("msgBack").style.display="none";
   const b=$("msgBody"); if(!b) return;
@@ -1633,19 +1633,49 @@ async function removeReaction(mid){
   renderReactionsFor(mid);
   try{ await sb.from("dm_reactions").delete().eq("message_id",mid).eq("actor",cloudUser.id); }catch(e){}
 }
+// the quick row adapts to you: your most-used reactions first, then the defaults fill any gaps
+function bumpEmoji(e){ settings.emojiFreq=settings.emojiFreq||{}; settings.emojiFreq[e]=(settings.emojiFreq[e]||0)+1; sset("settings",settings); }
+function quickEmojis(){
+  const freq=settings.emojiFreq||{};
+  const top=Object.keys(freq).sort((a,b)=>freq[b]-freq[a]).slice(0,6);
+  const out=top.slice();
+  for(const e of QUICK_REACT){ if(out.length>=6) break; if(out.indexOf(e)<0) out.push(e); }
+  return out.slice(0,6);
+}
+function pickReaction(mid, friendUid, e){ setReaction(mid, friendUid, e); bumpEmoji(e); closeReactBar(); closeEmojiPicker(); }
 function closeReactBar(){ const b=$("reactBar"); if(b) b.remove(); }
+function closeEmojiPicker(){ const p=$("emojiPicker"); if(p) p.remove(); }
+function closeReactUI(){ closeReactBar(); closeEmojiPicker(); }
 function showReactBar(bubble, mid, friendUid){
-  closeReactBar();
+  closeReactUI();
   const bar=document.createElement("div"); bar.className="react-bar"; bar.id="reactBar";
-  bar.innerHTML=QUICK_REACT.map(e=>'<button class="react-pick" data-e="'+e+'">'+e+'</button>').join('');
+  bar.innerHTML=quickEmojis().map(e=>'<button class="react-pick" data-e="'+e+'">'+e+'</button>').join('')
+    +'<button class="react-pick react-more" id="reactMore" aria-label="More emojis">'+ICON.plus+'</button>';
   document.body.appendChild(bar);
   const r=bubble.getBoundingClientRect(), bw=bar.offsetWidth, bh=bar.offsetHeight, vw=window.innerWidth, vh=window.innerHeight;
   let top=r.top-bh-8; if(top<8) top=r.bottom+8;              // prefer above the bubble, else below
   top=Math.max(8, Math.min(top, vh-bh-8));                   // keep on-screen vertically
   bar.style.left=Math.max(8, Math.min(r.left, vw-bw-8))+"px";
   bar.style.top=top+"px";
-  bar.querySelectorAll(".react-pick").forEach(b=> b.onclick=()=>{ setReaction(mid, friendUid, b.dataset.e); closeReactBar(); });
-  setTimeout(()=> document.addEventListener("pointerdown", function _o(e){ if(!e.target.closest(".react-bar")){ closeReactBar(); document.removeEventListener("pointerdown",_o); } }), 0);
+  bar.querySelectorAll(".react-pick[data-e]").forEach(b=> b.onclick=()=>pickReaction(mid, friendUid, b.dataset.e));
+  bar.querySelector("#reactMore").onclick=()=> openEmojiPicker(mid, friendUid);
+  setTimeout(()=> document.addEventListener("pointerdown", function _o(e){ if(!e.target.closest(".react-bar") && !e.target.closest(".emoji-picker")){ closeReactUI(); document.removeEventListener("pointerdown",_o); } }), 0);
+}
+// full emoji picker (the "+" on the reaction bar) — a scrollable, categorised grid
+const EMOJI_GROUPS=[
+  { label:"Smileys", emojis:["😀","😃","😄","😁","😆","😅","😂","🤣","🙂","🙃","😉","😊","😇","🥰","😍","🤩","😘","😋","😛","😜","🤪","😎","🥳","😏","🤔","🤨","😐","😴","😬","🙄","😮","😯","😲","🥺","😢","😭","😤","😠","😡","🤯","😳","🥵","🥶","😱","😨","😅","😓","🤗","🤭","🤫","😶"] },
+  { label:"Gestures", emojis:["👍","👎","👌","🤌","✌️","🤞","🤟","🤘","🤙","👏","🙌","👐","🤲","🙏","💪","🦾","🤝","👊","✊","🫶","👀","🫡","🫥","🤷","🤦"] },
+  { label:"Hearts & symbols", emojis:["❤️","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔","❤️‍🔥","💕","💞","💓","💗","💖","💘","💝","💯","🔥","⭐","✨","🎉","🎊","✅","❌","💢","💥","💫","🙌"] },
+  { label:"Active", emojis:["🏋️","🤸","🏃","🚴","🧗","🤾","🚀","⚽","🏀","🏈","⚾","🎾","🥊","🥇","🏆","🎯","💧","😈","👑","🐐","☕","🍺","🥤","🍎","🥗","🍗"] },
+];
+function openEmojiPicker(mid, friendUid){
+  closeEmojiPicker();
+  const p=document.createElement("div"); p.className="emoji-picker"; p.id="emojiPicker";
+  p.innerHTML=EMOJI_GROUPS.map(g=>'<div class="emoji-cat">'+g.label+'</div><div class="emoji-grid">'
+    +g.emojis.map(e=>'<button class="emoji-cell" data-e="'+e+'">'+e+'</button>').join('')+'</div>').join('');
+  document.body.appendChild(p);
+  p.querySelectorAll(".emoji-cell").forEach(b=> b.onclick=()=>pickReaction(mid, friendUid, b.dataset.e));
+  setTimeout(()=> document.addEventListener("pointerdown", function _o(e){ if(!e.target.closest(".emoji-picker") && !e.target.closest(".react-bar")){ closeReactUI(); document.removeEventListener("pointerdown",_o); } }), 0);
 }
 function attachReactions(box, friendUid){
   let lastTap=0, lastMid=0, lpTimer=null, lpFired=false, dx=0, dy=0;
@@ -3090,7 +3120,7 @@ if($("scrimFriends")) $("scrimFriends").onclick=()=>closeSheet("Friends");
 // end-to-end encrypted messages: open from the Friends hub
 if($("ovMessages")) $("ovMessages").onclick=openMessages;   // the single inbox entry — overview chat icon
 if($("msgBackupNav")) $("msgBackupNav").onclick=promptBackup;   // permanent home for key backup / change passphrase
-function closeMessages(){ _msgThreadUid=null; if(_msgThreadChan){ try{ sb.removeChannel(_msgThreadChan); }catch(e){} _msgThreadChan=null; } closeSheet("Messages"); }
+function closeMessages(){ _msgThreadUid=null; closeReactUI(); if(_msgThreadChan){ try{ sb.removeChannel(_msgThreadChan); }catch(e){} _msgThreadChan=null; } closeSheet("Messages"); }
 if($("msgClose")) $("msgClose").onclick=closeMessages;
 if($("scrimMessages")) $("scrimMessages").onclick=closeMessages;
 if($("msgBack")) $("msgBack").onclick=()=> _msgThreadUid?renderConversations():closeMessages();
