@@ -52,6 +52,12 @@
   </div>
 </div>
 
+<!-- training mode: strength logging vs cardio (a separate axis) -->
+<div class="seg appearance" id="trainModeSeg" style="margin-bottom:14px;">
+  <div class="s active" data-m="strength">Strength</div>
+  <div class="s" data-m="cardio">Cardio</div>
+</div>
+<div id="strengthWrap">
 <!-- WORKOUT -->
 <div class="seg" id="seg"></div>
 <!-- Live share — kept ABOVE the timer so the pinned timer only ever overlaps neutral exercise cards
@@ -86,7 +92,47 @@
 <div class="injbanner" id="injBanner" style="display:none;"></div>
 <div id="exlist"></div>
 <button class="btn wide" id="saveBtn" style="margin-top:12px;">Finish &amp; Save Workout</button>
-<div class="foot">On-device only · keep a backup · lift safely · build <span id="appVer">v73</span></div>
+<!-- live session balance: fills in as you log, and is what friends watching live see -->
+<div class="group sessrose" id="sessRose" style="display:none; margin-top:14px;">
+  <div class="pad sessrose-pad">
+    <div class="ed-label">This session</div>
+    <canvas id="sessRoseCv" width="320" height="320"></canvas>
+    <p class="freehint" id="sessRoseSub" style="margin:8px 0 0;"></p>
+  </div>
+</div>
+</div><!-- /strengthWrap -->
+
+<!-- CARDIO PANEL — logged here, tracked on its own minutes/zone axis (not muscle volume) -->
+<div id="cardioPanel" style="display:none;">
+  <p class="levelcap" style="margin:0 4px 12px;">Log cardio &amp; conditioning. Tracked on its own — by minutes and effort zone — and kept separate from your muscle-volume balance.</p>
+  <div class="ed-label">Activity</div>
+  <div class="chips wrap" id="cdActChips"></div>
+  <div id="cdRun" style="display:none;">
+    <div class="ed-label">Run details <span class="subhint">— fill any two</span></div>
+    <div class="runrow">
+      <div class="rfield"><input id="cdDist" type="number" inputmode="decimal" placeholder="0"><span>km</span></div>
+      <div class="rfield"><input id="cdTime" type="number" inputmode="decimal" placeholder="0"><span>min</span></div>
+      <div class="rfield"><input id="cdPace" type="text" inputmode="decimal" placeholder="m:ss"><span>/km</span></div>
+    </div>
+  </div>
+  <div id="cdDur">
+    <div class="ed-label">Duration</div>
+    <div class="meinput"><input id="cdMin" type="number" inputmode="numeric" placeholder="—"><span class="unit">min</span></div>
+  </div>
+  <div class="ed-label">Effort zone</div>
+  <div class="chips wrap" id="cdZoneChips"></div>
+  <div class="ed-label">Heart rate &amp; effort <span class="subhint">— optional</span></div>
+  <div class="runrow">
+    <div class="rfield"><input id="cdHr" type="number" inputmode="numeric" placeholder="—"><span>avg bpm</span></div>
+    <div class="rfield"><input id="cdRpe" type="number" inputmode="numeric" placeholder="—"><span>RPE 1–10</span></div>
+  </div>
+  <div class="otherprev" id="cdPrev"></div>
+  <button class="btn wide" id="cdLog" style="margin-top:8px;">Log cardio</button>
+  <div class="ed-label" id="cdLogLabel" style="display:none;">Recent cardio</div>
+  <div id="cdLogList"></div>
+</div>
+
+<div class="foot">On-device only · keep a backup · lift safely · build <span id="appVer">v74</span></div>
 </div><!-- /pageWorkout -->
 
 <div class="exmenu-pop" id="exMenu"></div>
@@ -468,38 +514,13 @@
   <div class="grabber"></div>
   <div class="sheethdr"><span class="t">Other training</span><button class="btn plain sm" id="otherClose">Done</button></div>
   <div class="sheetbody">
-    <p class="levelcap" style="margin:0 4px 12px;">Log training done elsewhere — a friend’s routine or another activity. Volume is estimated so your balance and totals stay roughly complete.</p>
-    <div class="seg appearance" id="otherModeSeg">
-      <div class="s active" data-m="muscle">Muscle group</div>
-      <div class="s" data-m="activity">Activity</div>
-    </div>
+    <p class="levelcap" style="margin:0 4px 12px;">Resistance training done elsewhere — a friend’s routine, a class, a hotel gym. Volume is estimated so your balance and totals stay roughly complete. <b>Cardio lives in the Workout tab → Cardio.</b></p>
 
     <div id="otherMuscle">
       <div class="ed-label">What did you train?</div>
       <div class="chips wrap" id="otherMuscleChips"></div>
       <div class="ed-label">Intensity <span class="subhint">— relative to your usual</span></div>
       <div class="seg appearance otherint" data-int="m">
-        <div class="s" data-i="low">Low</div><div class="s active" data-i="med">Medium</div><div class="s" data-i="high">High</div>
-      </div>
-    </div>
-
-    <div id="otherActivity" style="display:none;">
-      <div class="ed-label">Activity</div>
-      <div class="chips wrap" id="otherActChips"></div>
-      <div id="otherRun" style="display:none;">
-        <div class="ed-label">Run details <span class="subhint">— fill any two</span></div>
-        <div class="runrow">
-          <div class="rfield"><input id="runDist" type="number" inputmode="decimal" placeholder="0"><span>km</span></div>
-          <div class="rfield"><input id="runTime" type="number" inputmode="decimal" placeholder="0"><span>min</span></div>
-          <div class="rfield"><input id="runPace" type="text" inputmode="decimal" placeholder="m:ss"><span>/km</span></div>
-        </div>
-      </div>
-      <div id="otherDur">
-        <div class="ed-label">Duration</div>
-        <div class="meinput"><input id="actMin" type="number" inputmode="numeric" placeholder="—"><span class="unit">min</span></div>
-      </div>
-      <div class="ed-label">Intensity</div>
-      <div class="seg appearance otherint" data-int="a">
         <div class="s" data-i="low">Low</div><div class="s active" data-i="med">Medium</div><div class="s" data-i="high">High</div>
       </div>
     </div>
