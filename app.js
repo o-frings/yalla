@@ -2455,9 +2455,9 @@ function renderOverview(){
   } else if(did){
     h+='<div class="group"><div class="pad"><div class="ovk">Today</div><div class="ovbig">Done for today 💪</div><p class="ovp" style="margin-top:8px;">You’ve logged a session. Rest and refuel — showing up consistently is what builds it.</p></div></div>';
   } else if(w){
-    h+='<div class="group ovtap ovstart"><div class="pad"><div class="ovk">Next session</div><div class="ovbig">'+esc(w.name)+'</div><div class="ovmeta">≈'+workoutMinutes(w)+' min · '+w.ex.length+' exercise'+(w.ex.length===1?'':'s')+'</div><button class="btn wide" style="margin-top:16px; pointer-events:none;">Start workout</button></div></div>';
+    h+='<div class="group ovtap ovstart"><div class="pad ovstartpad"><div class="ovstarttext"><div class="ovk">Next session</div><div class="ovbig">'+esc(w.name)+'</div><div class="ovmeta">≈'+workoutMinutes(w)+' min · '+w.ex.length+' exercise'+(w.ex.length===1?'':'s')+'</div></div><span class="ovchev ovgo">›</span></div></div>';
   } else {
-    h+='<div class="group ovtap ovstart"><div class="pad"><div class="ovbig">Pick a plan to begin</div><button class="btn wide" style="margin-top:16px; pointer-events:none;">Go to workout</button></div></div>';
+    h+='<div class="group ovtap ovstart"><div class="pad ovstartpad"><div class="ovstarttext"><div class="ovbig">Pick a plan to begin</div></div><span class="ovchev ovgo">›</span></div></div>';
   }
   // a one-line motivator under Today (the full stats live on Me) — counts only real sessions, not token efforts
   const f7=sessionDays(7);
