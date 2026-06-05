@@ -993,10 +993,6 @@ function updateLiveRow(){
   const tog=$("liveToggle"); if(tog) tog.checked=liveOn;
   const lbl=$("liveLbl"); if(lbl) lbl.textContent = liveOn ? "Sharing live" : "Share workout live";
   row.classList.toggle("on", liveOn);
-  const hint=$("liveHint");
-  if(hint) hint.textContent = liveOn
-    ? "All your friends can watch — tap below to limit who."
-    : "Go live and all your friends can watch in real time.";
   if(liveAvailable() && _liveFollowers===null) loadLivePicks();   // know the audience up front (powers the summary)
   liveAudienceLabel();
 }
@@ -1018,14 +1014,16 @@ async function loadLivePicks(){
   if(!_liveAudienceCustom && !_liveViewers.length) _liveViewers = followers.map(u=>u.user_id);
   renderLivePicks(); liveAudienceLabel();
 }
-// summarise the broadcast audience on the picker button (Everyone · N / X of N)
+// sleek audience summary on the picker: a face-pile + one marked name ("Lea +2")
 function liveAudienceLabel(){
-  const lbl=$("livePickLbl"); if(!lbl) return;
-  if(_liveFollowers===null){ lbl.textContent="Choose who can watch"; return; }
-  const M=_liveFollowers.length;
-  if(!M){ lbl.textContent="No friends to share with yet"; return; }
-  const sel=_liveFollowers.filter(u=> u.live || _liveViewers.indexOf(u.user_id)>=0).length;
-  lbl.textContent = sel>=M ? ("Everyone · "+M+" friend"+(M>1?"s":"")) : (sel+" of "+M+" can watch");
+  const lbl=$("livePickLbl"), faces=$("lpFaces"); if(!lbl) return;
+  if(_liveFollowers===null){ if(faces) faces.innerHTML=""; lbl.textContent="Choose who can watch"; return; }
+  if(!_liveFollowers.length){ if(faces) faces.innerHTML=""; lbl.textContent="No friends yet"; return; }
+  const sel=_liveFollowers.filter(u=> u.live || _liveViewers.indexOf(u.user_id)>=0);
+  if(faces) faces.innerHTML = sel.slice(0,4).map(u=> avatarHTML(u.display_name,{size:26,uid:u.user_id})).join('');
+  if(!sel.length){ lbl.textContent="No one yet"; return; }
+  const first=(sel[0].display_name||"A friend").split(" ")[0];
+  lbl.textContent = sel.length>1 ? (first+" +"+(sel.length-1)) : first;
 }
 function renderLivePicks(){
   const box=$("livePick"); if(!box || _liveFollowers===null) return;
