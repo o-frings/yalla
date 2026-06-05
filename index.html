@@ -165,16 +165,23 @@
   .liveswui::after{ content:""; position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .2s; }
   .livesw:checked + .liveswui{ background:var(--red); }
   .livesw:checked + .liveswui::after{ transform:translateX(18px); }
+  .livebcast{ flex:0 0 auto; width:30px; height:30px; display:flex; align-items:center; justify-content:center; color:var(--l3); transition:color .2s; }
+  .livebcast svg{ width:21px; height:21px; }
   .livewrap.on .liverow{ background:rgba(255,59,48,.10); border-color:rgba(255,59,48,.32); }
   .livewrap.on .liveswitch{ color:var(--red); }
-  .livepick-btn{ display:flex; align-items:center; gap:4px; width:100%; background:none; border:none; cursor:pointer; color:var(--accent); font:inherit; font-size:13px; font-weight:600; padding:9px 6px 2px; }
-  .lpchev{ transition:transform .15s; }
+  .livewrap.on .livebcast{ color:var(--red); animation:bcastpulse 1.8s ease-in-out infinite; }
+  @keyframes bcastpulse{ 0%,100%{ opacity:.5; transform:scale(.94); } 50%{ opacity:1; transform:scale(1.06); } }
+  .livepick-btn{ display:flex; align-items:center; gap:7px; width:100%; background:none; border:none; cursor:pointer; color:var(--accent); font:inherit; font-size:13px; font-weight:600; padding:10px 6px 2px; }
+  .livepick-btn .lpico{ width:15px; height:15px; flex:0 0 auto; }
+  .lpchev{ margin-left:auto; transition:transform .15s; }
   .livepick-btn.open .lpchev{ transform:rotate(90deg); }
-  .livepick{ display:flex; flex-wrap:wrap; gap:8px; padding:8px 4px 0; }
+  .livepick{ display:flex; flex-wrap:wrap; gap:8px; padding:10px 4px 2px; }
   .livepick[hidden]{ display:none; }
-  .livechip{ font-size:13px; font-weight:600; padding:6px 12px; border-radius:13px; border:.5px solid var(--line); background:var(--row); color:var(--ink); cursor:pointer; transition:background .12s, border-color .12s, color .12s; }
-  .livechip.on{ background:rgba(255,59,48,.12); border-color:rgba(255,59,48,.4); color:var(--red); }
-  .livechip.always{ background:rgba(255,59,48,.12); border-color:rgba(255,59,48,.4); color:var(--red); opacity:.7; cursor:default; }
+  .livechip{ display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:600; padding:4px 12px 4px 4px; border-radius:18px; border:.5px solid var(--line); background:var(--row); color:var(--ink); cursor:pointer; transition:background .12s, border-color .12s, color .12s; }
+  .livechip .avatar{ box-shadow:inset 0 0 0 .5px rgba(255,255,255,.18); }
+  .livechip .lcname{ max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .livechip.on{ background:rgba(255,59,48,.12); border-color:rgba(255,59,48,.45); color:var(--red); }
+  .livechip.always{ background:rgba(255,59,48,.12); border-color:rgba(255,59,48,.45); color:var(--red); opacity:.72; cursor:default; }
   .livecard{ display:flex; align-items:center; gap:12px; padding:12px 14px; margin:8px 0; border-radius:14px; background:var(--accent-soft); cursor:pointer; }
   .livedot{ width:10px; height:10px; border-radius:50%; background:var(--red); flex:0 0 auto; animation:livepulse 1.6s infinite; }
   .livego{ color:var(--accent); font-weight:600; flex:0 0 auto; }
@@ -887,6 +894,7 @@
      signed in + the friends schema is live; wired by updateLiveRow() / goLive() / endLive(). -->
 <div class="livewrap" id="liveRow" style="display:none;">
   <label class="liverow">
+    <span class="livebcast" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.3" fill="currentColor" stroke="none"/><path d="M8 8a5.5 5.5 0 0 0 0 8M16 8a5.5 5.5 0 0 1 0 8"/><path d="M5 5a9.5 9.5 0 0 0 0 14M19 5a9.5 9.5 0 0 1 0 14"/></svg></span>
     <span class="liverow-col">
       <span class="liveswitch" id="liveLbl">Share workout live</span>
       <span class="livehint" id="liveHint"></span>
@@ -894,7 +902,7 @@
     <input type="checkbox" class="livesw" id="liveToggle">
     <span class="liveswui" aria-hidden="true"></span>
   </label>
-  <button class="livepick-btn" id="livePickBtn" type="button">Choose who can watch<span class="lpchev">›</span></button>
+  <button class="livepick-btn" id="livePickBtn" type="button"><svg class="lpico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c0-2.8 2.4-4.4 5.5-4.4s5.5 1.6 5.5 4.4"/><path d="M16 5.3a3 3 0 0 1 0 5.6M17.5 14.4c2.2.4 3.7 1.8 3.7 4.1"/></svg><span id="livePickLbl">Choose who can watch</span><span class="lpchev">›</span></button>
   <div class="livepick" id="livePick" hidden></div>
 </div>
 <!-- session timer + rest ("pause") timer: pinned to the top of the page once a workout's underway -->
@@ -2609,7 +2617,7 @@ async function cloudTouchWorkout(){ try{ if(cloudReady()) await sb.from("push_su
 // Broadcaster writes a row to live_sessions (RLS-gated to granted followers); watchers read it over
 // Realtime. Going live pushes the granted followers (social-notify kind "live"). Watchers cheer /
 // comment into live_reactions, streamed back to the broadcaster. See supabase/LIVE-SHARING.md.
-let liveOn=false, _liveTimer=null, _liveLast=0, _liveRecvChan=null, _liveFeedChan=null, _liveFeedT=null, _liveViewChan=null, _liveViewOwner=null, _liveViewers=[];
+let liveOn=false, _liveTimer=null, _liveLast=0, _liveRecvChan=null, _liveFeedChan=null, _liveFeedT=null, _liveViewChan=null, _liveViewOwner=null, _liveViewers=[], _liveAudienceCustom=false;
 const _nameCache={};
 function liveAvailable(){ return cloudReady() && dbHardened; }
 async function liveName(uid){
@@ -2650,8 +2658,10 @@ function updateLiveRow(){
   row.classList.toggle("on", liveOn);
   const hint=$("liveHint");
   if(hint) hint.textContent = liveOn
-    ? "Friends you've allowed + anyone ticked can watch."
-    : "Broadcast in real time to allowed friends.";
+    ? "All your friends can watch — tap below to limit who."
+    : "Go live and all your friends can watch in real time.";
+  if(liveAvailable() && _liveFollowers===null) loadLivePicks();   // know the audience up front (powers the summary)
+  liveAudienceLabel();
 }
 // Inline per-session picker: tick friends to share THIS session with, independently of the start
 // toggle. Always-on grantees (Settings → Friends) are shown locked-on — they always see you live.
@@ -2666,7 +2676,19 @@ async function loadLivePicks(){
   const box=$("livePick"); if(!box) return;
   box.innerHTML='<span class="levelcap" style="padding:2px 4px;">Loading…</span>';
   let followers=[]; try{ if(cloudReady()){ const { data } = await sb.rpc("my_followers"); followers=data||[]; } }catch(e){}
-  _liveFollowers=followers; renderLivePicks();
+  _liveFollowers=followers; recordAvatars(followers);
+  // mirror the default: everyone's ticked until you narrow it
+  if(!_liveAudienceCustom && !_liveViewers.length) _liveViewers = followers.map(u=>u.user_id);
+  renderLivePicks(); liveAudienceLabel();
+}
+// summarise the broadcast audience on the picker button (Everyone · N / X of N)
+function liveAudienceLabel(){
+  const lbl=$("livePickLbl"); if(!lbl) return;
+  if(_liveFollowers===null){ lbl.textContent="Choose who can watch"; return; }
+  const M=_liveFollowers.length;
+  if(!M){ lbl.textContent="No friends to share with yet"; return; }
+  const sel=_liveFollowers.filter(u=> u.live || _liveViewers.indexOf(u.user_id)>=0).length;
+  lbl.textContent = sel>=M ? ("Everyone · "+M+" friend"+(M>1?"s":"")) : (sel+" of "+M+" can watch");
 }
 function renderLivePicks(){
   const box=$("livePick"); if(!box || _liveFollowers===null) return;
@@ -2674,12 +2696,13 @@ function renderLivePicks(){
   box.innerHTML=_liveFollowers.map(u=>{
     const always=!!u.live, sel=_liveViewers.indexOf(u.user_id)>=0;
     const cls = always ? "livechip always" : ("livechip"+(sel?" on":""));
-    return '<button type="button" class="'+cls+'" data-uid="'+esc(u.user_id)+'"'+(always?' disabled':'')+'>'+esc(u.display_name||"A lifter")+(always?' ✓':'')+'</button>';
+    return '<button type="button" class="'+cls+'" data-uid="'+esc(u.user_id)+'"'+(always?' disabled':'')+'>'+avatarHTML(u.display_name,{size:22,uid:u.user_id})+'<span class="lcname">'+esc(u.display_name||"A lifter")+'</span>'+(always?' ✓':'')+'</button>';
   }).join('');
   box.querySelectorAll('.livechip:not(.always)').forEach(c=> c.onclick=()=>{
+    _liveAudienceCustom=true;   // you've taken control of the audience
     const uid=c.dataset.uid, i=_liveViewers.indexOf(uid);
     if(i>=0) _liveViewers.splice(i,1); else _liveViewers.push(uid);
-    c.classList.toggle("on", i<0);
+    c.classList.toggle("on", i<0); liveAudienceLabel();
     if(liveOn) pushLiveViewers();   // already broadcasting → update who can watch + ping the new picks
   });
 }
@@ -2690,7 +2713,14 @@ async function pushLiveViewers(){
 }
 async function goLive(viewers){
   if(!liveAvailable()){ toast("Sign in to share your workout live."); return false; }
-  if(Array.isArray(viewers)) _liveViewers = viewers.filter(Boolean);   // else keep the inline tick selection
+  if(Array.isArray(viewers)){ _liveViewers = viewers.filter(Boolean); _liveAudienceCustom=true; }   // else keep the inline tick selection
+  // default audience: everyone who follows you, unless you've narrowed it in the picker. Without this,
+  // going live with no pre-granted/ticked friends would reach nobody.
+  if(!_liveAudienceCustom){
+    let fols=_liveFollowers;
+    if(fols===null){ try{ const { data } = await sb.rpc("my_followers"); fols=data||[]; }catch(e){ fols=[]; } }
+    _liveViewers = (fols||[]).map(u=>u.user_id);
+  }
   liveOn=true; updateLiveRow();
   try{ await sb.from("live_sessions").upsert({ user_id:cloudUser.id, active:true, viewers:_liveViewers,
         started_at:new Date().toISOString(), updated_at:new Date().toISOString(), state:buildLiveState() }); }
@@ -2708,7 +2738,7 @@ function liveTick(){
   try{ sb.from("live_sessions").upsert({ user_id:cloudUser.id, active:true, updated_at:new Date().toISOString(), state:buildLiveState() }); }catch(e){}
 }
 async function endLive(silent){
-  if(!liveOn) return; liveOn=false; _liveViewers=[]; clearTimeout(_liveTimer); updateLiveRow(); renderLivePicks();
+  if(!liveOn) return; liveOn=false; _liveViewers=[]; _liveAudienceCustom=false; clearTimeout(_liveTimer); updateLiveRow(); renderLivePicks();
   try{ if(cloudReady()) await sb.from("live_sessions").update({ active:false, updated_at:new Date().toISOString() }).eq("user_id",cloudUser.id); }catch(e){}
   if(_liveRecvChan){ try{ sb.removeChannel(_liveRecvChan); }catch(e){} _liveRecvChan=null; }
   if(!silent) toast("Live session ended.");
