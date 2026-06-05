@@ -1054,7 +1054,6 @@ function updateLiveRow(){
   const row=$("liveRow"); if(!row) return;
   row.style.display = liveAvailable() ? "" : "none";
   const tog=$("liveToggle"); if(tog) tog.checked=liveOn;
-  const lbl=$("liveLbl"); if(lbl) lbl.textContent = liveOn ? "Sharing live" : "Share workout live";
   row.classList.toggle("on", liveOn);
   if(liveAvailable() && _liveFollowers===null) loadLivePicks();   // know the audience up front (powers the summary)
   liveAudienceLabel();
