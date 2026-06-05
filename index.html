@@ -58,6 +58,13 @@
   </div>
 </div>
 
+<!-- TRAVEL MODE banner (only when travel mode is on) -->
+<div class="travelbar" id="travelBanner" style="display:none;">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;flex:0 0 auto;"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l5.2 4.2-2 4-2-1-1 1 3 2 2 3 1-1-1-2 4-2 4.2 5.2a.5.5 0 0 0 .8-.4z"/></svg>
+  <span id="travelBannerTxt">Travel mode</span>
+  <button class="tvx" id="travelEnd" type="button">End</button>
+</div>
+
 <div id="strengthWrap">
 <!-- WORKOUT -->
 <div class="seg" id="seg"></div>
@@ -282,31 +289,37 @@
     <button class="btn tinted wide injrow ok" id="injuryRow"><span id="injuryRowTxt">Feeling good — no limits</span><span class="injchev">›</span></button>
 
     <div id="setBody">
-    <div id="goalHomeSettings"></div>
-    <div class="ed-label">Body</div>
-    <div class="merow">
-      <label>Name</label>
-      <div class="meinput"><input id="nameIn" type="text" autocapitalize="words" autocomplete="given-name" placeholder="—" style="width:120px;text-align:right;"></div>
-    </div>
-    <div class="merow">
-      <label>Sex</label>
-      <div class="sexseg" id="sexSeg">
-        <div class="s" data-sex="male">Male</div>
-        <div class="s" data-sex="female">Female</div>
+    <details class="setcard" open>
+      <summary>
+        <svg class="scicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+        <span class="sctitle">Profile<span class="scsub"> — body &amp; goals</span></span>
+      </summary>
+      <div class="scbody">
+        <div id="goalHomeSettings"></div>
+        <div class="merow">
+          <label>Name</label>
+          <div class="meinput"><input id="nameIn" type="text" autocapitalize="words" autocomplete="given-name" placeholder="—" style="width:120px;text-align:right;"></div>
+        </div>
+        <div class="merow">
+          <label>Sex</label>
+          <div class="sexseg" id="sexSeg">
+            <div class="s" data-sex="male">Male</div>
+            <div class="s" data-sex="female">Female</div>
+          </div>
+        </div>
+        <div class="merow">
+          <label>Height</label>
+          <div class="meinput"><input id="heightIn" type="number" inputmode="decimal" placeholder="—"><span class="unit">cm</span></div>
+        </div>
+        <div class="merow">
+          <label>Body fat</label>
+          <div class="meinput"><input id="bfIn" type="number" inputmode="decimal" placeholder="—"><span class="unit">%</span></div>
+        </div>
+        <button class="btn tinted wide" id="bodySave" style="margin-top:8px;">Save body details</button>
+        <div class="ed-label">Calculated</div>
+        <div class="calc" id="calcRows"></div>
       </div>
-    </div>
-    <div class="merow">
-      <label>Height</label>
-      <div class="meinput"><input id="heightIn" type="number" inputmode="decimal" placeholder="—"><span class="unit">cm</span></div>
-    </div>
-    <div class="merow">
-      <label>Body fat</label>
-      <div class="meinput"><input id="bfIn" type="number" inputmode="decimal" placeholder="—"><span class="unit">%</span></div>
-    </div>
-    <button class="btn tinted wide" id="bodySave" style="margin-top:4px;">Save body details</button>
-
-    <div class="ed-label">Calculated</div>
-    <div class="calc" id="calcRows"></div>
+    </details>
     </div><!-- /setBody -->
 
     <div class="ed-label">Training</div>
@@ -337,22 +350,64 @@
     </details>
 
     <div id="setMisc">
-    <div class="ed-label" style="margin-top:20px;">Appearance</div>
-    <div class="seg appearance" id="appSeg">
-      <div class="s" data-th="auto">Auto</div>
-      <div class="s" data-th="light">Light</div>
-      <div class="s" data-th="dark">Dark</div>
-    </div>
 
-    <div class="ed-label" style="margin-top:20px;">Rest timer</div>
-    <div class="merow">
-      <label for="setRestDefault">Default rest between sets</label>
-      <div class="meinput"><input id="setRestDefault" type="text" inputmode="numeric" placeholder="1:30" style="width:90px;text-align:right;"><span class="unit">mm:ss</span></div>
-    </div>
+    <!-- Training & coaching -->
+    <details class="setcard">
+      <summary>
+        <svg class="scicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9v6M6 7.5v9M18 7.5v9M21 9v6M6 12h12"/></svg>
+        <span class="sctitle">Training &amp; coaching<span class="scsub"> — rest, tips, travel</span></span>
+      </summary>
+      <div class="scbody">
+        <div class="ed-label">Rest timer</div>
+        <div class="merow">
+          <label for="setRestDefault">Default rest between sets</label>
+          <div class="meinput"><input id="setRestDefault" type="text" inputmode="numeric" placeholder="1:30" style="width:90px;text-align:right;"><span class="unit">mm:ss</span></div>
+        </div>
 
-    <div class="ed-label" id="acctLabel" style="margin-top:20px; display:none;">Account &amp; sync</div>
-    <div id="acctBox" style="display:none;">
-      <p class="levelcap" style="margin:0 4px 12px;" id="acctCap">Sign in to sync your log across your devices. We email you a 6-digit code — no password.</p>
+        <div class="ed-label">Coach tips</div>
+        <p class="levelcap" style="margin:0 4px 8px;">How often a research-backed tip appears on your overview.</p>
+        <div class="seg appearance" id="tipSeg">
+          <div class="s" data-te="2">Often</div>
+          <div class="s" data-te="3">Normal</div>
+          <div class="s" data-te="6">Rarely</div>
+          <div class="s" data-te="0">Off</div>
+        </div>
+
+        <div class="ed-label">Travel mode</div>
+        <p class="levelcap" style="margin:0 4px 8px;">Tag sessions while you're away so you can see how travel shifts your training. Stays on until you switch it back to Home.</p>
+        <div class="seg appearance" id="travelSeg">
+          <div class="s" data-tv="off">Home</div>
+          <div class="s" data-tv="gym">With gym</div>
+          <div class="s" data-tv="nogym">No gym</div>
+        </div>
+        <div id="travelBreakdown"></div>
+      </div>
+    </details>
+
+    <!-- Appearance -->
+    <details class="setcard">
+      <summary>
+        <svg class="scicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <span class="sctitle">Appearance</span>
+      </summary>
+      <div class="scbody">
+        <div class="seg appearance" id="appSeg" style="margin-top:14px;">
+          <div class="s" data-th="auto">Auto</div>
+          <div class="s" data-th="light">Light</div>
+          <div class="s" data-th="dark">Dark</div>
+        </div>
+      </div>
+    </details>
+
+    <!-- Account & sharing -->
+    <details class="setcard" id="acctCard" style="display:none;">
+      <summary>
+        <svg class="scicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span class="sctitle">Account &amp; sharing<span class="scsub" id="acctCardSub"></span></span>
+      </summary>
+      <div class="scbody">
+      <div id="acctBox">
+      <p class="levelcap" style="margin:14px 4px 12px;" id="acctCap">Sign in to sync your log across your devices. We email you a 6-digit code — no password.</p>
       <div id="acctOut">
         <div class="row" style="margin-top:2px;">
           <input id="acctEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@email.com">
@@ -405,16 +460,25 @@
         <button class="btn tinted wide" id="acctPush" style="margin-top:12px;">Save this device to my account</button>
         <a id="acctDelete" class="levelcap" style="display:inline-block; margin:12px 0 0; color:var(--bad,#ff375f); cursor:pointer; text-decoration:underline;">Delete my cloud data</a>
       </div>
-    </div>
+      </div><!-- /acctBox -->
+      </div><!-- /scbody -->
+    </details>
 
-
-    <div class="ed-label" style="margin-top:20px;">Your data</div>
-    <p class="levelcap" style="margin:0 4px 12px;">Everything stays on this device. Back up to a file so a lost phone never costs you your history.</p>
-    <div class="row" style="gap:8px;">
-      <button class="btn tinted wide" id="exportBtn">Back up my data</button>
-      <button class="btn tinted wide" id="importBtn">Restore</button>
-    </div>
-    <input type="file" id="importFile" accept="application/json,.json" style="display:none;">
+    <!-- Your data -->
+    <details class="setcard">
+      <summary>
+        <svg class="scicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg>
+        <span class="sctitle">Your data<span class="scsub"> — backup &amp; restore</span></span>
+      </summary>
+      <div class="scbody">
+        <p class="levelcap" style="margin:14px 4px 12px;">Everything stays on this device. Back up to a file so a lost phone never costs you your history.</p>
+        <div class="row" style="gap:8px;">
+          <button class="btn tinted wide" id="exportBtn">Back up my data</button>
+          <button class="btn tinted wide" id="importBtn">Restore</button>
+        </div>
+        <input type="file" id="importFile" accept="application/json,.json" style="display:none;">
+      </div>
+    </details>
     </div><!-- /setMisc -->
   </div>
 </div>

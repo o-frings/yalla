@@ -702,6 +702,9 @@ function isBW(name){ return equipFor(name).key==="body"; }
 function bwLoadFrac(name){
   const n=String(name).toLowerCase();
   if(/plank|hollow|\(sec\)|hold|dead bug/.test(n)) return 0;   // isometric — no rep-volume
+  // Postural / neck / scapular activation moves barely move bodyweight — counting them at the 0.65
+  // default made e.g. Chin Tucks tally as much tonnage as a push-up. Treat them as a light fraction.
+  if(/chin.?tuck|\bneck\b|wall slide|wall angel|scap(ula|ular)|snow.?angel|cat.?cow|bird.?dog|prone (y|t|w|i)\b|y-?raise|t-?raise|w-?raise/.test(n)) return 0.08;
   for(const k in BWLOAD){ if(n.includes(k)) return BWLOAD[k]; }
   return 0.65;
 }
@@ -961,18 +964,19 @@ async function reloadFromStore(){
 }
 
 function renderAccount(){
-  const lbl=$("acctLabel"), box=$("acctBox");
+  const card=$("acctCard"), box=$("acctBox"), sub=$("acctCardSub");
   const cta=$("feedCTA"), list=$("feedList"), flbl=$("ovFeedLabel");
   const setFeed=(signedIn)=>{ if(cta) cta.style.display = signedIn ? "none" : ""; if(list) list.style.display = signedIn ? "" : "none"; };
   if(flbl) flbl.style.display = cloudConfigured() ? "" : "none";
   renderPresenceRail(); renderMeProfile();   // refresh the social surfaces regardless of sign-in state
-  if(!lbl||!box) return;
-  if(!cloudConfigured()){ lbl.style.display="none"; box.style.display="none"; setFeed(false); return; }
-  lbl.style.display=""; box.style.display="";
+  if(!box) return;
+  if(!cloudConfigured()){ if(card) card.style.display="none"; box.style.display="none"; setFeed(false); return; }
+  if(card) card.style.display=""; box.style.display="";
   const inB=$("acctIn"), outB=$("acctOut");
   if(cloudUser){
     outB.style.display="none"; inB.style.display="";
     $("acctWho").textContent=cloudUser.email||"Signed in";
+    if(sub) sub.textContent = " — "+(cloudUser.email||"signed in");
     const an=$("acctName"); if(an && document.activeElement!==an) an.value=settings.displayName||settings.name||"";
     renderShareSeg();
     renderFriends();
@@ -981,6 +985,7 @@ function renderAccount(){
     renderFeed();
   } else {
     outB.style.display=""; inB.style.display="none";
+    if(sub) sub.textContent=" — sign in to sync";
     setFeed(false);
     renderFriends();   // applies the signed-out state to the Friends sheet + clears the badge
   }
@@ -2574,7 +2579,8 @@ function decideTip(){
   const ts = settings.tipState = settings.tipState || { opens:0, last:{} };
   ts.opens = (ts.opens||0) + 1;
   currentTip = null;
-  if(TIPS.length && ts.opens > 1 && ts.opens % 3 === 0){   // skip the very first open; then ~every 3rd
+  const every = settings.tipEvery==null ? 3 : settings.tipEvery;   // user-set cadence; 0 = never show tips
+  if(every>0 && TIPS.length && ts.opens > 1 && ts.opens % every === 0){   // skip the very first open; then ~every Nth
     const obj = settings.objective;
     const pool = TIPS.filter(tip => !tip.goals || !obj || tip.goals.indexOf(obj) >= 0);
     // weight ∝ opens since last shown; never-shown tips get the highest weight; weak single-cohort tips show rarely
@@ -3184,6 +3190,7 @@ function flushDraft(){ try{ captureDraft(); clearTimeout(_draftTimer); sset("dra
 window.addEventListener("pagehide", flushDraft);
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden") flushDraft(); });
 function renderWorkout(){
+  if(typeof renderTravelBanner==="function") renderTravelBanner();
   const p=activePlan(), w=p.workouts[curWk], list=$("exlist"); list.innerHTML="";
   // recompute the auto-rotation pick only when the slot (or its completion count) changes, so a manual
   // swap or "keep" re-render doesn't reshuffle the variety or wipe the user's pins.
@@ -3298,6 +3305,8 @@ $("repeatBtn").onclick=repeatLastWorkout;
 $("saveBtn").onclick=async()=>{
   const savedSig=draftSig();
   const p=activePlan(); const w = freeMode ? null : p.workouts[curWk]; let logged=0, beaten=0;
+  // travel tag: 1 = travelling with gym access, 2 = travelling without a gym, 0 = home (normal)
+  const tvCode = settings.travelMode==="gym"?1 : settings.travelMode==="nogym"?2 : 0;
   const session={ name: freeMode?"Free workout":(w?w.name:"Workout"), sub:"", totalVol:0, sets:0, beaten:0, top:null, mtot:{}, exercises:[], date:Date.now() };
   document.querySelectorAll("#exlist .group").forEach(g=>{
     const name=g.dataset.ex, pt=topSet(last[name]), sets=[];
@@ -3311,7 +3320,8 @@ $("saveBtn").onclick=async()=>{
       if(!session.top || tw>session.top.w) session.top={name, w:tw, r:tr};
       muscleFor(name).forEach((grp,gi)=> session.mtot[grp]=(session.mtot[grp]||0)+vol*(gi===0?1:0.5));
       session.exercises.push({ name, sets: sets.map(s=>({w:s.w, r:s.r})) });
-      (hist[name]=hist[name]||[]).push({d:Date.now(), w:nt.w, r:nt.r, n:sets.length, v:Math.round(vol)}); }
+      const he={d:Date.now(), w:nt.w, r:nt.r, n:sets.length, v:Math.round(vol)}; if(tvCode) he.tv=tvCode;
+      (hist[name]=hist[name]||[]).push(he); }
   });
   if(!logged){ toast(freeMode?"Add an exercise and log a set":"Log at least one set first"); return; }
   await sset("lastsets",last);
@@ -3323,7 +3333,13 @@ $("saveBtn").onclick=async()=>{
   // Only a session with real substance (>= QUALIFY_SETS sets) counts toward the lifetime tally,
   // achievements, and the share/feed. The work is still logged below either way (history, PRs, rings-by-set).
   const qualifies = session.sets >= QUALIFY_SETS;
-  if(qualifies) settings.sessions++;
+  if(qualifies){ settings.sessions++;
+    // travel-vs-home tally, so the user can isolate how travelling shifts their training
+    const tkey = tvCode===1?"gym" : tvCode===2?"nogym" : "home";
+    const ts=settings.travelStats=settings.travelStats||{};
+    const slot=ts[tkey]=ts[tkey]||{n:0,sets:0,vol:0,mins:0};
+    slot.n++; slot.sets+=session.sets; slot.vol+=Math.round(session.totalVol); slot.mins+=mins;
+  }
   settings.beatTotal = (settings.beatTotal||0) + beaten;
   if(freeMode){ settings.sinceDeload++; }
   else if(w.rotate!==false){
@@ -3390,7 +3406,7 @@ function placeGoalBlock(){
   if($("goalStart")) $("goalStart").value = settings.goalStart!=null ? settings.goalStart : "";
   if($("goalTarget")) $("goalTarget").value = settings.goalTarget!=null ? settings.goalTarget : "";
 }
-$("openSettings").onclick=()=>{ renderDash(); renderAccount(); if($("setRestDefault")) $("setRestDefault").value=tmrFmt(settings.restSec||90); openSheet("Settings"); };
+$("openSettings").onclick=()=>{ renderDash(); renderAccount(); if($("setRestDefault")) $("setRestDefault").value=tmrFmt(settings.restSec||90); renderTipSeg(); renderTravel(); openSheet("Settings"); };
 $("settingsClose").onclick=()=>closeSheet("Settings");
 if($("setRestDefault")) $("setRestDefault").onchange=e=>{ const sec=parseRest(e.target.value); if(sec){ settings.restSec=Math.max(5,Math.min(1800,Math.round(sec))); sset("settings",settings); } e.target.value=tmrFmt(settings.restSec||90); };
 $("scrimSettings").onclick=()=>closeSheet("Settings");
@@ -3926,13 +3942,16 @@ function drawRadar(totals, canvasId, target, noLabels){
   [0.5,1].forEach(f=>{ ctx.beginPath(); ctx.arc(cx,cy,R*f,0,Math.PI*2); ctx.stroke(); });
   if(target){ ctx.strokeStyle=accent; ctx.globalAlpha=.45; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; }
   const half=Math.PI/n - 0.05;
-  MGROUPS.forEach((g,i)=>{ const rr=R*norm(g); if(rr<=0.5) return;
+  // Auxiliary (NO_TARGET) muscles have no weekly goal, so against the target ring they'd read as
+  // permanent gaps. Match the small roses: show an aux spoke/label only when it was actually trained.
+  const showSpoke=g=> (totals[g]||0)>0 || !NO_TARGET.has(g);
+  MGROUPS.forEach((g,i)=>{ if(!showSpoke(g)) return; const rr=R*norm(g); if(rr<=0.5) return;
     const a=(-90+i*360/n)*Math.PI/180, col=MCOLOR[g]||accent;
     ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rr,a-half,a+half); ctx.closePath();
     ctx.fillStyle=col; ctx.globalAlpha=.30; ctx.fill(); ctx.globalAlpha=1; ctx.lineWidth=2; ctx.strokeStyle=col; ctx.stroke(); });
   if(noLabels) return;
   ctx.fillStyle=lab; ctx.font="600 29px -apple-system,sans-serif"; ctx.textBaseline="middle";
-  MGROUPS.forEach((g,i)=>{ const a=(-90+i*360/n)*Math.PI/180, x=cx+(R+52)*Math.cos(a), y=cy+(R+52)*Math.sin(a), co=Math.cos(a);
+  MGROUPS.forEach((g,i)=>{ if(!showSpoke(g)) return; const a=(-90+i*360/n)*Math.PI/180, x=cx+(R+52)*Math.cos(a), y=cy+(R+52)*Math.sin(a), co=Math.cos(a);
     ctx.textAlign = Math.abs(co)<0.3 ? "center" : (co>0?"left":"right"); ctx.fillText(MSHORT[g], x, y); });
 }
 // dynamic intervention: when a muscle is over/under-trained, suggest adding or trimming an exercise in the current plan
@@ -4061,6 +4080,48 @@ document.querySelectorAll("#appSeg .s").forEach(s=>{
 });
 try{ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>{ if((settings.theme||"auto")==="auto") applyTheme(); }); }catch(e){}
 
+// ================= coach-tip cadence =================
+function renderTipSeg(){
+  const every = settings.tipEvery==null ? 3 : settings.tipEvery;
+  document.querySelectorAll("#tipSeg .s").forEach(s=> s.classList.toggle("active", +s.dataset.te===every));
+}
+document.querySelectorAll("#tipSeg .s").forEach(s=>{
+  s.onclick=async()=>{ settings.tipEvery=+s.dataset.te; await sset("settings",settings); renderTipSeg(); };
+});
+
+// ================= travel mode (global; tags sessions home / travel+gym / travel-no-gym) =================
+const TRAVEL_LBL={ off:"Home", gym:"with gym access", nogym:"no gym" };
+function renderTravelSeg(){
+  const m = settings.travelMode || "off";
+  document.querySelectorAll("#travelSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.tv===m));
+}
+// banner on the workout page so it's obvious travel tagging is on (and easy to end)
+function renderTravelBanner(){
+  const b=$("travelBanner"); if(!b) return;
+  const m=settings.travelMode||"off";
+  if(m==="off"){ b.style.display="none"; return; }
+  b.style.display="";
+  $("travelBannerTxt").textContent = m==="gym" ? "Travel mode — with gym access" : "Travel mode — no gym";
+}
+function renderTravelBreakdown(){
+  const box=$("travelBreakdown"); if(!box) return;
+  const ts=settings.travelStats||{};
+  const order=[["home","Home"],["gym","Travel · gym"],["nogym","Travel · no gym"]];
+  const rows=order.filter(([k])=>ts[k]&&ts[k].n>0);
+  if(rows.length<2){ box.innerHTML=""; return; }   // nothing to compare against until there's travel data
+  let h='<div class="ed-label">Travel vs home</div><div class="tvbreak">';
+  rows.forEach(([k,lab])=>{ const s=ts[k]; const perSets=(s.sets/s.n), perVol=Math.round(s.vol/s.n);
+    h+='<div class="tvrow"><span>'+lab+'</span><span><b>'+s.n+'</b> session'+(s.n===1?'':'s')+' · <b>'+round1(perSets)+'</b> sets · <b>'+fmtKg(perVol)+'</b>/session</span></div>'; });
+  h+='</div><p class="levelcap" style="margin:8px 4px 0;">Average sets &amp; load per session in each context — so you can see what travel really costs.</p>';
+  box.innerHTML=h;
+}
+function renderTravel(){ renderTravelSeg(); renderTravelBanner(); renderTravelBreakdown(); }
+if($("travelEnd")) $("travelEnd").onclick=async()=>{ settings.travelMode="off"; await sset("settings",settings); renderTravel(); toast("Back home — sessions log as normal."); };
+document.querySelectorAll("#travelSeg .s").forEach(s=>{
+  s.onclick=async()=>{ settings.travelMode=s.dataset.tv; await sset("settings",settings); renderTravel();
+    toast(settings.travelMode==="off" ? "Back home — sessions log as normal." : "Travel mode on — "+TRAVEL_LBL[settings.travelMode].toLowerCase()+". Sessions tagged until you switch back."); };
+});
+
 // ================= free workout =================
 function exerciseLibrary(){
   const set=new Set(LIBRARY);
@@ -4098,6 +4159,7 @@ function buildFreeGroup(name){
   return g;
 }
 function renderFree(){
+  if(typeof renderTravelBanner==="function") renderTravelBanner();
   $("planSub").textContent="Free workout — choose your exercises";
   const list=$("exlist"); list.innerHTML="";
   const hint=document.createElement("p"); hint.className="freehint";

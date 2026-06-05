@@ -364,6 +364,24 @@
   .mefold > summary::-webkit-details-marker{ display:none; }
   .mefold > summary::after{ content:"⌄"; font-size:17px; line-height:1; color:var(--l3); transform:translateY(-3px); transition:transform .2s; }
   .mefold[open] > summary::after{ transform:translateY(1px) rotate(180deg); }
+  /* collapsible setting cards (Settings sheet) */
+  .setcard{ background:var(--row); border:.5px solid var(--line); border-radius:14px; margin:0 0 12px; overflow:hidden; }
+  .setcard > summary{ list-style:none; cursor:pointer; display:flex; align-items:center; gap:12px; padding:15px 16px; font-size:16px; font-weight:600; color:var(--ink); }
+  .setcard > summary::-webkit-details-marker{ display:none; }
+  .setcard > summary:active{ background:var(--sep); }
+  .setcard > summary .scicon{ width:21px; height:21px; flex:0 0 auto; color:var(--accent); }
+  .setcard > summary .sctitle{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .setcard > summary .scsub{ font-size:13px; font-weight:500; color:var(--l3); }
+  .setcard > summary::after{ content:"⌄"; font-size:18px; line-height:1; color:var(--l3); flex:0 0 auto; transition:transform .2s; }
+  .setcard[open] > summary{ border-bottom:.5px solid var(--sep); }
+  .setcard[open] > summary::after{ transform:rotate(180deg); }
+  .setcard .scbody{ padding:2px 16px 16px; }
+  .setcard .scbody > .ed-label:first-child{ margin-top:14px; }
+  .travelbar{ display:flex; align-items:center; gap:10px; margin:6px 0 14px; padding:11px 14px; border-radius:12px; background:var(--accent-soft); color:var(--accent); font-size:14px; font-weight:600; }
+  .travelbar .tvx{ margin-left:auto; flex:0 0 auto; background:transparent; border:.5px solid currentColor; color:inherit; font:inherit; font-size:13px; padding:4px 10px; border-radius:9px; cursor:pointer; opacity:.85; }
+  .tvbreak{ display:flex; flex-direction:column; gap:7px; margin:10px 0 2px; }
+  .tvrow{ display:flex; align-items:center; justify-content:space-between; font-size:13px; color:var(--l2); }
+  .tvrow b{ color:var(--ink); font-weight:600; }
   .rglgwrap{ display:flex; flex-direction:column; gap:7px; }
   .rglg{ display:flex; align-items:center; gap:7px; font-size:13px; color:var(--l2); }
   .rglg i{ width:9px; height:9px; border-radius:50%; flex:0 0 auto; }
