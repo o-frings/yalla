@@ -22,7 +22,7 @@ We **prioritise meta-analyses, systematic reviews and umbrella reviews in reputa
 
 **Source quality** (`tier`): `meta` (meta-analysis/review — preferred) · `rct` · `review` (guideline/consensus/narrative) · `cohort` (large) · `small-cohort` (weak, flagged) · `mechanism`.
 
-**Copy rule:** `tone:"do"` (imperative, mechanistic) is allowed only for causal / causal-leaning studies. `tone:"linked"` (observational, marker) must use "linked to / tends to" and must never promise lifespan. This is enforced in `evidence.json`.
+**Copy rule:** `tone:"do"` (imperative, mechanistic) is allowed only for causal / causal-leaning studies. `tone:"linked"` (observational, marker) must use "linked to / tends to" and must never promise lifespan. **Every figure in a tip must name the outcome (all-cause mortality, muscle gain — not bare "risk") and the comparison group (vs the least active / vs lowest intake / vs once-weekly); popular analogies (e.g. "= N cigarettes/day") are used only if the cited paper states them.** This is enforced in `evidence.json`.
 
 ## Library categories (how users browse all of it)
 
@@ -32,7 +32,7 @@ The app surfaces every item in a dedicated, searchable **Library** screen groupe
 
 # Part A — Training & nutrition (mostly causal)
 
-- **`sch17` — Schoenfeld, Ogborn, Krieger (2017),** *J Sports Sci.* [10.1080/02640414.2016.1210197](https://doi.org/10.1080/02640414.2016.1210197) · *meta · causal · 15 studies* — Graded dose–response: each added weekly set ≈ **+0.37%** muscle gain; near-max around **~10+ sets/muscle/wk.** → ~10-set target ring; growth-dose.
+- **`sch17` — Schoenfeld, Ogborn, Krieger (2017),** *J Sports Sci.* [10.1080/02640414.2016.1210197](https://doi.org/10.1080/02640414.2016.1210197) · *meta · causal · 15 studies* — Graded dose–response: each added weekly set ≈ **+0.37%** muscle gain, growth still rising across the studied range. **~10 sets/muscle/wk is a practical target, not a hard plateau the paper identifies.** → ~10-set target ring; growth-dose.
 - **`drr` — Pelland et al. (2024),** *SportRxiv.* [10.51224/SRXIV.460](https://doi.org/10.51224/SRXIV.460) · *meta · causal-leaning* — Indirect/secondary sets weighted **0.5** best fit hypertrophy; more frequency accommodates volume. → primary ×1 / secondary ×0.5 weighting. *(preprint)*
 - **`sch16` — Schoenfeld et al. (2016),** *Sports Med.* [10.1007/s40279-016-0543-8](https://doi.org/10.1007/s40279-016-0543-8) · *meta · causal-leaning · 10 studies* — At matched volume, **~2×/wk** modestly out-grew 1×/wk. → frequency tips & builder.
 - **`sch10` — Schoenfeld (2010),** *JSCR.* [10.1519/JSC.0b013e3181e840f3](https://doi.org/10.1519/JSC.0b013e3181e840f3) · *review · causal-leaning* — Mechanical tension (progressive overload) is the primary growth driver. → growth signal needs a *rising* trend; `overload`, `tension`.
@@ -56,8 +56,8 @@ The app surfaces every item in a dedicated, searchable **Library** screen groupe
 **Move for life**
 - **`paluch` — Paluch et al. (2022),** *Lancet Public Health.* [10.1016/S2468-2667(21)00302-9](https://doi.org/10.1016/S2468-2667(21)00302-9) · *meta · correlational · 15 cohorts, 47,471* — Mortality fell with steps, plateauing **~7–8k (60+) / 8–10k (<60)**; top vs bottom quartile **~40–53% lower** (HR 0.47–0.60). 10k was a slogan. → `steps10k`.
 - **`odonovan` — O'Donovan et al. (2017),** *JAMA Intern Med.* [10.1001/jamainternmed.2016.8014](https://doi.org/10.1001/jamainternmed.2016.8014) · *cohort · correlational · 63,591* — "Weekend warriors" **~30% lower** all-cause mortality (HR 0.70), ≈ regularly active. → `weekendwarrior`.
-- **`stamatakis` — Stamatakis et al. (2022),** *Nat Med.* [10.1038/s41591-022-02100-x](https://doi.org/10.1038/s41591-022-02100-x) · *cohort · correlational* — **~4.4 min/day** of vigorous bursts ≈ **26–30% lower** all-cause/cancer, **32–34% lower** CVD mortality. → `vilpa`.
-- **`momma` — Momma et al. (2022),** *BJSM.* [10.1136/bjsports-2021-105061](https://doi.org/10.1136/bjsports-2021-105061) · *meta · correlational · 16 studies* — **30–60 min/wk** strength work ≈ **10–17% lower** mortality, J-shaped. → `rtdose`.
+- **`stamatakis` — Stamatakis et al. (2022),** *Nat Med.* [10.1038/s41591-022-02100-x](https://doi.org/10.1038/s41591-022-02100-x) · *cohort · correlational* — At median dose (**~4 min/day, ~3 short bouts**): all-cause/cancer **~38–40% lower**, CVD **~48% lower** vs none; ~3 bouts/day ≈ HR 0.61. *(The smaller 24–34% figures are a below-median dose.)* → `vilpa`.
+- **`momma` — Momma et al. (2022),** *BJSM.* [10.1136/bjsports-2021-105061](https://doi.org/10.1136/bjsports-2021-105061) · *meta · correlational · 16 studies* — **30–60 min/wk** strength work ≈ **10–17% lower** mortality vs none, J-shaped (benefit out to ~130–140 min/wk). → `rtdose`.
 - **`mandsager` — Mandsager et al. (2018),** *JAMA Netw Open.* [10.1001/jamanetworkopen.2018.3605](https://doi.org/10.1001/jamanetworkopen.2018.3605) · *cohort · correlational · 122,007* — Fitness → lower mortality, **no upper limit**; elite vs low **HR 0.20**; unfitness ≈ smoking. → `vo2nolimit`.
 - **`diaz` — Diaz et al. (2017),** *Ann Intern Med.* [10.7326/M17-0212](https://doi.org/10.7326/M17-0212) · *cohort · correlational+mech · 7,985* — More total sitting **and** longer unbroken bouts (≥60–90 min) → higher mortality; short bouts (<30 min) best. → `sitbreaks`.
 - **`laukkanen` — Laukkanen et al. (2015),** *JAMA Intern Med.* [10.1001/jamainternmed.2014.8187](https://doi.org/10.1001/jamainternmed.2014.8187) · *small-cohort · correlational · 2,315 men* ⚠️ — 4–7 sauna/wk vs 1: all-cause **HR 0.60**, CVD 0.50. → `sauna` *(weak: single-sex cohort)*.
@@ -79,10 +79,10 @@ The app surfaces every item in a dedicated, searchable **Library** screen groupe
 - **`white` — White et al. (2019),** *Sci Rep.* [10.1038/s41598-019-44097-3](https://doi.org/10.1038/s41598-019-44097-3) · *cohort · correlational · ~20,000* — **≥120 min/week in nature** → better health & wellbeing; nothing below that. → `nature`.
 - **`carr` — Carr et al. (2021),** *J Positive Psychol.* [10.1080/17439760.2020.1818807](https://doi.org/10.1080/17439760.2020.1818807) · *meta · causal · 347 studies* — Positive-psychology habits: wellbeing **g=0.39**, depression g=−0.39. → `gratitude`.
 - **`curry` — Curry et al. (2018),** *J Exp Soc Psychol.* [10.1016/j.jesp.2018.02.014](https://doi.org/10.1016/j.jesp.2018.02.014) · *meta · causal · 27 studies* — Acts of kindness lift the **giver's** wellbeing (**d=0.28**). → `kindness`.
-- **`holtlunstad` — Holt-Lunstad et al. (2010),** *PLoS Med.* [10.1371/journal.pmed.1000316](https://doi.org/10.1371/journal.pmed.1000316) · *meta · correlational · 308,849* — Strong ties **≈ +50%** survival odds (OR 1.50) ≈ quitting smoking. → `social`.
+- **`holtlunstad` — Holt-Lunstad et al. (2010),** *PLoS Med.* [10.1371/journal.pmed.1000316](https://doi.org/10.1371/journal.pmed.1000316) · *meta · correlational · 308,849* — Strong ties **≈ +50%** survival odds (OR 1.50) ≈ quitting smoking, > obesity/inactivity. *(The popular "15 cigarettes/day" figure is a later media gloss, not in this paper.)* → `social`.
 - **`lee` — Lee et al. (2019),** *PNAS.* [10.1073/pnas.1900712116](https://doi.org/10.1073/pnas.1900712116) · *cohort · correlational* — Optimists **11–15% longer** lifespan, 50–70% higher odds of reaching 85. → `optimism`.
 - **`alimujiang` — Alimujiang et al. (2019),** *JAMA Netw Open.* [10.1001/jamanetworkopen.2019.4270](https://doi.org/10.1001/jamanetworkopen.2019.4270) · *cohort · correlational · 6,985* — Lowest vs highest purpose **~2.4×** mortality (HR 2.43). → `purpose`.
-- **`bavishi` — Bavishi, Slade, Levy (2016),** *Soc Sci Med.* [10.1016/j.socscimed.2016.07.014](https://doi.org/10.1016/j.socscimed.2016.07.014) · *cohort · correlational · 3,635* — Reading books **>3.5 h/wk → 23% lower** mortality (HR 0.80). → `reading`.
+- **`bavishi` — Bavishi, Slade, Levy (2016),** *Soc Sci Med.* [10.1016/j.socscimed.2016.07.014](https://doi.org/10.1016/j.socscimed.2016.07.014) · *cohort · correlational · 3,635* — Any book reading **~20% lower** mortality (HR 0.80); heaviest readers (>3.5 h/wk) **~23%** (HR 0.77). *(Adjusted survival gain ~4 months; the quoted "23 months" is unadjusted.)* → `reading`.
 
 ---
 
@@ -104,7 +104,8 @@ General self-management and prevention, **not medical advice** — in-app copy s
 ---
 
 ## Changelog
+- **v3 (2026-06-05):** Scientific-rigour pass on the tip copy — every figure now names its **outcome** and **comparison group** (e.g. "vs the least active", "vs none"), and observational items read "linked to / tends to". Re-verified all DOIs and headline numbers against the papers; corrected three: **`vilpa`** (median-dose reductions are ~38–40% all-cause/cancer & ~48% CVD, not 26–34% — the lower figures were a below-median dose), **`reading`** (any-book HR 0.80 ≈ 20%; the "23-month" survival gain is unadjusted, ~4 months adjusted), and **`social`** (dropped the "15 cigarettes/day" analogy — not from Holt-Lunstad 2010). Softened the `sch17`/`vol10` "near-max ~10 sets" wording (the meta-analysis shows a continuing dose-response, not a hard plateau) and the `momma`/`rtdose` cutoff. Fixed the `curry` study title.
 - **v2 (2026-06-04):** Added source `tier` to every study and a source-quality-priority rule (meta-analyses/reviews first). Made every finding concrete with verified effect sizes (double-checked against sources). Added **injury prevention** (`lauersen`, `vandyk`) and **happiness/life-satisfaction** (`singh`, `white`, `carr`, `curry`). Relabelled categories *Mind & happiness* and *Injury care & prevention*. Flagged weak single cohorts (`sauna`, `sitrise`). All DOIs verified to resolve.
 - **v1 (2026-06-03):** Initial ledger (Parts A/B/C) as prose.
 
-_Canonical data: `evidence.json`. Last updated 2026-06-04._
+_Canonical data: `evidence.json`. Last updated 2026-06-05._

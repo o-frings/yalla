@@ -1881,12 +1881,34 @@ function drawRose(x, cx, cy, R, G, tot, o){
     x.fillStyle=col; x.globalAlpha=o.alpha!=null?o.alpha:0.85; x.fill(); x.globalAlpha=1;
     if(o.stroke){ x.lineWidth=o.strokeW||1; x.strokeStyle=o.stroke; x.stroke(); }
   }
+  // optional muscle labels — only for muscles actually trained (a wedge present), so the ring stays readable
+  if(o.labels){
+    const gap=o.labelGap!=null?o.labelGap:14;
+    x.font=o.labelFont||"600 12px -apple-system,system-ui,sans-serif"; x.textBaseline="middle";
+    if(o.labelShadow){ x.shadowColor="rgba(0,0,0,.30)"; x.shadowBlur=6; x.shadowOffsetY=1; }
+    for(let i=0;i<n;i++){ if(frac[i]<=0) continue;
+      const a=(-90+i*360/n)*Math.PI/180, px=cx+(R+gap)*Math.cos(a), py=cy+(R+gap)*Math.sin(a), co=Math.cos(a);
+      x.textAlign=Math.abs(co)<0.3?"center":(co>0?"left":"right");
+      x.fillStyle=typeof o.labelColor==="function"?o.labelColor(G[i],i):(o.labelColor||"#888");
+      x.fillText(MSHORT[G[i]]||G[i], px, py);
+    }
+    x.shadowColor="transparent"; x.shadowBlur=0; x.shadowOffsetY=0;
+  }
 }
-// Small rose (no labels) for a feed card.
+// Small rose for a feed card (no on-canvas labels — colours map to the wedge legend rendered alongside).
 function miniRadar(cv, tot){
   const W=cv.width, H=cv.height, x=cv.getContext("2d"), cx=W/2, cy=H/2, R=Math.min(W,H)/2-4;
   x.clearRect(0,0,W,H);
-  drawRose(x, cx, cy, R, MGROUPS, tot, { color:g=>MCOLOR[g]||"#f08020", alpha:.55, rings:[0.5,1], grid:"rgba(127,127,127,.28)" });
+  drawRose(x, cx, cy, R, MGROUPS, tot, { color:g=>MCOLOR[g]||"#f08020", alpha:.72, rings:[0.5,1], grid:"rgba(127,127,127,.28)" });
+}
+// Color-dot legend mapping rose wedges → trained muscles (sorted by share). `max` caps the count
+// (feed cards stay to a line; the detail sheet shows them all). Returns "" when nothing was trained.
+function muscleLegend(mt, max){
+  const items=MGROUPS.filter(g=>(mt[g]||0)>0).sort((a,b)=>(mt[b]||0)-(mt[a]||0));
+  if(!items.length) return "";
+  const top=(max&&items.length>max)?items.slice(0,max):items;
+  const more=(max&&items.length>max)?(' <span class="rl-more">+'+(items.length-max)+'</span>'):'';
+  return '<div class="roselegend">'+top.map(g=>'<span class="rl-item"><i class="rl-dot" style="background:'+(MCOLOR[g]||"#f08020")+'"></i>'+esc(MSHORT[g]||g)+'</span>').join('')+more+'</div>';
 }
 
 async function renderFeed(){
@@ -1926,13 +1948,12 @@ async function renderFeed(){
     const stats=[ s.exN?s.exN+" ex":null, s.sets!=null?s.sets+" sets":null, s.vol?fmtKg(s.vol):null,
       s.mins?Math.round(s.mins)+" min":null, s.prs?s.prs+" PR"+(s.prs>1?"s":""):null ].filter(Boolean).join(" · ");
     const t=s.top, topLine = t&&t.name ? ("Top · "+t.name + (viewLvl>=3 && t.w>0 ? " · "+t.w+"kg×"+t.r : "")) : "";
-    const mt=s.mtot||{}, topM=MGROUPS.slice().sort((a,b)=>(mt[b]||0)-(mt[a]||0)).filter(g=>(mt[g]||0)>0).slice(0,2).map(g=>MSHORT[g]||g);
-    const hl = topM.length ? "mostly "+topM.join(" · ") : "";
+    const mt=s.mtot||{}, hl=muscleLegend(mt, 3);
     const canOpen = viewLvl>=2 && s.ex && s.ex.length;
     txt.innerHTML='<div style="font-weight:600;">'+esc(who)+' · '+esc(s.name||"Workout")+'</div>'+
       '<div class="levelcap" style="margin:4px 0 0;">'+esc(stats)+'</div>'+
       (topLine?'<div class="levelcap" style="margin:2px 0 0;">'+esc(topLine)+'</div>':'')+
-      (hl?'<div class="levelcap" style="margin:2px 0 0; opacity:.85;">'+esc(hl)+'</div>':'')+
+      (hl?'<div class="levelcap" style="margin:3px 0 0; opacity:.9;">'+hl+'</div>':'')+
       '<div class="levelcap" style="margin:2px 0 0; opacity:.7;">'+esc(agoStr(Date.parse(r.created_at)))+(canOpen?' · tap for detail ›':'')+'</div>';
     const cv=document.createElement("canvas"); cv.width=72; cv.height=72; cv.style.cssText="flex:0 0 auto; width:60px; height:60px;";
     const avt=document.createElement("div"); avt.style.cssText="flex:0 0 auto;"+(mine?"":" cursor:pointer;"); avt.innerHTML=avatarHTML(who,{size:44,uid:r.user_id});
@@ -1972,9 +1993,9 @@ function openWorkoutDetail(r, who, viewLvl){
   let when=""; try{ when=new Date(Date.parse(r.created_at)).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); }catch(e){}
   let h='<div class="ovbig" style="font-size:22px;">'+esc(s.name||"Workout")+'</div>';
   if(when) h+='<div class="levelcap" style="margin:4px 0 0;">'+esc(when)+'</div>';
-  const mt=s.mtot||{}, topM=MGROUPS.slice().sort((a,b)=>(mt[b]||0)-(mt[a]||0)).filter(g=>(mt[g]||0)>0).slice(0,2).map(g=>MSHORT[g]||g);
+  const mt=s.mtot||{};
   h+='<div style="text-align:center; margin:14px 0 2px;"><canvas id="woRadar" width="320" height="320" style="width:190px; height:190px;"></canvas></div>';
-  if(topM.length) h+='<div class="levelcap" style="text-align:center; margin:0 0 6px;">mostly '+esc(topM.join(" · "))+'</div>';
+  h+=muscleLegend(mt);
   const chips=[["Volume", s.vol?fmtKg(s.vol):"—"],["Sets", ""+(s.sets||0)],["Time", (s.mins||0)+" min"],["PRs", ""+(s.prs||0)]];
   h+='<div class="row" style="gap:8px; margin:12px 0;">'+chips.map(c=>'<div style="flex:1; background:var(--row); border-radius:14px; padding:10px 4px; text-align:center;"><div style="font-weight:700; font-size:18px;">'+esc(c[1])+'</div><div class="levelcap" style="margin-top:2px;">'+esc(c[0])+'</div></div>').join('')+'</div>';
   if(viewLvl>=2 && s.ex && s.ex.length){
@@ -5877,12 +5898,14 @@ $("importFile").onchange=(e)=>{ const f=e.target.files&&e.target.files[0]; if(!f
 function fmtKgShort(v){ v=Math.round(v); return v>=1000 ? (v/1000).toFixed(v>=10000?0:1).replace(/\.0$/,"")+"k kg" : v+" kg"; }
 function rrect(x,X,Y,w,h,r){ x.beginPath(); x.moveTo(X+r,Y); x.arcTo(X+w,Y,X+w,Y+h,r); x.arcTo(X+w,Y+h,X,Y+h,r); x.arcTo(X,Y+h,X,Y,r); x.arcTo(X,Y,X+w,Y,r); x.closePath(); }
 function tileRadar(x,cx,cy,R,tot){
-  const G=MGROUPS, n=G.length;
   // rose: each wedge's area = that muscle's share of the session (see drawRose) — constant total area.
-  drawRose(x, cx, cy, R, G, tot, { color:"rgba(255,255,255,.88)", alpha:1, stroke:"#fff", strokeW:2, gap:0.08, rings:[0.5,1], grid:"rgba(255,255,255,.30)", gridW:2 });
-  x.fillStyle="rgba(255,255,255,.92)"; x.font="600 22px -apple-system,system-ui,sans-serif"; x.textBaseline="middle";
-  G.forEach((g,i)=>{ const a=(-90+i*360/n)*Math.PI/180, px=cx+(R+34)*Math.cos(a), py=cy+(R+34)*Math.sin(a), co=Math.cos(a);
-    x.textAlign=Math.abs(co)<0.3?"center":(co>0?"left":"right"); x.fillText(MSHORT[g]||g, px, py); });
+  // Wedges are colour-coded per muscle (same palette as the in-app radar) with a white rim so the split
+  // reads at a glance on the gradient; only trained muscles get a shadowed white label, keeping the ring clean.
+  drawRose(x, cx, cy, R, MGROUPS, tot, {
+    color:g=>MCOLOR[g]||"#f08020", alpha:.92, stroke:"rgba(255,255,255,.85)", strokeW:2,
+    gap:0.08, rings:[0.5,1], grid:"rgba(255,255,255,.30)", gridW:2,
+    labels:true, labelColor:"rgba(255,255,255,.96)", labelFont:"700 22px -apple-system,system-ui,sans-serif", labelGap:34, labelShadow:true
+  });
 }
 // app URL shown on the share tile — derived from the live location so it stays right under any
 // host (GitHub Pages subpath or a custom domain), minus protocol, trailing file, and trailing slash.

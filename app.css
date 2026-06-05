@@ -661,6 +661,12 @@
   .sessrose-pad{ text-align:center; }
   .sessrose-pad .ed-label{ text-align:left; }
   .sessrose-pad canvas{ width:180px; height:180px; display:inline-block; }
+  /* color-dot legend mapping rose wedges → muscles (feed cards + workout-detail sheet) */
+  .roselegend{ display:flex; flex-wrap:wrap; gap:6px 12px; justify-content:center; }
+  .roselegend .rl-item{ display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
+  .roselegend .rl-dot{ width:8px; height:8px; border-radius:50%; flex:0 0 auto; display:inline-block; }
+  .roselegend .rl-more{ color:var(--l3); }
+  .levelcap .roselegend{ justify-content:flex-start; }
   .cueact{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
   .cuebtn{ font-family:inherit; font-size:13px; font-weight:700; color:var(--accent); background:var(--accent-soft);
     border:none; border-radius:9px; padding:8px 12px; cursor:pointer; line-height:1; transition:transform .12s, filter .12s; }
