@@ -374,8 +374,10 @@
   .react-pick{ background:none; border:none; font-size:25px; line-height:1; cursor:pointer; padding:4px 5px; border-radius:50%; transition:transform .1s; }
   .react-pick:active{ transform:scale(1.35); }
   .sheethdr .t.tappable{ cursor:pointer; }
-  #ovMessages{ position:relative; padding:8px; }
+  #ovMessages{ position:relative; padding:8px; color:var(--l2); }   /* neutral by default… */
+  #ovMessages.has-unread{ color:var(--accent); }                   /* …accent only when there's an unread message */
   #ovMessages .railnotch{ position:absolute; top:2px; right:2px; min-width:16px; height:16px; padding:0 4px; font-size:10px; }
+  .msgbadge[hidden]{ display:none; }   /* guard: the .msgbadge display rule otherwise overrides the hidden attribute */
   .msg-compose{ display:flex; gap:8px; align-items:center; padding-top:10px; margin-top:6px; border-top:.5px solid var(--line); }
   .msg-compose .comminput{ flex:1; }
   .msg-empty{ text-align:center; color:var(--l2); padding:32px 16px; line-height:1.5; }

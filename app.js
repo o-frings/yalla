@@ -1419,8 +1419,9 @@ function teardownMessages(){
   _msgUnread=0; setMsgBadge(0);
 }
 function setMsgBadge(n){
-  const b=$("msgRailBadge"); if(b){ b.textContent=n>0?(n>9?"9+":String(n)):""; b.hidden=!(n>0); }
+  const b=$("msgRailBadge"); if(b){ b.textContent=n>9?"9+":String(n); b.style.display=n>0?"":"none"; }
   const fb=$("friendsMsgBadge"); if(fb){ fb.textContent=n>9?"9+":String(n); fb.style.display=n>0?"":"none"; }
+  const ic=$("ovMessages"); if(ic) ic.classList.toggle("has-unread", n>0);   // accent only when there's something unread
 }
 async function refreshUnread(){
   if(!cloudReady()){ setMsgBadge(0); return; }
@@ -3087,8 +3088,7 @@ function openFriends(){ renderFriends(); openSheet("Friends"); }
 if($("friendsClose")) $("friendsClose").onclick=()=>closeSheet("Friends");
 if($("scrimFriends")) $("scrimFriends").onclick=()=>closeSheet("Friends");
 // end-to-end encrypted messages: open from the Friends hub
-if($("openMessages")) $("openMessages").onclick=openMessages;
-if($("ovMessages")) $("ovMessages").onclick=openMessages;   // prominent chat shortcut on the overview
+if($("ovMessages")) $("ovMessages").onclick=openMessages;   // the single inbox entry — overview chat icon
 if($("msgBackupNav")) $("msgBackupNav").onclick=promptBackup;   // permanent home for key backup / change passphrase
 function closeMessages(){ _msgThreadUid=null; if(_msgThreadChan){ try{ sb.removeChannel(_msgThreadChan); }catch(e){} _msgThreadChan=null; } closeSheet("Messages"); }
 if($("msgClose")) $("msgClose").onclick=closeMessages;
@@ -5196,7 +5196,7 @@ async function renderPresenceRail(){
     +'<span class="railall" id="railAll">All <span class="ovchev">›</span>'+badge+'</span></div>'
     +'<div class="prail">'+faces+'</div>';
   rail.querySelectorAll(".pr-item[data-uid]").forEach(el=> el.onclick=()=>{
-    if(el.dataset.live==="1") openLiveView(el.dataset.uid, el.dataset.nm); else openChat(el.dataset.uid, el.dataset.nm); });
+    if(el.dataset.live==="1") openLiveView(el.dataset.uid, el.dataset.nm); else openProfile(el.dataset.uid, el.dataset.nm); });   // avatar → profile (workouts, live, Message)
   const all=$("railAll"); if(all) all.onclick=openFriends;
 }
 
