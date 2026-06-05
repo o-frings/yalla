@@ -175,6 +175,8 @@ const ICON={
   play:'<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5.5v13l11-6.5z"/></svg>',
   pause:'<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>',
   lock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2.2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+  bell:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
+  key:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 20 3M16 7l3 3M13.5 9.5l2.5 2.5"/></svg>',
   chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16"/><path d="M7 14l3-3 3 2 4-6"/></svg>',
   play:'<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5.5v13l11-6.5z"/></svg>',
   info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11.5v4.5"/><path d="M12 8h.01"/></svg>',
@@ -741,12 +743,13 @@ let sb=null, cloudUser=null, _syncMeta={}, _pushTimers={};
 let dbHardened=false;
 // A tap-to-follow invite link (?add=CODE) stashes the code here until we're signed in + hardened.
 // A live-watch push (?live=UID) stashes the broadcaster id and opens their live view once ready.
-let pendingAddCode=null, pendingLiveView=null;
+let pendingAddCode=null, pendingLiveView=null, pendingDM=null;
 try{ const _p=new URLSearchParams(location.search);
   if(_p.has("add")) pendingAddCode=(_p.get("add")||"").trim().toUpperCase();
   if(_p.has("live")) pendingLiveView=(_p.get("live")||"").trim();
-  if(_p.has("add")||_p.has("live")){
-    _p.delete("add"); _p.delete("live"); const _qs=_p.toString();
+  if(_p.has("dm")) pendingDM=(_p.get("dm")||"").trim();   // a "new message" push (?dm=senderId)
+  if(_p.has("add")||_p.has("live")||_p.has("dm")){
+    _p.delete("add"); _p.delete("live"); _p.delete("dm"); const _qs=_p.toString();
     history.replaceState(null,"", location.pathname+(_qs?"?"+_qs:"")+location.hash); }
 }catch(e){}
 async function detectHardened(){
@@ -783,9 +786,10 @@ async function handleAuth(user){
     await detectHardened();        // does this project have the friends-only schema yet?
     renderAccount(); renderFriends(); updateLiveRow();
     if(dbHardened) startPresence();   // heartbeat so friends see me as online
-    if(dbHardened) e2eInit();         // publish my message key + subscribe to incoming DMs
+    if(dbHardened) await e2eInit();   // publish my message key + subscribe to incoming DMs
     processPendingAdd();           // act on a tap-to-follow invite link, if any
     if(pendingLiveView && dbHardened){ const id=pendingLiveView; pendingLiveView=null; openLiveView(id); }  // a "watch me live" push
+    if(pendingDM && dbHardened){ const id=pendingDM; pendingDM=null; openDMFromLink(id); }                  // a "new message" push
     await cloudReconcile();
     if(!settings.displayName) askDisplayName();   // first thing after signing in: how should I address you?
   } else if(!cloudUser){ dbHardened=false; teardownLive(); teardownMessages();
@@ -1011,6 +1015,28 @@ async function pushSubscribe(){
   }catch(e){ toast("Couldn’t enable reminders."); return false; }
 }
 async function pushDisable(){ try{ if(cloudReady()) await sb.from("push_subscriptions").update({ reminders_on:false, updated_at:new Date().toISOString() }).eq("user_id", cloudUser.id); }catch(e){} }
+// Ensure a Web Push subscription exists for this device (shared by reminders + every social push,
+// incl. messages). opts.prompt=true may ask for permission; opts.forMessages keeps workout reminders
+// OFF for a brand-new subscriber who only opted into message pings (an existing preference is never
+// flipped). Returns true if a subscription is in place.
+async function pushEnsure(opts){
+  opts=opts||{};
+  if(!cloudReady() || !SUPA.vapidPublic) return false;
+  if(!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return false;
+  let perm=Notification.permission;
+  if(perm==="default" && opts.prompt){ try{ perm=await Notification.requestPermission(); }catch(e){ return false; } }
+  if(perm!=="granted") return false;
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub) sub=await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlB64ToUint8(SUPA.vapidPublic) });
+    let exists=false; try{ const { data } = await sb.from("push_subscriptions").select("user_id").eq("user_id",cloudUser.id).maybeSingle(); exists=!!data; }catch(e){}
+    const row={ user_id:cloudUser.id, subscription:sub.toJSON(), updated_at:new Date().toISOString() };
+    if(!exists) row.reminders_on = opts.forMessages ? false : true;   // don't auto-enable nudges for a DM-only opt-in
+    await sb.from("push_subscriptions").upsert(row);
+    return true;
+  }catch(e){ return false; }
+}
 // keep the server's "last workout" fresh so the 2-day timer is accurate
 async function cloudTouchWorkout(){ try{ if(cloudReady()) await sb.from("push_subscriptions").update({ last_workout_at:new Date().toISOString(), last_reminded_at:null }).eq("user_id", cloudUser.id); }catch(e){} }
 
@@ -1369,6 +1395,9 @@ async function e2eInit(){
   else { try{ await e2eGetKeys(); await e2ePublish(); }catch(e){} }   // brand-new user → fresh key
   subscribeMessages();
   refreshUnread();
+  // If notifications are already permitted, make sure a push subscription exists so the user gets
+  // message pings (they may have a key but never have toggled reminders). Silent — never prompts.
+  try{ if(window.Notification && Notification.permission==="granted") pushEnsure({ forMessages:true }); }catch(e){}
 }
 function subscribeMessages(){
   if(!cloudReady() || _msgChan) return;
@@ -1379,7 +1408,7 @@ function subscribeMessages(){
       if(_msgThreadUid && r.sender===_msgThreadUid){ await renderThread(_msgThreadUid); markRead(_msgThreadUid); return; }
       _msgUnread++; setMsgBadge(_msgUnread);
       if(sheetOpen && !_msgThreadUid){ renderConversations(); }
-      else { const nm=await liveName(r.sender), txt=await e2eDecrypt(r.sender,r); toast("💬 "+nm+(txt?": "+txt:""), true); }
+      else { const nm=await liveName(r.sender), txt=await e2eDecrypt(r.sender,r); toast(nm+(txt?": "+txt:" sent you a message"), true); }
     }).subscribe();
 }
 function teardownMessages(){
@@ -1404,9 +1433,14 @@ async function sendMessage(uid,text){
   if(text.length>4000) text=text.slice(0,4000);
   const enc=await e2eEncrypt(uid,text);
   if(!enc){ toast("Can't encrypt yet — your friend hasn't opened messaging."); return false; }
-  try{ await sb.from("direct_messages").insert({ sender:cloudUser.id, recipient:uid, ciphertext:enc.ciphertext, iv:enc.iv, salt:enc.salt }); return true; }
+  try{ await sb.from("direct_messages").insert({ sender:cloudUser.id, recipient:uid, ciphertext:enc.ciphertext, iv:enc.iv, salt:enc.salt }); }
   catch(e){ toast("Couldn't send — are you still friends?"); return false; }
+  notifyMessage(uid);   // best-effort push to the recipient (generic — the body stays E2E)
+  return true;
 }
+// best-effort push to the recipient (social-notify "message" kind). Generic body only — the server
+// can't see the plaintext, so the notification never carries message content. No-op if not deployed.
+async function notifyMessage(uid){ try{ if(sb && sb.functions && uid) await sb.functions.invoke("social-notify",{ body:{ kind:"message", target:uid } }); }catch(e){} }
 async function loadThread(uid){
   if(!cloudReady()) return [];
   let rows=[];
@@ -1442,6 +1476,14 @@ async function markRead(uid){
 }
 
 // --- messaging UI (a single sheet that swaps between the conversation list and an open thread) ---
+// deep-link target of a "new message" push (?dm=senderId): jump straight into that thread
+async function openDMFromLink(uid){
+  if(!cloudReady() || !dbHardened || !uid) return;
+  openSheet("Messages");
+  if(_e2eNeedsRestore){ renderRestoreGate(); return; }
+  try{ await e2eGetKeys(); }catch(e){}
+  openThread(uid, await liveName(uid));
+}
 async function openMessages(){
   if(!cloudReady() || !dbHardened){ toast("Sign in to message your friends."); return; }
   _msgThreadUid=null;
@@ -1454,14 +1496,14 @@ async function openMessages(){
 function renderRestoreGate(){
   const b=$("msgBody"); if(!b) return;
   $("msgTitle").textContent="Messages"; $("msgBack").style.display="none";
-  b.innerHTML='<div class="msg-empty"><div class="msg-empty-ic">🔒</div>'
+  b.innerHTML='<div class="msg-empty"><div class="msg-empty-ic">'+ICON.lock+'</div>'
     +'<p>Your encrypted messages are locked on this device. Enter your message passphrase to unlock your history.</p>'
     +'<input class="comminput" id="msgRestorePass" type="password" placeholder="Message passphrase" style="margin:12px 0; width:100%;">'
     +'<button class="btn wide" id="msgRestoreBtn">Unlock my messages</button>'
     +'<button class="btn tinted wide" id="msgFreshBtn" style="margin-top:8px;">Start fresh on this device</button>'
     +'<p class="levelcap" style="margin-top:12px; line-height:1.45;">Starting fresh makes a new key — older messages stay locked, and friends will message your new key from now on.</p></div>';
   $("msgRestoreBtn").onclick=async()=>{ const v=$("msgRestorePass").value||""; if(!v) return; const ok=await e2eRestore(v);
-    if(ok){ toast("Messages unlocked 🔓"); renderConversations(); } else toast("Wrong passphrase — try again."); };
+    if(ok){ toast("Messages unlocked"); renderConversations(); } else toast("Wrong passphrase — try again."); };
   $("msgFreshBtn").onclick=async()=>{ if(!confirm("Start fresh? Older messages will stay locked on this device.")) return;
     _e2eNeedsRestore=false; try{ await e2eGetKeys(); await e2ePublish(); }catch(e){} renderConversations(); };
 }
@@ -1476,10 +1518,11 @@ async function renderConversations(){
   let h="";
   if(convos.length){
     h+=convos.map(c=>{ const nm=c.name||_nameCache[c.uid]||"Friend";
-      const prev=c.preview==null?"🔒 can't decrypt":((c.last.sender===cloudUser.id?"You: ":"")+c.preview);
+      const locked=c.preview==null, prevTxt=locked?"can't decrypt":((c.last.sender===cloudUser.id?"You: ":"")+c.preview);
+      const prevHTML=(locked?ICON.lock+" ":"")+esc(prevTxt.length>56?prevTxt.slice(0,56)+"…":prevTxt);
       return '<div class="msg-convo" data-uid="'+esc(c.uid)+'" data-nm="'+esc(nm)+'">'+statusAvatar(nm,{size:46,uid:c.uid},isOnline(c.last_seen))
         +'<div class="msg-convo-main"><div class="msg-convo-top"><span class="msg-convo-nm">'+esc(nm)+'</span><span class="msg-convo-time">'+esc(agoStr(Date.parse(c.last.created_at)))+'</span></div>'
-        +'<div class="msg-convo-prev'+(c.unread?' unread':'')+'">'+esc(prev.length>56?prev.slice(0,56)+"…":prev)+'</div></div>'
+        +'<div class="msg-convo-prev'+(c.unread?' unread':'')+'">'+prevHTML+'</div></div>'
         +(c.unread?'<span class="msg-dot"></span>':'')+'</div>'; }).join('');
   }
   if(fresh.length){
@@ -1487,24 +1530,33 @@ async function renderConversations(){
       return '<div class="msg-convo" data-uid="'+esc(f.user_id)+'" data-nm="'+esc(nm)+'">'+statusAvatar(nm,{size:46,uid:f.user_id},isOnline(f.last_seen))
         +'<div class="msg-convo-main"><div class="msg-convo-nm">'+esc(nm)+'</div><div class="msg-convo-prev">Tap to message</div></div></div>'; }).join('');
   }
-  if(!convos.length && !fresh.length){ h='<div class="msg-empty"><div class="msg-empty-ic">💬</div><p>No friends to message yet. Add friends in the Friends hub, then come back.</p></div>'; }
+  if(!convos.length && !fresh.length){ h='<div class="msg-empty"><div class="msg-empty-ic">'+ICON.chat+'</div><p>No friends to message yet. Add friends in the Friends hub, then come back.</p></div>'; }
   else {
     const backed=await e2eBackupExists();
     h+='<div class="msg-foot">'+(backed
-      ? '🔐 Message key backed up · <span class="msg-link" id="msgRebackup">change passphrase</span>'
-      : '<span class="msg-link" id="msgBackupLink">🔐 Back up your message key</span> — so you keep your history on new devices')+'</div>';
+      ? ICON.lock+' Message key backed up · <span class="msg-link" id="msgRebackup">change passphrase</span>'
+      : '<span class="msg-link" id="msgBackupLink">'+ICON.lock+' Back up your message key</span> — so you keep your history on new devices')+'</div>';
   }
-  b.innerHTML=h;
+  // one-time opt-in to message notifications (only while the OS permission is still undecided)
+  const canNotif = !!(window.Notification && SUPA.vapidPublic && ("PushManager" in window));
+  const banner = (canNotif && Notification.permission==="default" && !settings.msgNotifDismissed)
+    ? '<div class="msg-notif" id="msgNotifBanner"><span>'+ICON.bell+' Get a ping when a friend messages you?</span>'
+      +'<span class="msg-notif-act"><button class="btn sm" id="msgNotifOn">Turn on</button><button class="msg-notif-x" id="msgNotifNo" aria-label="Not now">×</button></span></div>'
+    : "";
+  b.innerHTML=banner+h;
   b.querySelectorAll(".msg-convo[data-uid]").forEach(el=> el.onclick=()=>openThread(el.dataset.uid, el.dataset.nm));
   const bl=$("msgBackupLink"); if(bl) bl.onclick=promptBackup;
   const rb=$("msgRebackup"); if(rb) rb.onclick=promptBackup;
+  const non=$("msgNotifOn"); if(non) non.onclick=async()=>{ const ok=await pushEnsure({ prompt:true, forMessages:true });
+    toast(ok?"Notifications on — we'll ping you about new messages.":"Couldn't turn on notifications."); renderConversations(); };
+  const nno=$("msgNotifNo"); if(nno) nno.onclick=async()=>{ settings.msgNotifDismissed=true; await sset("settings",settings); const el=$("msgNotifBanner"); if(el) el.remove(); };
 }
 async function promptBackup(){
   let p=""; try{ p=window.prompt("Set a message passphrase to back up your key.\n\nOn a new device you'll enter this to unlock your message history.\n\n⚠️ Forget it with no other device signed in and your history is gone — it can't be recovered.","")||""; }catch(e){ p=""; }
   if(!p) return;
   if(p.length<6){ toast("Use at least 6 characters."); return; }
   const ok=await e2eBackup(p);
-  toast(ok?"Message key backed up 🔐":"Couldn't back up — is messaging set up on the server?");
+  toast(ok?"Message key backed up":"Couldn't back up — is messaging set up on the server?");
   if(ok) renderConversations();
 }
 async function openThread(uid,name){
@@ -1519,7 +1571,7 @@ async function openThread(uid,name){
   $("msgSend").onclick=send;
   $("msgInput").addEventListener("keydown",e=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); send(); } });
   const fpub=await e2eFriendPub(uid);
-  if(!fpub){ $("msgThread").innerHTML='<div class="msg-empty"><div class="msg-empty-ic">🔑</div><p>'+esc(name)+" hasn't opened messaging yet, so there's no key to encrypt to. Once they open Messages once, you can chat.</p></div>"; return; }
+  if(!fpub){ $("msgThread").innerHTML='<div class="msg-empty"><div class="msg-empty-ic">'+ICON.key+'</div><p>'+esc(name)+" hasn't opened messaging yet, so there's no key to encrypt to. Once they open Messages once, you can chat.</p></div>"; return; }
   await renderThread(uid);
   markRead(uid);
 }
@@ -1527,7 +1579,7 @@ async function renderThread(uid){
   const box=$("msgThread"); if(!box) return;
   const msgs=await loadThread(uid);
   if(!msgs.length){ box.innerHTML='<div class="msg-empty"><p>No messages yet — say hi 👋</p></div>'; return; }
-  box.innerHTML=msgs.map(m=>{ const t=m.text==null?'<span class="msg-locked">🔒 can\'t decrypt (key changed)</span>':esc(m.text);
+  box.innerHTML=msgs.map(m=>{ const t=m.text==null?'<span class="msg-locked">'+ICON.lock+' can\'t decrypt (key changed)</span>':esc(m.text);
     const meta=new Date(Date.parse(m.at)).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})+(m.mine&&m.read?" · read":"");
     return '<div class="msg-bubble '+(m.mine?"mine":"theirs")+'">'+t+'<span class="msg-time">'+esc(meta)+'</span></div>'; }).join('');
   box.scrollTop=box.scrollHeight;
@@ -5062,7 +5114,7 @@ async function openProfile(uid, name){
   if(act){
     if(live){ act.innerHTML='<button class="btn wide" id="profWatch">🔴 Watch live now</button>';
       $("profWatch").onclick=()=>{ closeSheet("Profile"); openLiveView(uid, name); }; }
-    else if(rel && rel.status==="accepted"){ act.innerHTML='<button class="btn wide" id="profMsg">💬 Message</button><button class="btn tinted wide" id="profUnfollow" style="margin-top:8px;">Remove friend</button>';
+    else if(rel && rel.status==="accepted"){ act.innerHTML='<button class="btn wide" id="profMsg">'+ICON.chat+'Message</button><button class="btn tinted wide" id="profUnfollow" style="margin-top:8px;">Remove friend</button>';
       $("profMsg").onclick=()=>{ closeSheet("Profile"); if(!dbHardened){ toast("Messaging needs the latest server setup."); return; } openSheet("Messages"); if(_e2eNeedsRestore){ renderRestoreGate(); } else { e2eGetKeys().catch(()=>{}); openThread(uid, name); } };
       $("profUnfollow").onclick=async()=>{ await removeFollow(uid,"followee"); closeSheet("Profile"); }; }
     else if(rel && rel.status==="pending"){ act.innerHTML='<button class="btn tinted wide" disabled>Request sent</button>'; }

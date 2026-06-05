@@ -67,6 +67,19 @@ The private key is device-local, so a fresh device/browser starts with **no** ke
   fingerprint verification yet. A malicious server *could* substitute a key. A future "verify safety
   number" screen would close this.
 
+## Push notifications
+
+A new message fires the `social-notify` Edge Function (`kind: "message"`), which sends the recipient
+a Web Push **only if they have a subscription**. Because the body is E2E-encrypted, the server can't
+see it — the notification is deliberately generic (`"<name> sent you a message 💬"`, no content) and
+deep-links to the thread via `?dm=<senderId>`. Friendship is verified server-side and the existing
+per-minute `notify_log` rate-limit applies (rapid messages collapse to one ping/minute per sender).
+
+Message pings ride the same `push_subscriptions` row as workout reminders and other social pushes.
+The client ensures a subscription exists when notifications are already granted, and shows a one-time
+opt-in banner in Messages otherwise; a DM-only opt-in does **not** enable workout reminders. No schema
+change is needed — reuses `push_subscriptions` + `notify_log` from `schema-push.sql`.
+
 ## Schema summary (`schema-messages.sql`)
 
 | Object | Purpose |

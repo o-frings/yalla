@@ -112,6 +112,19 @@ Deno.serve(async (req) => {
       recipient = target;
       msg = `${who} accepted your follow request 🤝`;
     }
+  } else if (kind === "message") {
+    // Direct message: `target` is the recipient. The body is end-to-end encrypted, so the server
+    // can't (and won't) include any content — just a generic "you have a message" ping that
+    // deep-links to the thread. Either party of an accepted follow edge may DM, so accept both
+    // directions. Validate `target` as a uuid before interpolating it into the filter string.
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!target || !UUID.test(String(target)) || target === actor.id) return OK();
+    const { data: edge } = await sb.from("follows").select("follower")
+      .or(`and(follower.eq.${actor.id},followee.eq.${target}),and(follower.eq.${target},followee.eq.${actor.id})`)
+      .eq("status", "accepted").limit(1);
+    if (!edge || !edge.length) return OK();
+    recipient = target;
+    msg = `${who} sent you a message 💬`;
   } else {
     // Activity events (cheer / comment): require activityId.
     if (!activityId) return new Response(JSON.stringify({ ok: false }), { status: 400 });
@@ -148,7 +161,11 @@ Deno.serve(async (req) => {
     Deno.env.get("VAPID_PUBLIC")!,
     Deno.env.get("VAPID_PRIVATE")!,
   );
-  const payload = JSON.stringify({ title: "Yalla", body: msg, url: "./", tag: "yalla-social" });
+  const payload = JSON.stringify({
+    title: "Yalla", body: msg,
+    url: kind === "message" ? `./?dm=${actor.id}` : "./",
+    tag: kind === "message" ? `yalla-dm-${actor.id}` : "yalla-social",
+  });
 
   try {
     await webpush.sendNotification(sub.subscription, payload);

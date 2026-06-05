@@ -370,6 +370,14 @@
   .msg-empty-ic{ font-size:40px; margin-bottom:8px; }
   .msg-foot{ font-size:12px; color:var(--l3); line-height:1.5; margin:18px 4px 4px; }
   .msg-link{ color:var(--accent); font-weight:600; cursor:pointer; }
+  .msg-notif{ display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--accent-soft); border:.5px solid var(--accent-soft); border-radius:14px; padding:10px 12px; margin-bottom:12px; font-size:14px; color:var(--ink); }
+  .msg-notif-act{ display:flex; align-items:center; gap:6px; flex:0 0 auto; }
+  .msg-notif-x{ background:none; border:none; color:var(--l2); font-size:20px; line-height:1; cursor:pointer; padding:2px 6px; }
+  /* monochrome icons inside the messaging UI (replace the old emoji) */
+  .msg-empty-ic{ color:var(--l3); line-height:0; }
+  .msg-empty-ic svg{ width:38px; height:38px; }
+  .msg-foot svg, .msg-convo-prev svg, .msg-locked svg{ width:13px; height:13px; vertical-align:-2px; }
+  .msg-notif svg{ color:var(--accent); width:17px; height:17px; vertical-align:-4px; }
   /* swipeable discover deck — cards snap, the next one peeks so it reads as swipeable */
   .discwrap{ display:flex; gap:10px; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch;
     scrollbar-width:none; margin:0 -16px; padding:2px 16px; }
