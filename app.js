@@ -4555,7 +4555,7 @@ const COMPOUND_GROUPS=["chest","back","quads","hamstrings","shoulders"];
 // the emphasis radar's spokes — identical to the app-wide analytics groups
 const BUILD_GROUPS=MGROUPS;
 function buildKey(m){ return ({"Front Delts":"shoulders","Side Delts":"sidedelts","Rear Delts":"reardelts"}[m]) || m.toLowerCase(); }
-let build={ exp:"intermediate", obj:"muscle", focus:["balanced"], bias:"balanced", time:60, freq:4, injuries:[], access:"gym", supersets:"on", vary:"on",
+let build={ exp:"intermediate", obj:"muscle", focus:["balanced"], bias:"balanced", time:60, freq:4, injuries:[], access:"gym", supersets:"on", vary:"on", kb:"off",
   emphasis:(function(){ const e={}; BUILD_GROUPS.forEach(m=>e[m]=0.5); return e; })() };
 function emphasisPreset(focus){
   const e={}; BUILD_GROUPS.forEach(m=>e[m]=0.5);
@@ -4757,6 +4757,10 @@ function buildPlan(b){
     const repSub  = secondary==="none" ? "Backup — bodyweight, anywhere" : secondary==="gym" ? "When you can get to the gym" : "Backup — at the park";
     dayDefs.push({groups:FB_GROUPS.slice(), name:repName, sub:repSub, lvl:secondary, rot:false});
   }
+  // optional dedicated kettlebell day — a full-body KB session drawn from KB_POOL, added on top of the week
+  const kbDay = (b.kb==="day" && !isKB);
+  if(kbDay) dayDefs.push({groups:["quads","hamstrings","glutes","back","shoulders","core"], name:"Kettlebells",
+    sub:"Full-body kettlebell session", lvl:"gym", rot:false, pool:KB_POOL});
   // round-robin accessories across muscles within each gym area, so a superset pairs DIFFERENT muscles at one station
   const interleave=(accs)=>{ const byArea={}; accs.forEach(p=>{ const a=exArea(p.n); (byArea[a]=byArea[a]||[]).push(p); });
     const out=[]; Object.keys(byArea).forEach(a=>{ const byM={}; byArea[a].forEach(p=>{ const m=muscleFor(p.n)[0]; (byM[m]=byM[m]||[]).push(p); });
@@ -4776,9 +4780,10 @@ function buildPlan(b){
   };
   // build one workout for a day at a given selection offset; fixedComps (optional) keeps the same compounds and only re-picks accessories
   const buildVariant=(d, offset, name, fixedComps)=>{
+    const dPool = d.pool || POOL;   // a KB day overrides the pool for that day only
     let groups=d.groups.slice(); const dom=dayDomain(d.name);
-    Object.keys(W).forEach(g=>{ if(W[g]>=0.55 && dom.indexOf(g)>=0 && groups.indexOf(g)<0 && POOL[g] && POOL[g].length) groups.push(g); });
-    let picks=pickWorkoutWeighted(groups, base, b.injuries, d.lvl, W, offset, b.exp, b.obj, bias, POOL);
+    Object.keys(W).forEach(g=>{ if(W[g]>=0.55 && dom.indexOf(g)>=0 && groups.indexOf(g)<0 && dPool[g] && dPool[g].length) groups.push(g); });
+    let picks=pickWorkoutWeighted(groups, base, b.injuries, d.lvl, W, offset, b.exp, b.obj, bias, dPool);
     if(fixedComps) picks=fixedComps.concat(picks.filter(p=>!p.comp));   // keep A's compounds, take this offset's accessories
     const comps=picks.filter(p=>p.comp), accs=interleave(picks.filter(p=>!p.comp));
     const ordered=comps.concat(accs);
@@ -4827,10 +4832,38 @@ function buildPlan(b){
     const protect=new Set(emphG); protect.add(m);                 // keep the new move; trim a lower-priority one to stay near the limit
     trimDay(workouts[bestI], workouts[bestI]._meta, protect);
   });
+  // "A little" kettlebell: force a KB move into the days that have none, until a small target is met.
+  // An explicit override, so it ignores the gym-only venue rule (the user is saying they have a bell).
+  if(b.kb==="some" && !isKB){
+    const kbCount = ()=> workouts.reduce((c,wk)=> c + wk.ex.filter(e=>equipFor(e.n).key==="kb").length, 0);
+    const target = Math.max(1, Math.min(3, Math.round(b.freq/2)));
+    const usedKb=new Set(); let guard=0;
+    while(kbCount() < target && guard++ < 12){
+      // target the rotating day with the fewest KB moves (then the shortest), skipping fixed/replacement days
+      let bestI=-1, bestKb=99, bestLen=99;
+      workouts.forEach((wk,i)=>{ if(wk.rotate===false) return;
+        const kc=wk.ex.filter(e=>equipFor(e.n).key==="kb").length;
+        if(kc<bestKb || (kc===bestKb && wk.ex.length<bestLen)){ bestKb=kc; bestLen=wk.ex.length; bestI=i; } });
+      if(bestI<0) break;
+      const wk=workouts[bestI], dom=dayDomain(wk.name); let cand=null, fallback=null;
+      // prefer a KB move not already used elsewhere in the plan, so days don't all get the same one
+      for(const g of dom){ for(const x of (KB_POOL[g]||[])){
+        if(injuryBlocks(x,b.injuries)||!suitsExp(x,b.exp)||!fitsGoal(x,b.obj,bias)) continue;
+        if(wk.ex.some(e=>e.n===x||familyKey(e.n)===familyKey(x))) continue;
+        if(!usedKb.has(x)){ cand=x; break; } if(!fallback) fallback=x;
+      } if(cand) break; }
+      cand = cand || fallback;
+      if(!cand) break;
+      usedKb.add(cand);
+      wk.ex.push({n:cand, t:accSets+" × "+(kbRepOverride(cand)||reps.a), s:accSets}); wk._meta.push({comp:false, grp:muscleFor(cand)[0]});
+      const protect=new Set(emphG); protect.add(muscleFor(cand)[0]);   // keep the forced KB move; trim a lower-priority one for time
+      trimDay(wk, wk._meta, protect);
+    }
+  }
   workouts.forEach(wk=>{ delete wk._meta; delete wk._lvl; });
   const objLbl={muscle:"Hypertrophy",strength:"Strength",fatloss:"Fat-loss",fitness:"Fitness"}[b.obj]||"Custom";
   const accLbl={gym:"",park:" · park",home:" · home",mostly_gym:" · gym+home",mostly_home:" · home+gym",kb:" · kettlebell"}[access]||"";
-  return { id:"custom-"+Date.now(), name:objLbl+accLbl, level:b.exp, daysPerWeek:b.freq, workouts };
+  return { id:"custom-"+Date.now(), name:objLbl+accLbl, level:b.exp, daysPerWeek:b.freq+(kbDay?1:0), workouts };
 }
 document.querySelectorAll("#sheetBuild .bopt").forEach(seg=>{ const k=seg.dataset.k; seg.querySelectorAll(".s").forEach(s=> s.onclick=()=>{
   seg.querySelectorAll(".s").forEach(x=>x.classList.toggle("active",x===s)); const v=s.dataset.v; build[k]=isNaN(+v)?v:+v; updateBuildPreview(); }); });
