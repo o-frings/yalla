@@ -72,6 +72,24 @@
   </div>
   <div class="livepick" id="livePick" hidden></div>
 </div>
+<!-- Train together — check in with a short gym code; friends on the same code show up here.
+     Shown only when signed in + the friends schema is live; wired by updateGymRow()/gymCheckIn(). -->
+<div class="gymwrap" id="gymRow" style="display:none;">
+  <div class="gymrow">
+    <span class="gymicon" aria-hidden="true">📍</span>
+    <span class="gymlbl" id="gymLbl">Train together</span>
+    <span class="gym-faces" id="gymFaces"></span>
+    <button class="gymbtn" id="gymBtn" type="button">Check in</button>
+  </div>
+  <div class="gympanel" id="gymPanel" hidden>
+    <p class="gymhint">Share a code with friends at your gym — anyone who enters the same one shows up here.</p>
+    <div class="gympanel-row">
+      <input id="gymCodeInput" type="text" autocapitalize="characters" autocomplete="off" maxlength="12" placeholder="Gym code" style="text-transform:uppercase;">
+      <button class="btn tinted sm" id="gymNew" type="button">New code</button>
+    </div>
+    <button class="btn wide sm" id="gymGo" type="button" style="margin-top:8px;">Check in</button>
+  </div>
+</div>
 <!-- session timer + rest ("pause") timer: pinned to the top of the page once a workout's underway -->
 <div class="timersbar" id="timersBar">
   <div class="timerbar" id="timerBar">

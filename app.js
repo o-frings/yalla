@@ -343,6 +343,11 @@ Object.assign(MUSCLES, {
   "Reverse Crunch":["Core"], "Side Plank":["Core"], "Mountain Climbers":["Core"], "Bird Dog":["Core"],
   "Dead Bug":["Core"], "Superman":["Lower Back"]
 });
+// Rotational / anti-rotation core work (transverse-plane training) — recommended at least once a week.
+// Covers true rotation (woodchop, twist, throw) and anti-rotation (Pallof, windmill) — both train the
+// obliques/core to resist or produce trunk rotation, which straight-plane crunches/planks miss.
+const ROTATIONAL=/woodchop|wood chop|landmine rotation|cable rotation|rotational throw|russian twist|pallof|windmill/i;
+function isRotational(name){ return ROTATIONAL.test(String(name||"")); }
 // ---- kettlebell catalogue ----
 // Ballistics (swing/snatch/clean/high-pull) are power/conditioning moves — high-rep or timed, never heavy/low-rep.
 // Grinds (squat/press/RDL/row/lunge/get-up) behave like any weighted move. KB_BALLISTIC gates the first group out
@@ -803,13 +808,14 @@ async function handleAuth(user){
     await detectHardened();        // does this project have the friends-only schema yet?
     renderAccount(); renderFriends(); updateLiveRow();
     if(dbHardened) startPresence();   // heartbeat so friends see me as online
+    if(dbHardened) gymRestore();      // reflect an active gym check-in, if any
     if(dbHardened) await e2eInit();   // publish my message key + subscribe to incoming DMs
     processPendingAdd();           // act on a tap-to-follow invite link, if any
     if(pendingLiveView && dbHardened){ const id=pendingLiveView; pendingLiveView=null; openLiveView(id); }  // a "watch me live" push
     if(pendingDM && dbHardened){ const id=pendingDM; pendingDM=null; openDMFromLink(id); }                  // a "new message" push
     await cloudReconcile();
     if(!settings.displayName) askDisplayName();   // first thing after signing in: how should I address you?
-  } else if(!cloudUser){ dbHardened=false; teardownLive(); teardownMessages();
+  } else if(!cloudUser){ dbHardened=false; teardownLive(); teardownMessages(); teardownGym();
     if(_presenceTimer){ clearInterval(_presenceTimer); _presenceTimer=null; }
     if(pendingAddCode){ toast("Sign in to follow your friend."); goAccount(); }
   }
@@ -1202,6 +1208,61 @@ async function grantLive(uid, on, cb){
   catch(e){ if(cb) cb.checked=!on; toast("Couldn't update — is live sharing set up?"); return; }
   toast(on ? "They can now watch you live." : "Removed their live access.");
 }
+
+// ================= train together (gym check-in) =================
+// Check in with a short code; friends with an accepted edge on the SAME code (set within the
+// server's 4h window) appear here, so people at the same gym find each other. State lives on
+// profiles.gym_code / gym_since; see supabase/schema-gym.sql. Feature is off until that's migrated.
+let _gymCode=null, _gymBuddies=[], _gymTimer=null;
+function gymAvailable(){ return cloudReady() && dbHardened; }
+function randGymCode(){ const a="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s=""; for(let i=0;i<4;i++) s+=a[Math.floor(Math.random()*a.length)]; return s; }  // no ambiguous 0/O/1/I
+async function loadGymBuddies(){
+  if(!gymAvailable() || !_gymCode){ _gymBuddies=[]; return; }
+  try{ const { data } = await sb.rpc("gym_buddies"); _gymBuddies=data||[]; recordAvatars(_gymBuddies); }catch(e){ _gymBuddies=[]; }
+  updateGymRow();
+}
+async function gymCheckIn(code){
+  code=(code||"").toUpperCase().replace(/\s+/g,"");
+  if(!gymAvailable()){ toast("Sign in to train together with friends."); return; }
+  if(!code){ toast("Enter a gym code first."); return; }
+  try{ const { error } = await sb.rpc("set_gym_checkin",{ p_code:code }); if(error) throw error; }
+  catch(e){ toast("Couldn't check in — is train-together set up on the server?"); return; }
+  _gymCode=code; const p=$("gymPanel"); if(p) p.hidden=true;
+  updateGymRow(); loadGymBuddies(); startGymPoll();
+  toast("Checked in to "+code+" — friends here will see you.");
+}
+async function gymCheckOut(silent){
+  const had=_gymCode; _gymCode=null; _gymBuddies=[]; stopGymPoll();
+  if(gymAvailable() && had){ try{ await sb.rpc("set_gym_checkin",{ p_code:"" }); }catch(e){} }
+  updateGymRow(); if(!silent && had) toast("Checked out.");
+}
+function startGymPoll(){ stopGymPoll(); if(!_gymCode) return; _gymTimer=setInterval(()=>{ if(document.visibilityState==="visible") loadGymBuddies(); }, 45000); }
+function stopGymPoll(){ if(_gymTimer){ clearInterval(_gymTimer); _gymTimer=null; } }
+function updateGymRow(){
+  const row=$("gymRow"); if(!row) return;
+  row.style.display = gymAvailable() ? "" : "none";
+  if(!gymAvailable()) return;
+  const on=!!_gymCode; row.classList.toggle("on", on);
+  const lbl=$("gymLbl"), btn=$("gymBtn"), faces=$("gymFaces");
+  if(lbl) lbl.textContent = on ? ("At "+_gymCode) : "Train together";
+  if(btn) btn.textContent = on ? "Leave" : "Check in";
+  if(faces){
+    if(on && _gymBuddies.length){
+      faces.innerHTML=_gymBuddies.slice(0,5).map(u=>'<span class="gymface" data-uid="'+esc(u.user_id)+'" data-nm="'+esc(u.display_name||"Friend")+'">'+avatarHTML(u.display_name,{size:26,uid:u.user_id})+'</span>').join('');
+      faces.querySelectorAll(".gymface").forEach(el=> bindFriendTap(el, el.dataset.uid, el.dataset.nm));   // tap → profile, long-press → chat
+    } else faces.innerHTML="";
+  }
+}
+// restore an active check-in on launch (within the server's 4h window) so the row reflects it
+async function gymRestore(){
+  if(!gymAvailable()){ updateGymRow(); return; }
+  try{ const { data } = await sb.from("profiles").select("gym_code,gym_since").eq("user_id",cloudUser.id).maybeSingle();
+    if(data && data.gym_code && data.gym_since && (Date.now()-Date.parse(data.gym_since))<4*3600*1000){ _gymCode=data.gym_code; loadGymBuddies(); startGymPoll(); }
+    else _gymCode=null;
+  }catch(e){}
+  updateGymRow();
+}
+function teardownGym(){ stopGymPoll(); _gymCode=null; _gymBuddies=[]; updateGymRow(); }
 
 // ---- viewer: live cards in the feed ----
 async function renderLiveCards(){
@@ -1985,6 +2046,13 @@ const $=id=>document.getElementById(id);
 // watch" list ticks friends independently of the toggle (loaded lazily on first expand).
 if($("liveToggle")) $("liveToggle").onchange=async(e)=>{ if(e.target.checked){ const ok=await goLive(); e.target.checked=ok; updateLiveRow(); } else endLive(false); };
 if($("livePickBtn")) $("livePickBtn").onclick=toggleLivePick;
+// train-together: Check in opens the code panel; Leave checks out. New code / Enter confirm.
+if($("gymBtn")) $("gymBtn").onclick=()=>{ if(_gymCode){ gymCheckOut(); return; }
+  const p=$("gymPanel"); if(!p) return; p.hidden=!p.hidden;
+  if(!p.hidden){ const inp=$("gymCodeInput"); if(inp){ if(!inp.value) inp.value=randGymCode(); inp.focus(); try{ inp.select(); }catch(e){} } } };
+if($("gymNew")) $("gymNew").onclick=()=>{ const inp=$("gymCodeInput"); if(inp){ inp.value=randGymCode(); inp.focus(); } };
+if($("gymGo")) $("gymGo").onclick=()=>{ const inp=$("gymCodeInput"); gymCheckIn(inp?inp.value:""); };
+if($("gymCodeInput")) $("gymCodeInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); gymCheckIn(e.target.value); } });
 if($("liveClose")) $("liveClose").onclick=()=>{ if(_liveViewChan){ try{ sb.removeChannel(_liveViewChan); }catch(e){} _liveViewChan=null; } _liveViewOwner=null; closeSheet("Live"); };
 if($("scrimLive")) $("scrimLive").onclick=()=>{ if($("liveClose")) $("liveClose").onclick(); };
 $("cNo").onclick=confirmClose;
@@ -2354,6 +2422,8 @@ function drawOvSets(id){ const c=$(id); if(!c) return; const ctx=c.getContext("2
   ctx.fillStyle=l3; ctx.font="600 17px -apple-system,sans-serif"; ctx.textAlign="left"; ctx.fillText("10w ago",pad,H-5); ctx.textAlign="right"; ctx.fillText("now",W-pad,H-5);
 }
 function lastWorkoutTs(){ let m=0; Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ if(e.d>m) m=e.d; })); return m; }
+// most recent logged rotational / anti-rotation move (0 = never) — drives the weekly rotational nudge
+function lastRotationalTs(){ let m=0; Object.keys(hist).forEach(n=>{ if(!isRotational(n)) return; (hist[n]||[]).forEach(e=>{ if(e.d>m) m=e.d; }); }); return m; }
 function daysOff(){ const t=lastWorkoutTs(); return t ? daysSince(t) : -1; }   // -1 = never logged
 // a balanced no-equipment session, started in free mode
 const HOME_MOVES=["Push-Ups","Pike Push-Ups","Reverse Lunge","Glute Bridge","Plank"];
@@ -2556,6 +2626,11 @@ function renderOverview(){
     if(!bw.length) push(40,"Pop in a weigh-in so I can chart your goal.","weight");
     else if(daysSince(bw[bw.length-1].d)>10) push(35,"Quick weigh-in? It's been "+daysSince(bw[bw.length-1].d)+" days — keeps your trend sharp.","weight");
   }
+  // rotational work at least once a week — nudge active users who've skipped the twisting plane
+  if(lastWorkoutTs() > Date.now()-14*86400000){ const rotTs=lastRotationalTs();
+    if((Date.now()-rotTs) > 7*86400000) push(38, rotTs
+      ? "No rotational work in over a week — add a Pallof press, woodchopper or twist to train your core in the twisting plane."
+      : "Train your core in the twisting plane this week — a Pallof press, woodchopper or twist builds rotation strength crunches miss.", "workout"); }
   if(due) push(72,"You've earned an easy week — a deload now and you'll come back stronger.","workout");
   if(settings.planStartAt && (Date.now()-settings.planStartAt) > 42*86400000 && Object.keys(hist).length)
     push(30,"Six strong weeks on this plan 💪 swap 1–2 accessories to keep the gains coming.","workout");
@@ -3139,6 +3214,7 @@ function renderWorkout(){
   applyDraft();
   updateRepeatBtn();
   updateLiveRow();
+  updateGymRow();
   renderSessionRose();
 }
 // the live muscle-balance rose under the workout — same shape friends see when they watch you live
@@ -4803,7 +4879,7 @@ const BUILD_POOL={
   hamstrings:["Romanian Deadlift","Seated Leg Curl","Lying Leg Curl","Single-Leg RDL","Nordic Curl","Kettlebell Romanian Deadlift","Two-Hand Kettlebell Swing"],
   glutes:["Hip Thrust","Bulgarian Split Squat","Cable Pull-Through","Glute Bridge","Single-Leg Glute Bridge","Reverse Lunge","Two-Hand Kettlebell Swing","One-Arm Kettlebell Swing","Kettlebell Snatch"],
   calves:["Standing Calf Raise","Seated Calf Raise","Leg-Press Calf Raise","Single-Leg Calf Raise"],
-  core:["Cable Crunch","Hanging Leg Raise","Ab Wheel Rollout","Plank","Hollow Hold (sec)","Side Plank","Bicycle Crunch","Reverse Crunch","Dead Bug","Kettlebell Windmill"]
+  core:["Cable Crunch","Hanging Leg Raise","Ab Wheel Rollout","Pallof Press","Cable Woodchopper","Landmine Rotation","Russian Twist","Plank","Hollow Hold (sec)","Side Plank","Bicycle Crunch","Reverse Crunch","Dead Bug","Kettlebell Windmill"]
 };
 const FB_GROUPS=["quads","chest","upperback","lats","shoulders","sidedelts","hamstrings","glutes","core"];
 // Kettlebell-only mode: a dedicated per-muscle pool (rep-based moves only — carries & get-ups stay
@@ -4939,7 +5015,7 @@ const BUILD_REPS={ strength:{c:"4–6",a:"6–10"}, muscle:{c:"6–10",a:"8–12
 // Evidence-based rep targets by goal × training style. Compounds use lower reps than isolation;
 // "intensity" = heavier load / lower reps (not more sets); "volume" = higher reps. (ACSM / Schoenfeld 2021 rep-range guidance.)
 const REPSCHEME={
-  strength:{ intensity:{c:"3–5",a:"5–8"},  balanced:{c:"4–6",a:"6–10"},  volume:{c:"6–8",a:"10–12"} },
+  strength:{ intensity:{c:"1–5",a:"4–6"},  balanced:{c:"3–5",a:"5–8"},  volume:{c:"5–6",a:"6–10"} },
   muscle:{   intensity:{c:"5–6",a:"6–10"},  balanced:{c:"6–10",a:"8–12"}, volume:{c:"8–12",a:"12–20"} },
   fatloss:{  intensity:{c:"6–8",a:"10–12"}, balanced:{c:"8–12",a:"12–15"},volume:{c:"12–15",a:"15–20"} },
   fitness:{  intensity:{c:"5–8",a:"8–12"},  balanced:{c:"8–12",a:"10–15"},volume:{c:"10–15",a:"12–20"} }
@@ -5026,7 +5102,10 @@ function pickWorkoutWeighted(groups, n, injuries, level, W, offset, exp, obj, bi
   const avail={}, usable=[];
   groups.forEach(g=>{ const a=(pool[g]||[]).filter(x=>!injuryBlocks(x,injuries)&&allowsAt(x,level)&&suitsExp(x,exp)&&fitsGoal(x,obj,bias)); avail[g]=a; if(a.length) usable.push(g); });
   if(!usable.length) return [];
-  const wt=g=>Math.pow(Math.max(0.06, W[g]!=null?W[g]:0.5), 1.8), cap=g=>Math.min(avail[g].length,3);
+  // Strength tilts slot allocation toward the big compound groups (chest/back/quads/hams/shoulders),
+  // so the day is built around heavy lifts rather than isolation.
+  const compBoost = obj==="strength" ? 1.6 : 1;
+  const wt=g=>Math.pow(Math.max(0.06, W[g]!=null?W[g]:0.5), 1.8) * (COMPOUND_GROUPS.indexOf(g)>=0?compBoost:1), cap=g=>Math.min(avail[g].length,3);
   const wsum=usable.reduce((s,g)=>s+wt(g),0), raw={}, target={}; let assigned=0;
   usable.forEach(g=>{ raw[g]=n*wt(g)/wsum; target[g]=Math.min(cap(g), Math.floor(raw[g])); assigned+=target[g]; });
   let rem=n-assigned, guard=0;
@@ -5057,15 +5136,19 @@ function buildPlan(b){
   const primary = isKB ? "gym" : (access==="home"||access==="mostly_home") ? "none" : access==="park" ? "park" : "gym";
   const secondary = access==="mostly_gym" ? "none" : access==="mostly_home" ? "gym" : null;  // the "replacement" environment
   const baseDays = isKB ? kbSplit(b.freq) : (primary==="none" ? null : buildSplit(b.freq, b.exp));
-  const base=exCount(b.time);
+  // Strength goal = heavy low-rep lifting: one fewer move per day so the session is built around the
+  // main compounds, not padded with isolation. (REPSCHEME.strength already drops the rep brackets.)
+  const isStrength = b.obj==="strength";
+  const base=Math.max(3, exCount(b.time) - (isStrength?1:0));
   const T=b.time, ssMode = (b.supersets==="off") ? "off" : (T<=45 ? "aggressive" : "accessory");
   const bias=b.bias||"balanced";
   const sch=(REPSCHEME[b.obj]||REPSCHEME.muscle)[bias]||(REPSCHEME[b.obj]||REPSCHEME.muscle).balanced;
   const reps={c:sch.c, a:sch.a};
   // sets stay in the productive 3–4 range; "intensity" works heavier (lower reps), "volume" adds one accessory set
   // 2–3 working sets per exercise is the efficient range. Default 3; drop to 2 for short sessions or heavy "intensity" work.
+  // Strength: more work on the heavy compounds (4 sets, or 3 when time/intensity is tight) and only 2 on accessories.
   const lowSets = (T<=45) || (bias==="intensity");
-  const compSets = lowSets ? 2 : 3, accSets = lowSets ? 2 : 3;
+  const compSets = isStrength ? (lowSets?3:4) : (lowSets ? 2 : 3), accSets = isStrength ? 2 : (lowSets ? 2 : 3);
   const seen={};
   const emph=b.emphasis||{}, W={}; BUILD_GROUPS.forEach(m=> W[buildKey(m)] = (emph[m]!=null?emph[m]:0.5));
   const emphG=new Set(); BUILD_GROUPS.forEach(m=>{ if((emph[m]!=null?emph[m]:0.5)>=0.55) emphG.add(m); });
@@ -5181,6 +5264,22 @@ function buildPlan(b){
       wk.ex.push({n:cand, t:accSets+" × "+cableRepBump(cand, kbRepOverride(cand)||reps.a), s:accSets}); wk._meta.push({comp:false, grp:muscleFor(cand)[0]});
       const protect=new Set(emphG); protect.add(muscleFor(cand)[0]);   // keep the forced KB move; trim a lower-priority one for time
       trimDay(wk, wk._meta, protect);
+    }
+  }
+  // Guarantee at least one rotational / anti-rotation core move across the week (transverse-plane work).
+  // If the picks left none in, slot one into the rotating day with the most room and trim for time.
+  if(!isKB && !workouts.some(wk=>wk.ex.some(e=>isRotational(e.n)))){
+    const cands=(BUILD_POOL.core||[]).filter(isRotational);
+    let bestI=-1, bestLen=99;
+    workouts.forEach((wk,i)=>{ if(wk.rotate===false) return; if(dayDomain(wk.name).indexOf("core")<0) return; if(wk.ex.length<bestLen){ bestLen=wk.ex.length; bestI=i; } });
+    if(bestI>=0){
+      const wk=workouts[bestI];
+      const cand=cands.find(x=>!injuryBlocks(x,b.injuries)&&allowsAt(x,wk._lvl)&&suitsExp(x,b.exp)&&!wk.ex.some(e=>e.n===x||familyKey(e.n)===familyKey(x)));
+      if(cand){
+        wk.ex.push({n:cand, t:accSets+" × "+cableRepBump(cand, reps.a), s:accSets}); wk._meta.push({comp:false, grp:"core"});
+        const protect=new Set(emphG); protect.add("core");   // keep the rotational move; trim a lower-priority one for time
+        trimDay(wk, wk._meta, protect);
+      }
     }
   }
   workouts.forEach(wk=>{ delete wk._meta; delete wk._lvl; });

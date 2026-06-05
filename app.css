@@ -166,6 +166,22 @@
   .livedot{ width:10px; height:10px; border-radius:50%; background:var(--red); flex:0 0 auto; animation:livepulse 1.6s infinite; }
   .livego{ color:var(--accent); font-weight:600; flex:0 0 auto; font-size:14px; }
   @keyframes livepulse{ 0%{ box-shadow:0 0 0 0 rgba(255,55,95,.5);} 70%{ box-shadow:0 0 0 8px rgba(255,55,95,0);} 100%{ box-shadow:0 0 0 0 rgba(255,55,95,0);} }
+  /* Train together — a quiet sibling of the live row: check in with a gym code, friends on the same one appear */
+  .gymwrap{ margin:2px 0 16px; }
+  .gymrow{ display:flex; align-items:center; gap:10px; padding:7px 12px; border-radius:14px; background:var(--row); border:.5px solid var(--line); transition:background .15s, border-color .15s; }
+  .gymicon{ flex:0 0 auto; font-size:15px; line-height:1; filter:grayscale(.2); }
+  .gymlbl{ flex:0 0 auto; font-weight:600; font-size:14px; color:var(--ink); line-height:1.2; }
+  .gym-faces{ display:inline-flex; flex:1; min-width:0; justify-content:flex-end; }
+  .gym-faces .avatar{ margin-left:-9px; box-shadow:0 0 0 2px var(--row); }
+  .gym-faces .avatar:first-child{ margin-left:0; }
+  .gymbtn{ flex:0 0 auto; font:inherit; font-size:13px; font-weight:600; color:var(--accent); background:none; border:none; cursor:pointer; padding:6px 2px; }
+  .gymwrap.on .gymrow{ background:rgba(10,132,255,.10); border-color:rgba(10,132,255,.30); }
+  .gymwrap.on .gymlbl{ color:var(--accent); }
+  .gympanel{ padding:10px 4px 2px; }
+  .gympanel[hidden]{ display:none; }
+  .gymhint{ font-size:12px; color:var(--l2); margin:0 4px 8px; line-height:1.4; }
+  .gympanel-row{ display:flex; gap:8px; align-items:center; }
+  .gympanel-row input{ flex:1; min-width:0; }
   .titleBtn .tchev{ width:22px; height:22px; color:var(--l3); vertical-align:-3px; margin-left:4px; }
   .ic{ width:16px; height:16px; vertical-align:-3px; }
   .btn .ic{ margin-right:8px; }
