@@ -188,6 +188,7 @@ const EQUIP={
   machine:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="5" height="16" rx="1"/><path d="M6 8h5M6 12h5M6 16h5"/><path d="M14 12h4"/></svg>',
   cable:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="6" r="2.2"/><path d="M12 8.2v5.5"/><path d="M9.5 13.7h5l-1 4.6h-3z"/></svg>',
   body:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5.4" r="2.2"/><path d="M12 7.6v6.2M12 10l-4 2.4M12 10l4 2.4M12 13.8l-3 4.8M12 13.8l3 4.8"/></svg>',
+  kb:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 8a3 3 0 0 1 6 0"/><path d="M8.2 8.6a6 6 0 1 0 7.6 0"/></svg>',
 };
 
 // same-muscle-group alternatives, keyed by exercise name (used by the Swap button)
@@ -223,6 +224,19 @@ const ALTS = {
   "Single-Leg Hip Thrust":["Glute Bridge","Step-Up","Hip Thrust"],
   "Calf Raises":["Seated Calf Raise","Leg-Press Calf Raise","Single-Leg Calf Raise"],
   "Band Pull-Aparts":["Face Pulls","Reverse Pec-Deck","Prone Y-Raise"],
+  "Two-Hand Kettlebell Swing":["One-Arm Kettlebell Swing","Kettlebell Romanian Deadlift","Hip Thrust"],
+  "One-Arm Kettlebell Swing":["Two-Hand Kettlebell Swing","Kettlebell Snatch","Kettlebell High Pull"],
+  "Kettlebell Snatch":["Kettlebell Clean & Press","One-Arm Kettlebell Swing","Kettlebell High Pull"],
+  "Kettlebell Clean":["Kettlebell Clean & Press","Kettlebell High Pull","Two-Hand Kettlebell Swing"],
+  "Kettlebell Front Squat":["Goblet Squat","Kettlebell Reverse Lunge","Back Squat"],
+  "Kettlebell Overhead Press":["Kettlebell Push Press","Overhead Press","Seated DB Press"],
+  "Kettlebell Romanian Deadlift":["Romanian Deadlift","Two-Hand Kettlebell Swing","Single-Leg RDL"],
+  "Kettlebell Row":["One-Arm DB Row","Bent-Over Row","Chest-Supported Row"],
+  "Kettlebell Floor Press":["Dumbbell Bench Press","Push-Ups","Machine Chest Press"],
+  "Kettlebell Reverse Lunge":["Kettlebell Bulgarian Split Squat","Walking Lunge","Step-Up"],
+  "Kettlebell Bulgarian Split Squat":["Kettlebell Reverse Lunge","Bulgarian Split Squat","Step-Up"],
+  "Turkish Get-Up":["Kettlebell Windmill","Pallof Press","Suitcase Carry"],
+  "Kettlebell Farmer's Carry":["Kettlebell Suitcase Carry","Weighted Plank","Dead Bug"],
 };
 
 // exercise -> [primary, ...secondary] muscle groups (secondary counts as half a set)
@@ -290,6 +304,7 @@ function muscleFor(name){
 }
 function equipFor(name){
   const n=String(name).toLowerCase();
+  if(/kettlebell|\bkb\b|turkish get-?up|goblet/.test(n)) return {key:"kb",label:"Kettlebell"};
   if(/push.?up|pull.?up|chin.?up|\bdip\b|plank|hollow|hanging|inverted|pike|sit.?up|dead bug|burpee|pistol|nordic|handstand|chair dip|bodyweight|step.?up|bridge|prone|superman|wall slide|wall angel|wall sit|scapular|chin.?tuck|bird.?dog|snow.?angel|cat.?cow/.test(n)) return {key:"body",label:"Bodyweight"};
   if(/cable|pulldown|pushdown|pull-through|kickback|face.?pull|rope|crossover|abduction|woodchop|pallof|band /.test(n)) return {key:"cable",label:"Cable / band"};
   if(/machine|leg press|leg curl|leg extension|pec.?deck|hack|smith|seated row|lat pulldown|ab.?machine|reverse pec/.test(n)) return {key:"machine",label:"Machine"};
@@ -316,7 +331,30 @@ Object.assign(MUSCLES, {
   "Reverse Crunch":["Core"], "Side Plank":["Core"], "Mountain Climbers":["Core"], "Bird Dog":["Core"],
   "Dead Bug":["Core"], "Superman":["Back"]
 });
+// ---- kettlebell catalogue ----
+// Ballistics (swing/snatch/clean/high-pull) are power/conditioning moves — high-rep or timed, never heavy/low-rep.
+// Grinds (squat/press/RDL/row/lunge/get-up) behave like any weighted move. KB_BALLISTIC gates the first group out
+// of strength / "intensity" days; KB_POOL drives the dedicated Kettlebell-only mode. See buildPlan.
+Object.assign(MUSCLES, {
+  "Two-Hand Kettlebell Swing":["Glutes","Hamstrings","Back"], "One-Arm Kettlebell Swing":["Glutes","Hamstrings","Back"],
+  "Kettlebell Snatch":["Glutes","Hamstrings","Side Delts"], "Kettlebell Clean":["Glutes","Hamstrings","Biceps"],
+  "Kettlebell High Pull":["Side Delts","Back"], "Kettlebell Clean & Press":["Front Delts","Glutes","Triceps"],
+  "Kettlebell Front Squat":["Quads","Glutes"], "Kettlebell Overhead Press":["Front Delts","Triceps"],
+  "Kettlebell Push Press":["Front Delts","Side Delts","Triceps"], "Kettlebell Romanian Deadlift":["Hamstrings","Glutes"],
+  "Kettlebell Row":["Back","Biceps","Rear Delts"], "Kettlebell Floor Press":["Chest","Triceps"],
+  "Kettlebell Reverse Lunge":["Quads","Glutes"], "Kettlebell Bulgarian Split Squat":["Quads","Glutes"],
+  "Turkish Get-Up":["Core","Front Delts","Glutes"], "Kettlebell Windmill":["Core","Hamstrings"],
+  "Kettlebell Halo":["Side Delts","Core"], "Kettlebell Suitcase Carry":["Core","Side Delts"],
+  "Kettlebell Farmer's Carry":["Core","Back"]
+});
+// ballistic / explosive KB moves — power & conditioning, kept off heavy strength/"intensity" days
+const KB_BALLISTIC=/kettlebell swing|kb swing|snatch|kettlebell clean|kb clean|high pull/;
 const LIBRARY=[
+  "Two-Hand Kettlebell Swing","One-Arm Kettlebell Swing","Kettlebell Snatch","Kettlebell Clean","Kettlebell High Pull",
+  "Kettlebell Clean & Press","Kettlebell Front Squat","Kettlebell Overhead Press","Kettlebell Push Press",
+  "Kettlebell Romanian Deadlift","Kettlebell Row","Kettlebell Floor Press","Kettlebell Reverse Lunge",
+  "Kettlebell Bulgarian Split Squat","Turkish Get-Up","Kettlebell Windmill","Kettlebell Halo",
+  "Kettlebell Suitcase Carry","Kettlebell Farmer's Carry",
   "Incline Bench Press","Decline Bench Press","Dumbbell Bench Press","Incline DB Press","Machine Chest Press",
   "Cable Fly","Pec Deck","Dumbbell Fly","Incline Dumbbell Fly","Cable Crossover","Low-to-High Cable Fly","Diamond Push-Ups","Incline Push-Ups","Decline Push-Ups",
   "Lat Pulldown","Seated Row","Chest-Supported Row","T-Bar Row","One-Arm DB Row","Meadows Row",
@@ -359,6 +397,11 @@ const EXPLAIN={
  "Incline DB Curl":{why:"Curling from an incline lets the arms hang back, putting the biceps on a deep stretch — one of the best curls for size.",cues:["Lie back so your arms hang behind you.","Curl without swinging; keep the elbows back.","Lower slowly into the full stretch."]},
  "Overhead Triceps Extension":{why:"Takes the long head of the triceps through a deep overhead stretch — studies show ~1.4× the growth of pushdowns.",cues:["Keep the elbows pointing up and tucked in.","Lower behind your head into a full stretch.","Press to a strong lockout."]},
  "Triceps Pushdown":{why:"Convenient triceps work; the overhead extension stretches the long head for more growth.",cues:["Elbows tucked and still.","Push down to a full lockout.","Control the weight back up."]},
+ "Two-Hand Kettlebell Swing":{why:"An explosive hip hinge for the whole posterior chain — power, conditioning and a hard glute snap.",cues:["Hike the bell back between your legs like a snap pass.","Snap the hips through — the arms just guide it to chest height.","It's a hinge, not a squat or a front raise."]},
+ "Kettlebell Snatch":{why:"One smooth pull from the floor to overhead — full-body power and conditioning.",cues:["Drive with the hips, keep the bell close.","Punch the hand through at the top so it doesn't bang the wrist.","Lower under control back into the hinge."]},
+ "Turkish Get-Up":{why:"Stand up and lie back down with a bell locked overhead — unmatched for shoulder stability and control.",cues:["Eyes on the bell, arm locked vertical throughout.","Move slowly through each step — roll, post, bridge, lunge, stand.","Reverse the steps with the same control."]},
+ "Kettlebell Romanian Deadlift":{why:"A loaded hip hinge with the bells — hamstrings and glutes through a deep stretch.",cues:["Soft knees, push the hips back.","Lower the bells along your legs until you feel the stretch.","Drive the hips forward to stand tall."]},
+ "Kettlebell Farmer's Carry":{why:"Pick up heavy bells and walk — grip, traps and a braced, upright core.",cues:["Stand tall, shoulders back, ribs down.","Take short, controlled steps.","Don't let the load tip you side to side."]},
 };
 function explainFor(name){
   if(EXPLAIN[name]) return EXPLAIN[name];
@@ -371,7 +414,12 @@ function explainFor(name){
 const DIFF={ "Deadlift":5,"Romanian Deadlift":4,"Single-Leg RDL":4,"Front Squat":4,"Back Squat":4,"Overhead Press":4,
   "Bent-Over Row":4,"Bulgarian Split Squat":4,"Good Morning":4,"Nordic Curl":5,"Push Press":4,
   "Weighted Pull-Up":4,"Pull-Up":3,"Pull-Ups":3,"Weighted Dip":3,"Barbell Bench Press":3,"Hip Thrust":3,
-  "Hack Squat":2,"Leg Press":1,"Goblet Squat":2,"Pec Deck":1,"Cable Fly":2 };
+  "Hack Squat":2,"Leg Press":1,"Goblet Squat":2,"Pec Deck":1,"Cable Fly":2,
+  "Two-Hand Kettlebell Swing":3,"One-Arm Kettlebell Swing":3,"Kettlebell Snatch":5,"Kettlebell Clean":4,
+  "Kettlebell High Pull":3,"Kettlebell Clean & Press":4,"Kettlebell Front Squat":3,"Kettlebell Overhead Press":3,
+  "Kettlebell Push Press":4,"Kettlebell Romanian Deadlift":3,"Kettlebell Row":3,"Kettlebell Floor Press":3,
+  "Kettlebell Reverse Lunge":3,"Kettlebell Bulgarian Split Squat":4,"Turkish Get-Up":5,"Kettlebell Windmill":4,
+  "Kettlebell Halo":2,"Kettlebell Suitcase Carry":2,"Kettlebell Farmer's Carry":2 };
 function difficultyFor(name){
   if(DIFF[name]!=null) return DIFF[name];
   const n=name.toLowerCase();
@@ -460,12 +508,27 @@ const HSCORE={
  "Face Pulls":[3,"Rear delts and posture — light, supportive work."],
  "Band Pull-Aparts":[3,"Upper-back and posture health; very light loading."],
  "Hollow Hold (sec)":[2.5,"An anti-extension hold — superb for control, modest for size."],
+ "Kettlebell Romanian Deadlift":[4,"Loads the hamstrings through a deep hinge — load is capped by the bell, so chase reps."],
+ "Kettlebell Bulgarian Split Squat":[4.5,"Big loaded stretch on quads and glutes, one leg at a time."],
+ "Kettlebell Reverse Lunge":[4,"Loaded stretch on the front leg, easy on the knees."],
+ "Kettlebell Front Squat":[3.5,"Honest quad stretch, though load caps out at what you can rack."],
+ "Kettlebell Row":[3.5,"Solid unilateral back work you can load and progress."],
+ "Kettlebell Floor Press":[3,"Triceps and chest pressing; the floor cuts the stretch short."],
+ "Kettlebell Overhead Press":[3.5,"Builds the delts; pair with side-delt work for width."],
+ "Two-Hand Kettlebell Swing":[3,"A power/conditioning move — great for the posterior chain and heart rate, modest for pure size."],
+ "One-Arm Kettlebell Swing":[3,"Ballistic posterior-chain work with an anti-rotation demand; train it for power and conditioning."],
+ "Kettlebell Snatch":[3,"Explosive full-body conditioning; chase crisp reps, not slow grinding."],
+ "Kettlebell Clean":[3,"A power move to rack the bell — light on hypertrophy, big on conditioning."],
+ "Turkish Get-Up":[3,"A full-body stability and shoulder-control drill — superb skill, modest for size."],
+ "Kettlebell Farmer's Carry":[3,"Loaded carry for grip, traps and a braced core; progress the load and distance."],
+ "Kettlebell Suitcase Carry":[3,"Single-side carry that hammers the obliques to resist the lean."],
 };
 function hScore(name){
   if(HSCORE[name]) return {s:HSCORE[name][0], why:HSCORE[name][1]};
   const eq=equipFor(name).key;
   if(eq==="body") return {s:3, why:"Convenient bodyweight work; load is capped, so chase reps, tempo and range."};
   if(eq==="cable") return {s:3.5, why:"Constant-tension isolation you can dial in and progress."};
+  if(eq==="kb") return {s:3.5, why:"Versatile kettlebell work; load caps out at the bell, so progress with reps, tempo and range."};
   return {s:3.5, why:"A solid hypertrophy choice — train it through a full range with a loaded stretch and add load over time."};
 }
 function starHTML(s){
@@ -480,7 +543,7 @@ function venueFor(name){
   const n=String(name).toLowerCase();
   // bands are purchased gear, not a zero-equipment home staple — they fall through to the loaded (gym) tier
   const k=equipFor(name).key;
-  if(k==="free"||k==="machine"||k==="cable") return "Gym";
+  if(k==="free"||k==="machine"||k==="cable"||k==="kb") return "Gym";   // kettlebells are gym equipment here, not a no-equipment home item
   if(/pull.?up|chin.?up|\bdip\b|hanging|inverted|muscle.?up|pike|handstand|bar\b/.test(n)) return "Park";
   return "Home";
 }
@@ -582,7 +645,7 @@ function workoutSupersets(w){ const set=new Set(); (w.ex||[]).forEach(e=>{ if(e.
 // the physical gym area a move lives in — supersets only pair within the same one (no running across the gym)
 function exArea(name){
   const k=equipFor(name).key;
-  if(k==="cable"||k==="machine"||k==="body") return k;
+  if(k==="cable"||k==="machine"||k==="body"||k==="kb") return k;
   const n=String(name).toLowerCase();   // split "free weights" into the dumbbell rack vs the barbell/rack platform
   if(/dumbbell|\bdb\b|goblet|hammer curl|arnold|one-arm|incline db|lateral raise|rear delt fly|overhead triceps|triceps extension|chest-supported|split squat|bulgarian|\blunge\b|step-up|single-leg/.test(n)) return "dumbbell";
   return "barbell";
@@ -4014,20 +4077,46 @@ function renderInsight(){
 
 // ================= automatic plan builder =================
 const BUILD_POOL={
-  chest:["Barbell Bench Press","Incline DB Press","Machine Chest Press","Weighted Dip","Dumbbell Bench Press","Cable Fly","Pec Deck","Push-Ups","Decline Push-Ups","Diamond Push-Ups","Incline Push-Ups"],
-  back:["Weighted Pull-Up","Pull-Up","Chest-Supported Row","Bent-Over Row","Lat Pulldown","Seated Row","One-Arm DB Row","Face Pulls","Chin-Up","Inverted / Backpack Row","Superman"],
-  shoulders:["Overhead Press","Seated DB Press","Machine Shoulder Press","Arnold Press","Pike Push-Ups"],
-  sidedelts:["Lateral Raise","Cable Lateral Raise","Dumbbell Lateral Raise","Machine Lateral Raise","Upright Row"],
+  chest:["Barbell Bench Press","Incline DB Press","Machine Chest Press","Weighted Dip","Dumbbell Bench Press","Cable Fly","Pec Deck","Push-Ups","Decline Push-Ups","Diamond Push-Ups","Incline Push-Ups","Kettlebell Floor Press"],
+  back:["Weighted Pull-Up","Pull-Up","Chest-Supported Row","Bent-Over Row","Lat Pulldown","Seated Row","One-Arm DB Row","Face Pulls","Chin-Up","Inverted / Backpack Row","Superman","Kettlebell Row"],
+  shoulders:["Overhead Press","Seated DB Press","Machine Shoulder Press","Arnold Press","Pike Push-Ups","Kettlebell Overhead Press","Kettlebell Push Press","Kettlebell Clean & Press"],
+  sidedelts:["Lateral Raise","Cable Lateral Raise","Dumbbell Lateral Raise","Machine Lateral Raise","Upright Row","Kettlebell High Pull"],
   reardelts:["Rear Delt Fly","Face Pulls","Reverse Pec Deck","Cable Rear Delt Fly","Bent-Over Lateral Raise","Band Pull-Aparts","Prone Y-Raise"],
   triceps:["Overhead Triceps Extension","Triceps Pushdown","Close-Grip Bench Press","Skull Crusher","Diamond Push-Ups"],
   biceps:["EZ-Bar Curl","Incline DB Curl","Hammer Curl","Cable Curl","Preacher Curl","Chin-Up"],
-  quads:["Back Squat","Hack Squat","Leg Press","Front Squat","Goblet Squat","Leg Extension","Bulgarian Split Squat","Walking Lunge","Reverse Lunge","Step-Up","Sissy Squat"],
-  hamstrings:["Romanian Deadlift","Seated Leg Curl","Lying Leg Curl","Single-Leg RDL","Nordic Curl"],
-  glutes:["Hip Thrust","Bulgarian Split Squat","Cable Pull-Through","Glute Bridge","Single-Leg Glute Bridge","Reverse Lunge"],
+  quads:["Back Squat","Hack Squat","Leg Press","Front Squat","Goblet Squat","Leg Extension","Bulgarian Split Squat","Walking Lunge","Reverse Lunge","Step-Up","Sissy Squat","Kettlebell Front Squat","Kettlebell Reverse Lunge","Kettlebell Bulgarian Split Squat"],
+  hamstrings:["Romanian Deadlift","Seated Leg Curl","Lying Leg Curl","Single-Leg RDL","Nordic Curl","Kettlebell Romanian Deadlift","Two-Hand Kettlebell Swing"],
+  glutes:["Hip Thrust","Bulgarian Split Squat","Cable Pull-Through","Glute Bridge","Single-Leg Glute Bridge","Reverse Lunge","Two-Hand Kettlebell Swing","One-Arm Kettlebell Swing","Kettlebell Snatch"],
   calves:["Standing Calf Raise","Seated Calf Raise","Leg-Press Calf Raise","Single-Leg Calf Raise"],
-  core:["Cable Crunch","Hanging Leg Raise","Ab Wheel Rollout","Plank","Hollow Hold (sec)","Side Plank","Bicycle Crunch","Reverse Crunch","Dead Bug"]
+  core:["Cable Crunch","Hanging Leg Raise","Ab Wheel Rollout","Plank","Hollow Hold (sec)","Side Plank","Bicycle Crunch","Reverse Crunch","Dead Bug","Kettlebell Windmill"]
 };
 const FB_GROUPS=["quads","chest","back","shoulders","sidedelts","hamstrings","glutes","core"];
+// Kettlebell-only mode: a dedicated per-muscle pool (rep-based moves only — carries & get-ups stay
+// manual/library picks since they're timed, not "3 × reps"). Drives access==="kb" in buildPlan.
+const KB_POOL={
+  chest:["Kettlebell Floor Press"],
+  back:["Kettlebell Row","Kettlebell High Pull"],
+  shoulders:["Kettlebell Overhead Press","Kettlebell Push Press","Kettlebell Clean & Press"],
+  sidedelts:["Kettlebell High Pull","Kettlebell Halo"],
+  reardelts:["Kettlebell High Pull","Kettlebell Row"],
+  triceps:["Kettlebell Overhead Press","Kettlebell Floor Press"],
+  biceps:["Kettlebell Row","Kettlebell Clean"],
+  quads:["Kettlebell Front Squat","Goblet Squat","Kettlebell Reverse Lunge","Kettlebell Bulgarian Split Squat"],
+  hamstrings:["Kettlebell Romanian Deadlift","Two-Hand Kettlebell Swing"],
+  glutes:["Two-Hand Kettlebell Swing","One-Arm Kettlebell Swing","Kettlebell Snatch","Kettlebell Reverse Lunge"],
+  calves:[],   // no kettlebell calf isolation — KB plans honestly skip it
+  core:["Kettlebell Windmill","Kettlebell Halo"]
+};
+// kettlebell favours full-body days / complexes over barbell U/L/PPL splits (no isolation machines)
+function kbSplit(freq){
+  const V=[
+    {g:["quads","glutes","shoulders","back","core"]},
+    {g:["hamstrings","glutes","back","sidedelts","core"]},
+    {g:["quads","hamstrings","shoulders","biceps","core"]},
+  ];
+  const days=[]; for(let i=0;i<freq;i++) days.push({name:"Full Body "+String.fromCharCode(65+i), g:V[i%3].g.slice()});
+  return days;
+}
 function allowsAt(name, level){ const l=exLevel(name);
   if(level==="gym") return true;
   if(level==="park") return l!=="gym";
@@ -4074,14 +4163,14 @@ function emphasisPreset(focus){
 // patterns, leaving only gentle isolation to substitute to; T3 (severe) is reinforced by INJURY_REGION below,
 // which rests the whole body part. Mild/moderate intentionally bite hard — a niggle still deserves real caution.
 const INJURY_TIERS={
-  lowback:[ /deadlift|good morning|bent-over row|barbell row|t-bar|clean|snatch|hyperextension|back extension/,
+  lowback:[ /deadlift|good morning|bent-over row|barbell row|t-bar|clean|snatch|swing|high pull|windmill|hyperextension|back extension/,
             /\bsquat\b|romanian|\brdl\b|hip hinge|overhead press|push press|hip thrust|leg press|sit-up|landmine|standing.*press/,
             /\brow\b|pulldown|pull-?up|chin-?up|crunch|leg raise/ ],
   knees:[   /sissy|pistol|\bjump\b|plyo|\bhop\b|\blunge\b|bulgarian|step-up|deep squat/,
             /\bsquat\b|leg press|hack squat|wall sit/,
             /leg extension|leg curl/ ],
-  shoulders:[ /overhead press|behind|upright row|arnold|push press|snatch|pike|lateral raise|\bdip\b/,
-              /^(?!.*\bleg\b).*\bpress\b|\bfly\b|pec deck|pulldown|pull-?up|\brow\b|front raise|chin-?up/,   // leg-excluded so "leg press" / "calf raise" don't false-match
+  shoulders:[ /overhead press|behind|upright row|arnold|push press|snatch|high pull|pike|lateral raise|\bdip\b/,
+              /^(?!.*\bleg\b).*\bpress\b|\bfly\b|pec deck|pulldown|pull-?up|\brow\b|front raise|chin-?up|halo/,   // leg-excluded so "leg press" / "calf raise" don't false-match
               /push-?up|pullover/ ],
   elbows:[  /skull|close-grip|\bdip\b|overhead.*extension|kickback|pushdown/,
             /triceps|chin-?up|pull-?up|^(?!.*\b(?:leg|nordic)\b).*\bcurl\b/,   // arm curls only — not leg/nordic curl
@@ -4144,6 +4233,15 @@ function dayDomain(name){ const n=name.toLowerCase();
 // movement family — variants of the same lift share a key, so a workout won't stack e.g. pull-up + weighted pull-up
 function familyKey(name){
   const n=String(name).toLowerCase();
+  // kettlebell families — keep variants from stacking and let same-family rotation work
+  if(/swing/.test(n)) return "swing";
+  if(/snatch/.test(n)) return "snatch";
+  if(/\bclean\b/.test(n)) return "clean";       // clean & clean-and-press share a family
+  if(/high pull/.test(n)) return "highpull";
+  if(/get-?up/.test(n)) return "getup";
+  if(/windmill/.test(n)) return "windmill";
+  if(/halo/.test(n)) return "halo";
+  if(/carry/.test(n)) return "carry";
   if(/pull-?up|chin-?up|pulldown|lat pull/.test(n)) return "vpull";
   if(/push-?up/.test(n)) return "pushup";
   if(/(rear[ -]?delt|reverse pec|face pull|bent-?over lateral|pull-?apart|prone y|reverse snow)/.test(n)) return "reardelt";
@@ -4157,7 +4255,7 @@ function familyKey(name){
   if(/pull-through/.test(n)) return "pullthrough";
   if(/(romanian|\brdl\b|good morning|deadlift)/.test(n)) return "hinge";
   if(/incline.*(press|bench)/.test(n)) return "inclinepress";
-  if(/(bench press|chest press|\bdip\b)/.test(n)) return "horizpress";
+  if(/(bench press|chest press|floor press|\bdip\b)/.test(n)) return "horizpress";
   if(/(overhead press|shoulder press|arnold|push press|pike|handstand)/.test(n)) return "ohp";
   if(/(split squat|bulgarian|\blunge\b|step-up)/.test(n)) return "lunge";
   if(/squat/.test(n)) return "squat";
@@ -4169,11 +4267,26 @@ function familyKey(name){
   if(/(crunch|leg raise|plank|hollow|sit-up|ab wheel|dead bug|bicycle|russian twist|mountain climber|bird dog|hold)/.test(n)) return "core";
   return n.replace(/[^a-z]/g,'');
 }
+// kettlebell ballistics (swing/snatch/clean/high-pull) are power & conditioning moves — keep them off heavy,
+// low-rep days. Grinds always pass. Used to gate the general builder by objective × training style.
+function fitsGoal(name, obj, bias){
+  if(!KB_BALLISTIC.test(String(name).toLowerCase())) return true;
+  if(bias==="intensity" || obj==="strength") return false;
+  return true;
+}
+// ballistics get power/conditioning rep ranges instead of the plan's hypertrophy scheme (returns null for everything else)
+function kbRepOverride(name){
+  const n=String(name).toLowerCase();
+  if(/two-hand kettlebell swing/.test(n)) return "12–20";
+  if(/swing|high pull/.test(n)) return "10–15";   // one-arm — treat as per side
+  if(/snatch|\bclean\b/.test(n)) return "8–12";   // per side
+  return null;
+}
 // allocate each day's exercise slots in proportion to the emphasis weights (with contrast), so dragging a spoke really changes volume
-function pickWorkoutWeighted(groups, n, injuries, level, W, offset, exp){
-  offset=offset||0;
+function pickWorkoutWeighted(groups, n, injuries, level, W, offset, exp, obj, bias, pool){
+  offset=offset||0; pool=pool||BUILD_POOL;
   const avail={}, usable=[];
-  groups.forEach(g=>{ const a=(BUILD_POOL[g]||[]).filter(x=>!injuryBlocks(x,injuries)&&allowsAt(x,level)&&suitsExp(x,exp)); avail[g]=a; if(a.length) usable.push(g); });
+  groups.forEach(g=>{ const a=(pool[g]||[]).filter(x=>!injuryBlocks(x,injuries)&&allowsAt(x,level)&&suitsExp(x,exp)&&fitsGoal(x,obj,bias)); avail[g]=a; if(a.length) usable.push(g); });
   if(!usable.length) return [];
   const wt=g=>Math.pow(Math.max(0.06, W[g]!=null?W[g]:0.5), 1.8), cap=g=>Math.min(avail[g].length,3);
   const wsum=usable.reduce((s,g)=>s+wt(g),0), raw={}, target={}; let assigned=0;
@@ -4200,9 +4313,12 @@ function pickWorkoutWeighted(groups, n, injuries, level, W, offset, exp){
 }
 function buildPlan(b){
   const access=b.access||"gym";
-  const primary = (access==="home"||access==="mostly_home") ? "none" : access==="park" ? "park" : "gym";
+  const isKB = access==="kb";
+  const POOL = isKB ? KB_POOL : BUILD_POOL;   // kettlebell-only draws from its own pool
+  // KB count as gym equipment: the dedicated mode builds at the "gym" level so KB_POOL isn't venue-filtered out
+  const primary = isKB ? "gym" : (access==="home"||access==="mostly_home") ? "none" : access==="park" ? "park" : "gym";
   const secondary = access==="mostly_gym" ? "none" : access==="mostly_home" ? "gym" : null;  // the "replacement" environment
-  const baseDays = primary==="none" ? null : buildSplit(b.freq, b.exp);
+  const baseDays = isKB ? kbSplit(b.freq) : (primary==="none" ? null : buildSplit(b.freq, b.exp));
   const base=exCount(b.time);
   const T=b.time, ssMode = (b.supersets==="off") ? "off" : (T<=45 ? "aggressive" : "accessory");
   const bias=b.bias||"balanced";
@@ -4218,8 +4334,8 @@ function buildPlan(b){
   // day plan: the routine runs entirely in the primary environment; a different environment becomes a non-rotating replacement
   const dayDefs=[];
   for(let di=0; di<b.freq; di++){
-    if(primary==="none") dayDefs.push({groups:FB_GROUPS.slice(), name:"Full Body "+String.fromCharCode(65+di), lvl:primary, rot:true});
-    else dayDefs.push({groups:baseDays[di].g.slice(), name:baseDays[di].name, lvl:primary, rot:true});
+    if(baseDays) dayDefs.push({groups:baseDays[di].g.slice(), name:baseDays[di].name, lvl:primary, rot:true});
+    else dayDefs.push({groups:FB_GROUPS.slice(), name:"Full Body "+String.fromCharCode(65+di), lvl:primary, rot:true});
   }
   if(secondary){
     const repName = secondary==="none" ? "Home session" : secondary==="gym" ? "Gym session" : "Park session";
@@ -4246,12 +4362,12 @@ function buildPlan(b){
   // build one workout for a day at a given selection offset; fixedComps (optional) keeps the same compounds and only re-picks accessories
   const buildVariant=(d, offset, name, fixedComps)=>{
     let groups=d.groups.slice(); const dom=dayDomain(d.name);
-    Object.keys(W).forEach(g=>{ if(W[g]>=0.55 && dom.indexOf(g)>=0 && groups.indexOf(g)<0 && BUILD_POOL[g]) groups.push(g); });
-    let picks=pickWorkoutWeighted(groups, base, b.injuries, d.lvl, W, offset, b.exp);
+    Object.keys(W).forEach(g=>{ if(W[g]>=0.55 && dom.indexOf(g)>=0 && groups.indexOf(g)<0 && POOL[g] && POOL[g].length) groups.push(g); });
+    let picks=pickWorkoutWeighted(groups, base, b.injuries, d.lvl, W, offset, b.exp, b.obj, bias, POOL);
     if(fixedComps) picks=fixedComps.concat(picks.filter(p=>!p.comp));   // keep A's compounds, take this offset's accessories
     const comps=picks.filter(p=>p.comp), accs=interleave(picks.filter(p=>!p.comp));
     const ordered=comps.concat(accs);
-    const wk={ name, ex: ordered.map(p=>{ const s=p.comp?compSets:accSets, rr=p.comp?reps.c:reps.a; return {n:p.n, t:s+" × "+rr, s}; }) };
+    const wk={ name, ex: ordered.map(p=>{ const s=p.comp?compSets:accSets, rr=kbRepOverride(p.n)||(p.comp?reps.c:reps.a); return {n:p.n, t:s+" × "+rr, s}; }) };
     if(d.sub) wk.sub=d.sub; wk.rotate=d.rot;
     wk._meta=ordered.map(p=>({ comp:p.comp, grp:muscleFor(p.n)[0] }));
     wk._lvl=d.lvl;
@@ -4268,7 +4384,7 @@ function buildPlan(b){
       // Variety: one template per slot, with each accessory tagged with a same-muscle rotation pool
       // so the session view cycles it automatically (compounds stay fixed for progression) — instead
       // of doubling into A/B templates. See planSessionsPerWeek / applyRotation.
-      if(vary) built.wk.ex.forEach((e,i)=>{
+      if(vary && !isKB) built.wk.ex.forEach((e,i)=>{   // KB-only stays pure — no rotating into bodyweight/free-weight moves
         const m=built.wk._meta[i]; if(!m || m.comp) return;
         const others=built.wk.ex.filter((_,j)=>j!==i);   // don't rotate into a move (or family) already in this session
         const taken={ names:new Set(others.map(x=>x.n)), fams:new Set(others.map(x=>familyKey(x.n))) };
@@ -4290,15 +4406,15 @@ function buildPlan(b){
     const key=buildKey(m); let bestI=-1, bestLen=99;
     workouts.forEach((wk,i)=>{ if(dayDomain(wk.name).indexOf(key)>=0 && wk.ex.length<bestLen){ bestLen=wk.ex.length; bestI=i; } });
     if(bestI<0) return;
-    const cand=(BUILD_POOL[key]||[]).find(x=>!injuryBlocks(x,b.injuries)&&allowsAt(x,workouts[bestI]._lvl)&&suitsExp(x,b.exp)&&!workouts[bestI].ex.some(e=>e.n===x||familyKey(e.n)===familyKey(x)));
+    const cand=(POOL[key]||[]).find(x=>!injuryBlocks(x,b.injuries)&&allowsAt(x,workouts[bestI]._lvl)&&suitsExp(x,b.exp)&&fitsGoal(x,b.obj,bias)&&!workouts[bestI].ex.some(e=>e.n===x||familyKey(e.n)===familyKey(x)));
     if(!cand) return;
-    workouts[bestI].ex.push({n:cand, t:accSets+" × "+reps.a, s:accSets}); workouts[bestI]._meta.push({comp:false, grp:m});
+    workouts[bestI].ex.push({n:cand, t:accSets+" × "+(kbRepOverride(cand)||reps.a), s:accSets}); workouts[bestI]._meta.push({comp:false, grp:m});
     const protect=new Set(emphG); protect.add(m);                 // keep the new move; trim a lower-priority one to stay near the limit
     trimDay(workouts[bestI], workouts[bestI]._meta, protect);
   });
   workouts.forEach(wk=>{ delete wk._meta; delete wk._lvl; });
   const objLbl={muscle:"Hypertrophy",strength:"Strength",fatloss:"Fat-loss",fitness:"Fitness"}[b.obj]||"Custom";
-  const accLbl={gym:"",park:" · park",home:" · home",mostly_gym:" · gym+home",mostly_home:" · home+gym"}[access]||"";
+  const accLbl={gym:"",park:" · park",home:" · home",mostly_gym:" · gym+home",mostly_home:" · home+gym",kb:" · kettlebell"}[access]||"";
   return { id:"custom-"+Date.now(), name:objLbl+accLbl, level:b.exp, daysPerWeek:b.freq, workouts };
 }
 document.querySelectorAll("#sheetBuild .bopt").forEach(seg=>{ const k=seg.dataset.k; seg.querySelectorAll(".s").forEach(s=> s.onclick=()=>{
