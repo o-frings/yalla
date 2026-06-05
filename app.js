@@ -1201,7 +1201,7 @@ async function renderLiveCards(){
     catch(e){ try{ const { data } = await sb.from("profiles").select("user_id,display_name").in("user_id",ids); profs=data||[]; }catch(e2){} }
     profs.forEach(p=>{ names[p.user_id]=p.display_name; _nameCache[p.user_id]=p.display_name; }); recordAvatars(profs);
   }
-  strip.innerHTML='<div class="ed-label" style="margin-top:4px;">Live now</div>';
+  strip.innerHTML='<div class="ed-label">Live now</div>';
   fresh.forEach(r=>{
     const s=r.state||{}, who=names[r.user_id]||"A friend";
     const card=document.createElement("div"); card.className="livecard";
