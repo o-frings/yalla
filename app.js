@@ -1486,6 +1486,19 @@ async function openChat(uid, name){
   openThread(uid, name || await liveName(uid));
 }
 function openDMFromLink(uid){ return openChat(uid); }   // push deep-link entry
+// friend gesture: short tap → their profile (activity log), long-press → chat. Skips taps that land
+// on an action button (Remove/Follow). Used on friend rows + avatars.
+function bindFriendTap(el, uid, name){
+  let timer=null, fired=false, armed=false, dx=0, dy=0;
+  el.addEventListener("pointerdown", e=>{
+    if(e.target.closest(".factions, button, input, label")){ armed=false; return; }
+    armed=true; fired=false; dx=e.clientX; dy=e.clientY;
+    clearTimeout(timer); timer=setTimeout(()=>{ fired=true; try{ navigator.vibrate && navigator.vibrate(8); }catch(_){} openChat(uid, name); }, 450);
+  });
+  el.addEventListener("pointermove", e=>{ if(armed && (Math.abs(e.clientX-dx)>10 || Math.abs(e.clientY-dy)>10)) clearTimeout(timer); });
+  el.addEventListener("pointercancel", ()=>{ clearTimeout(timer); armed=false; });
+  el.addEventListener("pointerup", ()=>{ clearTimeout(timer); if(!armed) return; armed=false; if(fired) return; openProfile(uid, name); });
+}
 async function openMessages(){
   if(!cloudReady() || !dbHardened){ toast("Sign in to message your friends."); return; }
   _msgThreadUid=null;
@@ -1778,7 +1791,7 @@ async function renderFeed(){
       '<div class="levelcap" style="margin:2px 0 0; opacity:.7;">'+esc(agoStr(Date.parse(r.created_at)))+(canOpen?' · tap for detail ›':'')+'</div>';
     const cv=document.createElement("canvas"); cv.width=72; cv.height=72; cv.style.cssText="flex:0 0 auto; width:60px; height:60px;";
     const avt=document.createElement("div"); avt.style.cssText="flex:0 0 auto;"+(mine?"":" cursor:pointer;"); avt.innerHTML=avatarHTML(who,{size:44,uid:r.user_id});
-    if(!mine) avt.onclick=(e)=>{ e.stopPropagation(); openProfile(r.user_id, who); };
+    if(!mine) bindFriendTap(avt, r.user_id, who);   // tap → profile, long-press → chat
     top.appendChild(avt); top.appendChild(txt); top.appendChild(cv); card.appendChild(top);
     if(canOpen){ top.style.cursor="pointer"; top.onclick=()=>openWorkoutDetail(r, who, viewLvl); }
     // social actions (cheer + comment) — own posts can't be cheered
@@ -5225,8 +5238,10 @@ async function renderPresenceRail(){
   rail.innerHTML='<div class="railhdr"><span class="ed-label" style="margin:0;">'+(aroundN?"Around now":"Friends")+'</span>'
     +'<span class="railall" id="railAll">All <span class="ovchev">›</span>'+badge+'</span></div>'
     +'<div class="prail">'+faces+'</div>';
-  rail.querySelectorAll(".pr-item[data-uid]").forEach(el=> el.onclick=()=>{
-    if(el.dataset.live==="1") openLiveView(el.dataset.uid, el.dataset.nm); else openProfile(el.dataset.uid, el.dataset.nm); });   // avatar → profile (workouts, live, Message)
+  rail.querySelectorAll(".pr-item[data-uid]").forEach(el=>{
+    if(el.dataset.live==="1") el.onclick=()=>openLiveView(el.dataset.uid, el.dataset.nm);   // live friend → straight to their session
+    else bindFriendTap(el, el.dataset.uid, el.dataset.nm);                                  // else tap → profile, long-press → chat
+  });
   const all=$("railAll"); if(all) all.onclick=openFriends;
 }
 
@@ -5339,7 +5354,7 @@ async function renderFriends(){
       liveRows=(data||[]).filter(r=> r.user_id!==cloudUser.id && (Date.now()-Date.parse(r.updated_at))<15*60*1000); }catch(e){}
     const ln={}; following.forEach(u=>{ ln[u.user_id]=u.display_name; });
     liveBox.innerHTML = liveRows.length
-      ? '<div class="ed-label" style="margin-top:6px;">Live now</div><div class="prail" style="padding-bottom:8px;">'
+      ? '<div class="ed-label">Live now</div><div class="prail" style="padding-bottom:8px;">'
         + liveRows.map(r=>{ const nm=ln[r.user_id]||_nameCache[r.user_id]||"A friend";
             return '<div class="pr-item" data-uid="'+esc(r.user_id)+'" data-nm="'+esc(nm)+'">'+avatarHTML(nm,{size:56,live:true,uid:r.user_id})+'<span class="pr-live">Live</span></div>'; }).join('')
         + '</div>'
@@ -5349,10 +5364,10 @@ async function renderFriends(){
   const reqBox=$("reqList");
   if(reqBox){
     reqBox.innerHTML = reqs.length
-      ? '<div class="ed-label" style="margin-top:18px;">Requests</div>'+reqs.map(u=>
-          '<div class="row" data-uid="'+esc(u.user_id)+'" style="justify-content:space-between; align-items:center; margin-top:10px;">'
-          +'<span class="frow" style="min-width:0;">'+avatarHTML(u.display_name,{size:40,uid:u.user_id})+'<span class="fname">'+esc(u.display_name||"A lifter")+'</span></span>'
-          +'<span style="flex:0 0 auto; display:flex; gap:8px;"><button class="btn sm reqYes">Accept</button><button class="btn tinted sm reqNo">Decline</button></span></div>').join('')
+      ? '<div class="ed-label">Requests</div><div class="flist">'+reqs.map(u=>
+          '<div class="fitem" data-uid="'+esc(u.user_id)+'">'+avatarHTML(u.display_name,{size:44,uid:u.user_id})
+          +'<div class="fmain"><div class="fnm">'+esc(u.display_name||"A lifter")+'</div><div class="fsub">wants to follow you</div></div>'
+          +'<div class="factions"><button class="btn pill reqYes">Accept</button><button class="btn tinted pill reqNo">Decline</button></div></div>').join('')+'</div>'
       : "";
     reqBox.querySelectorAll(".reqYes").forEach(b=> b.onclick=()=>acceptFollow(b.closest("[data-uid]").dataset.uid));
     reqBox.querySelectorAll(".reqNo").forEach(b=> b.onclick=()=>removeFollow(b.closest("[data-uid]").dataset.uid, "follower"));
@@ -5360,41 +5375,43 @@ async function renderFriends(){
   const folBox=$("followList");
   if(folBox){
     folBox.innerHTML = following.length
-      ? '<div class="ed-label" style="margin-top:18px;">Your friends</div>'+following.map(u=>
-          '<div class="row" data-uid="'+esc(u.user_id)+'" data-nm="'+esc(u.display_name||"")+'" style="justify-content:space-between; align-items:center; margin-top:10px;">'
-          +'<span class="frow folopen" style="min-width:0; cursor:pointer;">'+statusAvatar(u.display_name,{size:40,uid:u.user_id},isOnline(u.last_seen))+'<span class="fname">'+esc(u.display_name||"A lifter")+(u.status==="pending"?' <span class="levelcap" style="font-weight:400;">· pending</span>':isOnline(u.last_seen)?' <span class="levelcap" style="font-weight:400; color:#34c759;">· online</span>':'')+'</span></span>'
-          +'<button class="btn tinted sm unfol" style="flex:0 0 auto;">Remove</button></div>').join('')
+      ? '<div class="ed-label">Your friends</div><div class="flist">'+following.map(u=>{
+          const on=isOnline(u.last_seen), sub=u.status==="pending"?'<div class="fsub">pending</div>':(on?'<div class="fsub on">online</div>':'');
+          return '<div class="fitem tap folopen" data-uid="'+esc(u.user_id)+'" data-nm="'+esc(u.display_name||"")+'">'+statusAvatar(u.display_name,{size:44,uid:u.user_id},on)
+            +'<div class="fmain"><div class="fnm">'+esc(u.display_name||"A lifter")+'</div>'+sub+'</div>'
+            +'<div class="factions"><button class="btn tinted pill unfol">Remove</button></div></div>'; }).join('')+'</div>'
       : "";
-    folBox.querySelectorAll(".unfol").forEach(b=> b.onclick=()=>removeFollow(b.closest("[data-uid]").dataset.uid, "followee"));
-    folBox.querySelectorAll(".folopen").forEach(el=>{ const row=el.closest("[data-uid]"); el.onclick=()=>openProfile(row.dataset.uid, row.dataset.nm); });
+    folBox.querySelectorAll(".unfol").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); removeFollow(b.closest("[data-uid]").dataset.uid, "followee"); });
+    folBox.querySelectorAll(".folopen").forEach(el=> bindFriendTap(el, el.dataset.uid, el.dataset.nm));   // tap → profile, long-press → chat
   }
   // live-watch grants: which of your accepted followers may watch you train in real time
   const grantBox=$("liveGrantList");
   if(grantBox){
     let followers=[]; try{ const { data } = await sb.rpc("my_followers"); followers=data||[]; recordAvatars(followers); }catch(e){}
     grantBox.innerHTML = followers.length
-      ? '<div class="ed-label" style="margin-top:18px;">Allow to watch me live</div>'
-        +'<p class="levelcap" style="margin:0 4px 4px; line-height:1.4;">Pick who can watch your workout in real time and cheer you on. Toggle one friend or your whole crew.</p>'
-        + followers.map(u=>
-          '<label class="row" data-uid="'+esc(u.user_id)+'" style="justify-content:space-between; align-items:center; margin-top:10px;">'
-          +'<span class="frow" style="min-width:0;">'+avatarHTML(u.display_name,{size:36,uid:u.user_id})+'<span class="fname">'+esc(u.display_name||"A lifter")+'</span></span>'
-          +'<input type="checkbox" class="livegrant" style="flex:0 0 auto; width:20px; height:20px; accent-color:var(--red);"'+(u.live?" checked":"")+'></label>').join('')
+      ? '<div class="ed-label">Allow to watch me live</div>'
+        +'<p class="levelcap" style="margin:0 2px 8px; line-height:1.4;">Pick who can watch your workout in real time and cheer you on.</p>'
+        +'<div class="flist">'+ followers.map(u=>
+          '<label class="fitem" data-uid="'+esc(u.user_id)+'">'+avatarHTML(u.display_name,{size:44,uid:u.user_id})
+          +'<div class="fmain"><div class="fnm">'+esc(u.display_name||"A lifter")+'</div></div>'
+          +'<input type="checkbox" class="livegrant" style="flex:0 0 auto; width:22px; height:22px; accent-color:var(--red);"'+(u.live?" checked":"")+'></label>').join('')+'</div>'
       : "";
     grantBox.querySelectorAll(".livegrant").forEach(cb=> cb.onchange=()=>{ const row=cb.closest("[data-uid]"); grantLive(row.dataset.uid, cb.checked, cb); });
   }
   const sugBox=$("suggList");
   if(sugBox){
     sugBox.innerHTML = sugg.length
-      ? '<div class="ed-label" style="margin-top:18px;">Suggested</div>'+sugg.map(u=>{
+      ? '<div class="ed-label">Suggested</div><div class="flist">'+sugg.map(u=>{
           const label = u.mutuals>0 ? ("followed by "+u.mutuals+" "+(u.mutuals>1?"friends":"friend"))
                        : u.follows_you ? "follows you"
                        : (u.visibility==="public" ? "public profile" : "");
-          return '<div class="row" data-uid="'+esc(u.user_id)+'" data-nm="'+esc(u.display_name||"")+'" style="justify-content:space-between; align-items:center; margin-top:10px;">'
-            +'<span class="frow" style="min-width:0;">'+avatarHTML(u.display_name,{size:40,uid:u.user_id})+'<span style="min-width:0; overflow:hidden;"><b style="display:block; overflow:hidden; text-overflow:ellipsis;">'+esc(u.display_name||"A lifter")+'</b>'+(label?'<span class="levelcap">'+esc(label)+'</span>':'')+'</span></span>'
-            +'<button class="btn sm sugFollow" style="flex:0 0 auto;">Follow</button></div>';
-        }).join('')
+          return '<div class="fitem tap" data-uid="'+esc(u.user_id)+'" data-nm="'+esc(u.display_name||"")+'">'+avatarHTML(u.display_name,{size:44,uid:u.user_id})
+            +'<div class="fmain"><div class="fnm">'+esc(u.display_name||"A lifter")+'</div>'+(label?'<div class="fsub">'+esc(label)+'</div>':'')+'</div>'
+            +'<div class="factions"><button class="btn pill sugFollow">Follow</button></div></div>';
+        }).join('')+'</div>'
       : "";
-    sugBox.querySelectorAll(".sugFollow").forEach(b=> b.onclick=()=>{ const row=b.closest("[data-uid]"); followUser(row.dataset.uid, row.dataset.nm); });
+    sugBox.querySelectorAll(".sugFollow").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); const row=b.closest("[data-uid]"); followUser(row.dataset.uid, row.dataset.nm); });
+    sugBox.querySelectorAll(".fitem.tap").forEach(el=> el.onclick=()=>openProfile(el.dataset.uid, el.dataset.nm));
   }
 }
 // follow a suggested person directly by id (the insert RLS allows follower = me; the

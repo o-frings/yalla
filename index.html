@@ -86,7 +86,7 @@
 <div class="injbanner" id="injBanner" style="display:none;"></div>
 <div id="exlist"></div>
 <button class="btn wide" id="saveBtn" style="margin-top:12px;">Finish &amp; Save Workout</button>
-<div class="foot">On-device only · keep a backup · lift safely · build <span id="appVer">v66</span></div>
+<div class="foot">On-device only · keep a backup · lift safely · build <span id="appVer">v67</span></div>
 </div><!-- /pageWorkout -->
 
 <div class="exmenu-pop" id="exMenu"></div>
@@ -351,25 +351,29 @@
     <div id="friendsCTA" class="group ovtap" style="display:none; cursor:pointer;"><div class="pad"><p style="font-size:14px;color:var(--l2);line-height:1.5;margin:2px 0;">Sign in under <b>Settings ⚙ → Account &amp; sync</b> to add friends and see what they're training.<span class="ovchev">›</span></p></div></div>
     <!-- the friend graph; built by renderFriends() -->
     <div id="friendsPeople" style="display:none;">
-      <button class="navlink" id="msgBackupNav" style="margin-bottom:6px;"><span>Message backup<span class="nlsub" id="msgBackupSub">protect your chat history</span></span><span class="ovchev">›</span></button>
+      <!-- people first: live now, requests needing action, then your crew -->
       <div id="liveNowRow"></div>
       <div id="reqList"></div>
       <div id="followList"></div>
-      <p class="levelcap" id="friendsEmpty" style="display:none; margin:10px 4px 0; line-height:1.5;">No friends yet — swap codes with a friend below to get started.</p>
-      <!-- code-first: add by code is the primary action, your code is the hero, link is secondary -->
-      <div class="ed-label" style="margin-top:18px;">Add a friend</div>
+      <p class="levelcap" id="friendsEmpty" style="display:none; margin:14px 2px 0; line-height:1.5;">No friends yet — swap codes below to get started.</p>
+      <!-- grow: code-first invite (your code is the hero), then passive suggestions -->
+      <div class="ed-label">Add a friend</div>
       <div class="row" style="gap:8px;">
         <input id="addCode" type="text" autocapitalize="characters" placeholder="Enter a friend's code" style="flex:1; text-transform:uppercase;">
         <button class="btn sm" id="addFriendBtn" style="flex:0 0 auto;">Add</button>
       </div>
-      <div class="ed-label" style="margin-top:18px;">Your code</div>
+      <div class="ed-label">Your code</div>
       <div class="codecard">
         <span class="codeval" id="myCode">—</span>
         <button class="btn tinted sm" id="copyCode" style="flex:0 0 auto;">Copy</button>
       </div>
-      <p class="levelcap" style="margin:8px 4px 0; line-height:1.45;">Give this code to a friend — they enter it above to follow you. <span id="inviteBtn" style="color:var(--accent); cursor:pointer;">Share a link instead ›</span></p>
+      <p class="levelcap" style="margin:8px 2px 0; line-height:1.45;">Give this code to a friend — they enter it above to follow you. <span id="inviteBtn" style="color:var(--accent); cursor:pointer;">Share a link instead ›</span></p>
       <div id="suggList"></div>
-      <button class="navlink" id="friendsToSharing" style="margin-top:22px;"><span>Sharing &amp; privacy<span class="nlsub">choose who can see you</span></span><span class="ovchev">›</span></button>
+      <!-- settings cluster, grouped at the bottom -->
+      <div class="fsettings">
+        <button class="navlink" id="msgBackupNav"><span>Message backup<span class="nlsub" id="msgBackupSub">protect your chat history</span></span><span class="ovchev">›</span></button>
+        <button class="navlink" id="friendsToSharing"><span>Sharing &amp; privacy<span class="nlsub">choose who can see you</span></span><span class="ovchev">›</span></button>
+      </div>
     </div>
   </div>
 </div>
