@@ -5600,7 +5600,10 @@ function updateBuildPreview(){
   syncEmphasisChips(); drawEmphasisRadar();
   const bc=$("biasCap"); if(bc) bc.textContent=BIAS_CAP[build.bias||"balanced"]||"";
   const sc=planScores(buildPlan(build));
-  $("buildPrevScores").innerHTML='<span class="psc"><b>Balance</b> '+sc.balance+'<small>/5</small></span><span class="psc"><b>Hypertrophy</b> '+sc.hyp+'<small>/5</small></span>';
+  // TEMP diagnostic — confirms which build is loaded and the actual emphasis values being plotted
+  const dbg='v83 · C'+emphVal('Chest').toFixed(2)+' T'+emphVal('Triceps').toFixed(2)+' Q'+emphVal('Quads').toFixed(2)+' Gl'+emphVal('Glutes').toFixed(2)+' Bk'+emphVal('Back').toFixed(2)+' · f:'+(Array.isArray(build.focus)?build.focus.join('+'):build.focus);
+  $("buildPrevScores").innerHTML='<span class="psc"><b>Balance</b> '+sc.balance+'<small>/5</small></span><span class="psc"><b>Hypertrophy</b> '+sc.hyp+'<small>/5</small></span>'
+    +'<span class="psc" style="opacity:.6;font-size:11px;flex-basis:100%;justify-content:center;">'+dbg+'</span>';
 }
 (function(){ const c=$("buildRadar"); if(!c) return; let dragging=false, downX=0, downY=0, moved=false;
   const curG=()=>roseGroups(buildExpanded);
