@@ -3108,6 +3108,22 @@ function incFor(name, w){
   if(exArea(name)==="dumbbell") return (w||0) < 10 ? 1 : 2;
   return /squat|deadlift|leg press|hip thrust|lunge|hack/i.test(name)?5:2.5;
 }
+// standard empty-bar weight, so barbell suggestions land on real totals: a 20kg Olympic bar, or ~8kg for a
+// lighter curved/EZ bar (curls, skull crushers, preacher work). 0 = not loaded on a straight bar.
+function barWeight(name){
+  if(exArea(name)!=="barbell") return 0;
+  return /ez-?bar|curl bar|preacher|skull|\bez\b/i.test(name) ? 8 : 20;
+}
+// next loadable weight at/above a target. On a barbell, plates go on in pairs (1.25kg pairs → 2.5kg jumps;
+// big lifts step 5kg), so snap to empty bar + N pairs — an 8kg EZ-bar climbs 8 → 10.5 → 13, a 20kg bar
+// 20 → 22.5 → 25. Dumbbells/machines pass through (incFor already lands them on the rack).
+function snapLoad(name, target){
+  const bar=barWeight(name); if(!bar) return target;
+  if(target<=bar) return bar;
+  const step=incFor(name);
+  return Math.round((bar + Math.round((target-bar)/step)*step)*10)/10;
+}
+function nextLoad(name, w){ return snapLoad(name, (w||0) + incFor(name, w)); }
 const FREQ_RECENT=21, FREQ_PAST=56;
 function trainingDays(nDays){
   const cutoff=Date.now()-nDays*86400000, days=new Set();
@@ -3154,12 +3170,12 @@ function suggestion(name, t){
   else if(regime==="overreached"){ soft=true; show=true; cue="You've trained hard and often — hold around "+fmtSet(lt)+" this week and let your body catch up."; }
   else if(overStreak){ show=true;
     const range=bumpRange(rng.low+"–"+rng.high);
-    over={ w: w>0?w+incFor(name,w):0, range };
+    over={ w: w>0?nextLoad(name,w):0, range };
     cue = w>0
       ? "You keep clearing "+rng.high+" reps — the weight's gone light. Step up the load, or raise your target range."
       : "You keep clearing "+rng.high+" reps — make it harder, or raise your target range."; }
   else if(!rng){ cue="Beat last time — add a rep or a little load over "+fmtSet(lt)+"."; }
-  else if(r>=rng.high && w>0){ show=true; cue="Topped the range — add weight: try "+(w+incFor(name,w))+"kg for "+rng.low+"+ reps."; }
+  else if(r>=rng.high && w>0){ show=true; cue="Topped the range — add weight: try "+nextLoad(name,w)+"kg for "+rng.low+"+ reps."; }
   else if(r>=rng.high){ show=true; cue="You topped the range — make it harder and aim "+rng.low+"+ reps."; }
   else if(r>0){ cue="Beat it: aim "+(r+1)+" rep"+(r+1>1?"s":"")+(w?" at "+w+"kg":"")+" (target "+rng.low+"–"+rng.high+")."; }
   else { cue="Beat last time: "+fmtSet(lt)+"."; }
