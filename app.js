@@ -5129,6 +5129,22 @@ function buildSplit(freq, exp){
   if(freq===5) return [{name:"Push",g:P},{name:"Pull",g:PL},{name:"Legs",g:L},{name:"Upper",g:U},{name:"Lower",g:L}];
   return [{name:"Push A",g:P},{name:"Pull A",g:PL},{name:"Legs A",g:L},{name:"Push B",g:P},{name:"Pull B",g:PL},{name:"Legs B",g:L}];
 }
+// Powerlifting (squat/bench/deadlift) split: each day carries an `anchor` — the competition lift it is built
+// around (trained heavy, first in the session) — plus the helper muscles its accessories come from.
+function sbdSplit(freq, exp){
+  const SQ={name:"Squat",sub:"Back squat + leg support",anchor:"Back Squat",g:["quads","hamstrings","glutes","core"]};
+  const BN={name:"Bench",sub:"Bench press + pressing support",anchor:"Barbell Bench Press",g:["chest","triceps","shoulders","upperback"]};
+  const DL={name:"Deadlift",sub:"Deadlift + posterior support",anchor:"Deadlift",g:["hamstrings","glutes","lowerback","lats","core"]};
+  const PR={name:"Press",sub:"Overhead press + upper support",anchor:"Overhead Press",g:["shoulders","sidedelts","triceps","chest"]};
+  const SQ2={name:"Squat (variation)",sub:"Front squat + leg support",anchor:"Front Squat",g:["quads","glutes","hamstrings","core"]};
+  const BN2={name:"Bench (variation)",sub:"Close-grip bench + pressing support",anchor:"Close-Grip Bench Press",g:["chest","triceps","shoulders","upperback"]};
+  if(freq<=2) return [Object.assign({},SQ,{name:"Full Body A",sub:"Squat-focused full body",g:["quads","glutes","chest","upperback","core"]}),
+                      Object.assign({},DL,{name:"Full Body B",sub:"Deadlift-focused full body",g:["hamstrings","glutes","chest","shoulders","core"]})];
+  if(freq===3) return [SQ,BN,DL];
+  if(freq===4) return [SQ,BN,DL,PR];
+  if(freq===5) return [SQ,BN,DL,PR,SQ2];
+  return [SQ,BN,DL,SQ2,BN2,PR];
+}
 function exCount(time){ return time<=30?4 : time<=45?5 : time<=60?6 : 8; }
 const BUILD_REPS={ strength:{c:"4–6",a:"6–10"}, muscle:{c:"6–10",a:"8–12"}, fatloss:{c:"8–12",a:"12–15"}, fitness:{c:"8–12",a:"10–15"} };
 // Evidence-based rep targets by goal × training style. Compounds use lower reps than isolation;
@@ -5141,7 +5157,8 @@ const REPSCHEME={
 };
 const BIAS_CAP={ intensity:"Heavier loads, lower reps, and fewer but harder sets with longer rests — strength-leaning.",
   balanced:"A balanced mix of load and reps at 2–3 sets per move — the evidence-based default.",
-  volume:"Lighter loads and higher reps for more total work per muscle." };
+  volume:"Lighter loads and higher reps for more total work per muscle.",
+  power:"Pure powerlifting: a squat / bench / deadlift split, each day built around the big lift trained heavy at 1–5 reps, with accessories to support it. Needs a barbell." };
 const UPPER_M=["chest","lats","upperback","shoulders","sidedelts","reardelts","biceps","triceps"], LOWER_M=["quads","hamstrings","glutes","calves"];
 function dayDomain(name){ const n=name.toLowerCase();
   if(/full body/.test(n)) return UPPER_M.concat(LOWER_M,["core"]);
@@ -5189,11 +5206,23 @@ function familyKey(name){
   if(/(crunch|leg raise|plank|hollow|sit-up|ab wheel|dead bug|bicycle|russian twist|mountain climber|bird dog|hold)/.test(n)) return "core";
   return n.replace(/[^a-z]/g,'');
 }
+// movement role — compound (multi-joint, the day's anchor) vs isolation (single-joint accessory). Explicit,
+// so it's right where muscle-array length misleads: Close-Grip Bench is a compound even though triceps is its
+// primary. Drives press+fly pairing within a muscle and the powerlifting anchors. A press/row/squat word wins
+// even if an isolation word also appears (e.g. "close-grip bench press").
+const COMP_RE=/(squat|deadlift|press|\brow\b|pull-?up|chin-?up|pulldown|\bdip\b|lunge|step-up|hip thrust|thruster|good morning|push-?up|clean|snatch|swing)/;
+const ISO_RE=/(fly|flye|pec deck|raise|lateral|\bcurl\b|extension|pushdown|skull|crossover|pull-?apart|pull-?through|reverse pec|kickback|shrug|face pull|crunch|leg raise|pullover|adduction|abduction)/;
+function roleFor(name){
+  const n=String(name).toLowerCase();
+  if(COMP_RE.test(n)) return "compound";
+  if(ISO_RE.test(n)) return "isolation";
+  return "compound";
+}
 // kettlebell ballistics (swing/snatch/clean/high-pull) are power & conditioning moves — keep them off heavy,
 // low-rep days. Grinds always pass. Used to gate the general builder by objective × training style.
 function fitsGoal(name, obj, bias){
   if(!KB_BALLISTIC.test(String(name).toLowerCase())) return true;
-  if(bias==="intensity" || obj==="strength") return false;
+  if(bias==="intensity" || bias==="power" || obj==="strength") return false;
   return true;
 }
 // ballistics get power/conditioning rep ranges instead of the plan's hypertrophy scheme (returns null for everything else)
@@ -5223,7 +5252,7 @@ function pickWorkoutWeighted(groups, n, injuries, level, W, offset, exp, obj, bi
   if(!usable.length) return [];
   // Strength tilts slot allocation toward the big compound groups (chest/back/quads/hams/shoulders),
   // so the day is built around heavy lifts rather than isolation.
-  const compBoost = obj==="strength" ? 1.6 : 1;
+  const compBoost = (obj==="strength"||bias==="power") ? 1.6 : 1;
   const wt=g=>Math.pow(Math.max(0.06, W[g]!=null?W[g]:0.5), 1.8) * (COMPOUND_GROUPS.indexOf(g)>=0?compBoost:1), cap=g=>Math.min(avail[g].length,3);
   const wsum=usable.reduce((s,g)=>s+wt(g),0), raw={}, target={}; let assigned=0;
   usable.forEach(g=>{ raw[g]=n*wt(g)/wsum; target[g]=Math.min(cap(g), Math.floor(raw[g])); assigned+=target[g]; });
@@ -5238,8 +5267,21 @@ function pickWorkoutWeighted(groups, n, injuries, level, W, offset, exp, obj, bi
   }});
   const idx={}; usable.forEach(g=> idx[g]= Math.min(offset, Math.max(0,avail[g].length-1)) );
   const used=new Set(), usedFam=new Set(), chosen=[], compDone=new Set(), left=Object.assign({},target), gcount={}; usable.forEach(g=>gcount[g]=0); let progress=true;
-  const take=(g)=>{ const arr=avail[g]; let i=idx[g]; while(i<arr.length && (used.has(arr[i])||usedFam.has(familyKey(arr[i])))) i++; idx[g]=i+1; if(i>=arr.length) return false;
-    const nm=arr[i]; used.add(nm); usedFam.add(familyKey(nm)); gcount[g]++; const isComp=COMPOUND_GROUPS.indexOf(g)>=0 && !compDone.has(g); if(isComp) compDone.add(g); chosen.push({n:nm, comp:isComp}); return true; };
+  // For a compound muscle, anchor it with a real compound (first pick), then prefer an isolation for any extra
+  // slot — so e.g. a chest day becomes bench (compound) + a fly (isolation), not two presses. Sequential idx
+  // scan is kept so the offset still rotates which exercises a repeated-signature day draws.
+  const take=(g)=>{ const arr=avail[g]; const roleAware=COMPOUND_GROUPS.indexOf(g)>=0, wantIso=roleAware && gcount[g]>0;
+    let i=idx[g], pick=-1, fallback=-1;
+    for(; i<arr.length; i++){ const nm=arr[i]; if(used.has(nm)||usedFam.has(familyKey(nm))) continue;
+      if(fallback<0) fallback=i;
+      if(!roleAware){ pick=i; break; }
+      if(wantIso===(roleFor(nm)==="isolation")){ pick=i; break; } }
+    if(pick<0) pick=fallback;
+    if(pick<0){ idx[g]=arr.length; return false; }
+    idx[g]=pick+1;
+    const nm=arr[pick]; used.add(nm); usedFam.add(familyKey(nm)); gcount[g]++;
+    const isComp=roleAware && roleFor(nm)==="compound" && !compDone.has(g); if(isComp) compDone.add(g);
+    chosen.push({n:nm, comp:isComp}); return true; };
   while(chosen.length<n && progress){ progress=false;
     usable.forEach(g=>{ if(left[g]<=0 || chosen.length>=n) return; if(take(g)){ left[g]--; progress=true; } else left[g]=0; }); }
   // if family/dup skips left the day short, top up from the highest-weighted groups (on a posture day this adds a row, etc.)
@@ -5250,19 +5292,23 @@ function pickWorkoutWeighted(groups, n, injuries, level, W, offset, exp, obj, bi
 function buildPlan(b){
   const access=b.access||"gym";
   const isKB = access==="kb";
+  const bias=b.bias||"balanced";
+  const isPower = bias==="power";             // pure powerlifting: SBD split, big-three anchored heavy
   const POOL = isKB ? KB_POOL : BUILD_POOL;   // kettlebell-only draws from its own pool
   // KB count as gym equipment: the dedicated mode builds at the "gym" level so KB_POOL isn't venue-filtered out
   const primary = isKB ? "gym" : (access==="home"||access==="mostly_home") ? "none" : access==="park" ? "park" : "gym";
   const secondary = access==="mostly_gym" ? "none" : access==="mostly_home" ? "gym" : null;  // the "replacement" environment
-  const baseDays = isKB ? kbSplit(b.freq) : (primary==="none" ? null : buildSplit(b.freq, b.exp));
+  const baseDays = isKB ? kbSplit(b.freq) : (primary==="none" ? null : (isPower ? sbdSplit(b.freq, b.exp) : buildSplit(b.freq, b.exp)));
   // Strength goal = heavy low-rep lifting: one fewer move per day so the session is built around the
-  // main compounds, not padded with isolation. (REPSCHEME.strength already drops the rep brackets.)
-  const isStrength = b.obj==="strength";
+  // main compounds, not padded with isolation. (REPSCHEME.strength already drops the rep brackets.) Powerlifting
+  // is the purest form of this — its days are anchored on the squat/bench/deadlift below.
+  const isStrength = b.obj==="strength" || isPower;
   const base=Math.max(3, exCount(b.time) - (isStrength?1:0));
-  const T=b.time, ssMode = (b.supersets==="off") ? "off" : (T<=45 ? "aggressive" : "accessory");
-  const bias=b.bias||"balanced";
-  const sch=(REPSCHEME[b.obj]||REPSCHEME.muscle)[bias]||(REPSCHEME[b.obj]||REPSCHEME.muscle).balanced;
+  const T=b.time, ssMode = (b.supersets==="off"||isPower) ? "off" : (T<=45 ? "aggressive" : "accessory");
+  // Powerlifting overrides the objective's rep brackets: accessories support the lift, the anchor is set below.
+  const sch=isPower ? {c:"3–5",a:"6–10"} : ((REPSCHEME[b.obj]||REPSCHEME.muscle)[bias]||(REPSCHEME[b.obj]||REPSCHEME.muscle).balanced);
   const reps={c:sch.c, a:sch.a};
+  const anchorReps="1–5", anchorSets=5;   // the day's competition lift: heavy, more sets than the other compounds
   // sets stay in the productive 3–4 range; "intensity" works heavier (lower reps), "volume" adds one accessory set
   // 2–3 working sets per exercise is the efficient range. Default 3; drop to 2 for short sessions or heavy "intensity" work.
   // Strength: more work on the heavy compounds (4 sets, or 3 when time/intensity is tight) and only 2 on accessories.
@@ -5274,7 +5320,7 @@ function buildPlan(b){
   // day plan: the routine runs entirely in the primary environment; a different environment becomes a non-rotating replacement
   const dayDefs=[];
   for(let di=0; di<b.freq; di++){
-    if(baseDays) dayDefs.push({groups:baseDays[di].g.slice(), name:baseDays[di].name, lvl:primary, rot:true});
+    if(baseDays) dayDefs.push({groups:baseDays[di].g.slice(), name:baseDays[di].name, sub:baseDays[di].sub, anchor:baseDays[di].anchor, lvl:primary, rot:true});
     else dayDefs.push({groups:FB_GROUPS.slice(), name:"Full Body "+String.fromCharCode(65+di), lvl:primary, rot:true});
   }
   if(secondary){
@@ -5308,11 +5354,17 @@ function buildPlan(b){
     const dPool = d.pool || POOL;   // a KB day overrides the pool for that day only
     let groups=d.groups.slice(); const dom=dayDomain(d.name);
     Object.keys(W).forEach(g=>{ if(W[g]>=0.55 && dom.indexOf(g)>=0 && groups.indexOf(g)<0 && dPool[g] && dPool[g].length) groups.push(g); });
-    let picks=pickWorkoutWeighted(groups, base, b.injuries, d.lvl, W, offset, b.exp, b.obj, bias, dPool);
+    // Powerlifting day: reserve the first slot for the competition lift, fill the rest with supporting accessories.
+    const anchor = d.anchor || null, need = anchor ? Math.max(1, base-1) : base;
+    let picks=pickWorkoutWeighted(groups, need, b.injuries, d.lvl, W, offset, b.exp, b.obj, bias, dPool);
+    if(anchor){ const af=familyKey(anchor);
+      picks=picks.filter(p=>familyKey(p.n)!==af && p.n!==anchor).slice(0, need);   // never duplicate the anchor's lift family
+      picks.unshift({n:anchor, comp:true, anchor:true});
+    }
     if(fixedComps) picks=fixedComps.concat(picks.filter(p=>!p.comp));   // keep A's compounds, take this offset's accessories
     const comps=picks.filter(p=>p.comp), accs=interleave(picks.filter(p=>!p.comp));
     const ordered=comps.concat(accs);
-    const wk={ name, ex: ordered.map(p=>{ const s=p.comp?compSets:accSets, rr=cableRepBump(p.n, kbRepOverride(p.n)||(p.comp?reps.c:reps.a)); return {n:p.n, t:s+" × "+rr, s}; }) };
+    const wk={ name, ex: ordered.map(p=>{ const s=p.anchor?anchorSets:(p.comp?compSets:accSets), rr=p.anchor?anchorReps:cableRepBump(p.n, kbRepOverride(p.n)||(p.comp?reps.c:reps.a)); return {n:p.n, t:s+" × "+rr, s}; }) };
     if(d.sub) wk.sub=d.sub; wk.rotate=d.rot;
     wk._meta=ordered.map(p=>({ comp:p.comp, grp:muscleFor(p.n)[0] }));
     wk._lvl=d.lvl;
@@ -5344,8 +5396,9 @@ function buildPlan(b){
   // rotating days first, then any non-rotating replacement day last (bWorkouts is unused now that
   // Variety rotates accessories in place rather than emitting separate B templates).
   const workouts=aWorkouts.concat(bWorkouts, fixedWorkouts);
-  // coverage: any muscle the user hasn't dialled to zero should get at least some work somewhere in the plan
-  BUILD_GROUPS.forEach(m=>{
+  // coverage: any muscle the user hasn't dialled to zero should get at least some work somewhere in the plan.
+  // (Skipped for powerlifting — an SBD program is meant to under-cover some muscles, not chase full balance.)
+  if(!isPower) BUILD_GROUPS.forEach(m=>{
     if(NO_TARGET.has(m) || (emph[m]!=null?emph[m]:0.5) < 0.2) return;   // exempt (Neck) or dragged to the centre = excluded
     if((planVolume({workouts}).totals[m]||0) > 0) return;          // already hit (primary or secondary)
     const key=buildKey(m); let bestI=-1, bestLen=99;
@@ -5387,7 +5440,7 @@ function buildPlan(b){
   }
   // Guarantee at least one rotational / anti-rotation core move across the week (transverse-plane work).
   // If the picks left none in, slot one into the rotating day with the most room and trim for time.
-  if(!isKB && !workouts.some(wk=>wk.ex.some(e=>isRotational(e.n)))){
+  if(!isKB && !isPower && !workouts.some(wk=>wk.ex.some(e=>isRotational(e.n)))){
     const cands=(BUILD_POOL.core||[]).filter(isRotational);
     let bestI=-1, bestLen=99;
     workouts.forEach((wk,i)=>{ if(wk.rotate===false) return; if(dayDomain(wk.name).indexOf("core")<0) return; if(wk.ex.length<bestLen){ bestLen=wk.ex.length; bestI=i; } });
@@ -5402,7 +5455,7 @@ function buildPlan(b){
     }
   }
   workouts.forEach(wk=>{ delete wk._meta; delete wk._lvl; });
-  const objLbl={muscle:"Hypertrophy",strength:"Strength",fatloss:"Fat-loss",fitness:"Fitness"}[b.obj]||"Custom";
+  const objLbl=isPower ? "Powerlifting" : ({muscle:"Hypertrophy",strength:"Strength",fatloss:"Fat-loss",fitness:"Fitness"}[b.obj]||"Custom");
   const accLbl={gym:"",park:" · park",home:" · home",mostly_gym:" · gym+home",mostly_home:" · home+gym",kb:" · kettlebell"}[access]||"";
   return { id:"custom-"+Date.now(), name:objLbl+accLbl, level:b.exp, daysPerWeek:b.freq+(kbDay?1:0), workouts };
 }
