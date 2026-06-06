@@ -5600,8 +5600,12 @@ function updateBuildPreview(){
   syncEmphasisChips(); drawEmphasisRadar();
   const bc=$("biasCap"); if(bc) bc.textContent=BIAS_CAP[build.bias||"balanced"]||"";
   const sc=planScores(buildPlan(build));
-  // TEMP diagnostic — confirms which build is loaded and the actual emphasis values being plotted
-  const dbg='v83 · C'+emphVal('Chest').toFixed(2)+' T'+emphVal('Triceps').toFixed(2)+' Q'+emphVal('Quads').toFixed(2)+' Gl'+emphVal('Glutes').toFixed(2)+' Bk'+emphVal('Back').toFixed(2)+' · f:'+(Array.isArray(build.focus)?build.focus.join('+'):build.focus);
+  // TEMP diagnostic — dumps the ACTUAL radii (frac) the radar draws, to compare equal-emphasis spokes
+  const Gd=roseGroups(buildExpanded), emd={}; Gd.forEach(g=>emd[g]=emphVal(g)); const fr=roseRadii(Gd,emd);
+  const fi=g=>{ const i=Gd.indexOf(g); return i<0?'-':fr[i].toFixed(2); };
+  const dbg='v84 f:'+(Array.isArray(build.focus)?build.focus.join('+'):build.focus)
+    +' | em C'+emphVal('Chest').toFixed(2)+' T'+emphVal('Triceps').toFixed(2)
+    +' | frac C'+fi('Chest')+' T'+fi('Triceps')+' Q'+fi('Quads')+' Gl'+fi('Glutes')+' Ca'+fi('Calves');
   $("buildPrevScores").innerHTML='<span class="psc"><b>Balance</b> '+sc.balance+'<small>/5</small></span><span class="psc"><b>Hypertrophy</b> '+sc.hyp+'<small>/5</small></span>'
     +'<span class="psc" style="opacity:.6;font-size:11px;flex-basis:100%;justify-content:center;">'+dbg+'</span>';
 }
