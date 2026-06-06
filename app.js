@@ -2033,13 +2033,20 @@ function openWorkoutDetail(r, who, viewLvl){
   let when=""; try{ when=new Date(Date.parse(r.created_at)).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); }catch(e){}
   const mt=s.mtot||{};
   let h='<div class="ovbig" style="font-size:22px;">'+esc(s.name||"Workout")+'</div>';
-  if(when) h+='<div class="levelcap" style="margin:3px 0 0;">'+esc(when)+'</div>';
-  // labelled rose — muscles are named on the chart itself, so no separate colour-dot legend
-  h+='<div class="wo-rose"><canvas id="woRadar" width="380" height="380"></canvas></div>';
+  if(when) h+='<div class="levelcap" style="margin:3px 0 16px;">'+esc(when)+'</div>';
+  // headline numbers up top
   const chips=[["Volume", s.vol?fmtKg(s.vol):"—"],["Sets", ""+(s.sets||0)],["Time", (s.mins||0)+" min"],["PRs", ""+(s.prs||0)]];
   h+='<div class="wo-stats">'+chips.map(c=>'<div class="wo-stat"><b>'+esc(c[1])+'</b><span>'+esc(c[0])+'</span></div>').join('')+'</div>';
+  // muscle split as horizontal bars — clean and never clips (a single session is too lopsided for a radar)
+  const at=roseTotals(mt), mg=roseGroups().filter(g=>(at[g]||0)>0).sort((a,b)=>(at[b]||0)-(at[a]||0)), mmax=Math.max(1,...mg.map(g=>at[g]));
+  if(mg.length){
+    h+='<div class="ed-label" style="margin-top:22px;">Muscles worked</div><div class="wo-mus">';
+    h+=mg.map(g=>{ const pct=Math.max(8,Math.round(at[g]/mmax*100)), col=MCOLOR[g]||"#888";
+      return '<div class="wo-mrow"><span class="wo-mlab"><i class="wo-mdot" style="background:'+col+'"></i>'+esc(MSHORT[g]||g)+'</span><span class="wo-mtrack"><i class="wo-mbar" style="width:'+pct+'%;background:'+col+'"></i></span></div>'; }).join('');
+    h+='</div>';
+  }
   if(viewLvl>=2 && s.ex && s.ex.length){
-    h+='<div class="ed-label" style="margin-top:18px;">Exercises</div><div class="wo-exlist">';
+    h+='<div class="ed-label" style="margin-top:22px;">Exercises</div><div class="wo-exlist">';
     h+=s.ex.map(e=>{
       const setsTxt=(e.sets||[]).map(st=>{ const hasW=viewLvl>=3 && st.w!=null && st.w!=="";
         return (hasW ? st.w+"kg×"+(st.r||0) : (st.r||0)+" reps"); }).join(" · ");
@@ -2049,9 +2056,6 @@ function openWorkoutDetail(r, who, viewLvl){
     if(viewLvl<3) h+='<p class="levelcap" style="margin:12px 4px 0; opacity:.75;">'+esc(who)+' shared sets &amp; reps but not the weights.</p>';
   }
   body.innerHTML=h;
-  const cv=$("woRadar"); if(cv){ const gx=cv.getContext("2d"), W=cv.width, H=cv.height, R=Math.min(W,H)/2-52; gx.clearRect(0,0,W,H);
-    drawRose(gx, W/2, H/2, R, roseGroups(), roseTotals(mt), { color:g=>MCOLOR[g]||"#f08020", alpha:.82, rings:[0.5,1], grid:"rgba(127,127,127,.20)",
-      labels:true, labelFont:"600 15px -apple-system,system-ui,sans-serif", labelGap:10, labelColor:g=>MCOLOR[g]||"#888" }); }
   openSheet("WO");
 }
 
