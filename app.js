@@ -5568,9 +5568,12 @@ function syncEmphasisChips(){ const sel=Array.isArray(build.focus)?build.focus:(
 // Because the render normalizes to the average worked muscle, changing any wedge rescales the others —
 // "drag one, the rest move proportionally". The drag logic lives in the pointer handlers below.
 let buildExpanded=new Set();   // which rolled-up wedges are split open on the planner's emphasis radar
-// emphasis to plot for a display spoke: a collapsed parent shows the mean of its heads; everything else reads straight
+// emphasis to plot for a display spoke: a collapsed parent shows the mean of its heads, EXCLUDING de-emphasised
+// auxiliary heads (e.g. Lower Back) — otherwise a "Balanced" plan reads uneven because Back is dragged down by
+// the low default on the erectors. Plain spokes read straight through.
+function emphMainSubs(g){ const subs=SUBGROUPS[g].filter(m=>AUX_EMPH.indexOf(m)<0); return subs.length?subs:SUBGROUPS[g]; }
 function emphVal(g){
-  if(SUBGROUPS[g] && !buildExpanded.has(g)){ const s=SUBGROUPS[g].map(m=>build.emphasis[m]!=null?build.emphasis[m]:0.5); return s.reduce((a,b)=>a+b,0)/s.length; }
+  if(SUBGROUPS[g] && !buildExpanded.has(g)){ const s=emphMainSubs(g).map(m=>build.emphasis[m]!=null?build.emphasis[m]:0.5); return s.reduce((a,b)=>a+b,0)/s.length; }
   return build.emphasis[g]!=null?build.emphasis[g]:0.5;
 }
 function drawEmphasisRadar(){
@@ -5610,7 +5613,7 @@ function updateBuildPreview(){
   const meanOther=(g)=>{ const o=curG().filter(m=>m!==g).map(emphVal);
     return Math.max(0.0001, o.reduce((a,b)=>a+b,0)/Math.max(1,o.length)); };
   // a collapsed parent writes its value to all of its heads; a head or plain group writes itself
-  const setEmph=(g,e)=>{ e=Math.max(0.04,e); if(SUBGROUPS[g] && !buildExpanded.has(g)) SUBGROUPS[g].forEach(s=>build.emphasis[s]=e); else build.emphasis[g]=e; };
+  const setEmph=(g,e)=>{ e=Math.max(0.04,e); if(SUBGROUPS[g] && !buildExpanded.has(g)) emphMainSubs(g).forEach(s=>build.emphasis[s]=e); else build.emphasis[g]=e; };
   const setFromFrac=(g, frac)=>{ frac=Math.max(0.05, Math.min(1, frac)); const mo=meanOther(g);
     const e = mo*Math.pow(Math.max(0.001,frac)/ROSE_MID, 1/ROSE_GAMMA);   // invert radius=ROSE_MID·(e/mean)
     setEmph(g, e); build.focus=[]; syncEmphasisChips(); updateBuildPreview(); };
