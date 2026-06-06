@@ -2096,7 +2096,12 @@ function gymOpenPanel(){
   const lp=$("livePanel"); if(lp) lp.hidden=true;          // only one panel open at a time
   p.hidden=false;
   const inp=$("gymCodeInput"); if(inp){ if(!inp.value) inp.value=randGymCode(); inp.focus(); try{ inp.select(); }catch(e){} } }
-if($("socialBtn")) $("socialBtn").onclick=(e)=>{ e.stopPropagation(); const m=$("socialMenu"); if(m) m.hidden=!m.hidden; };
+// tapping the icon toggles the whole social UI: if anything is open (menu or a panel), collapse it all; else open the menu
+if($("socialBtn")) $("socialBtn").onclick=(e)=>{ e.stopPropagation();
+  const m=$("socialMenu"), lp=$("livePanel"), gp=$("gymPanel");
+  const anyOpen=(m&&!m.hidden)||(lp&&!lp.hidden)||(gp&&!gp.hidden);
+  if(anyOpen){ if(m) m.hidden=true; if(lp) lp.hidden=true; if(gp) gp.hidden=true; }
+  else if(m) m.hidden=false; };
 if($("liveMenuItem")) $("liveMenuItem").onclick=()=>{ closeSocialMenu(); const g=$("gymPanel"); if(g) g.hidden=true; toggleLivePick(); };
 if($("gymMenuItem")) $("gymMenuItem").onclick=()=>{ closeSocialMenu(); gymOpenPanel(); };
 if($("gymPanelX")) $("gymPanelX").onclick=()=>{ const p=$("gymPanel"); if(p) p.hidden=true; };
