@@ -373,10 +373,10 @@ const LIBRARY=[
   "Kettlebell Bulgarian Split Squat","Turkish Get-Up","Kettlebell Windmill","Kettlebell Halo",
   "Kettlebell Suitcase Carry","Kettlebell Farmer's Carry",
   "Incline Bench Press","Decline Bench Press","Dumbbell Bench Press","Incline DB Press","Machine Chest Press",
-  "Cable Fly","Pec Deck","Dumbbell Fly","Incline Dumbbell Fly","Cable Crossover","Low-to-High Cable Fly","Diamond Push-Ups","Incline Push-Ups","Decline Push-Ups",
+  "Cable Fly","Pec Deck","Dumbbell Fly","Incline Dumbbell Fly","Cable Crossover","Low-to-High Cable Fly","Push-Ups","Diamond Push-Ups","Incline Push-Ups","Decline Push-Ups",
   "Lat Pulldown","Seated Row","Chest-Supported Row","T-Bar Row","One-Arm DB Row","Meadows Row",
   "Chin-Up","Straight-Arm Pulldown","Dumbbell Pullover","Face Pulls",
-  "Seated DB Press","Arnold Press","Machine Shoulder Press","Cable Lateral Raise","Rear Delt Fly","Upright Row","Front Raise",
+  "Seated DB Press","Arnold Press","Machine Shoulder Press","Pike Push-Ups","Cable Lateral Raise","Rear Delt Fly","Upright Row","Front Raise",
   "Barbell Curl","EZ-Bar Curl","Cable Curl","Preacher Curl","Concentration Curl","Spider Curl","Hammer Curl","Reverse Curl",
   "Wrist Curl","Reverse Wrist Curl","Farmer's Carry",
   "Triceps Pushdown","Skull Crusher","Close-Grip Bench Press","Triceps Kickback",
@@ -556,7 +556,7 @@ function starHTML(s){
 function scoreTag(name){ const s=hScore(name).s; return '<span class="scoretag" title="Hypertrophy rating '+s+'/5">'+ICON.starF+s+'</span>'; }
 // venue: where you'd do the exercise — Gym (loaded), Park (bar/structure bodyweight), Home (floor/band)
 // bodyweight-capable movements — performable home, park and gym, so they show in every venue filter
-const VENUE_HOME=["Walking Lunge","Reverse Lunge","Sissy Squat","Single-Leg RDL","Single-Leg Calf Raise","Standing Calf Raise","Bulgarian Split Squat","Glute Kickback","Lying Leg Raise","Superman","Bird Dog","Dead Bug","Side Plank","Bicycle Crunch","Reverse Crunch","Russian Twist","Mountain Climbers","Glute Bridge","Single-Leg Glute Bridge","Step-Up","Inverted / Backpack Row","Backpack Bent-Over Row","Towel Row","Chair Dips"];
+const VENUE_HOME=["Push-Ups","Pike Push-Ups","Walking Lunge","Reverse Lunge","Sissy Squat","Single-Leg RDL","Single-Leg Calf Raise","Standing Calf Raise","Bulgarian Split Squat","Glute Kickback","Lying Leg Raise","Superman","Bird Dog","Dead Bug","Side Plank","Bicycle Crunch","Reverse Crunch","Russian Twist","Mountain Climbers","Glute Bridge","Single-Leg Glute Bridge","Step-Up","Inverted / Backpack Row","Backpack Bent-Over Row","Towel Row","Chair Dips"];
 function venueFor(name){
   if(VENUE_HOME.indexOf(name)>=0) return "Home";
   const n=String(name).toLowerCase();
@@ -2484,7 +2484,7 @@ function dismissTip(id, card){
 // Apple-style activity rings — concentric arcs filling toward each weekly target
 function drawRings(id, rings){
   const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, cx=W/2, cy=W/2; ctx.clearRect(0,0,W,W);
-  const thick=W*0.13, gap=W*0.03; let r=W*0.5-thick/2-2;
+  const n=rings.length, thick=W*(n>3?0.10:0.13), gap=W*(n>3?0.022:0.03); let r=W*0.5-thick/2-2;
   rings.forEach(rg=>{
     const pct=Math.max(0, Math.min(1, rg.target? rg.val/rg.target : 0));
     ctx.lineWidth=thick; ctx.lineCap="round";
@@ -2655,18 +2655,19 @@ function renderOverview(){
   h+='<p class="ovp" style="margin:12px 0 0;">'+motiv+'</p>';
   // --- visual snapshot: three activity rings to fill this week + a "vs last month" delta ---
   let ovRings=null;
-  if(Object.keys(hist).length){
+  if(Object.keys(hist).length || cardioList().length){
     const cut=Date.now()-7*86400000; let setsWk=0; const musWk=new Set();
     Object.keys(hist).forEach(n=>{ const gs=muscleFor(n); (hist[n]||[]).forEach(e=>{ if(e.d>=cut){ setsWk+=(e.n||0); gs.forEach(g=>{ if(MGROUPS.indexOf(g)>=0) musWk.add(g); }); } }); });
     const sessTarget=Math.max(2,Math.min(5,planSessionsPerWeek(activePlan())||3)), setsTarget=Math.max(20,sessTarget*18);
     ovRings=[ {label:"Sessions", val:f7, target:sessTarget, color:"#ff6b3d"},
               {label:"Hard sets", val:setsWk, target:setsTarget, color:"#4dabf7"},
               {label:"Muscles", val:musWk.size, target:12, color:"#51cf66"} ];
+    const cTgt=cardioTargetMins(); if(cTgt>0) ovRings.push({label:"Cardio", val:cardioMinsWeek(7), target:cTgt, color:"#9775fa", unit:"min"});
     if(ovRings.every(r=>r.val>=r.target)) shareRingsClosed(setsWk);   // all rings closed → auto-share (gated inside)
     // month-over-month volume delta
     const vol=(loDays,hiDays)=>{ const lo=Date.now()-loDays*86400000, hi=Date.now()-hiDays*86400000; let v=0; Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ if(e.d>=lo&&e.d<hi) v+=(e.v||0); })); return v; };
     const cur=vol(28,0), prev=vol(56,28), delta = prev>0 ? Math.round((cur-prev)/prev*100) : null;
-    const legend=ovRings.map(r=>'<span class="rglg"><i style="background:'+r.color+'"></i>'+r.label+' <b>'+Math.round(r.val)+'</b>/'+r.target+'</span>').join('');
+    const legend=ovRings.map(r=>'<span class="rglg"><i style="background:'+r.color+'"></i>'+r.label+' <b>'+Math.round(r.val)+'</b>/'+r.target+(r.unit?' '+r.unit:'')+'</span>').join('');
     const deltaLine = delta!=null ? '<div class="ovdelta'+(delta>=0?' up':' down')+'">'+(delta>=0?'▲':'▼')+' Volume '+(delta>=0?'+':'')+delta+'% vs the month before</div>' : '';
     h+='<div class="ed-label">This week <span class="subhint">— tap for detail ›</span></div>';
     h+='<div class="group ovtap ovsnap"><div class="pad" style="display:flex; align-items:center; gap:16px;">'
@@ -2782,6 +2783,7 @@ function renderDash(){
   if($("bfIn") && document.activeElement!==$("bfIn")) $("bfIn").value = settings.bodyfatPct||"";
   renderCalc(now);
   renderCalendar();
+  renderCardioCard();
   renderAchievements();
   renderInsight();
   renderObjective();
@@ -3915,6 +3917,8 @@ function weeklyEquiv(totals, windowDays){
 $("meBalance").onclick=()=>{ openMuscles(); };
 $("musClose").onclick=()=>closeSheet("Mus");
 $("scrimMus").onclick=()=>closeSheet("Mus");
+if($("cardioClose")) $("cardioClose").onclick=()=>closeSheet("Cardio");
+if($("scrimCardio")) $("scrimCardio").onclick=()=>closeSheet("Cardio");
 $("libClose").onclick=()=>closeSheet("Library");
 $("scrimLibrary").onclick=()=>closeSheet("Library");
 $("libSearch").oninput=function(){ libQuery=this.value; renderLibrary(); };
@@ -4945,6 +4949,138 @@ $("cdLog").onclick=()=>{
   toast("Logged "+entry.name+(mins?" — "+mins+" min":"")+(dist?" · "+round1(dist)+" km":""));
   if(fresh.length) setTimeout(()=>celebrateAch(fresh), 1200);
 };
+
+// ===== cardio dose: weekly aerobic minutes + zone mix, a SEPARATE axis from muscle volume =====
+// (also folds in pre-Phase-1 kind:"activity" logs so old runs/rides still count toward the cardio picture)
+function cardioList(){ return (extlog||[]).filter(e=>e.kind==="cardio"||e.kind==="activity"); }
+function cardioMinsOf(e){ return Math.round(e.mins||0); }
+function cardioMinsWeek(days){ days=days||7; const cut=Date.now()-days*86400000; let m=0; cardioList().forEach(e=>{ if(e.d>=cut) m+=cardioMinsOf(e); }); return Math.round(m); }
+function cardioSessionsWeek(days){ days=days||7; const cut=Date.now()-days*86400000; return cardioList().filter(e=>e.d>=cut).length; }
+function cardioZoneMix(days){ days=days||7; const cut=Date.now()-days*86400000; const mix={}; CZONES.forEach(z=>mix[z.z]=0);
+  cardioList().forEach(e=>{ if(e.d<cut) return; const z=mix[e.zone]!=null?e.zone:"z2"; mix[z]+=cardioMinsOf(e); }); return mix; }
+// objective-aware weekly aerobic-minutes target (Phase 3 layers coaching on top of this)
+function cardioTargetMins(){ switch(settings.objective){
+  case "fatloss":  return 200;          // higher volume aids the deficit
+  case "fitness":  return 150;          // general health (≈ WHO 150 min/wk moderate)
+  case "muscle":   return 90;           // enough conditioning without blunting hypertrophy
+  case "strength": return 75;
+  default:         return 150; } }
+// 10-week weekly-minutes series for the sparkline (index N-1 = this week)
+function cardioWeeklySeries(){ const wkMs=7*86400000, now=Date.now(), N=PROG_WEEKS, out=new Array(N).fill(0);
+  cardioList().forEach(e=>{ const k=Math.floor((now-e.d)/wkMs), i=(k>=0&&k<N)?(N-1-k):-1; if(i>=0) out[i]+=cardioMinsOf(e); }); return out; }
+const CZCOL={z1:"#74c0fc", z2:"#51cf66", z3:"#fcc419", z4:"#ff922b", z5:"#fa5252"};
+// objective-aware distribution nudge from the last 2 weeks of cardio (polarized base — rosenblat19;
+// keep cardio moderate when chasing size/strength — wilson12). null when there's too little to judge.
+function cardioCoachLine(){
+  const mix=cardioZoneMix(14), tot=Object.values(mix).reduce((a,b)=>a+b,0);
+  if(tot<30) return null;
+  const hard=(mix.z4||0)+(mix.z5||0), easy=(mix.z1||0)+(mix.z2||0), tgt=cardioTargetMins();
+  if((settings.objective==="muscle"||settings.objective==="strength") && cardioMinsWeek(7)>tgt*1.6)
+    return "Lots of cardio this week — while you're chasing size/strength, keep it moderate (and favour cycling) so it doesn't blunt your gains.";
+  if(hard/tot>0.4) return "A lot of your cardio is hard (Z4–Z5). Most weeks work better with ~80% easy — it builds your aerobic base with less fatigue.";
+  if(easy>=tot*0.97 && cardioMinsWeek(14)>=tgt*2) return "Almost all easy lately — with a solid base, one weekly harder session or some intervals nudges your fitness up.";
+  return null;
+}
+function renderCardioCard(){
+  const card=$("cardioCard"); if(!card) return; card.style.display="";
+  if(!cardioList().length){
+    card.classList.remove("ovtap"); card.onclick=null;
+    card.innerHTML='<div class="pad"><div class="ovk">Cardio</div><p class="ovp" style="margin-top:6px;">No cardio logged yet. Add a run, ride or swim from <b>Workout → Cardio</b> — it’s tracked here on its own, separate from your muscle balance.</p></div>';
+    return;
+  }
+  const mins=cardioMinsWeek(7), tgt=cardioTargetMins(), sess=cardioSessionsWeek(7);
+  const pct=tgt?Math.min(100,Math.round(mins/tgt*100)):0;
+  const mix=cardioZoneMix(7), mixTot=Object.values(mix).reduce((a,b)=>a+b,0);
+  const segs=mixTot? CZONES.map(z=>{ const w=mix[z.z]||0; if(!w) return ""; return '<span style="display:block;height:100%;width:'+(w/mixTot*100)+'%;background:'+CZCOL[z.z]+'" title="'+z.lbl+' · '+Math.round(w)+' min"></span>'; }).join("") : "";
+  const obj=planObjective(activePlan());
+  // a distribution nudge takes priority over the volume verdict when there's enough to judge (evidence: rosenblat19/wilson12)
+  const coachLine=cardioCoachLine();
+  const verdict = coachLine ? "💡 "+coachLine
+    : mins>=tgt ? "Target met — strong aerobic week. 👏"
+    : mins>=tgt*0.5 ? "Good base — a little more to reach your weekly target."
+    : "Light so far — aim for ~"+tgt+" min/wk for "+esc((obj.label||"general fitness").toLowerCase())+".";
+  card.innerHTML='<div class="pad">'
+    +'<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;">'
+      +'<div><div class="ovk">This week</div><div class="ovbig"><b>'+mins+'</b> <small style="font-weight:500;color:var(--l2);">/ '+tgt+' min</small></div></div>'
+      +'<div style="font-size:13px;color:var(--l2);">'+sess+' session'+(sess===1?'':'s')+'</div>'
+    +'</div>'
+    +'<div style="height:7px;border-radius:4px;background:var(--sep);overflow:hidden;margin-top:10px;"><i style="display:block;height:100%;width:'+pct+'%;background:#9775fa;border-radius:4px;"></i></div>'
+    +(segs?'<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:7px;gap:1px;">'+segs+'</div>':'')
+    +'<canvas id="cardioSpark" width="500" height="46" style="width:100%;height:46px;margin-top:10px;display:block;"></canvas>'
+    +'<p class="ovp" style="margin-top:6px;font-size:13px;">'+verdict+'</p>'
+    +'<div class="libteaser" style="margin-top:4px;">See your cardio trends →</div>'
+  +'</div>';
+  drawCardioSpark();
+  card.classList.add("ovtap"); card.onclick=openCardioDetail;
+}
+function drawCardioSpark(){ const c=$("cardioSpark"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  const data=cardioWeeklySeries(), ac="#9775fa", tgt=cardioTargetMins(), hi=Math.max(1,tgt,...data), base=H-6, top=8, pad=8;
+  const x=i=>pad+i*((W-pad*2)/(data.length-1)), y=v=>base-(v/hi)*(base-top);
+  if(tgt>0){ ctx.strokeStyle=hexAlpha(ac,.3); ctx.setLineDash([4,4]); ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(pad,y(tgt)); ctx.lineTo(W-pad,y(tgt)); ctx.stroke(); ctx.setLineDash([]); }
+  ctx.strokeStyle=ac; ctx.lineWidth=3; ctx.lineJoin="round"; ctx.lineCap="round"; ctx.beginPath();
+  data.forEach((v,i)=>{ i?ctx.lineTo(x(i),y(v)):ctx.moveTo(x(i),y(v)); }); ctx.stroke();
+  data.forEach((v,i)=>{ ctx.beginPath(); ctx.arc(x(i),y(v), i===data.length-1?4.5:3, 0, 7); ctx.fillStyle=i===data.length-1?ac:hexAlpha(ac,.5); ctx.fill(); });
+}
+
+// ===== Cardio detail sheet (Phase 4): weekly minutes, effort split, pace trend =====
+let cdcPaceSel=null;
+// activities with ≥2 sessions that have a computable pace (stored, or distance & minutes)
+function cardioPaceActivities(){
+  const by={}; cardioList().forEach(e=>{ const p=e.pace || (e.dist&&e.mins ? e.mins/e.dist : 0); if(p>0){ (by[e.name]=by[e.name]||[]).push({d:e.d, pace:p}); } });
+  return Object.keys(by).filter(n=>by[n].length>=2).map(n=>({name:n, pts:by[n].sort((a,b)=>a.d-b.d)}));
+}
+// minutes per zone for each of the last `weeks` weeks (index weeks-1 = this week)
+function cardioZoneWeekly(weeks){ weeks=weeks||8; const wkMs=7*86400000, now=Date.now();
+  const out=Array.from({length:weeks},()=>{ const o={}; CZONES.forEach(z=>o[z.z]=0); return o; });
+  cardioList().forEach(e=>{ const k=Math.floor((now-e.d)/wkMs), i=(k>=0&&k<weeks)?(weeks-1-k):-1; if(i<0) return; const z=out[i][e.zone]!=null?e.zone:"z2"; out[i][z]+=cardioMinsOf(e); });
+  return out;
+}
+function openCardioDetail(){ renderCardioDetail(); openSheet("Cardio"); }
+function renderCardioDetail(){
+  const mins=cardioMinsWeek(7), tgt=cardioTargetMins(), m28=cardioMinsWeek(28);
+  $("cdcSummary").innerHTML='<div class="group" style="margin-bottom:4px;"><div class="pad" style="display:flex;justify-content:space-around;text-align:center;gap:8px;">'
+    +'<div><div class="ovbig"><b>'+mins+'</b></div><div class="ovk">min this week</div></div>'
+    +'<div><div class="ovbig"><b>'+tgt+'</b></div><div class="ovk">weekly target</div></div>'
+    +'<div><div class="ovbig"><b>'+Math.round(m28/4)+'</b></div><div class="ovk">avg/wk (4wk)</div></div>'
+    +'</div></div>';
+  drawCardioMins("cdcMinsC"); drawZoneStack("cdcZoneC");
+  $("cdcZoneLegend").innerHTML = CZONES.map(z=>'<span><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:'+CZCOL[z.z]+';margin-right:4px;vertical-align:-1px;"></i>'+z.lbl+'</span>').join("");
+  const acts=cardioPaceActivities();
+  if(!acts.length){ $("cdcPaceWrap").style.display="none"; return; }
+  $("cdcPaceWrap").style.display="";
+  if(!cdcPaceSel || !acts.some(a=>a.name===cdcPaceSel)) cdcPaceSel=acts.slice().sort((a,b)=>b.pts.length-a.pts.length)[0].name;
+  const chips=$("cdcPaceChips"); chips.innerHTML="";
+  acts.forEach(a=>{ const c=document.createElement("button"); c.className="chip"+(cdcPaceSel===a.name?" on":""); c.textContent=a.name; c.onclick=()=>{ cdcPaceSel=a.name; renderCardioDetail(); }; chips.appendChild(c); });
+  drawPaceTrend("cdcPaceC", cdcPaceSel);
+  const a=acts.find(x=>x.name===cdcPaceSel), pts=a.pts, best=Math.min(...pts.map(p=>p.pace)), last=pts[pts.length-1].pace, first=pts[0].pace;
+  $("cdcPaceCap").textContent = pts.length+" sessions · best "+fmtPace(best)+"/km · latest "+fmtPace(last)+"/km"+(last<first-0.02?" · trending faster":last>first+0.02?" · easing off":" · holding");
+}
+function _axisColor(){ return (getComputedStyle(document.documentElement).getPropertyValue('--l3')||'#888').trim(); }
+function drawCardioMins(id){ const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  const data=cardioWeeklySeries(), tgt=cardioTargetMins(), hi=Math.max(1,tgt*1.15,...data), base=H-22, top=12, pad=10, n=data.length, gapX=(W-pad*2)/n, bw=gapX*0.66;
+  const y=v=>base-(v/hi)*(base-top);
+  ctx.strokeStyle=hexAlpha("#9775fa",.45); ctx.setLineDash([4,4]); ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(pad,y(tgt)); ctx.lineTo(W-pad,y(tgt)); ctx.stroke(); ctx.setLineDash([]);
+  data.forEach((v,i)=>{ const x=pad+i*gapX+(gapX-bw)/2, h=Math.max(0,base-y(v)); ctx.fillStyle = v>=tgt ? "#9775fa" : hexAlpha("#9775fa",.4);
+    if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(x,y(v),bw,h,3); ctx.fill(); } else ctx.fillRect(x,y(v),bw,h); });
+  ctx.fillStyle=_axisColor(); ctx.font="600 15px -apple-system,sans-serif"; ctx.textAlign="left"; ctx.fillText("10w ago",pad,H-5); ctx.textAlign="right"; ctx.fillText("now",W-pad,H-5);
+}
+function drawZoneStack(id){ const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  const wk=cardioZoneWeekly(8), base=H-22, top=12, pad=10, n=wk.length, gapX=(W-pad*2)/n, bw=gapX*0.66;
+  const tots=wk.map(o=>CZONES.reduce((s,z)=>s+o[z.z],0)), hi=Math.max(1,...tots);
+  wk.forEach((o,i)=>{ let yb=base; const x=pad+i*gapX+(gapX-bw)/2;
+    CZONES.forEach(z=>{ const v=o[z.z]; if(!v) return; const h=(v/hi)*(base-top); yb-=h; ctx.fillStyle=CZCOL[z.z]; ctx.fillRect(x,yb,bw,h); }); });
+  ctx.fillStyle=_axisColor(); ctx.font="600 15px -apple-system,sans-serif"; ctx.textAlign="left"; ctx.fillText("8w ago",pad,H-5); ctx.textAlign="right"; ctx.fillText("now",W-pad,H-5);
+}
+function drawPaceTrend(id, activity){ const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  const a=cardioPaceActivities().find(a=>a.name===activity); if(!a) return;
+  const pts=a.pts, paces=pts.map(p=>p.pace), mn=Math.min(...paces), mx=Math.max(...paces), range=(mx-mn)||1, pad=12, base=H-22, top=14, ac="#9775fa";
+  const x=i=> pts.length>1 ? pad+i*((W-pad*2)/(pts.length-1)) : W/2;
+  const y=v=> top + ((v-mn)/range)*(base-top);   // faster (lower pace) sits higher
+  ctx.strokeStyle=ac; ctx.lineWidth=3; ctx.lineJoin="round"; ctx.lineCap="round"; ctx.beginPath();
+  pts.forEach((p,i)=>{ i?ctx.lineTo(x(i),y(p.pace)):ctx.moveTo(x(i),y(p.pace)); }); ctx.stroke();
+  pts.forEach((p,i)=>{ ctx.beginPath(); ctx.arc(x(i),y(p.pace), i===pts.length-1?5:3,0,7); ctx.fillStyle=i===pts.length-1?ac:hexAlpha(ac,.5); ctx.fill(); });
+  ctx.fillStyle=_axisColor(); ctx.font="600 14px -apple-system,sans-serif"; ctx.textAlign="left"; ctx.fillText("faster ↑",pad,H-5); ctx.textAlign="right"; ctx.fillText("now",W-pad,H-5);
+}
 
 // ================= achievements (gamification) =================
 function lifetimeVolume(mode){ mode=mode||"total";
