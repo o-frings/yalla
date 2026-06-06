@@ -1889,6 +1889,22 @@ function expandLegacyMtot(tot){
   if(t.Shoulders!=null){ const v=t.Shoulders/3; ["Front Delts","Side Delts","Rear Delts"].forEach(m=>t[m]=(t[m]||0)+v); delete t.Shoulders; }
   return t;
 }
+// --- chart aggregation -------------------------------------------------------------------------------
+// The analytics groups are detailed (3 delt heads, 3 back regions) so volume/targets stay precise, but a
+// rose with 17 spokes reads as noise. So every chart renders a COARSE ~13-spoke view by default — the delt
+// heads roll up into "Shoulders" and the back regions into "Back" — and the two large interactive radars
+// (muscle-balance + planner) let you tap a rolled-up wedge to expand it into its detailed heads.
+const SUBGROUPS={ Shoulders:["Front Delts","Side Delts","Rear Delts"], Back:["Lats","Upper Back","Lower Back"] };
+const AGG={}; Object.keys(SUBGROUPS).forEach(p=> SUBGROUPS[p].forEach(s=> AGG[s]=p));   // sub-group → parent
+const DISPLAY_GROUPS=["Chest","Back","Shoulders","Biceps","Triceps","Forearms","Quads","Adductors","Hamstrings","Glutes","Calves","Core","Neck"];
+// the spoke list for a chart: parents stay collapsed unless their name is in `expanded`, then they split
+function roseGroups(expanded){ const out=[];
+  DISPLAY_GROUPS.forEach(g=>{ if(SUBGROUPS[g] && expanded && expanded.has(g)) Array.prototype.push.apply(out, SUBGROUPS[g]); else out.push(g); });
+  return out; }
+// roll detailed totals up onto the spoke list (legacy keys expanded first); opened parents keep their heads
+function roseTotals(tot, expanded){ const t=expandLegacyMtot(tot||{}), out={};
+  Object.keys(t).forEach(k=>{ const p=AGG[k]||k, keep=(SUBGROUPS[p] && expanded && expanded.has(p)); const key=keep?k:p; out[key]=(out[key]||0)+(t[k]||0); });
+  return out; }
 function drawRose(x, cx, cy, R, G, tot, o){
   o=o||{}; tot=expandLegacyMtot(tot); const n=G.length, frac=roseRadii(G,tot);
   x.strokeStyle=o.grid||"rgba(127,127,127,.30)"; x.lineWidth=o.gridW||1;
@@ -1920,12 +1936,13 @@ function drawRose(x, cx, cy, R, G, tot, o){
 function miniRadar(cv, tot){
   const W=cv.width, H=cv.height, x=cv.getContext("2d"), cx=W/2, cy=H/2, R=Math.min(W,H)/2-4;
   x.clearRect(0,0,W,H);
-  drawRose(x, cx, cy, R, MGROUPS, tot, { color:g=>MCOLOR[g]||"#f08020", alpha:.72, rings:[0.5,1], grid:"rgba(127,127,127,.28)" });
+  drawRose(x, cx, cy, R, roseGroups(), roseTotals(tot), { color:g=>MCOLOR[g]||"#f08020", alpha:.72, rings:[0.5,1], grid:"rgba(127,127,127,.28)" });
 }
 // Color-dot legend mapping rose wedges → trained muscles (sorted by share). `max` caps the count
 // (feed cards stay to a line; the detail sheet shows them all). Returns "" when nothing was trained.
 function muscleLegend(mt, max){
-  const items=MGROUPS.filter(g=>(mt[g]||0)>0).sort((a,b)=>(mt[b]||0)-(mt[a]||0));
+  const t=roseTotals(mt);   // match the aggregated mini rose — coarse groups, not individual delt/back heads
+  const items=roseGroups().filter(g=>(t[g]||0)>0).sort((a,b)=>(t[b]||0)-(t[a]||0));
   if(!items.length) return "";
   const top=(max&&items.length>max)?items.slice(0,max):items;
   const more=(max&&items.length>max)?(' <span class="rl-more">+'+(items.length-max)+'</span>'):'';
@@ -3279,16 +3296,16 @@ function renderWorkout(){
 // the live muscle-balance rose under the workout — same shape friends see when they watch you live
 function renderSessionRose(){
   const card=$("sessRose"), cv=$("sessRoseCv"); if(!card||!cv) return;
-  const st=buildLiveState(), mt=st.mtot||{};
-  const has=MGROUPS.some(g=>(mt[g]||0)>0);
+  const st=buildLiveState(), mt=st.mtot||{}, agg=roseTotals(mt), G=roseGroups();
+  const has=G.some(g=>(agg[g]||0)>0);
   card.style.display = has ? "" : "none";
   if(!has) return;
   // labelled rose so you can see which muscles you trained (only the trained wedges get a label)
   const gx=cv.getContext("2d"), W=cv.width, H=cv.height, R=Math.min(W,H)/2-62;   // leave room for edge labels
   gx.clearRect(0,0,W,H);
-  drawRose(gx, W/2, H/2, R, MGROUPS, mt, { color:g=>MCOLOR[g]||"#f08020", alpha:.72, rings:[0.5,1], grid:"rgba(127,127,127,.28)",
+  drawRose(gx, W/2, H/2, R, G, agg, { color:g=>MCOLOR[g]||"#f08020", alpha:.72, rings:[0.5,1], grid:"rgba(127,127,127,.28)",
     labels:true, labelFont:"600 11px -apple-system,system-ui,sans-serif", labelGap:10, labelColor:g=>MCOLOR[g]||"#888" });
-  const top=MGROUPS.slice().sort((a,b)=>(mt[b]||0)-(mt[a]||0)).filter(g=>(mt[g]||0)>0).slice(0,3).map(g=>MSHORT[g]||g);
+  const top=G.slice().sort((a,b)=>(agg[b]||0)-(agg[a]||0)).filter(g=>(agg[g]||0)>0).slice(0,3).map(g=>MSHORT[g]||g);
   const sub=$("sessRoseSub"); if(sub) sub.textContent=(st.doneSets||0)+" set"+(st.doneSets===1?"":"s")+" logged · mostly "+top.join(" · ");
 }
 // prefill every set with last session's weights/reps — then the user just confirms or tweaks before Finish
@@ -3932,15 +3949,30 @@ function fmtKg(v){ return v>=1000 ? round1(v/1000)+"t" : Math.round(v)+"kg"; }
 // target: if given, a spoke reaching the outer ring means that muscle hit `target` sets/week
 // (so the chart reads "am I training each muscle enough?"); if omitted, spokes scale to the largest
 // muscle (the old "which did I train most?" view).
+let musExpanded=new Set();   // which rolled-up wedges (Shoulders / Back) are split open on the balance radar
+// Value to plot for a display spoke. Sub-groups sum into their parent for raw volume; but in TARGET mode the
+// ring is a PER-MUSCLE goal, so a collapsed parent shows the mean of its target-bearing heads (not the sum) —
+// otherwise "Shoulders" would always peg the rim. Expanded sub-spokes and plain groups read straight through.
+function radarVal(det, g, target){
+  if(SUBGROUPS[g] && !musExpanded.has(g)){
+    const subs = target ? SUBGROUPS[g].filter(s=>!NO_TARGET.has(s)) : SUBGROUPS[g];
+    if(!subs.length) return 0;
+    const sum=subs.reduce((a,s)=>a+(det[s]||0),0);
+    return target ? sum/subs.length : sum;
+  }
+  return det[g]||0;
+}
 function drawRadar(totals, canvasId, target, noLabels){
   const c=$(canvasId||"musRadar"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
-  const cx=W/2, cy=H/2, R=W*(noLabels?0.42:0.33), n=MGROUPS.length;
+  const det=expandLegacyMtot(totals||{}), G=roseGroups(musExpanded), n=G.length;
+  const cx=W/2, cy=H/2, R=W*(noLabels?0.42:0.33);
   const cs=getComputedStyle(document.documentElement);
   const accent=(cs.getPropertyValue("--accent")||"#0a84ff").trim();
   const lab=(cs.getPropertyValue("--l2")||"#888").trim();
   const grid="rgba(128,128,128,.22)";
-  const max=Math.max(1, ...MGROUPS.map(g=>totals[g]||0));
-  const norm = target ? (g=>Math.min(1,(totals[g]||0)/target)) : (g=>(totals[g]||0)/max);
+  const val=g=>radarVal(det, g, target);
+  const max=Math.max(1, ...G.map(val));
+  const norm = target ? (g=>Math.min(1,val(g)/target)) : (g=>val(g)/max);
   // Coxcomb rose — same wedge style as the feed/builder. In target mode the rim is the weekly
   // "enough volume" line, so short wedges are the muscles still under target (gaps stay visible).
   ctx.strokeStyle=grid; ctx.lineWidth=1.5;
@@ -3949,16 +3981,34 @@ function drawRadar(totals, canvasId, target, noLabels){
   const half=Math.PI/n - 0.05;
   // Auxiliary (NO_TARGET) muscles have no weekly goal, so against the target ring they'd read as
   // permanent gaps. Match the small roses: show an aux spoke/label only when it was actually trained.
-  const showSpoke=g=> (totals[g]||0)>0 || !NO_TARGET.has(g);
-  MGROUPS.forEach((g,i)=>{ if(!showSpoke(g)) return; const rr=R*norm(g); if(rr<=0.5) return;
+  const showSpoke=g=> val(g)>0 || !NO_TARGET.has(g);
+  G.forEach((g,i)=>{ if(!showSpoke(g)) return; const rr=R*norm(g); if(rr<=0.5) return;
     const a=(-90+i*360/n)*Math.PI/180, col=MCOLOR[g]||accent;
     ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rr,a-half,a+half); ctx.closePath();
     ctx.fillStyle=col; ctx.globalAlpha=.30; ctx.fill(); ctx.globalAlpha=1; ctx.lineWidth=2; ctx.strokeStyle=col; ctx.stroke(); });
   if(noLabels) return;
   ctx.fillStyle=lab; ctx.font="600 29px -apple-system,sans-serif"; ctx.textBaseline="middle";
-  MGROUPS.forEach((g,i)=>{ if(!showSpoke(g)) return; const a=(-90+i*360/n)*Math.PI/180, x=cx+(R+52)*Math.cos(a), y=cy+(R+52)*Math.sin(a), co=Math.cos(a);
-    ctx.textAlign = Math.abs(co)<0.3 ? "center" : (co>0?"left":"right"); ctx.fillText(MSHORT[g], x, y); });
+  G.forEach((g,i)=>{ if(!showSpoke(g)) return; const a=(-90+i*360/n)*Math.PI/180, x=cx+(R+52)*Math.cos(a), y=cy+(R+52)*Math.sin(a), co=Math.cos(a);
+    ctx.textAlign = Math.abs(co)<0.3 ? "center" : (co>0?"left":"right");
+    const isParent=SUBGROUPS[g] && !musExpanded.has(g);
+    ctx.fillText((MSHORT[g]||g)+(isParent?" ›":""), x, y); });
 }
+// tap a rolled-up wedge (Shoulders / Back) to split it into its heads — or any head to collapse it back
+(function(){ const c=$("musRadar"); if(!c) return;
+  c.style.cursor="pointer";
+  c.addEventListener("click", e=>{
+    const G=roseGroups(musExpanded), n=G.length, r=c.getBoundingClientRect();
+    const px=(e.clientX-r.left)/r.width*c.width, py=(e.clientY-r.top)/r.height*c.height;
+    const cx=c.width/2, cy=c.height/2, dist=Math.hypot(px-cx,py-cy);
+    if(dist > c.width*0.33+96) return;                       // tap outside the wheel/labels — ignore
+    const ang=Math.atan2(py-cy,px-cx)*180/Math.PI;
+    let bestI=0,bestD=999; for(let i=0;i<n;i++){ const a=-90+i*360/n, d=Math.abs(((ang-a+540)%360)-180); if(d<bestD){bestD=d;bestI=i;} }
+    const g=G[bestI], parent=SUBGROUPS[g]?g:AGG[g];
+    if(!parent) return;                                      // a plain group with no detail — nothing to expand
+    if(musExpanded.has(parent)) musExpanded.delete(parent); else musExpanded.add(parent);
+    renderMuscles();
+  });
+})();
 // dynamic intervention: when a muscle is over/under-trained, suggest adding or trimming an exercise in the current plan
 const HIGH_SET_CAP=WEEKLY_SET_TARGET*2;   // ~20 sets/wk — beyond what a muscle usefully needs
 function suggestRank(name){ const h=hScore(name).s, d=difficultyFor(name);
@@ -4064,6 +4114,7 @@ function renderMuscles(){
         ? "Spokes and bars show <b>sets per muscle per week</b> against a ~"+WEEKLY_SET_TARGET+"-set target; the window is a hard cut-off (no decay), since volume is usually judged weekly."
         : (useKg ? "Bars show <b>total load</b> (weight × reps, bodyweight-aware), scaled to your biggest group."
                  : "Switch to <b>Sets</b> to compare against weekly volume targets."));
+  $("musMethod").innerHTML += " The rose rolls the three delt heads into <b>Shoulders</b> and the back regions into <b>Back</b> — tap either wedge to split it into its individual muscles (the bars below always list them in full).";
   if(isLog) $("musMethod").innerHTML += " The <b>growth signal</b> above reads each muscle's recent weekly sets against a growth dose (~"+WEEKLY_SET_MIN+"–"+WEEKLY_SET_TARGET+") and a maintenance floor (~"+WEEKLY_SET_MAINT+"), then checks whether its weekly volume is trending up, flat or down — growth needs both an adequate dose and progressive overload; below maintenance, muscle is slowly lost. It estimates the training stimulus, not measured size.";
   let keys = useTarget ? ["sch17","drr","rpvol","vigotsky","mps"] : ["sch17","drr","vigotsky"];
   if(isLog) keys = keys.concat(["sch10","plotkin","bickel","mujika"]);   // growth-signal evidence
@@ -5486,13 +5537,20 @@ function syncEmphasisChips(){ const sel=Array.isArray(build.focus)?build.focus:(
 // The builder rose uses the same average-normalized curve as the feed/share roses (ROSE_MID/GAMMA).
 // Because the render normalizes to the average worked muscle, changing any wedge rescales the others —
 // "drag one, the rest move proportionally". The drag logic lives in the pointer handlers below.
+let buildExpanded=new Set();   // which rolled-up wedges are split open on the planner's emphasis radar
+// emphasis to plot for a display spoke: a collapsed parent shows the mean of its heads; everything else reads straight
+function emphVal(g){
+  if(SUBGROUPS[g] && !buildExpanded.has(g)){ const s=SUBGROUPS[g].map(m=>build.emphasis[m]!=null?build.emphasis[m]:0.5); return s.reduce((a,b)=>a+b,0)/s.length; }
+  return build.emphasis[g]!=null?build.emphasis[g]:0.5;
+}
 function drawEmphasisRadar(){
   const c=$("buildRadar"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
-  const G=BUILD_GROUPS, cx=W/2, cy=H/2, R=W*0.30, n=G.length;
+  const G=roseGroups(buildExpanded), cx=W/2, cy=H/2, R=W*0.30, n=G.length;
   const cs=getComputedStyle(document.documentElement), accent=(cs.getPropertyValue("--accent")||"#0a84ff").trim(), lab=(cs.getPropertyValue("--l2")||"#888").trim();
   const pt=(i,rr)=>{ const a=(-90+i*360/n)*Math.PI/180; return [cx+rr*Math.cos(a), cy+rr*Math.sin(a)]; };
   // Sums-to-1 distribution; radius is a gentle curve of each muscle's share (shared roseRadii / ROSE_GAMMA).
-  const frac=roseRadii(G, build.emphasis);
+  const em={}; G.forEach(g=> em[g]=emphVal(g));
+  const frac=roseRadii(G, em);
   ctx.strokeStyle="rgba(128,128,128,.22)"; ctx.lineWidth=1.5;
   [0.5,1].forEach(f=>{ ctx.beginPath(); ctx.arc(cx,cy,R*f,0,Math.PI*2); ctx.stroke(); });
   const half=Math.PI/n - 0.05;
@@ -5502,7 +5560,8 @@ function drawEmphasisRadar(){
   // grab handle at each wedge tip
   G.forEach((g,i)=>{ const [x,y]=pt(i,R*frac[i]); ctx.beginPath(); ctx.arc(x,y,14,0,Math.PI*2); ctx.fillStyle=MCOLOR[g]||accent; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle="#fff"; ctx.stroke(); });
   ctx.fillStyle=lab; ctx.font="600 26px -apple-system,sans-serif"; ctx.textBaseline="middle";
-  G.forEach((g,i)=>{ const [x,y]=pt(i,R+50), co=Math.cos((-90+i*360/n)*Math.PI/180); ctx.textAlign=Math.abs(co)<0.3?"center":(co>0?"left":"right"); ctx.fillText(MSHORT[g]||g, x, y); });
+  G.forEach((g,i)=>{ const [x,y]=pt(i,R+50), co=Math.cos((-90+i*360/n)*Math.PI/180); ctx.textAlign=Math.abs(co)<0.3?"center":(co>0?"left":"right");
+    const isParent=SUBGROUPS[g] && !buildExpanded.has(g); ctx.fillText((MSHORT[g]||g)+(isParent?" ›":""), x, y); });
 }
 function updateBuildPreview(){
   syncEmphasisChips(); drawEmphasisRadar();
@@ -5511,25 +5570,29 @@ function updateBuildPreview(){
   $("buildPrevScores").innerHTML='<span class="psc"><b>Balance</b> '+sc.balance+'<small>/5</small></span><span class="psc"><b>Hypertrophy</b> '+sc.hyp+'<small>/5</small></span>';
 }
 (function(){ const c=$("buildRadar"); if(!c) return; let dragging=false, downX=0, downY=0, moved=false;
+  const curG=()=>roseGroups(buildExpanded);
   const nearestSpoke=(ev)=>{ const r=c.getBoundingClientRect(); const px=(ev.clientX-r.left)/r.width*c.width, py=(ev.clientY-r.top)/r.height*c.height;
-    const G=BUILD_GROUPS, n=G.length, cx=c.width/2, cy=c.height/2, ang=Math.atan2(py-cy,px-cx)*180/Math.PI;
+    const G=curG(), n=G.length, cx=c.width/2, cy=c.height/2, ang=Math.atan2(py-cy,px-cx)*180/Math.PI;
     let bestI=0,bestD=999; for(let i=0;i<n;i++){ const a=-90+i*360/n, d=Math.abs(((ang-a+540)%360)-180); if(d<bestD){bestD=d;bestI=i;} } return bestI; };
-  // Render is average-normalized: radius ≈ ROSE_MID·(e/mean). setFromFrac sets muscle g so its wedge
+  // Render is average-normalized: radius ≈ ROSE_MID·(e/mean). setFromFrac sets the spoke so its wedge
   // tracks the finger — at the rim it sits well above the field; at ROSE_MID it matches the average.
-  // (Using the OTHER muscles' mean as the reference; changing one wedge rescales the rest.)
-  const meanOther=(g)=>{ const o=BUILD_GROUPS.filter(m=>m!==g).map(m=> build.emphasis[m]!=null?build.emphasis[m]:0.5);
+  // (Using the OTHER display spokes' mean as the reference; changing one wedge rescales the rest.)
+  const meanOther=(g)=>{ const o=curG().filter(m=>m!==g).map(emphVal);
     return Math.max(0.0001, o.reduce((a,b)=>a+b,0)/Math.max(1,o.length)); };
+  // a collapsed parent writes its value to all of its heads; a head or plain group writes itself
+  const setEmph=(g,e)=>{ e=Math.max(0.04,e); if(SUBGROUPS[g] && !buildExpanded.has(g)) SUBGROUPS[g].forEach(s=>build.emphasis[s]=e); else build.emphasis[g]=e; };
   const setFromFrac=(g, frac)=>{ frac=Math.max(0.05, Math.min(1, frac)); const mo=meanOther(g);
     const e = mo*Math.pow(Math.max(0.001,frac)/ROSE_MID, 1/ROSE_GAMMA);   // invert radius=ROSE_MID·(e/mean)
-    build.emphasis[g]=Math.max(0.04, e); build.focus=[]; syncEmphasisChips(); updateBuildPreview(); };
+    setEmph(g, e); build.focus=[]; syncEmphasisChips(); updateBuildPreview(); };
   const applyDrag=(ev)=>{ const r=c.getBoundingClientRect(); const px=(ev.clientX-r.left)/r.width*c.width, py=(ev.clientY-r.top)/r.height*c.height;
     const cx=c.width/2, cy=c.height/2, R=c.width*0.30, i=nearestSpoke(ev);
-    setFromFrac(BUILD_GROUPS[i], Math.hypot(px-cx,py-cy)/R); };
+    setFromFrac(curG()[i], Math.hypot(px-cx,py-cy)/R); };
   c.addEventListener("pointerdown", e=>{ dragging=true; downX=e.clientX; downY=e.clientY; moved=false; try{ c.setPointerCapture(e.pointerId); }catch(_){} e.preventDefault(); });
   c.addEventListener("pointermove", e=>{ if(!dragging) return; if(Math.hypot(e.clientX-downX,e.clientY-downY)>7){ moved=true; applyDrag(e); } });
-  c.addEventListener("pointerup", e=>{ if(dragging && !moved){    // a tap toggles a muscle between boosted and matching the field
-      const g=BUILD_GROUPS[nearestSpoke(e)], mo=meanOther(g);
-      build.emphasis[g] = (build.emphasis[g]||0) > mo*1.25 ? mo : mo*1.8; build.focus=[]; syncEmphasisChips(); updateBuildPreview(); }
+  c.addEventListener("pointerup", e=>{ if(dragging && !moved){
+      const g=curG()[nearestSpoke(e)], parent=SUBGROUPS[g]?g:AGG[g];
+      if(parent){ if(buildExpanded.has(parent)) buildExpanded.delete(parent); else buildExpanded.add(parent); drawEmphasisRadar(); }   // tap a roll-up (or head) to split/collapse
+      else { const mo=meanOther(g); setEmph(g, emphVal(g) > mo*1.25 ? mo : mo*1.8); build.focus=[]; syncEmphasisChips(); updateBuildPreview(); } }   // tap a plain muscle to toggle a boost
     dragging=false; });
   c.addEventListener("pointercancel", ()=>{ dragging=false; });
 })();
@@ -6052,7 +6115,7 @@ function tileRadar(x,cx,cy,R,tot){
   // rose: each wedge's area = that muscle's share of the session (see drawRose) — constant total area.
   // Wedges are colour-coded per muscle (same palette as the in-app radar) with a white rim so the split
   // reads at a glance on the gradient; only trained muscles get a shadowed white label, keeping the ring clean.
-  drawRose(x, cx, cy, R, MGROUPS, tot, {
+  drawRose(x, cx, cy, R, roseGroups(), roseTotals(tot), {
     color:g=>MCOLOR[g]||"#f08020", alpha:.92, stroke:"rgba(255,255,255,.85)", strokeW:2,
     gap:0.08, rings:[0.5,1], grid:"rgba(255,255,255,.30)", gridW:2,
     labels:true, labelColor:"rgba(255,255,255,.96)", labelFont:"700 22px -apple-system,system-ui,sans-serif", labelGap:34, labelShadow:true
