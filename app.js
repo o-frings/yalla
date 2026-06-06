@@ -2602,9 +2602,9 @@ function renderLibrary(){
   list.innerHTML=h;
 }
 // Decided once per app launch (in init), so it doesn't reshuffle as you switch tabs. Roughly every 3rd open we
-// surface a tip; which tip is drawn stochastically from the goal-relevant pool, weighted by how long since it
-// was last shown (recency). A tip is eligible if it has no `goals`, the user has no objective set, or its
-// `goals` include the current objective.
+// surface a tip; which tip is drawn stochastically, weighted by how long since it was last shown (recency,
+// squared — the repetition penalty). settings.tipMode picks the pool: "all" draws evenly from the whole
+// library, "prefer" leans toward the current objective, "focus" restricts to objective-matching tips.
 let currentTip=null;
 function decideTip(){
   const ts = settings.tipState = settings.tipState || { opens:0, last:{} };
@@ -2613,9 +2613,16 @@ function decideTip(){
   const every = settings.tipEvery==null ? 3 : settings.tipEvery;   // user-set cadence; 0 = never show tips
   if(every>0 && TIPS.length && ts.opens > 1 && ts.opens % every === 0){   // skip the very first open; then ~every Nth
     const obj = settings.objective;
-    const pool = TIPS.filter(tip => !tip.goals || !obj || tip.goals.indexOf(obj) >= 0);
-    // weight ∝ opens since last shown; never-shown tips get the highest weight; weak single-cohort tips show rarely
-    const w = pool.map(tip => { const at = ts.last[tip.id]; const base = at==null ? ts.opens + 1 : Math.max(0.01, ts.opens - at); return tip.strength==="weak" ? base*0.25 : base; });
+    const mode = settings.tipMode || "all";   // "all" = draw evenly from the whole library; "prefer" = lean toward the objective; "focus" = objective-matching tips only
+    const matches = tip => !tip.goals || !obj || tip.goals.indexOf(obj) >= 0;
+    const pool = mode==="focus" ? TIPS.filter(matches) : TIPS;
+    // recency = opens since last shown (never-shown counts as opens+1). Squared so a just-seen tip is far less likely
+    // to recur than one parked for a while — the repetition penalty. "prefer" then 3× the objective-matching tips;
+    // weak single-cohort tips always show rarely.
+    const w = pool.map(tip => { const at = ts.last[tip.id]; const since = at==null ? ts.opens + 1 : Math.max(0, ts.opens - at);
+      let base = (since*since) || 0.01;                                   // 0.01 floor so a just-shown tip can still, rarely, recur
+      if(mode==="prefer" && obj && tip.goals && tip.goals.indexOf(obj) >= 0) base *= 3;
+      return tip.strength==="weak" ? base*0.25 : base; });
     const sum = w.reduce((a,b)=>a+b, 0);
     let r = Math.random() * sum, pick = 0;
     for(let i=0;i<pool.length;i++){ r -= w[i]; if(r <= 0){ pick = i; break; } }
@@ -3460,7 +3467,7 @@ function placeGoalBlock(){
   if($("goalStart")) $("goalStart").value = settings.goalStart!=null ? settings.goalStart : "";
   if($("goalTarget")) $("goalTarget").value = settings.goalTarget!=null ? settings.goalTarget : "";
 }
-$("openSettings").onclick=()=>{ renderDash(); renderAccount(); if($("setRestDefault")) $("setRestDefault").value=tmrFmt(settings.restSec||90); renderTipSeg(); renderTravel(); openSheet("Settings"); };
+$("openSettings").onclick=()=>{ renderDash(); renderAccount(); if($("setRestDefault")) $("setRestDefault").value=tmrFmt(settings.restSec||90); renderTipSeg(); renderTipModeSeg(); renderTravel(); openSheet("Settings"); };
 $("settingsClose").onclick=()=>closeSheet("Settings");
 if($("setRestDefault")) $("setRestDefault").onchange=e=>{ const sec=parseRest(e.target.value); if(sec){ settings.restSec=Math.max(5,Math.min(1800,Math.round(sec))); sset("settings",settings); } e.target.value=tmrFmt(settings.restSec||90); };
 $("scrimSettings").onclick=()=>closeSheet("Settings");
@@ -4177,6 +4184,13 @@ function renderTipSeg(){
 }
 document.querySelectorAll("#tipSeg .s").forEach(s=>{
   s.onclick=async()=>{ settings.tipEvery=+s.dataset.te; await sset("settings",settings); renderTipSeg(); };
+});
+function renderTipModeSeg(){
+  const mode = settings.tipMode || "all";
+  document.querySelectorAll("#tipModeSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.tm===mode));
+}
+document.querySelectorAll("#tipModeSeg .s").forEach(s=>{
+  s.onclick=async()=>{ settings.tipMode=s.dataset.tm; await sset("settings",settings); renderTipModeSeg(); };
 });
 
 // ================= travel mode (global; tags sessions home / travel+gym / travel-no-gym) =================
