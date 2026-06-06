@@ -5137,10 +5137,11 @@ const BUILD_GROUPS=MGROUPS;
 function buildKey(m){ return ({"Front Delts":"shoulders","Side Delts":"sidedelts","Rear Delts":"reardelts","Upper Back":"upperback","Lower Back":"lowerback"}[m]) || m.toLowerCase(); }
 // "Back" in a focus/preset now means the whole back wall — lats + upper back
 const BACK_M=["Lats","Upper Back"];
-// auxiliary detail groups (NO_TARGET): kept off the default emphasis so plans don't auto-stack forearm/
-// adductor/erector isolation — they only enter a plan when the user explicitly emphasizes them.
+// auxiliary detail groups (NO_TARGET). They never get auto-programmed regardless of emphasis (they're not
+// in any split or day domain, and the coverage pass skips NO_TARGET), so "Balanced" can show them equal to
+// everything else — a balanced intent reads as a uniform wheel rather than punishing lower back / forearms.
 const AUX_EMPH=["Lower Back","Forearms","Adductors","Neck"];
-function baseEmphasis(){ const e={}; BUILD_GROUPS.forEach(m=>e[m]= AUX_EMPH.indexOf(m)>=0 ? 0.12 : 0.5); return e; }
+function baseEmphasis(){ const e={}; BUILD_GROUPS.forEach(m=>e[m]=0.5); return e; }
 let build={ exp:"intermediate", obj:"muscle", focus:["balanced"], bias:"balanced", time:60, freq:4, injuries:[], access:"gym", supersets:"on", vary:"on", kb:"off",
   emphasis:baseEmphasis() };
 function emphasisPreset(focus){
@@ -5600,14 +5601,7 @@ function updateBuildPreview(){
   syncEmphasisChips(); drawEmphasisRadar();
   const bc=$("biasCap"); if(bc) bc.textContent=BIAS_CAP[build.bias||"balanced"]||"";
   const sc=planScores(buildPlan(build));
-  // TEMP diagnostic — dumps the ACTUAL radii (frac) the radar draws, to compare equal-emphasis spokes
-  const Gd=roseGroups(buildExpanded), emd={}; Gd.forEach(g=>emd[g]=emphVal(g)); const fr=roseRadii(Gd,emd);
-  const fi=g=>{ const i=Gd.indexOf(g); return i<0?'-':fr[i].toFixed(2); };
-  const dbg='v84 f:'+(Array.isArray(build.focus)?build.focus.join('+'):build.focus)
-    +' | em C'+emphVal('Chest').toFixed(2)+' T'+emphVal('Triceps').toFixed(2)
-    +' | frac C'+fi('Chest')+' T'+fi('Triceps')+' Q'+fi('Quads')+' Gl'+fi('Glutes')+' Ca'+fi('Calves');
-  $("buildPrevScores").innerHTML='<span class="psc"><b>Balance</b> '+sc.balance+'<small>/5</small></span><span class="psc"><b>Hypertrophy</b> '+sc.hyp+'<small>/5</small></span>'
-    +'<span class="psc" style="opacity:.6;font-size:11px;flex-basis:100%;justify-content:center;">'+dbg+'</span>';
+  $("buildPrevScores").innerHTML='<span class="psc"><b>Balance</b> '+sc.balance+'<small>/5</small></span><span class="psc"><b>Hypertrophy</b> '+sc.hyp+'<small>/5</small></span>';
 }
 (function(){ const c=$("buildRadar"); if(!c) return; let dragging=false, downX=0, downY=0, moved=false;
   const curG=()=>roseGroups(buildExpanded);
