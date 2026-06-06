@@ -148,7 +148,7 @@
   .socialmenu-item.on .socialic2{ color:#0a84ff; }
   /* Share live panel — broadcast toggle + choose-who chips */
   /* dismissable panel card (shared by live + gym) */
-  .spanel{ position:relative; margin-top:8px; padding:14px 14px 16px; background:var(--row); border:.5px solid var(--line); border-radius:16px; animation:spanelIn .2s cubic-bezier(.2,1,.4,1); }
+  .spanel{ position:relative; margin:8px 0 16px; padding:14px 14px 16px; background:var(--row); border:.5px solid var(--line); border-radius:16px; animation:spanelIn .2s cubic-bezier(.2,1,.4,1); }
   .spanel[hidden]{ display:none; }
   @keyframes spanelIn{ from{ opacity:0; transform:translateY(-6px); } to{ opacity:1; transform:translateY(0); } }
   .spanel-x{ position:absolute; top:8px; right:9px; background:none; border:none; color:var(--l3); font-size:14px; line-height:1; cursor:pointer; padding:6px; }
