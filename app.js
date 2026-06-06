@@ -1906,7 +1906,9 @@ function roseTotals(tot, expanded){ const t=expandLegacyMtot(tot||{}), out={};
   Object.keys(t).forEach(k=>{ const p=AGG[k]||k, keep=(SUBGROUPS[p] && expanded && expanded.has(p)); const key=keep?k:p; out[key]=(out[key]||0)+(t[k]||0); });
   return out; }
 function drawRose(x, cx, cy, R, G, tot, o){
-  o=o||{}; tot=expandLegacyMtot(tot); const n=G.length, frac=roseRadii(G,tot);
+  // tot is already display-prepared by roseTotals() (legacy keys expanded, heads rolled into Back/Shoulders).
+  // Don't expandLegacyMtot here — it would re-split the rolled-up "Back"/"Shoulders" keys and blank those spokes.
+  o=o||{}; const n=G.length, frac=roseRadii(G,tot);
   x.strokeStyle=o.grid||"rgba(127,127,127,.30)"; x.lineWidth=o.gridW||1;
   (o.rings||[1]).forEach(f=>{ x.beginPath(); x.arc(cx,cy,R*f,0,Math.PI*2); x.stroke(); });
   const half=Math.PI/n - (o.gap!=null?o.gap:0.06)/2;
@@ -2029,24 +2031,27 @@ function openWorkoutDetail(r, who, viewLvl){
   const s=r.summary||{}, body=$("woBody"); if(!body) return;
   $("woWho").textContent = who||"Workout";
   let when=""; try{ when=new Date(Date.parse(r.created_at)).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); }catch(e){}
-  let h='<div class="ovbig" style="font-size:22px;">'+esc(s.name||"Workout")+'</div>';
-  if(when) h+='<div class="levelcap" style="margin:4px 0 0;">'+esc(when)+'</div>';
   const mt=s.mtot||{};
-  h+='<div style="text-align:center; margin:14px 0 2px;"><canvas id="woRadar" width="320" height="320" style="width:190px; height:190px;"></canvas></div>';
-  h+=muscleLegend(mt);
+  let h='<div class="ovbig" style="font-size:22px;">'+esc(s.name||"Workout")+'</div>';
+  if(when) h+='<div class="levelcap" style="margin:3px 0 0;">'+esc(when)+'</div>';
+  // labelled rose — muscles are named on the chart itself, so no separate colour-dot legend
+  h+='<div class="wo-rose"><canvas id="woRadar" width="380" height="380"></canvas></div>';
   const chips=[["Volume", s.vol?fmtKg(s.vol):"—"],["Sets", ""+(s.sets||0)],["Time", (s.mins||0)+" min"],["PRs", ""+(s.prs||0)]];
-  h+='<div class="row" style="gap:8px; margin:12px 0;">'+chips.map(c=>'<div style="flex:1; background:var(--row); border-radius:14px; padding:10px 4px; text-align:center;"><div style="font-weight:700; font-size:18px;">'+esc(c[1])+'</div><div class="levelcap" style="margin-top:2px;">'+esc(c[0])+'</div></div>').join('')+'</div>';
+  h+='<div class="wo-stats">'+chips.map(c=>'<div class="wo-stat"><b>'+esc(c[1])+'</b><span>'+esc(c[0])+'</span></div>').join('')+'</div>';
   if(viewLvl>=2 && s.ex && s.ex.length){
-    h+='<div class="ed-label">Exercises</div>';
+    h+='<div class="ed-label" style="margin-top:18px;">Exercises</div><div class="wo-exlist">';
     h+=s.ex.map(e=>{
       const setsTxt=(e.sets||[]).map(st=>{ const hasW=viewLvl>=3 && st.w!=null && st.w!=="";
         return (hasW ? st.w+"kg×"+(st.r||0) : (st.r||0)+" reps"); }).join(" · ");
-      return '<div style="padding:10px 4px; border-bottom:.5px solid var(--line);"><div style="font-weight:600;">'+esc(e.name)+'</div><div class="levelcap" style="margin-top:3px;">'+esc(setsTxt)+'</div></div>';
-    }).join('');
-    if(viewLvl<3) h+='<p class="levelcap" style="margin:10px 4px 0; opacity:.75;">'+esc(who)+' shared sets &amp; reps but not the weights.</p>';
+      const m=muscleFor(e.name)[0], col=MCOLOR[AGG[m]||m]||"#888";
+      return '<div class="wo-ex"><span class="wo-exdot" style="background:'+col+'"></span><div><div class="wo-exn">'+esc(e.name)+'</div><div class="wo-exs">'+esc(setsTxt)+'</div></div></div>';
+    }).join('')+'</div>';
+    if(viewLvl<3) h+='<p class="levelcap" style="margin:12px 4px 0; opacity:.75;">'+esc(who)+' shared sets &amp; reps but not the weights.</p>';
   }
   body.innerHTML=h;
-  const cv=$("woRadar"); if(cv) miniRadar(cv, mt);
+  const cv=$("woRadar"); if(cv){ const gx=cv.getContext("2d"), W=cv.width, H=cv.height, R=Math.min(W,H)/2-52; gx.clearRect(0,0,W,H);
+    drawRose(gx, W/2, H/2, R, roseGroups(), roseTotals(mt), { color:g=>MCOLOR[g]||"#f08020", alpha:.82, rings:[0.5,1], grid:"rgba(127,127,127,.20)",
+      labels:true, labelFont:"600 15px -apple-system,system-ui,sans-serif", labelGap:10, labelColor:g=>MCOLOR[g]||"#888" }); }
   openSheet("WO");
 }
 

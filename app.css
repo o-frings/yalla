@@ -1026,3 +1026,17 @@
     *,*::before,*::after{ animation-duration:.001s!important; transition-duration:.05s!important; }
     .confetti{ display:none!important; }
   }
+
+  /* workout-detail sheet — rose with on-chart labels, stat grid, grouped exercise list */
+  .wo-rose{ display:flex; justify-content:center; margin:14px 0 20px; }
+  .wo-rose canvas{ width:252px; height:252px; }
+  .wo-stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .wo-stat{ background:var(--row); border-radius:14px; padding:12px 4px; text-align:center; }
+  .wo-stat b{ display:block; font-size:18px; font-weight:700; color:var(--ink); }
+  .wo-stat span{ display:block; margin-top:2px; font-size:12px; color:var(--l2); }
+  .wo-exlist{ background:var(--card); border-radius:16px; overflow:hidden; }
+  .wo-ex{ display:flex; align-items:center; gap:12px; padding:13px 14px; border-bottom:.5px solid var(--line); }
+  .wo-ex:last-child{ border-bottom:none; }
+  .wo-exdot{ width:9px; height:9px; border-radius:50%; flex:0 0 auto; }
+  .wo-exn{ font-weight:600; font-size:15px; color:var(--ink); }
+  .wo-exs{ margin-top:2px; font-size:13px; color:var(--l2); }
