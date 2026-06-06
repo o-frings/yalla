@@ -3102,7 +3102,12 @@ function parseReps(t){
   if(!m) return null;
   const low=+m[1], high=m[2]?+m[2]:low; return {low,high};
 }
-function incFor(name){ return /squat|deadlift|leg press|hip thrust|lunge|hack/i.test(name)?5:2.5; }
+// smallest realistic load jump for the next step. Dumbbells come in 1kg jumps up to 10kg, then 2kg
+// (…8, 9, 10, 12, 14…), so the step depends on where the current load sits; big barbell lifts go up 5kg.
+function incFor(name, w){
+  if(exArea(name)==="dumbbell") return (w||0) < 10 ? 1 : 2;
+  return /squat|deadlift|leg press|hip thrust|lunge|hack/i.test(name)?5:2.5;
+}
 const FREQ_RECENT=21, FREQ_PAST=56;
 function trainingDays(nDays){
   const cutoff=Date.now()-nDays*86400000, days=new Set();
@@ -3149,12 +3154,12 @@ function suggestion(name, t){
   else if(regime==="overreached"){ soft=true; show=true; cue="You've trained hard and often — hold around "+fmtSet(lt)+" this week and let your body catch up."; }
   else if(overStreak){ show=true;
     const range=bumpRange(rng.low+"–"+rng.high);
-    over={ w: w>0?w+incFor(name):0, range };
+    over={ w: w>0?w+incFor(name,w):0, range };
     cue = w>0
       ? "You keep clearing "+rng.high+" reps — the weight's gone light. Step up the load, or raise your target range."
       : "You keep clearing "+rng.high+" reps — make it harder, or raise your target range."; }
   else if(!rng){ cue="Beat last time — add a rep or a little load over "+fmtSet(lt)+"."; }
-  else if(r>=rng.high && w>0){ show=true; cue="Topped the range — add weight: try "+(w+incFor(name))+"kg for "+rng.low+"+ reps."; }
+  else if(r>=rng.high && w>0){ show=true; cue="Topped the range — add weight: try "+(w+incFor(name,w))+"kg for "+rng.low+"+ reps."; }
   else if(r>=rng.high){ show=true; cue="You topped the range — make it harder and aim "+rng.low+"+ reps."; }
   else if(r>0){ cue="Beat it: aim "+(r+1)+" rep"+(r+1>1?"s":"")+(w?" at "+w+"kg":"")+" (target "+rng.low+"–"+rng.high+")."; }
   else { cue="Beat last time: "+fmtSet(lt)+"."; }
