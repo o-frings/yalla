@@ -982,10 +982,9 @@
   .mebal .mebalstat.under{ color:var(--red); }
   .mebal .mebalstat.good{ color:#2fb463; }
   .mebal .mebalcta{ display:block; position:relative; margin-top:14px; font-size:12px; color:var(--l3); }
-  /* hero achievement ring: conic-gradient band wrapping the balance radar; --mepct (0–100) = % of the
-     week's objective met. The radar canvas sits on the card colour and masks all but the outer band. */
-  .meRing{ position:relative; box-sizing:border-box; width:100%; max-width:290px; aspect-ratio:1/1; margin:14px auto 4px; padding:11px; border-radius:50%; background:conic-gradient(var(--accent) calc(var(--mepct,0)*1%), rgba(128,128,128,.16) 0); }
-  #meRadar{ display:block; width:100%; height:100%; background:var(--card); border-radius:50%; }
+  /* per-muscle success gauge wrapper (no outer ring) */
+  .meRing{ box-sizing:border-box; width:100%; max-width:300px; aspect-ratio:1/1; margin:10px auto 6px; }
+  #meRadar{ display:block; width:100%; height:100%; }
   .emphradar{ max-width:300px!important; margin:8px auto 12px!important; touch-action:none; cursor:grab; -webkit-user-select:none; user-select:none; }
   .emphradar:active{ cursor:grabbing; }
   .prevhdr{ display:flex; align-items:center; justify-content:space-between; margin:20px 0 0; font-size:12px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--l2); }

@@ -4225,16 +4225,14 @@ function renderMeRadar(){
   const {totals}=muscleVolume(30, "sets", "total");
   // per-muscle success gauge (30-day weekly avg keeps each group's read stable); the conic ring is overall
   drawSuccessGauge("meRadar", weeklyEquiv(totals,30));
-  const st=$("meBalStat"), cta=$("meBalCta"), ring=$("meRing");
+  const st=$("meBalStat"), cta=$("meBalCta");
   if(st) st.classList.remove("under","good");
   if(!Object.keys(hist).length){
-    if(ring) ring.style.setProperty("--mepct", 0);
     if(st) st.textContent="No sessions yet";
     if(cta) cta.textContent="Log a workout to see your balance ›";
     return;
   }
   const {pct, objLabel}=meObjectiveScore();
-  if(ring) ring.style.setProperty("--mepct", pct);
   if(st){ st.textContent=objLabel+" · "+pct+"%"; if(pct>=85) st.classList.add("good"); else if(pct<50) st.classList.add("under"); }
   if(cta){ const under=ovUnderMuscles();
     cta.textContent=(under.length ? under.length+" muscle"+(under.length>1?"s":"")+" under target" : "On track")+" · tap for detail ›"; }
@@ -6593,7 +6591,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v99";
+const APP_VER="v100";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
