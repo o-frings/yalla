@@ -9,7 +9,7 @@
  * new service worker; the new SW then re-fetches the shell with cache:"reload" (bypassing the HTTP
  * cache) and deletes the old cache on activate, so friends get the update on next open.
  */
-const CACHE = "yalla-v105";
+const CACHE = "yalla-v106";
 const SHELL = ["./", "./index.html", "./app.css", "./app.js", "./manifest.webmanifest", "./icon-1024.png", "./evidence.json"];
 
 self.addEventListener("install", (e) => {
