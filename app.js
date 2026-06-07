@@ -3966,6 +3966,7 @@ const MGROUPS=["Chest","Lats","Upper Back","Lower Back","Front Delts","Side Delt
 const NO_TARGET=new Set(["Neck","Lower Back","Forearms","Adductors"]);
 const MSHORT={Chest:"Chest",Back:"Back",Shoulders:"Delts",Biceps:"Biceps",Triceps:"Triceps",Quads:"Quads",Hamstrings:"Hams",Glutes:"Glutes",Calves:"Calves",Core:"Core","Front Delts":"F·Delt","Side Delts":"S·Delt","Rear Delts":"R·Delt",Neck:"Neck",Lats:"Lats","Upper Back":"U·Back","Lower Back":"L·Back",Forearms:"Forearm",Adductors:"Adduct"};
 let musWindow=7, musMetric="sets", musSrc="log", musVolMode="total", musScale="abs";
+let meWindow=7;   // Me-page hero gauge window: 7 (this week) or 30 (this month)
 // Evidence-based weekly volume targets (fractional sets per muscle per week).
 // Dose-response meta-regressions: benefits accrue across ~10+ hard sets/muscle/wk; ~4–6 is a rough
 // lower bound (MEV) below which most trainees under-stimulate growth. One baseline for all groups —
@@ -3988,6 +3989,8 @@ function weeklyEquiv(totals, windowDays){
   const out={}; Object.keys(totals).forEach(g=> out[g]=totals[g]/wks); return out;
 }
 $("meBalance").onclick=()=>{ openMuscles(); };
+// hero window toggle (Week / Month) — stop the tap from also opening the full sheet
+document.querySelectorAll("#meWinSeg .s").forEach(s=> s.onclick=(e)=>{ e.stopPropagation(); meWindow=+s.dataset.d; renderMeRadar(); });
 $("musClose").onclick=()=>closeSheet("Mus");
 $("scrimMus").onclick=()=>closeSheet("Mus");
 if($("cardioClose")) $("cardioClose").onclick=()=>closeSheet("Cardio");
@@ -4175,15 +4178,16 @@ function renderMuscleSuggestions(view){
 // grow). Unlike the rose, all groups always show as even slots, so there's no lopsided gap and you can
 // read "relative success by muscle group" at a glance. The conic ring around it is the overall objective.
 const GAUGE_GROUPS=["Chest","Back","Shoulders","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves","Core"];
+// collapse delt heads / back regions into the parent (mean of its target-bearing heads), independent of the
+// sheet's expand state, so the hero is always the clean 10-spoke view. `wk` is a per-week sets map.
+const GAUGE_HEADS={ Shoulders:["Front Delts","Side Delts","Rear Delts"], Back:["Lats","Upper Back"] };
+function gaugeVal(det, g){ const h=GAUGE_HEADS[g]; return h ? h.reduce((a,m)=>a+(det[m]||0),0)/h.length : (det[g]||0); }
 function drawSuccessGauge(canvasId, wk){
   const c=$(canvasId); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const det=expandLegacyMtot(wk||{});
   const lab=(getComputedStyle(document.documentElement).getPropertyValue("--l2")||"#888").trim();
   const cx=W/2, cy=H/2, R=W*0.30, n=GAUGE_GROUPS.length, half=Math.PI/n-0.06;
-  // collapse delt heads / back regions into the parent (mean of its target-bearing heads), independent of
-  // the sheet's expand state so the hero is always the clean 10-spoke view.
-  const HEADS={ Shoulders:["Front Delts","Side Delts","Rear Delts"], Back:["Lats","Upper Back"] };
-  const val=g=>{ const h=HEADS[g]; return h ? h.reduce((a,m)=>a+(det[m]||0),0)/h.length : (det[g]||0); };
+  const val=g=>gaugeVal(det, g);
   ctx.strokeStyle="rgba(128,128,128,.25)"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();  // target rim
   GAUGE_GROUPS.forEach((g,i)=>{
     const a=(-90+i*360/n)*Math.PI/180, col=MCOLOR[g]||lab, succ=Math.min(1,(val(g)||0)/WEEKLY_SET_TARGET);
@@ -4198,19 +4202,20 @@ function drawSuccessGauge(canvasId, wk){
     ctx.fillStyle=col; ctx.fillText(MSHORT[g]||g, x, y);
   });
 }
-// How much of THIS WEEK's objective the user has met (0–100). Blends three trailing-7-day signals,
-// weighted by the stated objective: lifting-volume adherence on the muscles the plan targets, training
-// consistency (days trained vs the plan's weekly sessions), and — for fat-loss / fitness — cardio minutes
-// vs goal. Components with no data (e.g. no cardio goal) drop out and the remaining weights renormalise,
-// so the % stays honest rather than being dragged down by a metric the user isn't chasing.
-function meObjectiveScore(){
-  const wk=weeklyEquiv(muscleVolume(7,"sets").totals, 7);
+// How much of the objective the user has met over `days` (0–100). Blends signals weighted by the stated
+// objective: lifting-volume adherence on the muscles the plan targets, training consistency (days trained
+// vs the plan's expected sessions for the window), and — for fat-loss / fitness — cardio minutes vs goal.
+// All signals are normalised per-week so the % is comparable across the Week and Month views; components
+// with no data (e.g. no cardio goal) drop out and the remaining weights renormalise.
+function meObjectiveScore(days){
+  days=days||7; const wkns=days/7;   // weeks in the window
+  const wk=weeklyEquiv(muscleVolume(days,"sets").totals, days);
   const scope=planScopeMuscles(activePlan()).filter(g=>!NO_TARGET.has(g));
   const prio=scope.length?scope:MGROUPS.filter(g=>!NO_TARGET.has(g));
   const vol=prio.reduce((a,g)=>a+Math.min(1,(wk[g]||0)/WEEKLY_SET_TARGET),0)/(prio.length||1);
   const p=activePlan(), planDays=p?Math.max(1,(p.workouts||[]).filter(w=>w.rotate!==false).length):3;
-  const cons=Math.min(1, trainingDays(7)/planDays);
-  const ct=cardioTargetMins(), cardio=ct?Math.min(1, cardioMinsWeek(7)/ct):0;
+  const cons=Math.min(1, trainingDays(days)/(planDays*wkns));
+  const ct=cardioTargetMins(), cardio=ct?Math.min(1, (cardioMinsWeek(days)/wkns)/ct):0;
   const W={ muscle:{vol:.70,cons:.30,cardio:0}, strength:{vol:.65,cons:.35,cardio:0},
             fatloss:{vol:.40,cons:.25,cardio:.35}, fitness:{vol:.45,cons:.25,cardio:.30} }[settings.objective]
           || {vol:.65,cons:.35,cardio:0};
@@ -4222,9 +4227,10 @@ function meObjectiveScore(){
 }
 function renderMeRadar(){
   const c=$("meRadar"); if(!c) return;
-  const {totals}=muscleVolume(30, "sets", "total");
-  // per-muscle success gauge (30-day weekly avg keeps each group's read stable); the conic ring is overall
-  drawSuccessGauge("meRadar", weeklyEquiv(totals,30));
+  document.querySelectorAll("#meWinSeg .s").forEach(s=> s.classList.toggle("active", +s.dataset.d===meWindow));
+  // per-muscle success gauge over the selected window (Week = 7d, Month = 30d), normalised to sets/week
+  const wk=weeklyEquiv(muscleVolume(meWindow, "sets", "total").totals, meWindow);
+  drawSuccessGauge("meRadar", wk);
   const st=$("meBalStat"), cta=$("meBalCta");
   if(st) st.classList.remove("under","good");
   if(!Object.keys(hist).length){
@@ -4232,10 +4238,10 @@ function renderMeRadar(){
     if(cta) cta.textContent="Log a workout to see your balance ›";
     return;
   }
-  const {pct, objLabel}=meObjectiveScore();
+  const {pct, objLabel}=meObjectiveScore(meWindow);
   if(st){ st.textContent=objLabel+" · "+pct+"%"; if(pct>=85) st.classList.add("good"); else if(pct<50) st.classList.add("under"); }
-  if(cta){ const under=ovUnderMuscles();
-    cta.textContent=(under.length ? under.length+" muscle"+(under.length>1?"s":"")+" under target" : "On track")+" · tap for detail ›"; }
+  if(cta){ const det=expandLegacyMtot(wk), under=GAUGE_GROUPS.filter(g=>gaugeVal(det,g)<WEEKLY_SET_MIN).length;
+    cta.textContent=(under ? under+" muscle"+(under>1?"s":"")+" under target" : "On track")+" · tap for detail ›"; }
 }
 function renderMuscles(){
   buildSrc();
@@ -6591,7 +6597,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v100";
+const APP_VER="v101";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
