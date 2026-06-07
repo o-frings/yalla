@@ -983,7 +983,9 @@
   .mebal .mebalstat.good{ color:#2fb463; }
   .mebal .mebalcta{ display:block; position:relative; margin-top:14px; font-size:12px; color:var(--l3); }
   /* per-muscle success gauge wrapper (no outer ring) */
-  .mebalseg{ max-width:200px; margin:10px auto 0; }
+  /* sleek, compact Week/Month pill (overrides the chunky default .seg sizing) */
+  .mebalseg{ max-width:172px; margin:6px auto 0; padding:3px; border-radius:10px; }
+  .mebalseg .s{ flex:1; padding:7px 0; font-size:13px; font-weight:600; border-radius:8px; }
   .meRing{ box-sizing:border-box; width:100%; max-width:300px; aspect-ratio:1/1; margin:8px auto 6px; }
   #meRadar{ display:block; width:100%; height:100%; }
   .emphradar{ max-width:300px!important; margin:8px auto 12px!important; touch-action:none; cursor:grab; -webkit-user-select:none; user-select:none; }
