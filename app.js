@@ -4172,16 +4172,45 @@ function renderMuscleSuggestions(view){
 }
 // compact muscle-balance preview on the Me dashboard — a 30-day sets/week radar vs the growth target;
 // the whole card taps through to the full balance sheet (see #meBalance → openMuscles).
+// How much of THIS WEEK's objective the user has met (0–100). Blends three trailing-7-day signals,
+// weighted by the stated objective: lifting-volume adherence on the muscles the plan targets, training
+// consistency (days trained vs the plan's weekly sessions), and — for fat-loss / fitness — cardio minutes
+// vs goal. Components with no data (e.g. no cardio goal) drop out and the remaining weights renormalise,
+// so the % stays honest rather than being dragged down by a metric the user isn't chasing.
+function meObjectiveScore(){
+  const wk=weeklyEquiv(muscleVolume(7,"sets").totals, 7);
+  const scope=planScopeMuscles(activePlan()).filter(g=>!NO_TARGET.has(g));
+  const prio=scope.length?scope:MGROUPS.filter(g=>!NO_TARGET.has(g));
+  const vol=prio.reduce((a,g)=>a+Math.min(1,(wk[g]||0)/WEEKLY_SET_TARGET),0)/(prio.length||1);
+  const p=activePlan(), planDays=p?Math.max(1,(p.workouts||[]).filter(w=>w.rotate!==false).length):3;
+  const cons=Math.min(1, trainingDays(7)/planDays);
+  const ct=cardioTargetMins(), cardio=ct?Math.min(1, cardioMinsWeek(7)/ct):0;
+  const W={ muscle:{vol:.70,cons:.30,cardio:0}, strength:{vol:.65,cons:.35,cardio:0},
+            fatloss:{vol:.40,cons:.25,cardio:.35}, fitness:{vol:.45,cons:.25,cardio:.30} }[settings.objective]
+          || {vol:.65,cons:.35,cardio:0};
+  const comps=[{w:W.vol,v:vol},{w:W.cons,v:cons}];
+  if(W.cardio>0 && ct>0) comps.push({w:W.cardio,v:cardio});
+  const tw=comps.reduce((a,c)=>a+c.w,0)||1;
+  const pct=Math.round(100*comps.reduce((a,c)=>a+c.w*c.v,0)/tw);
+  return { pct:Math.max(0,Math.min(100,pct)), objLabel: OBJ_LABELS[settings.objective]||"Training" };
+}
 function renderMeRadar(){
   const c=$("meRadar"); if(!c) return;
   const {totals}=muscleVolume(30, "sets", "total");
-  drawRadar(weeklyEquiv(totals,30), "meRadar", WEEKLY_SET_TARGET, true, false);   // noLabels: compact preview
-  const st=$("meBalStat"); if(!st) return;
-  st.classList.remove("under","good");
-  if(!Object.keys(hist).length){ st.textContent="No sessions yet"; return; }
-  const under=ovUnderMuscles();
-  if(under.length){ st.textContent=under.length+" under target"; st.classList.add("under"); }
-  else { st.textContent="On target"; st.classList.add("good"); }
+  drawRadar(weeklyEquiv(totals,30), "meRadar", WEEKLY_SET_TARGET, true, false);   // noLabels balance shape
+  const st=$("meBalStat"), cta=$("meBalCta"), ring=$("meRing");
+  if(st) st.classList.remove("under","good");
+  if(!Object.keys(hist).length){
+    if(ring) ring.style.setProperty("--mepct", 0);
+    if(st) st.textContent="No sessions yet";
+    if(cta) cta.textContent="Log a workout to see your balance ›";
+    return;
+  }
+  const {pct, objLabel}=meObjectiveScore();
+  if(ring) ring.style.setProperty("--mepct", pct);
+  if(st){ st.textContent=objLabel+" · "+pct+"%"; if(pct>=85) st.classList.add("good"); else if(pct<50) st.classList.add("under"); }
+  if(cta){ const under=ovUnderMuscles();
+    cta.textContent=(under.length ? under.length+" muscle"+(under.length>1?"s":"")+" under target" : "On track")+" · tap for detail ›"; }
 }
 function renderMuscles(){
   buildSrc();
