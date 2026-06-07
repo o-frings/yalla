@@ -4973,12 +4973,27 @@ function cardioSessionsWeek(days){ days=days||7; const cut=Date.now()-days*86400
 function cardioZoneMix(days){ days=days||7; const cut=Date.now()-days*86400000; const mix={}; CZONES.forEach(z=>mix[z.z]=0);
   cardioList().forEach(e=>{ if(e.d<cut) return; const z=mix[e.zone]!=null?e.zone:"z2"; mix[z]+=cardioMinsOf(e); }); return mix; }
 // objective-aware weekly aerobic-minutes target (Phase 3 layers coaching on top of this)
-function cardioTargetMins(){ switch(settings.objective){
-  case "fatloss":  return 200;          // higher volume aids the deficit
-  case "fitness":  return 150;          // general health (≈ WHO 150 min/wk moderate)
-  case "muscle":   return 90;           // enough conditioning without blunting hypertrophy
-  case "strength": return 75;
-  default:         return 150; } }
+// Dedicated cardio goal — a SEPARATE axis from the lifting objective; it sets the weekly-minutes target.
+// Editable in the Cardio detail sheet (settings.cardioGoal). Falls back to a sensible default derived from
+// the lifting objective so existing users get a reasonable target until they pick one.
+const CARDIO_GOALS=[
+  {k:"maintain",  lbl:"Maintain",        sub:"minimal — protect lifting gains", mins:75},
+  {k:"health",    lbl:"Basic health",    sub:"the ~150 min/wk guideline",       mins:150},
+  {k:"fitness",   lbl:"General fitness", sub:"a strong all-round base",          mins:200},
+  {k:"fatloss",   lbl:"Fat loss",        sub:"more movement for the deficit",    mins:250},
+  {k:"endurance", lbl:"Endurance",       sub:"events & long efforts",            mins:300}
+];
+function cardioGoalDef(){
+  const g=CARDIO_GOALS.find(x=>x.k===settings.cardioGoal); if(g) return g;
+  const map={ muscle:"maintain", strength:"maintain", fitness:"fitness", fatloss:"fatloss" };  // back-compat default
+  return CARDIO_GOALS.find(x=>x.k===(map[settings.objective]||"health"));
+}
+function cardioTargetMins(){ return cardioGoalDef().mins; }
+function setCardioGoal(k){ if(!CARDIO_GOALS.some(x=>x.k===k)) return; settings.cardioGoal=k; sset("settings",settings);
+  renderCardioDetail(); renderCardioCard();
+  if(document.querySelector('#pageFeed.active') && typeof renderOverview==="function") renderOverview();
+  toast("Cardio goal: "+cardioGoalDef().lbl+" — "+cardioTargetMins()+" min/wk");
+}
 // 10-week weekly-minutes series for the sparkline (index N-1 = this week)
 function cardioWeeklySeries(){ const wkMs=7*86400000, now=Date.now(), N=PROG_WEEKS, out=new Array(N).fill(0);
   cardioList().forEach(e=>{ const k=Math.floor((now-e.d)/wkMs), i=(k>=0&&k<N)?(N-1-k):-1; if(i>=0) out[i]+=cardioMinsOf(e); }); return out; }
@@ -5057,6 +5072,12 @@ function renderCardioDetail(){
     +'<div><div class="ovbig"><b>'+tgt+'</b></div><div class="ovk">weekly target</div></div>'
     +'<div><div class="ovbig"><b>'+Math.round(m28/4)+'</b></div><div class="ovk">avg/wk (4wk)</div></div>'
     +'</div></div>';
+  // editable cardio goal — drives the weekly target (separate from the lifting objective)
+  const gw=$("cdcGoalChips"); if(gw){ const cur=cardioGoalDef(); gw.innerHTML="";
+    CARDIO_GOALS.forEach(g=>{ const c=document.createElement("button"); c.className="chip"+(cur.k===g.k?" on":""); c.textContent=g.lbl+" · "+g.mins+"m";
+      c.onclick=()=>setCardioGoal(g.k); gw.appendChild(c); });
+    $("cdcGoalHint").textContent = cur.sub.charAt(0).toUpperCase()+cur.sub.slice(1)+" — target ~"+cur.mins+" min/week.";
+  }
   drawCardioMins("cdcMinsC"); drawZoneStack("cdcZoneC");
   $("cdcZoneLegend").innerHTML = CZONES.map(z=>'<span><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:'+CZCOL[z.z]+';margin-right:4px;vertical-align:-1px;"></i>'+z.lbl+'</span>').join("");
   const acts=cardioPaceActivities();
