@@ -381,13 +381,6 @@
   .setcard .scbody > .ed-label:first-child{ margin-top:14px; }
   .travelbar{ display:flex; align-items:center; gap:10px; margin:6px 0 14px; padding:11px 14px; border-radius:12px; background:var(--accent-soft); color:var(--accent); font-size:14px; font-weight:600; }
   .travelbar .tvx{ margin-left:auto; flex:0 0 auto; background:transparent; border:.5px solid currentColor; color:inherit; font:inherit; font-size:13px; padding:4px 10px; border-radius:9px; cursor:pointer; opacity:.85; }
-  /* Global travel indicator — pinned to the same spot on every page while travel mode is on.
-     right offset hugs the centred 540px column on wide screens, falls back to 14px on phones. */
-  .travelfab{ position:fixed; top:calc(env(safe-area-inset-top) + 8px); right:max(14px, calc((100vw - 540px)/2 + 14px));
-    z-index:45; display:flex; align-items:center; justify-content:center; width:36px; height:36px; padding:0;
-    border:none; border-radius:50%; background:var(--accent); color:#fff; cursor:pointer;
-    box-shadow:0 4px 14px rgba(0,0,0,.22); -webkit-tap-highlight-color:transparent; }
-  .travelfab svg{ width:18px; height:18px; flex:0 0 auto; }
   .tvbreak{ display:flex; flex-direction:column; gap:7px; margin:10px 0 2px; }
   .tvrow{ display:flex; align-items:center; justify-content:space-between; font-size:13px; color:var(--l2); }
   .tvrow b{ color:var(--ink); font-weight:600; }

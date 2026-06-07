@@ -2833,7 +2833,7 @@ function renderDash(){
   renderAchievements();
   renderInsight();
   renderObjective();
-  if(typeof renderMeRadar==="function") renderMeRadar();   // WIP Me-page radar — guarded until it's defined
+  renderMeRadar();
 }
 function renderCalendar(){
   const grid=$("calGrid"); if(!grid) return;
@@ -4170,6 +4170,19 @@ function renderMuscleSuggestions(view){
   box.querySelectorAll(".sgbtn[data-add]").forEach(b=> b.onclick=()=>addMoveToPlan(b.dataset.mus, b.dataset.add));
   box.querySelectorAll(".sgbtn[data-rm]").forEach(b=> b.onclick=()=>{ const p=b.dataset.rm.split(",").map(Number); removeMoveFromPlan(p[0],p[1]); });
 }
+// compact muscle-balance preview on the Me dashboard — a 30-day sets/week radar vs the growth target;
+// the whole card taps through to the full balance sheet (see #meBalance → openMuscles).
+function renderMeRadar(){
+  const c=$("meRadar"); if(!c) return;
+  const {totals}=muscleVolume(30, "sets", "total");
+  drawRadar(weeklyEquiv(totals,30), "meRadar", WEEKLY_SET_TARGET, true, false);   // noLabels: compact preview
+  const st=$("meBalStat"); if(!st) return;
+  st.classList.remove("under","good");
+  if(!Object.keys(hist).length){ st.textContent="No sessions yet"; return; }
+  const under=ovUnderMuscles();
+  if(under.length){ st.textContent=under.length+" under target"; st.classList.add("under"); }
+  else { st.textContent="On target"; st.classList.add("good"); }
+}
 function renderMuscles(){
   buildSrc();
   const isLog = musSrc==="log";
@@ -4279,15 +4292,12 @@ function renderTravelSeg(){
   const m = settings.travelMode || "off";
   document.querySelectorAll("#travelSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.tv===m));
 }
-// global airplane badge — pinned to the same spot on EVERY page while travel mode is on, so it's
-// never silently active (the old in-page banner only showed on the workout tab; this replaces it).
+// the Workout-header ✈ lights up while travel mode is on (the only travel indicator — workout page only)
 const TRAVEL_FAB_LBL={ gym:"full gym", nogym:"no gym", partial:"partial gym" };
-// the global ✈ badge (on every page while travelling) AND the Workout-header ✈ both reflect on/off here
 function renderTravelFab(){
   const m=settings.travelMode||"off", on=m!=="off";
-  const f=$("travelFab"); if(f){ f.style.display=on?"":"none";
-    if(on) f.setAttribute("aria-label","Travel mode on — "+(TRAVEL_FAB_LBL[m]||"")+" — tap to switch or end"); }
-  const q=$("travelQuick"); if(q) q.classList.toggle("on", on);
+  const q=$("travelQuick"); if(q){ q.classList.toggle("on", on);
+    q.setAttribute("aria-label", on ? "Travel mode on — "+(TRAVEL_FAB_LBL[m]||"")+" — tap to switch or end" : "Travel mode"); }
 }
 // kept as an alias so older call sites stay valid
 function renderTravelBanner(){ renderTravelFab(); }
@@ -4323,7 +4333,6 @@ function renderTravelBreakdown(){
   box.innerHTML=h;
 }
 function renderTravel(){ renderTravelSeg(); renderTravelFab(); renderTravelBreakdown(); }
-if($("travelFab")) $("travelFab").onclick=()=> openTravel();
 if($("travelQuick")) $("travelQuick").onclick=()=> openTravel();
 if($("openTravelBtn")) $("openTravelBtn").onclick=()=> openTravel();
 document.querySelectorAll("#travelSeg .s").forEach(s=>{
