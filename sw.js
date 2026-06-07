@@ -9,7 +9,7 @@
  * new service worker; the new SW then re-fetches the shell with cache:"reload" (bypassing the HTTP
  * cache) and deletes the old cache on activate, so friends get the update on next open.
  */
-const CACHE = "yalla-v98";
+const CACHE = "yalla-v99";
 const SHELL = ["./", "./index.html", "./app.css", "./app.js", "./manifest.webmanifest", "./icon-1024.png", "./evidence.json"];
 
 self.addEventListener("install", (e) => {
@@ -22,15 +22,6 @@ self.addEventListener("install", (e) => {
       .then(() => self.skipWaiting())
       .catch(() => {})
   );
-});
-
-// The page asks "getVersion" to show the live build in the footer — reply with CACHE so the displayed
-// version is always the worker that's actually controlling the page (no hand-maintained string to drift).
-self.addEventListener("message", (e) => {
-  if (e.data === "getVersion") {
-    if (e.source) e.source.postMessage({ type: "version", version: CACHE });
-    else self.clients.matchAll().then((cs) => cs.forEach((c) => c.postMessage({ type: "version", version: CACHE })));
-  }
 });
 
 self.addEventListener("activate", (e) => {

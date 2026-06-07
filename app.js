@@ -6590,17 +6590,22 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 
 // Offline support: register the service worker when served over HTTPS (e.g. GitHub Pages).
 // Skipped silently on file:// so opening the raw file still works.
+// Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
+// number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
+// Bump APP_VER and the SW CACHE together on every deploy.
+const APP_VER="v99";
+(function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
-  // when a new version takes control, reload once so the update shows without a manual re-add
+  // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
+  // controllerchange AND the new worker reaching "activated" — iOS standalone PWAs don't always fire
+  // controllerchange, so the statechange path is the belt-and-suspenders that gets the reload to happen.
   let _swReloaded=false;
-  navigator.serviceWorker.addEventListener("controllerchange", ()=>{ if(_swReloaded) return; _swReloaded=true; location.reload(); });
-  // footer build label: ask the controlling worker for its cache version so it can never drift from reality
-  const showSwVersion=()=>{ const c=navigator.serviceWorker.controller; if(c) c.postMessage("getVersion"); };
-  navigator.serviceWorker.addEventListener("message", (e)=>{ if(e.data && e.data.type==="version"){
-    const el=document.getElementById("appVer"); if(el) el.textContent=String(e.data.version).replace(/^yalla-/,""); } });
+  const reloadOnce=()=>{ if(_swReloaded) return; _swReloaded=true; location.reload(); };
+  navigator.serviceWorker.addEventListener("controllerchange", reloadOnce);
   window.addEventListener("load", ()=>{
-    showSwVersion();
     navigator.serviceWorker.register("sw.js").then(reg=>{
+      reg.addEventListener("updatefound", ()=>{ const nw=reg.installing; if(nw) nw.addEventListener("statechange", ()=>{
+        if(nw.state==="activated" && navigator.serviceWorker.controller) reloadOnce(); }); });
       reg.update();                                   // check for a newer worker on every launch
       setInterval(()=>reg.update(), 60*60*1000);      // and hourly while open
     }).catch(()=>{});
