@@ -524,7 +524,7 @@
   .obopt span{ display:block; font-size:13px; color:var(--l2); margin-top:2px; }
   /* progress chart — a 5-page metric carousel (Volume/Sets/Sessions/Weight/PRs) the finger drags & snaps.
      Viewport stretches to the panel edges; each page re-insets the chart by 16px so charts keep a gutter. */
-  .progswipe{ margin:12px -16px 0; overflow:hidden; touch-action:pan-y; -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; }
+  .progswipe{ margin:10px -16px 8px; overflow:hidden; touch-action:pan-y; -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; }
   .progtrack{ display:flex; width:500%; will-change:transform; }
   .progpage{ flex:0 0 20%; width:20%; box-sizing:border-box; padding:0 16px; }
   .progpage canvas{ display:block; width:100%; height:auto; aspect-ratio:11/3; outline:none; -webkit-tap-highlight-color:transparent; }
@@ -982,31 +982,36 @@
   .growth.shrink{ border-left-color:var(--red); } .growth .gdot.shrink{ background:var(--red); }
   .growth.more{ border-left-color:var(--line); } .growth .gdot.more{ background:var(--l3); }
   #musRadar, #buildRadar{ width:100%; max-width:330px; height:auto; aspect-ratio:1/1; display:block; margin:16px auto 20px; }
-  .mebal{ display:block; width:100%; text-align:center; padding:16px 16px 13px; margin-bottom:18px; background:var(--card); border:.5px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--shadow), inset 0 .5px 0 var(--hi); cursor:pointer; -webkit-tap-highlight-color:transparent; transition:opacity .12s; color:inherit; -webkit-appearance:none; appearance:none; font:inherit; }
-  .mebal:active{ opacity:.7; }
-  .mebal .mebalhd{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
-  .mebal .mebalt{ font-size:19px; font-weight:700; letter-spacing:-.3px; }
-  /* window switch: quiet underline tabs docked top-right (also the state indicator for the swipe gesture) */
-  .mewintabs{ display:flex; gap:16px; flex:0 0 auto; }
+  /* Unified card for the two homogenised panels (Muscle balance + Progress):
+     title → underline tab bar → swipe carousel → footer. `.tap` adds the press affordance (balance only). */
+  .panel{ display:block; box-sizing:border-box; width:100%; padding:16px 16px 14px; margin-bottom:18px; text-align:left;
+    background:var(--card); border:.5px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--shadow), inset 0 .5px 0 var(--hi);
+    color:inherit; -webkit-appearance:none; appearance:none; font:inherit; }
+  .panel.tap{ cursor:pointer; -webkit-tap-highlight-color:transparent; transition:opacity .12s; }
+  .panel.tap:active{ opacity:.7; }
+  .panel:focus, .panel:focus-visible{ outline:none; }
+  .panelhd{ display:flex; align-items:center; gap:8px; }
+  .panelt{ display:inline-flex; align-items:center; gap:7px; font-size:19px; font-weight:700; letter-spacing:-.3px; }
+  .panelt svg{ width:18px; height:18px; flex:0 0 auto; }
+  /* underline tab bar — window/metric switch + swipe state indicator, left-aligned under the title */
+  .mewintabs{ display:flex; flex-wrap:wrap; gap:18px; }
+  .paneltabs{ margin:9px 0 2px; }
   .mewintab{ position:relative; padding:1px 0 5px; background:none; border:none; font:inherit; font-size:13px; font-weight:600; color:var(--l3); cursor:pointer; -webkit-appearance:none; appearance:none; -webkit-tap-highlight-color:transparent; transition:color .15s; }
   .mewintab.active{ color:var(--ink); }
   .mewintab.active::after{ content:""; position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:2px; background:var(--accent); }
-  /* progress metric tabs: same underline style as the balance gauge, spread full-width under the chart */
-  .progtabs{ justify-content:space-between; gap:8px; margin:6px 2px 0; }
-  /* per-muscle success gauge — an iOS-style 2-page carousel (Week / Month) the finger drags & snaps.
-     The clip viewport is stretched to the panel's edges (negative side margins cancel the card padding),
-     so the clip line sits at the panel margin, well outside the centred rose — no visible box around it. */
+  /* swipe carousels — clip viewport bleeds to the card edges (negative side margins cancel the padding) */
   .meRing{ margin:10px -16px 8px; overflow:hidden; touch-action:pan-y;
     -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
   .meRingTrack{ display:flex; width:200%; will-change:transform; }
   .meRingPage{ flex:0 0 50%; width:50%; display:flex; align-items:center; justify-content:center; }
-  .mebal:focus, .mebal:focus-visible{ outline:none; }
-  .mebalfoot{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
-  .mebal .mebalstat{ font-size:13px; font-weight:600; color:var(--l2); text-align:left; }
-  .mebal .mebalstat.under{ color:var(--red); }
-  .mebal .mebalstat.good{ color:#2fb463; }
-  .mebal .mebalcta{ font-size:12px; color:var(--l3); flex:0 0 auto; }
   #meRadar, #meRadar2{ display:block; width:100%; max-width:300px; aspect-ratio:1/1; height:auto; outline:none; -webkit-tap-highlight-color:transparent; }
+  /* panel footer — balance: stat | cta (row); progress: caption + verdict (stacked via .stack) */
+  .panelfoot{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:4px; }
+  .panelfoot.stack{ display:block; }
+  .mebalstat{ font-size:13px; font-weight:600; color:var(--l2); }
+  .mebalstat.under{ color:var(--red); }
+  .mebalstat.good{ color:#2fb463; }
+  .mebalcta{ font-size:12px; color:var(--l3); flex:0 0 auto; }
   .emphradar{ max-width:300px!important; margin:8px auto 12px!important; touch-action:none; cursor:grab; -webkit-user-select:none; user-select:none; }
   .emphradar:active{ cursor:grabbing; }
   .prevhdr{ display:flex; align-items:center; justify-content:space-between; margin:20px 0 0; font-size:12px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--l2); }

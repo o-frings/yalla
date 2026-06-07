@@ -175,7 +175,7 @@
   <div id="cdLogList"></div>
 </div>
 
-<div class="foot">On-device only · keep a backup · lift safely · build <span id="appVer">v110</span></div>
+<div class="foot">On-device only · keep a backup · lift safely · build <span id="appVer">v111</span></div>
 </div><!-- /pageWorkout -->
 
 <div class="exmenu-pop" id="exMenu"></div>
@@ -231,37 +231,33 @@
   <div class="pagebody">
     <div class="profcard" id="meProfile" style="display:none;"></div>
     <div class="mezone">Training</div>
-    <div class="mebal" id="meBalance" role="button" tabindex="0" aria-label="Open muscle balance">
-      <div class="mebalhd">
-        <span class="mebalt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;flex:0 0 auto;vertical-align:-3px;margin-right:6px"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>Muscle balance</span>
-        <div class="mewintabs" id="meWinSeg">
-          <button class="mewintab active" data-d="7" type="button">Week</button>
-          <button class="mewintab" data-d="30" type="button">Month</button>
-        </div>
+    <div class="panel tap" id="meBalance" role="button" tabindex="0" aria-label="Open muscle balance">
+      <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>Muscle balance</span></div>
+      <div class="mewintabs paneltabs" id="meWinSeg">
+        <button class="mewintab active" data-d="7" type="button">Week</button>
+        <button class="mewintab" data-d="30" type="button">Month</button>
       </div>
       <div class="meRing" id="meRing"><div class="meRingTrack" id="meRingTrack"><div class="meRingPage"><canvas id="meRadar" width="900" height="900"></canvas></div><div class="meRingPage"><canvas id="meRadar2" width="900" height="900"></canvas></div></div></div>
-      <div class="mebalfoot">
-        <span class="mebalstat" id="meBalStat"></span>
-        <span class="mebalcta" id="meBalCta">tap for detail ›</span>
+      <div class="panelfoot"><span class="mebalstat" id="meBalStat"></span><span class="mebalcta" id="meBalCta">tap for detail ›</span></div>
+    </div>
+    <div class="panel" id="progPanel">
+      <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 2 5-6"/></svg>Progress</span></div>
+      <div class="mewintabs paneltabs" id="progMetric">
+        <button class="mewintab active" data-pm="volume" type="button">Volume</button>
+        <button class="mewintab" data-pm="sets" type="button">Sets</button>
+        <button class="mewintab" data-pm="sessions" type="button">Sessions</button>
+        <button class="mewintab" data-pm="weight" type="button">Weight</button>
+        <button class="mewintab" data-pm="prs" type="button">PRs</button>
       </div>
+      <div class="progswipe" id="progSwipe"><div class="progtrack" id="progTrack">
+        <div class="progpage"><canvas id="progBars0" width="660" height="180"></canvas></div>
+        <div class="progpage"><canvas id="progBars1" width="660" height="180"></canvas></div>
+        <div class="progpage"><canvas id="progBars2" width="660" height="180"></canvas></div>
+        <div class="progpage"><canvas id="progBars3" width="660" height="180"></canvas></div>
+        <div class="progpage"><canvas id="progBars4" width="660" height="180"></canvas></div>
+      </div></div>
+      <div class="panelfoot stack"><div class="progcap" id="progCap"></div><div class="progverd" id="progVerdict" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div></div>
     </div>
-    <div class="ed-label">Progress</div>
-    <div class="mewintabs progtabs" id="progMetric">
-      <button class="mewintab active" data-pm="volume" type="button">Volume</button>
-      <button class="mewintab" data-pm="sets" type="button">Sets</button>
-      <button class="mewintab" data-pm="sessions" type="button">Sessions</button>
-      <button class="mewintab" data-pm="weight" type="button">Weight</button>
-      <button class="mewintab" data-pm="prs" type="button">PRs</button>
-    </div>
-    <div class="progswipe" id="progSwipe"><div class="progtrack" id="progTrack">
-      <div class="progpage"><canvas id="progBars0" width="660" height="180"></canvas></div>
-      <div class="progpage"><canvas id="progBars1" width="660" height="180"></canvas></div>
-      <div class="progpage"><canvas id="progBars2" width="660" height="180"></canvas></div>
-      <div class="progpage"><canvas id="progBars3" width="660" height="180"></canvas></div>
-      <div class="progpage"><canvas id="progBars4" width="660" height="180"></canvas></div>
-    </div></div>
-    <div class="progcap" id="progCap"></div>
-    <div class="progverd" id="progVerdict" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div>
 
     <div class="ed-label">Cardio</div>
     <div class="group" id="cardioCard"></div>
