@@ -2824,7 +2824,7 @@ function renderDash(){
   $("deload").style.display = due ? "" : "none";
   $("spark").style.display = bw.length >= 3 ? "" : "none";
   drawSpark();
-  drawProgBars();
+  animateProgBars();
   if($("heightIn") && document.activeElement!==$("heightIn")) $("heightIn").value = settings.heightCm||"";
   if($("bfIn") && document.activeElement!==$("bfIn")) $("bfIn").value = settings.bodyfatPct||"";
   renderCalc(now);
@@ -2906,14 +2906,10 @@ function drawSpark(){
 }
 // ---- weekly progress bars (Me sheet) ----
 const PROG_WEEKS=10;
-let progMetric="volume", progAnim=1, progRAF=0;
-// grow the bars in from the baseline (called when the Me sheet opens or the metric changes)
-function animateProgBars(){
-  if(typeof requestAnimationFrame!=="function"){ progAnim=1; drawProgBars(); return; }
-  cancelAnimationFrame(progRAF); const start=performance.now(), dur=520;
-  const step=t=>{ const k=Math.min(1,(t-start)/dur); progAnim=1-Math.pow(1-k,3); drawProgBars(); if(k<1){ progRAF=requestAnimationFrame(step); } else { progAnim=1; } };
-  progRAF=requestAnimationFrame(step);
-}
+let progMetric="volume", progIdx=0, progMeta={};
+const PROG_METRICS=["volume","sets","sessions","weight","prs"];
+// (re)draw all five metric pages and re-show the active page — name kept for existing callers
+function animateProgBars(){ drawAllProg(); applyProgMetric(progIdx, false); }
 function progWeeklyData(metric){
   const wkMs=7*86400000, now=Date.now(), N=PROG_WEEKS, out=new Array(N).fill(0);
   const idx=d=>{ const k=Math.floor((now-d)/wkMs); return (k>=0 && k<N) ? (N-1-k) : -1; }; // N-1 = this week
@@ -3063,25 +3059,26 @@ function renderGrowth(){
   }
   box.innerHTML=h;
 }
-function drawProgBars(){
-  const c=$("progBars"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
-  const cap=$("progCap"), ac=accentHex();
+// Draw ONE progress metric into a given canvas (static — the swipe provides motion). Returns the
+// caption HTML + the data the verdict needs, so the active page's meta can be shown below the carousel.
+function drawProgChart(metric, canvasId){
+  const c=$(canvasId); if(!c) return {capHTML:"", vData:null}; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  const ac=accentHex();
   const l3=(getComputedStyle(document.documentElement).getPropertyValue('--l3')||'#888').trim();
   const ink=(getComputedStyle(document.documentElement).getPropertyValue('--ink')||'#000').trim();
   const N=PROG_WEEKS, pad=12, base=H-26, top=12;
   const cx=i=> pad + i*((W-pad*2)/(N-1));
-  const empty=()=>{ ctx.fillStyle=l3; ctx.font="13px -apple-system,sans-serif"; ctx.textAlign="center"; ctx.fillText("Log a few workouts to see this build up.", W/2, H/2); if(cap) cap.textContent=""; const v0=$("progVerdict"); if(v0) v0.style.display="none"; };
+  const emptyMsg=()=>{ ctx.fillStyle=l3; ctx.font="13px -apple-system,sans-serif"; ctx.textAlign="center"; ctx.fillText("Log a few workouts to see this build up.", W/2, H/2); };
   const xLabels=()=>{ ctx.fillStyle=l3; ctx.font="600 17px -apple-system,sans-serif"; ctx.textAlign="left"; ctx.fillText(PROG_WEEKS+"w ago", pad, H-6); ctx.textAlign="right"; ctx.fillText("now", W-pad, H-6); };
   const baseline=()=>{ ctx.strokeStyle=hexAlpha(ac,.18); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad,base+0.5); ctx.lineTo(W-pad,base+0.5); ctx.stroke(); };
-  const verdict=data=>{ const ve=$("progVerdict"); if(ve){ const v=progVerdict(progMetric, data); ve.style.display="flex"; ve.className="progverd v-"+v.lvl; ve.querySelector(".pvtxt").textContent=v.msg; } };
 
   // ---- volume / sets → one line per muscle (like the radar, but over time) ----
-  if(progMetric==="volume" || progMetric==="sets"){
-    const series=progMuscleWeekly(progMetric==="volume"?"vol":"sets");
+  if(metric==="volume" || metric==="sets"){
+    const series=progMuscleWeekly(metric==="volume"?"vol":"sets");
     const active=MGROUPS.filter(g=> series[g].some(v=>v>0));
-    if(!active.length){ empty(); return; }
+    if(!active.length){ emptyMsg(); return {capHTML:"", vData:null}; }
     let hi=0; active.forEach(g=> series[g].forEach(v=>{ if(v>hi) hi=v; })); hi=hi||1;
-    const mapY=v=> base-(v/hi)*(base-top)*progAnim;
+    const mapY=v=> base-(v/hi)*(base-top);
     baseline();
     ctx.lineJoin="round"; ctx.lineCap="round";
     active.forEach(g=>{ const col=MCOLOR[g]||l3;
@@ -3090,27 +3087,26 @@ function drawProgBars(){
       const li=N-1; ctx.globalAlpha=1; ctx.beginPath(); ctx.arc(cx(li), mapY(series[g][li]), 4.5, 0, Math.PI*2); ctx.fillStyle=col; ctx.fill();
     });
     ctx.globalAlpha=1; xLabels();
-    if(cap) cap.innerHTML=(progMetric==="volume"?"Weekly volume":"Weekly sets")+' by muscle · last '+PROG_WEEKS+' weeks'
+    const capHTML=(metric==="volume"?"Weekly volume":"Weekly sets")+' by muscle · last '+PROG_WEEKS+' weeks'
       +'<div class="proglegend">'+active.map(g=>'<span class="pglg"><i style="background:'+(MCOLOR[g]||"#888")+'"></i>'+MSHORT[g]+'</span>').join('')+'</div>';
-    verdict(progWeeklyData(progMetric));
-    return;
+    return {capHTML, vData:progWeeklyData(metric)};
   }
 
   // ---- sessions / weight / PRs → a single trend line ----
-  const data=progWeeklyData(progMetric);
-  if(!data.some(v=>v>0)){ empty(); return; }
+  const data=progWeeklyData(metric);
+  if(!data.some(v=>v>0)){ emptyMsg(); return {capHTML:"", vData:null}; }
   let lo=0, hi=Math.max(...data);
-  if(progMetric==="weight"){ const nz=data.filter(v=>v>0); lo=Math.min(...nz); hi=Math.max(...nz); const span=Math.max(1,hi-lo); lo=Math.max(0,lo-span*0.2); hi=hi+span*0.1; }
-  const mapY=v=> base-(hi>lo?(v-lo)/(hi-lo):0)*(base-top)*progAnim;
+  if(metric==="weight"){ const nz=data.filter(v=>v>0); lo=Math.min(...nz); hi=Math.max(...nz); const span=Math.max(1,hi-lo); lo=Math.max(0,lo-span*0.2); hi=hi+span*0.1; }
+  const mapY=v=> base-(hi>lo?(v-lo)/(hi-lo):0)*(base-top);
   baseline();
   // line + dots over the weeks that have data (weight skips gaps; sessions/PRs plot every week incl. zeros)
-  const valid=[]; data.forEach((v,i)=>{ if(progMetric!=="weight" || v>0) valid.push([i,v]); });
+  const valid=[]; data.forEach((v,i)=>{ if(metric!=="weight" || v>0) valid.push([i,v]); });
   ctx.strokeStyle=ac; ctx.lineWidth=3; ctx.lineJoin="round"; ctx.lineCap="round";
   ctx.beginPath(); valid.forEach(([i,v],k)=>{ const x=cx(i), y=mapY(v); k?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.stroke();
   valid.forEach(([i,v])=>{ ctx.beginPath(); ctx.arc(cx(i), mapY(v), i===N-1?5:3.5, 0, Math.PI*2); ctx.fillStyle = i===N-1?ac:hexAlpha(ac,.55); ctx.fill(); });
   // trend line
   const tp=[]; data.forEach((v,i)=>{ if(v>0) tp.push([i,v]); });
-  if(tp.length>=2 && progAnim>=1){
+  if(tp.length>=2){
     const k=tp.length, sx=tp.reduce((a,p)=>a+p[0],0), sy=tp.reduce((a,p)=>a+p[1],0),
           sxy=tp.reduce((a,p)=>a+p[0]*p[1],0), sxx=tp.reduce((a,p)=>a+p[0]*p[0],0), den=k*sxx-sx*sx;
     const m=den?(k*sxy-sx*sy)/den:0, b0=(sy-m*sx)/k, i0=tp[0][0], i1=tp[tp.length-1][0];
@@ -3118,15 +3114,44 @@ function drawProgBars(){
     ctx.beginPath(); ctx.moveTo(cx(i0), mapY(m*i0+b0)); ctx.lineTo(cx(i1), mapY(m*i1+b0)); ctx.stroke(); ctx.setLineDash([]);
   }
   xLabels();
-  const latest=data[N-1], fmt = progMetric==="weight" ? (latest>0?round1(latest)+" kg":"—") : Math.round(latest);
-  if(cap) cap.innerHTML=PROG_LABELS[progMetric]+' · last '+PROG_WEEKS+' weeks · <b>this week: '+(latest>0?fmt:"—")+'</b>';
-  verdict(data);
+  const latest=data[N-1], fmt = metric==="weight" ? (latest>0?round1(latest)+" kg":"—") : Math.round(latest);
+  const capHTML=PROG_LABELS[metric]+' · last '+PROG_WEEKS+' weeks · <b>this week: '+(latest>0?fmt:"—")+'</b>';
+  return {capHTML, vData:data};
 }
-document.querySelectorAll("#progMetric .s").forEach(s=> s.onclick=()=>{
-  progMetric=s.dataset.pm;
-  document.querySelectorAll("#progMetric .s").forEach(x=> x.classList.toggle("active", x===s));
-  animateProgBars();
-});
+// pre-draw all five metric pages; show the active page's caption + verdict below
+function drawAllProg(){ PROG_METRICS.forEach((m,i)=> progMeta[m]=drawProgChart(m, "progBars"+i)); }
+function progTrackTo(idx, animate){ const tr=$("progTrack"); if(!tr) return;
+  tr.style.transition = animate ? "transform .34s cubic-bezier(.25,.46,.45,.94)" : "none";
+  tr.style.transform = "translateX("+(-idx*20)+"%)"; }
+function applyProgMetric(idx, animate){
+  idx=Math.max(0, Math.min(PROG_METRICS.length-1, idx));
+  progIdx=idx; progMetric=PROG_METRICS[idx];
+  document.querySelectorAll("#progMetric .s").forEach(s=> s.classList.toggle("active", s.dataset.pm===progMetric));
+  progTrackTo(idx, animate);
+  const cap=$("progCap"), ve=$("progVerdict"), meta=progMeta[progMetric]||{capHTML:"",vData:null};
+  if(cap) cap.innerHTML=meta.capHTML;
+  if(ve){ if(meta.vData){ const v=progVerdict(progMetric, meta.vData); ve.style.display="flex"; ve.className="progverd v-"+v.lvl; ve.querySelector(".pvtxt").textContent=v.msg; } else ve.style.display="none"; }
+}
+document.querySelectorAll("#progMetric .s").forEach(s=> s.onclick=()=> applyProgMetric(PROG_METRICS.indexOf(s.dataset.pm), true));
+// iOS-style paged swipe across the five metric charts (one step per swipe; pager ignores .progswipe)
+(function(){ const sw=$("progSwipe"), tr=$("progTrack"); if(!sw||!tr) return;
+  let x0=0,y0=0,w=1,start=0,active=false,drag=false; const last=PROG_METRICS.length-1;
+  sw.addEventListener("touchstart", e=>{ if(e.touches.length!==1) return;
+    x0=e.touches[0].clientX; y0=e.touches[0].clientY; w=sw.clientWidth||1; start=progIdx; active=true; drag=false; tr.style.transition="none"; }, {passive:true});
+  sw.addEventListener("touchmove", e=>{ if(!active) return; const dx=e.touches[0].clientX-x0, dy=e.touches[0].clientY-y0;
+    if(!drag){ if(Math.abs(dx)<7 && Math.abs(dy)<7) return; if(Math.abs(dx)<=Math.abs(dy)*1.2){ active=false; return; } drag=true; }
+    e.preventDefault();
+    let pct=-start*20 + (dx/w)*20, min=-last*20;
+    if(pct>0) pct*=0.35; else if(pct<min) pct=min+(pct-min)*0.35;     // rubber-band past the ends
+    tr.style.transform="translateX("+pct+"%)"; }, {passive:false});
+  const end=e=>{ if(!active) return; active=false; if(!drag) return; drag=false;
+    const dx=(e.changedTouches?e.changedTouches[0].clientX-x0:0);
+    let idx=start;
+    if(dx<-w*0.2) idx=start+1; else if(dx>w*0.2) idx=start-1;
+    applyProgMetric(idx, true); };
+  sw.addEventListener("touchend", end, {passive:true});
+  sw.addEventListener("touchcancel", end, {passive:true});
+})();
 $("bwBtn").onclick=async()=>{ const v=parseFloat($("bwInput").value);
   if(isNaN(v)||v<30||v>250){ toast("Enter a valid weight"); return; }
   bw.push({d:Date.now(),kg:v}); await sset("bodyweight",bw); $("bwInput").value=""; renderDash(); toast("Bodyweight logged — staying consistent."); };
@@ -3669,7 +3694,7 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
 
   // don't hijack gestures meant for an input, canvas, button, horizontal strip, drag handle, the tab bar, or an open sheet
   const blocked=el=>{ for(let n=el; n && n!==document.body; n=n.parentElement){
-    if(n.matches && n.matches('input,textarea,select,canvas,button,[data-act="grip"],.seg,.sexseg,.appearance,.chips,.tabbar,.sheet')) return true;
+    if(n.matches && n.matches('input,textarea,select,canvas,button,[data-act="grip"],.seg,.sexseg,.appearance,.chips,.tabbar,.sheet,.meRing,.progswipe')) return true;
     const ox=getComputedStyle(n).overflowX; if((ox==="auto"||ox==="scroll") && n.scrollWidth>n.clientWidth+4) return true;
   } return false; };
   let x0=0, y0=0, armed=false, locked=false, dragging=false, lastX=0, lastT=0, vx=0;
@@ -6628,7 +6653,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v108";
+const APP_VER="v109";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
