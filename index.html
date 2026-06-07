@@ -175,7 +175,7 @@
   <div id="cdLogList"></div>
 </div>
 
-<div class="foot">On-device only · keep a backup · lift safely · build <span id="appVer">v104</span></div>
+<div class="foot">On-device only · keep a backup · lift safely · build <span id="appVer">v105</span></div>
 </div><!-- /pageWorkout -->
 
 <div class="exmenu-pop" id="exMenu"></div>
@@ -230,6 +230,7 @@
   </div></div>
   <div class="pagebody">
     <div class="profcard" id="meProfile" style="display:none;"></div>
+    <div class="mezone">Training</div>
     <div class="mebal" id="meBalance" role="button" tabindex="0" aria-label="Open muscle balance">
       <div class="mebalhd">
         <span class="mebalt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;flex:0 0 auto;vertical-align:-3px;margin-right:6px"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>Muscle balance</span>
@@ -244,7 +245,29 @@
         <span class="mebalcta" id="meBalCta">tap for detail ›</span>
       </div>
     </div>
-    <div class="ed-label">Body weight</div>
+    <div class="ed-label">Progress</div>
+    <div class="seg appearance" id="progMetric">
+      <div class="s active" data-pm="volume">Volume</div>
+      <div class="s" data-pm="sets">Sets</div>
+      <div class="s" data-pm="sessions">Sessions</div>
+      <div class="s" data-pm="weight">Weight</div>
+      <div class="s" data-pm="prs">PRs</div>
+    </div>
+    <canvas id="progBars" width="660" height="180"></canvas>
+    <div class="progcap" id="progCap"></div>
+    <div class="progverd" id="progVerdict" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div>
+
+    <div class="ed-label">Cardio</div>
+    <div class="group" id="cardioCard"></div>
+
+    <div class="stats" style="border:.5px solid var(--line); border-radius:12px; margin-top:16px;">
+      <div class="stat"><div class="n" id="stSessions">0</div><div class="k">Sessions</div></div>
+      <div class="stat"><div class="n" id="stTime">0</div><div class="k">Hours</div></div>
+      <div class="stat"><div class="n" id="stSince">0</div><div class="k">Since deload</div></div>
+      <div class="stat"><div class="n" id="stBeat">0</div><div class="k">Beat last</div></div>
+    </div>
+
+    <div class="mezone">Body</div>
     <div class="row" style="justify-content:space-between; align-items:flex-end;">
       <div class="bwnum"><span id="bwNow">—</span><small>kg</small></div>
       <div class="bwgoal">goal <b id="bwGoalTxt">75 kg</b><br><span id="bwLeft"></span></div>
@@ -265,29 +288,6 @@
         <button class="btn tinted sm" id="goalSave">Save</button>
       </div>
     </div></div>
-
-    <div class="ed-label">Training</div>
-    <div class="stats" style="border:.5px solid var(--line); border-radius:12px;">
-      <div class="stat"><div class="n" id="stSessions">0</div><div class="k">Sessions</div></div>
-      <div class="stat"><div class="n" id="stTime">0</div><div class="k">Hours</div></div>
-      <div class="stat"><div class="n" id="stSince">0</div><div class="k">Since deload</div></div>
-      <div class="stat"><div class="n" id="stBeat">0</div><div class="k">Beat last</div></div>
-    </div>
-
-    <div class="ed-label">Progress</div>
-    <div class="seg appearance" id="progMetric">
-      <div class="s active" data-pm="volume">Volume</div>
-      <div class="s" data-pm="sets">Sets</div>
-      <div class="s" data-pm="sessions">Sessions</div>
-      <div class="s" data-pm="weight">Weight</div>
-      <div class="s" data-pm="prs">PRs</div>
-    </div>
-    <canvas id="progBars" width="660" height="180"></canvas>
-    <div class="progcap" id="progCap"></div>
-    <div class="progverd" id="progVerdict" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div>
-
-    <div class="ed-label">Cardio</div>
-    <div class="group" id="cardioCard"></div>
 
     <details class="setcard" style="margin-top:20px;">
       <summary>
@@ -354,6 +354,7 @@
     </details>
     </div><!-- /setBody -->
 
+    <div class="mezone">History</div>
     <details class="mefold">
       <summary>Achievements</summary>
       <div class="achcap">Lifetime volume moved: <b id="achVol">—</b></div>
