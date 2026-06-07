@@ -4077,7 +4077,7 @@ function radarVal(det, g, target){
 function drawRadar(totals, canvasId, target, noLabels, relative, bare){
   const c=$(canvasId||"musRadar"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const det=expandLegacyMtot(totals||{}), G=roseGroups(musExpanded), n=G.length;
-  const cx=W/2, cy=H/2, R=W*(bare?0.45:(noLabels?0.42:0.33));
+  const cx=W/2, cy=H/2, R=W*(bare?0.30:(noLabels?0.42:0.33));   // bare leaves room for tip labels inside the ring
   const cs=getComputedStyle(document.documentElement);
   const accent=(cs.getPropertyValue("--accent")||"#0a84ff").trim();
   const lab=(cs.getPropertyValue("--l2")||"#888").trim();
@@ -4106,9 +4106,14 @@ function drawRadar(totals, canvasId, target, noLabels, relative, bare){
     ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rr,a-half,a+half); ctx.closePath();
     ctx.fillStyle=col; ctx.globalAlpha=.30; ctx.fill(); ctx.globalAlpha=1; ctx.lineWidth=2; ctx.strokeStyle=col; ctx.stroke(); });
   if(noLabels) return;
-  ctx.fillStyle=lab; ctx.font="600 29px -apple-system,sans-serif"; ctx.textBaseline="middle";
-  G.forEach((g,i)=>{ if(!showSpoke(g)) return; const a=(-90+i*360/n)*Math.PI/180, x=cx+(R+52)*Math.cos(a), y=cy+(R+52)*Math.sin(a), co=Math.cos(a);
+  // bare/hero: only name petals that actually exist, in the muscle's own colour, so label↔wedge is obvious;
+  // full radar: muted labels for every spoke (incl. untrained, to show the gaps).
+  const off = bare ? 40 : 52;
+  ctx.font="600 "+(bare?34:29)+"px -apple-system,sans-serif"; ctx.textBaseline="middle";
+  G.forEach((g,i)=>{ if(!showSpoke(g)) return; if(bare && val(g)<=0) return;
+    const a=(-90+i*360/n)*Math.PI/180, x=cx+(R+off)*Math.cos(a), y=cy+(R+off)*Math.sin(a), co=Math.cos(a);
     ctx.textAlign = Math.abs(co)<0.3 ? "center" : (co>0?"left":"right");
+    ctx.fillStyle = bare ? (MCOLOR[g]||lab) : lab;
     const isParent=SUBGROUPS[g] && !musExpanded.has(g);
     ctx.fillText((MSHORT[g]||g)+(isParent?" ›":""), x, y); });
 }
@@ -4200,9 +4205,10 @@ function meObjectiveScore(){
 function renderMeRadar(){
   const c=$("meRadar"); if(!c) return;
   const {totals}=muscleVolume(30, "sets", "total");
-  // relative + bare: fill the rose to your most-trained muscle (readable even when everything's under
-  // target) and drop the inner guide rings — the conic achievement ring around it is the only ring.
-  drawRadar(weeklyEquiv(totals,30), "meRadar", WEEKLY_SET_TARGET, true, true, true);
+  // relative + bare, WITH labels: rose scales to your most-trained muscle (readable even when everything's
+  // under target), no inner guide rings (the conic ring is the only ring), and each trained petal is named
+  // in its own colour at the tip — so it reads as a labelled dial: ring = % to goal, petals = your muscles.
+  drawRadar(weeklyEquiv(totals,30), "meRadar", WEEKLY_SET_TARGET, false, true, true);
   const st=$("meBalStat"), cta=$("meBalCta"), ring=$("meRing");
   if(st) st.classList.remove("under","good");
   if(!Object.keys(hist).length){
