@@ -34,10 +34,11 @@
 
 <div class="statusbar-bg"></div>
 
-<!-- ROTATE GUARD: Yalla is portrait-only. iOS Safari ignores the manifest/lock API, so this
-     CSS-driven overlay covers the app whenever a phone is held in landscape. -->
-<div class="rotateGuard" id="rotateGuard" aria-hidden="true">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.4"/><path d="M11 18.5h2"/><path d="M2.5 12a4.5 4.5 0 0 1 4.5-4.5" opacity=".5"/><path d="M5 6.2 7 7.5 5.6 9.6" opacity=".5"/></svg>
+<!-- ROTATE GUARD: Yalla is portrait-only. iOS Safari ignores the manifest/lock API, so JS shows this
+     overlay only in landscape on phone-sized screens. Hidden by default INLINE so a stale/missing
+     stylesheet can never expose it (updateRotateGuard in app.js drives the show/hide). -->
+<div class="rotateGuard" id="rotateGuard" aria-hidden="true" style="display:none;">
+  <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.4"/><path d="M11 18.5h2"/><path d="M2.5 12a4.5 4.5 0 0 1 4.5-4.5" opacity=".5"/><path d="M5 6.2 7 7.5 5.6 9.6" opacity=".5"/></svg>
   <div class="rgmsg">Rotate your phone upright</div>
   <div class="rgsub">Yalla works in portrait.</div>
 </div>
@@ -235,8 +236,15 @@
   </div></div>
   <div class="pagebody">
     <div class="profcard" id="meProfile" style="display:none;"></div>
+    <button class="mebal" id="meBalance" type="button" aria-label="Open muscle balance">
+      <div class="mebalhd">
+        <span class="mebalt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;flex:0 0 auto;vertical-align:-3px;margin-right:6px"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>Muscle balance</span>
+        <span class="mebalstat" id="meBalStat"></span>
+      </div>
+      <canvas id="meRadar" width="900" height="900"></canvas>
+      <span class="mebalcta">Tap for the full breakdown ›</span>
+    </button>
     <div class="row" style="gap:8px; margin-bottom:16px;">
-      <button class="btn tinted sm" id="meBalance" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;flex:0 0 auto"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>Muscle balance</button>
       <button class="btn tinted sm" id="meOther" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;flex:0 0 auto"><path d="M3 12h4l2.5-7 4 14 2.5-7H21"/></svg>Other training</button>
     </div>
     <div class="row" style="margin-bottom:16px;">
@@ -889,6 +897,10 @@
       <div class="s" data-m="sets">Sets</div>
       <div class="s" data-m="vol">Volume (kg)</div>
     </div>
+    <div class="seg appearance" id="musScale" style="margin-top:8px; display:none;">
+      <div class="s active" data-sc="abs">vs target</div>
+      <div class="s" data-sc="rel">Relative</div>
+    </div>
     <div class="seg appearance" id="musVolMode" style="margin-top:8px; display:none;">
       <div class="s active" data-vm="total">+ Bodyweight</div>
       <div class="s" data-vm="lifted">Lifted only</div>
@@ -916,7 +928,8 @@
     <p style="color:var(--l2);font-size:13px;margin:0 4px 12px;line-height:1.45;">Away from your usual gym? Tag your sessions so you can see how travel shifts your training. An ✈ badge stays pinned to every page while it's on — tap it to come back here.</p>
     <div class="seg appearance" id="travelSeg">
       <div class="s" data-tv="off">Home</div>
-      <div class="s" data-tv="gym">With gym</div>
+      <div class="s" data-tv="gym">Full gym</div>
+      <div class="s" data-tv="partial">Partial</div>
       <div class="s" data-tv="nogym">No gym</div>
     </div>
     <div id="travelBreakdown"></div>

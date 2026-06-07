@@ -2833,6 +2833,7 @@ function renderDash(){
   renderAchievements();
   renderInsight();
   renderObjective();
+  if(typeof renderMeRadar==="function") renderMeRadar();   // WIP Me-page radar — guarded until it's defined
 }
 function renderCalendar(){
   const grid=$("calGrid"); if(!grid) return;
@@ -3428,8 +3429,8 @@ $("repeatBtn").onclick=repeatLastWorkout;
 $("saveBtn").onclick=async()=>{
   const savedSig=draftSig();
   const p=activePlan(); const w = freeMode ? null : p.workouts[curWk]; let logged=0, beaten=0;
-  // travel tag: 1 = travelling with gym access, 2 = travelling without a gym, 0 = home (normal)
-  const tvCode = settings.travelMode==="gym"?1 : settings.travelMode==="nogym"?2 : 0;
+  // travel tag: 1 = travel + full gym, 2 = travel + no gym, 3 = travel + partial gym, 0 = home (normal)
+  const tvCode = settings.travelMode==="gym"?1 : settings.travelMode==="nogym"?2 : settings.travelMode==="partial"?3 : 0;
   const session={ name: freeMode?"Free workout":(w?w.name:"Workout"), sub:"", totalVol:0, sets:0, beaten:0, top:null, mtot:{}, exercises:[], date:Date.now() };
   document.querySelectorAll("#exlist .group").forEach(g=>{
     const name=g.dataset.ex, pt=topSet(last[name]), sets=[];
@@ -3461,7 +3462,7 @@ $("saveBtn").onclick=async()=>{
   const qualifies = session.sets >= QUALIFY_SETS;
   // per-context travel tally: every session's credit accrues (micro included) so we can later compare
   // session-equivalents PER WEEK across home vs travel; the n/sets/vol/mins quality stats stay full-session-only.
-  const tkey = tvCode===1?"gym" : tvCode===2?"nogym" : "home";
+  const tkey = tvCode===1?"gym" : tvCode===2?"nogym" : tvCode===3?"partial" : "home";
   const ts=settings.travelStats=settings.travelStats||{};
   const slot=ts[tkey]=ts[tkey]||{n:0,sets:0,vol:0,mins:0,cred:0};
   slot.cred=(slot.cred||0)+cred;
@@ -3964,7 +3965,7 @@ const MGROUPS=["Chest","Lats","Upper Back","Lower Back","Front Delts","Side Delt
 // in the builder; they're just not part of the "are you under-training this?" model.
 const NO_TARGET=new Set(["Neck","Lower Back","Forearms","Adductors"]);
 const MSHORT={Chest:"Chest",Back:"Back",Shoulders:"Delts",Biceps:"Biceps",Triceps:"Triceps",Quads:"Quads",Hamstrings:"Hams",Glutes:"Glutes",Calves:"Calves",Core:"Core","Front Delts":"F·Delt","Side Delts":"S·Delt","Rear Delts":"R·Delt",Neck:"Neck",Lats:"Lats","Upper Back":"U·Back","Lower Back":"L·Back",Forearms:"Forearm",Adductors:"Adduct"};
-let musWindow=7, musMetric="sets", musSrc="log", musVolMode="total";
+let musWindow=7, musMetric="sets", musSrc="log", musVolMode="total", musScale="abs";
 // Evidence-based weekly volume targets (fractional sets per muscle per week).
 // Dose-response meta-regressions: benefits accrue across ~10+ hard sets/muscle/wk; ~4–6 is a rough
 // lower bound (MEV) below which most trainees under-stimulate growth. One baseline for all groups —
@@ -3993,6 +3994,8 @@ if($("cardioClose")) $("cardioClose").onclick=()=>closeSheet("Cardio");
 if($("scrimCardio")) $("scrimCardio").onclick=()=>closeSheet("Cardio");
 if($("ringsClose")) $("ringsClose").onclick=()=>closeSheet("Rings");
 if($("scrimRings")) $("scrimRings").onclick=()=>closeSheet("Rings");
+if($("travelClose")) $("travelClose").onclick=()=>closeSheet("Travel");
+if($("scrimTravel")) $("scrimTravel").onclick=()=>closeSheet("Travel");
 $("libClose").onclick=()=>closeSheet("Library");
 $("scrimLibrary").onclick=()=>closeSheet("Library");
 $("libSearch").oninput=function(){ libQuery=this.value; renderLibrary(); };
@@ -4043,6 +4046,7 @@ $("scrimAbout").onclick=()=>closeSheet("About");
 document.querySelectorAll("#musSeg .s").forEach(s=> s.onclick=()=>{ musWindow=+s.dataset.d; renderMuscles(); });
 document.querySelectorAll("#musMetric .s").forEach(s=> s.onclick=()=>{ musMetric=s.dataset.m; renderMuscles(); });
 document.querySelectorAll("#musVolMode .s").forEach(s=> s.onclick=()=>{ musVolMode=s.dataset.vm; renderMuscles(); });
+document.querySelectorAll("#musScale .s").forEach(s=> s.onclick=()=>{ musScale=s.dataset.sc; renderMuscles(); });
 const MUS_TIP="This radar shows weekly sets per muscle against the ~10-set growth target. Switch the source to compare your logs and each plan.";
 function openMuscles(){ if(!plans.some(p=>p.id===musSrc)) musSrc="log"; renderMuscles(); openSheet("Mus"); coach("muscles",MUS_TIP); }
 function openMusclesFor(id){ if(plans.some(p=>p.id===id)){ musSrc=id; renderMuscles(); openSheet("Mus"); coach("muscles",MUS_TIP); } }  // plan-level entry
@@ -4070,7 +4074,7 @@ function radarVal(det, g, target){
   }
   return det[g]||0;
 }
-function drawRadar(totals, canvasId, target, noLabels){
+function drawRadar(totals, canvasId, target, noLabels, relative){
   const c=$(canvasId||"musRadar"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const det=expandLegacyMtot(totals||{}), G=roseGroups(musExpanded), n=G.length;
   const cx=W/2, cy=H/2, R=W*(noLabels?0.42:0.33);
@@ -4080,12 +4084,16 @@ function drawRadar(totals, canvasId, target, noLabels){
   const grid="rgba(128,128,128,.22)";
   const val=g=>radarVal(det, g, target);
   const max=Math.max(1, ...G.map(val));
-  const norm = target ? (g=>Math.min(1,val(g)/target)) : (g=>val(g)/max);
-  // Coxcomb rose — same wedge style as the feed/builder. In target mode the rim is the weekly
-  // "enough volume" line, so short wedges are the muscles still under target (gaps stay visible).
+  // Absolute (target) mode: the rim is a fixed per-muscle weekly goal, so short wedges read as gaps.
+  // Relative mode: spokes scale to your most-trained muscle so the BALANCE SHAPE stays full-size at any
+  // time window (a month no longer collapses toward the centre); the target then shows as a dashed ring.
+  const norm = (target && !relative) ? (g=>Math.min(1,val(g)/target)) : (g=>val(g)/max);
   ctx.strokeStyle=grid; ctx.lineWidth=1.5;
   [0.5,1].forEach(f=>{ ctx.beginPath(); ctx.arc(cx,cy,R*f,0,Math.PI*2); ctx.stroke(); });
-  if(target){ ctx.strokeStyle=accent; ctx.globalAlpha=.45; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; }
+  if(target && !relative){ ctx.strokeStyle=accent; ctx.globalAlpha=.45; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; }
+  else if(target && relative){ const tr=R*Math.min(1,target/max);   // where the ~target/wk line falls on the relative scale
+    ctx.strokeStyle=accent; ctx.globalAlpha=.5; ctx.lineWidth=2; ctx.setLineDash([7,7]);
+    ctx.beginPath(); ctx.arc(cx,cy,tr,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; }
   const half=Math.PI/n - 0.05;
   // Auxiliary (NO_TARGET) muscles have no weekly goal, so against the target ring they'd read as
   // permanent gaps. Match the small roses: show an aux spoke/label only when it was actually trained.
@@ -4180,15 +4188,20 @@ function renderMuscles(){
   }
   const useTarget = isLog && musMetric==="sets";   // sets/week vs a weekly-volume target
   const useKg = isLog && musMetric==="vol";
+  const relative = useTarget && musScale==="rel";  // scale to top muscle instead of the fixed target ring
+  $("musScale").style.display = useTarget ? "" : "none";
+  document.querySelectorAll("#musScale .s").forEach(s=> s.classList.toggle("active", s.dataset.sc===musScale));
   if(isLog) $("musIntro").textContent = useTarget
-    ? "Sets per muscle per week vs a ~"+WEEKLY_SET_TARGET+"-set target (the outer ring). Reaching the ring means that muscle is getting enough weekly volume to grow; a dent means it's under-dosed."
+    ? (relative
+        ? "Your training shape over this window — each muscle scaled to your most-trained, so balance stays readable at any range (it won't shrink on longer windows). The dashed ring marks the ~"+WEEKLY_SET_TARGET+"-set weekly target."
+        : "Sets per muscle per week vs a ~"+WEEKLY_SET_TARGET+"-set target (the outer ring). Reaching the ring means that muscle is getting enough weekly volume to grow; a dent means it's under-dosed.")
     : "Total load moved per muscle in this window — bigger means more volume, scaled to your top group.";
   else $("musIntro").textContent="Projected balance if you follow “"+(plans.find(p=>p.id===musSrc)||activePlan()).name+"” — planned sets across one full cycle.";
   const showVolMode = useKg;
   $("musVolMode").style.display = showVolMode ? "" : "none";
   $("musVolNote").style.display = showVolMode ? "" : "none";
   const view = useTarget ? weeklyEquiv(totals, musWindow) : totals;
-  drawRadar(view, "musRadar", useTarget ? WEEKLY_SET_TARGET : null);
+  drawRadar(view, "musRadar", useTarget ? WEEKLY_SET_TARGET : null, false, relative);
   const groups=Object.keys(view).filter(g=>view[g]>0).sort((a,b)=>view[b]-view[a]);
   const max=Math.max(1, ...groups.map(g=>view[g]));
   const bars=$("musBars");
@@ -4261,14 +4274,14 @@ document.querySelectorAll("#tipModeSeg .s").forEach(s=>{
 });
 
 // ================= travel mode (global; tags sessions home / travel+gym / travel-no-gym) =================
-const TRAVEL_LBL={ off:"Home", gym:"with gym access", nogym:"no gym" };
+const TRAVEL_LBL={ off:"Home", gym:"full gym access", nogym:"no gym", partial:"partial gym access" };
 function renderTravelSeg(){
   const m = settings.travelMode || "off";
   document.querySelectorAll("#travelSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.tv===m));
 }
 // global airplane badge — pinned to the same spot on EVERY page while travel mode is on, so it's
 // never silently active (the old in-page banner only showed on the workout tab; this replaces it).
-const TRAVEL_FAB_LBL={ gym:"with gym", nogym:"no gym" };
+const TRAVEL_FAB_LBL={ gym:"full gym", nogym:"no gym", partial:"partial gym" };
 // the global ✈ badge (on every page while travelling) AND the Workout-header ✈ both reflect on/off here
 function renderTravelFab(){
   const m=settings.travelMode||"off", on=m!=="off";
@@ -4285,9 +4298,9 @@ function openTravel(){ renderTravel(); openSheet("Travel"); }
 // We bank the real time spent in each context (home / travel+gym / travel-no-gym) so we can later
 // compare training output PER WEEK across them — i.e. how strongly travel dents your consistency,
 // not just per-session quality. travelStats[ctx].cred = session-equivalents logged in that context.
-function travelCtx(m){ m=m||settings.travelMode||"off"; return m==="gym"?"gym":m==="nogym"?"nogym":"home"; }
+function travelCtx(m){ m=m||settings.travelMode||"off"; return m==="gym"?"gym":m==="nogym"?"nogym":m==="partial"?"partial":"home"; }
 function travelAccrue(){   // call on every mode change + once per launch; persisted by the caller
-  const now=Date.now(), tt=settings.travelTime=settings.travelTime||{home:0,gym:0,nogym:0};
+  const now=Date.now(), tt=settings.travelTime=settings.travelTime||{home:0,gym:0,nogym:0,partial:0};
   if(settings.travelSince) tt[travelCtx()]=(tt[travelCtx()]||0)+Math.max(0, now-settings.travelSince);
   settings.travelSince=now;
 }
@@ -4298,7 +4311,7 @@ function travelWeeks(ctx){ const tt=settings.travelTime||{};
 function renderTravelBreakdown(){
   const box=$("travelBreakdown"); if(!box) return;
   const ts=settings.travelStats||{};
-  const order=[["home","Home"],["gym","Travel · gym"],["nogym","Travel · no gym"]];
+  const order=[["home","Home"],["gym","Travel · full gym"],["partial","Travel · partial gym"],["nogym","Travel · no gym"]];
   const rows=order.filter(([k])=>ts[k]&&ts[k].n>0);
   if(rows.length<2){ box.innerHTML=""; return; }   // nothing to compare against until there's travel data
   let h='<div class="ed-label">Travel vs home</div><div class="tvbreak">';
@@ -6489,6 +6502,15 @@ $("coachX").onclick=()=>$("coach").classList.remove("show");
 // keep the app portrait. The manifest already declares orientation:portrait (honored by installed
 // PWAs / Android); this is a best-effort runtime lock where the API exists. iOS Safari ignores it.
 try{ if(screen.orientation && screen.orientation.lock) screen.orientation.lock("portrait").catch(()=>{}); }catch(e){}
+
+// iOS Safari can't be locked, so show the rotate guard only when actually landscape on a phone-sized
+// screen. JS-driven (sets inline display) so it's robust against a stale stylesheet and never lingers.
+function updateRotateGuard(){ const g=$("rotateGuard"); if(!g) return;
+  const land = !!(window.matchMedia && matchMedia("(orientation:landscape)").matches) && window.innerHeight<=540 && window.innerWidth<=900;
+  g.style.display = land ? "flex" : "none"; }
+window.addEventListener("resize", updateRotateGuard);
+window.addEventListener("orientationchange", updateRotateGuard);
+updateRotateGuard();
 
 init();
 

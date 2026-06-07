@@ -981,6 +981,15 @@
   .growth.shrink{ border-left-color:var(--red); } .growth .gdot.shrink{ background:var(--red); }
   .growth.more{ border-left-color:var(--line); } .growth .gdot.more{ background:var(--l3); }
   #musRadar, #buildRadar{ width:100%; max-width:330px; height:auto; aspect-ratio:1/1; display:block; margin:16px auto 20px; }
+  .mebal{ display:block; width:100%; text-align:center; padding:16px 16px 13px; margin-bottom:18px; background:var(--card); border:.5px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--shadow), inset 0 .5px 0 var(--hi); cursor:pointer; -webkit-tap-highlight-color:transparent; transition:opacity .12s; color:inherit; -webkit-appearance:none; appearance:none; font:inherit; }
+  .mebal:active{ opacity:.7; }
+  .mebal .mebalhd{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+  .mebal .mebalt{ font-size:19px; font-weight:700; letter-spacing:-.3px; }
+  .mebal .mebalstat{ font-size:13px; font-weight:600; color:var(--l2); text-align:right; }
+  .mebal .mebalstat.under{ color:var(--red); }
+  .mebal .mebalstat.good{ color:#2fb463; }
+  .mebal .mebalcta{ display:block; font-size:12px; color:var(--l3); }
+  #meRadar{ width:100%; max-width:250px; height:auto; aspect-ratio:1/1; display:block; margin:10px auto 6px; }
   .emphradar{ max-width:300px!important; margin:8px auto 12px!important; touch-action:none; cursor:grab; -webkit-user-select:none; user-select:none; }
   .emphradar:active{ cursor:grabbing; }
   .prevhdr{ display:flex; align-items:center; justify-content:space-between; margin:20px 0 0; font-size:12px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--l2); }
@@ -1069,15 +1078,13 @@
   .wo-exn{ font-weight:600; font-size:15px; color:var(--ink); }
   .wo-exs{ margin-top:2px; font-size:13px; color:var(--l2); }
 
-  /* Portrait-only guard. Hidden by default; the landscape media query (phones only — capped by
-     max-height so tablets/desktop are unaffected) covers the whole app and asks to rotate back. */
-  .rotateGuard{ display:none; }
-  @media (orientation:landscape) and (max-height:540px){
-    .rotateGuard{ display:flex; position:fixed; inset:0; z-index:500; flex-direction:column;
-      align-items:center; justify-content:center; gap:10px; text-align:center; padding:24px;
-      background:var(--bg); color:var(--ink); }
-    .rotateGuard svg{ width:46px; height:46px; color:var(--accent); animation:rgturn 2.4s ease-in-out infinite; }
-    .rotateGuard .rgmsg{ font-size:18px; font-weight:700; letter-spacing:-.3px; }
-    .rotateGuard .rgsub{ font-size:14px; color:var(--l2); }
-    @keyframes rgturn{ 0%,55%,100%{ transform:rotate(0deg); } 75%,90%{ transform:rotate(-90deg); } }
-  }
+  /* Portrait-only guard. Visibility is driven by JS (updateRotateGuard) which sets inline display —
+     the element ships inline display:none so a stale/missing stylesheet can't expose it. These rules
+     only style it for when JS does show it (landscape on a phone-sized screen). */
+  .rotateGuard{ position:fixed; inset:0; z-index:500; flex-direction:column;
+    align-items:center; justify-content:center; gap:10px; text-align:center; padding:24px;
+    background:var(--bg); color:var(--ink); }
+  .rotateGuard svg{ width:46px; height:46px; color:var(--accent); animation:rgturn 2.4s ease-in-out infinite; }
+  .rotateGuard .rgmsg{ font-size:18px; font-weight:700; letter-spacing:-.3px; }
+  .rotateGuard .rgsub{ font-size:14px; color:var(--l2); }
+  @keyframes rgturn{ 0%,55%,100%{ transform:rotate(0deg); } 75%,90%{ transform:rotate(-90deg); } }
