@@ -4074,10 +4074,10 @@ function radarVal(det, g, target){
   }
   return det[g]||0;
 }
-function drawRadar(totals, canvasId, target, noLabels, relative, bare){
+function drawRadar(totals, canvasId, target, noLabels, relative){
   const c=$(canvasId||"musRadar"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const det=expandLegacyMtot(totals||{}), G=roseGroups(musExpanded), n=G.length;
-  const cx=W/2, cy=H/2, R=W*(bare?0.30:(noLabels?0.42:0.33));   // bare leaves room for tip labels inside the ring
+  const cx=W/2, cy=H/2, R=W*(noLabels?0.42:0.33);
   const cs=getComputedStyle(document.documentElement);
   const accent=(cs.getPropertyValue("--accent")||"#0a84ff").trim();
   const lab=(cs.getPropertyValue("--l2")||"#888").trim();
@@ -4088,15 +4088,12 @@ function drawRadar(totals, canvasId, target, noLabels, relative, bare){
   // Relative mode: spokes scale to your most-trained muscle so the BALANCE SHAPE stays full-size at any
   // time window (a month no longer collapses toward the centre); the target then shows as a dashed ring.
   const norm = (target && !relative) ? (g=>Math.min(1,val(g)/target)) : (g=>val(g)/max);
-  // bare: skip all guide rings (used by the Me-page hero, where the conic achievement ring is the only ring)
-  if(!bare){
-    ctx.strokeStyle=grid; ctx.lineWidth=1.5;
-    [0.5,1].forEach(f=>{ ctx.beginPath(); ctx.arc(cx,cy,R*f,0,Math.PI*2); ctx.stroke(); });
-    if(target && !relative){ ctx.strokeStyle=accent; ctx.globalAlpha=.45; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; }
-    else if(target && relative){ const tr=R*Math.min(1,target/max);   // where the ~target/wk line falls on the relative scale
-      ctx.strokeStyle=accent; ctx.globalAlpha=.5; ctx.lineWidth=2; ctx.setLineDash([7,7]);
-      ctx.beginPath(); ctx.arc(cx,cy,tr,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; }
-  }
+  ctx.strokeStyle=grid; ctx.lineWidth=1.5;
+  [0.5,1].forEach(f=>{ ctx.beginPath(); ctx.arc(cx,cy,R*f,0,Math.PI*2); ctx.stroke(); });
+  if(target && !relative){ ctx.strokeStyle=accent; ctx.globalAlpha=.45; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; }
+  else if(target && relative){ const tr=R*Math.min(1,target/max);   // where the ~target/wk line falls on the relative scale
+    ctx.strokeStyle=accent; ctx.globalAlpha=.5; ctx.lineWidth=2; ctx.setLineDash([7,7]);
+    ctx.beginPath(); ctx.arc(cx,cy,tr,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; }
   const half=Math.PI/n - 0.05;
   // Auxiliary (NO_TARGET) muscles have no weekly goal, so against the target ring they'd read as
   // permanent gaps. Match the small roses: show an aux spoke/label only when it was actually trained.
@@ -4106,14 +4103,9 @@ function drawRadar(totals, canvasId, target, noLabels, relative, bare){
     ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rr,a-half,a+half); ctx.closePath();
     ctx.fillStyle=col; ctx.globalAlpha=.30; ctx.fill(); ctx.globalAlpha=1; ctx.lineWidth=2; ctx.strokeStyle=col; ctx.stroke(); });
   if(noLabels) return;
-  // bare/hero: only name petals that actually exist, in the muscle's own colour, so label↔wedge is obvious;
-  // full radar: muted labels for every spoke (incl. untrained, to show the gaps).
-  const off = bare ? 40 : 52;
-  ctx.font="600 "+(bare?34:29)+"px -apple-system,sans-serif"; ctx.textBaseline="middle";
-  G.forEach((g,i)=>{ if(!showSpoke(g)) return; if(bare && val(g)<=0) return;
-    const a=(-90+i*360/n)*Math.PI/180, x=cx+(R+off)*Math.cos(a), y=cy+(R+off)*Math.sin(a), co=Math.cos(a);
+  ctx.fillStyle=lab; ctx.font="600 29px -apple-system,sans-serif"; ctx.textBaseline="middle";
+  G.forEach((g,i)=>{ if(!showSpoke(g)) return; const a=(-90+i*360/n)*Math.PI/180, x=cx+(R+52)*Math.cos(a), y=cy+(R+52)*Math.sin(a), co=Math.cos(a);
     ctx.textAlign = Math.abs(co)<0.3 ? "center" : (co>0?"left":"right");
-    ctx.fillStyle = bare ? (MCOLOR[g]||lab) : lab;
     const isParent=SUBGROUPS[g] && !musExpanded.has(g);
     ctx.fillText((MSHORT[g]||g)+(isParent?" ›":""), x, y); });
 }
@@ -4178,8 +4170,34 @@ function renderMuscleSuggestions(view){
   box.querySelectorAll(".sgbtn[data-add]").forEach(b=> b.onclick=()=>addMoveToPlan(b.dataset.mus, b.dataset.add));
   box.querySelectorAll(".sgbtn[data-rm]").forEach(b=> b.onclick=()=>{ const p=b.dataset.rm.split(",").map(Number); removeMoveFromPlan(p[0],p[1]); });
 }
-// compact muscle-balance preview on the Me dashboard — a 30-day sets/week radar vs the growth target;
-// the whole card taps through to the full balance sheet (see #meBalance → openMuscles).
+// Per-muscle SUCCESS gauge for the Me dashboard. Every major target-bearing group gets an equal spoke
+// whose fill = its % of the ~10-set/wk growth target (rim = target → reaching the rim = enough volume to
+// grow). Unlike the rose, all groups always show as even slots, so there's no lopsided gap and you can
+// read "relative success by muscle group" at a glance. The conic ring around it is the overall objective.
+const GAUGE_GROUPS=["Chest","Back","Shoulders","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves","Core"];
+function drawSuccessGauge(canvasId, wk){
+  const c=$(canvasId); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  const det=expandLegacyMtot(wk||{});
+  const lab=(getComputedStyle(document.documentElement).getPropertyValue("--l2")||"#888").trim();
+  const cx=W/2, cy=H/2, R=W*0.30, n=GAUGE_GROUPS.length, half=Math.PI/n-0.06;
+  // collapse delt heads / back regions into the parent (mean of its target-bearing heads), independent of
+  // the sheet's expand state so the hero is always the clean 10-spoke view.
+  const HEADS={ Shoulders:["Front Delts","Side Delts","Rear Delts"], Back:["Lats","Upper Back"] };
+  const val=g=>{ const h=HEADS[g]; return h ? h.reduce((a,m)=>a+(det[m]||0),0)/h.length : (det[g]||0); };
+  ctx.strokeStyle="rgba(128,128,128,.25)"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();  // target rim
+  GAUGE_GROUPS.forEach((g,i)=>{
+    const a=(-90+i*360/n)*Math.PI/180, col=MCOLOR[g]||lab, succ=Math.min(1,(val(g)||0)/WEEKLY_SET_TARGET);
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,a-half,a+half); ctx.closePath();        // empty slot → the target
+    ctx.fillStyle=col; ctx.globalAlpha=.10; ctx.fill(); ctx.globalAlpha=1;
+    const rr=R*succ;
+    if(rr>1){ ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rr,a-half,a+half); ctx.closePath();   // success fill
+      ctx.fillStyle=col; ctx.globalAlpha=succ>=1?.62:.42; ctx.fill(); ctx.globalAlpha=1; ctx.lineWidth=2; ctx.strokeStyle=col; ctx.stroke(); }
+    const x=cx+(R+40)*Math.cos(a), y=cy+(R+40)*Math.sin(a), co=Math.cos(a);
+    ctx.font="600 31px -apple-system,sans-serif"; ctx.textBaseline="middle";
+    ctx.textAlign = Math.abs(co)<0.3 ? "center" : (co>0?"left":"right");
+    ctx.fillStyle=col; ctx.fillText(MSHORT[g]||g, x, y);
+  });
+}
 // How much of THIS WEEK's objective the user has met (0–100). Blends three trailing-7-day signals,
 // weighted by the stated objective: lifting-volume adherence on the muscles the plan targets, training
 // consistency (days trained vs the plan's weekly sessions), and — for fat-loss / fitness — cardio minutes
@@ -4205,10 +4223,8 @@ function meObjectiveScore(){
 function renderMeRadar(){
   const c=$("meRadar"); if(!c) return;
   const {totals}=muscleVolume(30, "sets", "total");
-  // relative + bare, WITH labels: rose scales to your most-trained muscle (readable even when everything's
-  // under target), no inner guide rings (the conic ring is the only ring), and each trained petal is named
-  // in its own colour at the tip — so it reads as a labelled dial: ring = % to goal, petals = your muscles.
-  drawRadar(weeklyEquiv(totals,30), "meRadar", WEEKLY_SET_TARGET, false, true, true);
+  // per-muscle success gauge (30-day weekly avg keeps each group's read stable); the conic ring is overall
+  drawSuccessGauge("meRadar", weeklyEquiv(totals,30));
   const st=$("meBalStat"), cta=$("meBalCta"), ring=$("meRing");
   if(st) st.classList.remove("under","good");
   if(!Object.keys(hist).length){
