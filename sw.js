@@ -5,15 +5,22 @@
  *              version to GitHub, friends get it the next time they open the app online.
  *  - Offline → serve the last version that was cached. Their log keeps working with no signal.
  *
- * Bump CACHE (v1 → v2 → …) only if you ever need to force-clear old caches; the network-first
- * strategy already picks up new versions on its own, so you usually won't need to touch this.
+ * Bump CACHE (v94 → v95 → …) on every deploy. Changing this file is what makes the browser notice a
+ * new service worker; the new SW then re-fetches the shell with cache:"reload" (bypassing the HTTP
+ * cache) and deletes the old cache on activate, so friends get the update on next open.
  */
-const CACHE = "yalla-v94";
+const CACHE = "yalla-v95";
 const SHELL = ["./", "./index.html", "./app.css", "./app.js", "./manifest.webmanifest", "./icon-1024.png", "./evidence.json"];
 
 self.addEventListener("install", (e) => {
+  // Pre-cache the shell with cache:"reload" so install ALWAYS bypasses the browser's HTTP cache
+  // (GitHub Pages serves app.js/app.css with max-age=600). Combined with bumping CACHE on each deploy,
+  // this means a fresh push lands on the next app open instead of after the ~10-minute cache window.
   e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()).catch(() => {})
+    caches.open(CACHE)
+      .then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: "reload" }))))
+      .then(() => self.skipWaiting())
+      .catch(() => {})
   );
 });
 
