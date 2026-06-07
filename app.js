@@ -3988,9 +3988,20 @@ function weeklyEquiv(totals, windowDays){
   const wks = windowDays ? windowDays/7 : histSpanWeeks();
   const out={}; Object.keys(totals).forEach(g=> out[g]=totals[g]/wks); return out;
 }
-$("meBalance").onclick=()=>{ openMuscles(); };
-// hero window toggle (Week / Month) — stop the tap from also opening the full sheet
-document.querySelectorAll("#meWinSeg .s").forEach(s=> s.onclick=(e)=>{ e.stopPropagation(); meWindow=+s.dataset.d; renderMeRadar(); });
+$("meBalance").onclick=()=>{ if(_meSwiped){ _meSwiped=false; return; } openMuscles(); };   // a swipe must not open the sheet
+// hero window switch (Week / Month): tappable underline tabs + swipe the gauge. Both set meWindow.
+let _meSwiped=false;
+function setMeWindow(d){ if(d!==meWindow){ meWindow=d; renderMeRadar(); } }
+document.querySelectorAll("#meWinSeg .mewintab").forEach(t=> t.onclick=(e)=>{ e.stopPropagation(); setMeWindow(+t.dataset.d); });
+(function(){ const el=$("meRadar"); if(!el) return;   // the pager ignores canvas touches, so this won't fight tab-swipe
+  let x0=0, y0=0, sw=false;
+  el.addEventListener("touchstart", e=>{ if(e.touches.length!==1) return; x0=e.touches[0].clientX; y0=e.touches[0].clientY; sw=false; }, {passive:true});
+  el.addEventListener("touchmove", e=>{ if(!e.touches.length) return; const dx=e.touches[0].clientX-x0, dy=e.touches[0].clientY-y0;
+    if(!sw && Math.abs(dx)>22 && Math.abs(dx)>Math.abs(dy)*1.3) sw=true;
+    if(sw) e.preventDefault(); }, {passive:false});
+  el.addEventListener("touchend", e=>{ if(!sw) return; _meSwiped=true;   // suppress the card tap that follows
+    setMeWindow((e.changedTouches[0].clientX-x0)<0 ? 30 : 7); }, {passive:true});
+})();
 $("musClose").onclick=()=>closeSheet("Mus");
 $("scrimMus").onclick=()=>closeSheet("Mus");
 if($("cardioClose")) $("cardioClose").onclick=()=>closeSheet("Cardio");
@@ -4227,7 +4238,7 @@ function meObjectiveScore(days){
 }
 function renderMeRadar(){
   const c=$("meRadar"); if(!c) return;
-  document.querySelectorAll("#meWinSeg .s").forEach(s=> s.classList.toggle("active", +s.dataset.d===meWindow));
+  document.querySelectorAll("#meWinSeg .mewintab").forEach(t=> t.classList.toggle("active", +t.dataset.d===meWindow));
   // per-muscle success gauge over the selected window (Week = 7d, Month = 30d), normalised to sets/week
   const wk=weeklyEquiv(muscleVolume(meWindow, "sets", "total").totals, meWindow);
   drawSuccessGauge("meRadar", wk);
@@ -4235,13 +4246,13 @@ function renderMeRadar(){
   if(st) st.classList.remove("under","good");
   if(!Object.keys(hist).length){
     if(st) st.textContent="No sessions yet";
-    if(cta) cta.textContent="Log a workout to see your balance ›";
+    if(cta) cta.textContent="log a workout ›";
     return;
   }
   const {pct, objLabel}=meObjectiveScore(meWindow);
   if(st){ st.textContent=objLabel+" · "+pct+"%"; if(pct>=85) st.classList.add("good"); else if(pct<50) st.classList.add("under"); }
   if(cta){ const det=expandLegacyMtot(wk), under=GAUGE_GROUPS.filter(g=>gaugeVal(det,g)<WEEKLY_SET_MIN).length;
-    cta.textContent=(under ? under+" muscle"+(under>1?"s":"")+" under target" : "On track")+" · tap for detail ›"; }
+    cta.textContent=(under ? under+" under target · " : "")+"detail ›"; }
 }
 function renderMuscles(){
   buildSrc();
@@ -6597,7 +6608,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v102";
+const APP_VER="v103";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH

@@ -976,17 +976,20 @@
   #musRadar, #buildRadar{ width:100%; max-width:330px; height:auto; aspect-ratio:1/1; display:block; margin:16px auto 20px; }
   .mebal{ display:block; width:100%; text-align:center; padding:16px 16px 13px; margin-bottom:18px; background:var(--card); border:.5px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--shadow), inset 0 .5px 0 var(--hi); cursor:pointer; -webkit-tap-highlight-color:transparent; transition:opacity .12s; color:inherit; -webkit-appearance:none; appearance:none; font:inherit; }
   .mebal:active{ opacity:.7; }
-  .mebal .mebalhd{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+  .mebal .mebalhd{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
   .mebal .mebalt{ font-size:19px; font-weight:700; letter-spacing:-.3px; }
-  .mebal .mebalstat{ font-size:13px; font-weight:600; color:var(--l2); text-align:right; }
+  /* window switch: quiet underline tabs docked top-right (also the state indicator for the swipe gesture) */
+  .mewintabs{ display:flex; gap:16px; flex:0 0 auto; }
+  .mewintab{ position:relative; padding:1px 0 5px; background:none; border:none; font:inherit; font-size:13px; font-weight:600; color:var(--l3); cursor:pointer; -webkit-appearance:none; appearance:none; -webkit-tap-highlight-color:transparent; transition:color .15s; }
+  .mewintab.active{ color:var(--ink); }
+  .mewintab.active::after{ content:""; position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:2px; background:var(--accent); }
+  /* per-muscle success gauge wrapper (no outer ring); swipe left/right to flip Week↔Month */
+  .meRing{ box-sizing:border-box; width:100%; max-width:300px; aspect-ratio:1/1; margin:10px auto 8px; touch-action:pan-y; }
+  .mebalfoot{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .mebal .mebalstat{ font-size:13px; font-weight:600; color:var(--l2); text-align:left; }
   .mebal .mebalstat.under{ color:var(--red); }
   .mebal .mebalstat.good{ color:#2fb463; }
-  .mebal .mebalcta{ display:block; position:relative; margin-top:14px; font-size:12px; color:var(--l3); }
-  /* per-muscle success gauge wrapper (no outer ring) */
-  /* sleek, compact Week/Month pill (overrides the chunky default .seg sizing) */
-  .mebalseg{ max-width:172px; margin:6px auto 0; padding:3px; border-radius:10px; }
-  .mebalseg .s{ flex:1; padding:7px 0; font-size:13px; font-weight:600; border-radius:8px; }
-  .meRing{ box-sizing:border-box; width:100%; max-width:300px; aspect-ratio:1/1; margin:8px auto 6px; }
+  .mebal .mebalcta{ font-size:12px; color:var(--l3); flex:0 0 auto; }
   #meRadar{ display:block; width:100%; height:100%; }
   .emphradar{ max-width:300px!important; margin:8px auto 12px!important; touch-action:none; cursor:grab; -webkit-user-select:none; user-select:none; }
   .emphradar:active{ cursor:grabbing; }

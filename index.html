@@ -175,7 +175,7 @@
   <div id="cdLogList"></div>
 </div>
 
-<div class="foot">On-device only · keep a backup · lift safely · build <span id="appVer">v102</span></div>
+<div class="foot">On-device only · keep a backup · lift safely · build <span id="appVer">v103</span></div>
 </div><!-- /pageWorkout -->
 
 <div class="exmenu-pop" id="exMenu"></div>
@@ -233,14 +233,16 @@
     <div class="mebal" id="meBalance" role="button" tabindex="0" aria-label="Open muscle balance">
       <div class="mebalhd">
         <span class="mebalt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;flex:0 0 auto;vertical-align:-3px;margin-right:6px"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>Muscle balance</span>
-        <span class="mebalstat" id="meBalStat"></span>
-      </div>
-      <div class="seg appearance mebalseg" id="meWinSeg">
-        <div class="s active" data-d="7">Week</div>
-        <div class="s" data-d="30">Month</div>
+        <div class="mewintabs" id="meWinSeg">
+          <button class="mewintab active" data-d="7" type="button">Week</button>
+          <button class="mewintab" data-d="30" type="button">Month</button>
+        </div>
       </div>
       <div class="meRing" id="meRing"><canvas id="meRadar" width="900" height="900"></canvas></div>
-      <span class="mebalcta" id="meBalCta">Tap for the full breakdown ›</span>
+      <div class="mebalfoot">
+        <span class="mebalstat" id="meBalStat"></span>
+        <span class="mebalcta" id="meBalCta">tap for detail ›</span>
+      </div>
     </div>
     <div class="row" style="gap:8px; margin-bottom:16px;">
       <button class="btn tinted sm" id="meOther" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;flex:0 0 auto"><path d="M3 12h4l2.5-7 4 14 2.5-7H21"/></svg>Other training</button>
