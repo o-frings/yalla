@@ -6578,7 +6578,12 @@ if("serviceWorker" in navigator && location.protocol==="https:"){
   // when a new version takes control, reload once so the update shows without a manual re-add
   let _swReloaded=false;
   navigator.serviceWorker.addEventListener("controllerchange", ()=>{ if(_swReloaded) return; _swReloaded=true; location.reload(); });
+  // footer build label: ask the controlling worker for its cache version so it can never drift from reality
+  const showSwVersion=()=>{ const c=navigator.serviceWorker.controller; if(c) c.postMessage("getVersion"); };
+  navigator.serviceWorker.addEventListener("message", (e)=>{ if(e.data && e.data.type==="version"){
+    const el=document.getElementById("appVer"); if(el) el.textContent=String(e.data.version).replace(/^yalla-/,""); } });
   window.addEventListener("load", ()=>{
+    showSwVersion();
     navigator.serviceWorker.register("sw.js").then(reg=>{
       reg.update();                                   // check for a newer worker on every launch
       setInterval(()=>reg.update(), 60*60*1000);      // and hourly while open
