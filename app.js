@@ -2495,11 +2495,12 @@ function drawRings(id, rings){
 }
 // ===== "This week" rings detail — tap the overview rings to see what each one means + which muscles
 // you've trained vs the ones your plan targets but you haven't hit yet =====
-function ringRow(color,label,val,target,desc,unit){
+function ringRow(color,label,val,target,desc,unit,dec){
   const pct=target?Math.min(100,Math.round(val/target*100)):0, done=target&&val>=target;
+  const shown = dec ? round1(val) : Math.round(val);
   return '<div class="ringrow"><div class="ringrowhd"><span class="rrdot" style="background:'+color+'"></span>'
     +'<span class="rrlbl">'+label+'</span>'
-    +'<span class="rrval"'+(done?' style="color:'+color+'"':'')+'>'+Math.round(val)+' <small>/ '+target+(unit?' '+unit:'')+'</small>'+(done?' ✓':'')+'</span></div>'
+    +'<span class="rrval"'+(done?' style="color:'+color+'"':'')+'>'+shown+' <small>/ '+target+(unit?' '+unit:'')+'</small>'+(done?' ✓':'')+'</span></div>'
     +'<div class="rrbar"><i style="width:'+pct+'%;background:'+color+'"></i></div>'
     +'<p class="rrdesc">'+desc+'</p></div>';
 }
@@ -2508,9 +2509,9 @@ function renderRingsDetail(){
   const box=$("ringsBody"); if(!box) return;
   const cut=Date.now()-7*86400000; let setsWk=0; const musWk=new Set();
   Object.keys(hist).forEach(n=>{ const gs=muscleFor(n); (hist[n]||[]).forEach(e=>{ if(e.d>=cut){ setsWk+=(e.n||0); gs.forEach(g=>{ if(MGROUPS.indexOf(g)>=0) musWk.add(g); }); } }); });
-  const f7=sessionDays(7), sessTarget=Math.max(2,Math.min(5,planSessionsPerWeek(activePlan())||3)), setsTarget=Math.max(20,sessTarget*18);
+  const f7=sessionCredit(7), sessTarget=Math.max(2,Math.min(5,planSessionsPerWeek(activePlan())||3)), setsTarget=Math.max(20,sessTarget*18);
   let h="";
-  h+=ringRow("#ff6b3d","Sessions",f7,sessTarget,"Real workouts logged in the last 7 days (a quick token effort doesn't count). Aim for "+sessTarget+" to match your plan's schedule.");
+  h+=ringRow("#ff6b3d","Sessions",f7,sessTarget,"Session-equivalents this week — a short session counts in proportion to the work done, so a couple of micro sessions add up to a full one. Aim for "+sessTarget+" to match your plan.",null,true);
   h+=ringRow("#4dabf7","Hard sets",setsWk,setsTarget,"Working sets across every muscle this week — quality sets taken near failure are what drive growth.");
   h+=ringRow("#51cf66","Muscles",musWk.size,12,"Distinct muscle groups you've trained this week. Spreading the work keeps you balanced and injury-resistant.");
   // trained vs not-trained breakdown (the heart of the muscles ring)
@@ -2692,8 +2693,8 @@ function renderOverview(){
   } else {
     h+='<div class="group ovtap ovstart"><div class="pad ovstartpad"><div class="ovstarttext"><div class="ovbig">Pick a plan to begin</div></div><span class="ovchev ovgo">›</span></div></div>';
   }
-  // a one-line motivator under Today (the full stats live on Me) — counts only real sessions, not token efforts
-  const f7=sessionDays(7);
+  // a one-line motivator under Today (the full stats live on Me) — session-equivalents, so micro sessions count too
+  const f7=sessionCredit(7);
   const motiv = f7>=4?"Strong week — you’re putting in the work." : f7>=2?"Good momentum — keep it rolling." : f7>=1?"You’ve started — one more session lifts the whole week." : "Fresh week. The first session is the hardest — let’s go.";
   h+='<p class="ovp" style="margin:12px 0 0;">'+motiv+'</p>';
   // --- visual snapshot: three activity rings to fill this week + a "vs last month" delta ---
@@ -2710,7 +2711,8 @@ function renderOverview(){
     // month-over-month volume delta
     const vol=(loDays,hiDays)=>{ const lo=Date.now()-loDays*86400000, hi=Date.now()-hiDays*86400000; let v=0; Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ if(e.d>=lo&&e.d<hi) v+=(e.v||0); })); return v; };
     const cur=vol(28,0), prev=vol(56,28), delta = prev>0 ? Math.round((cur-prev)/prev*100) : null;
-    const legend=ovRings.map(r=>'<span class="rglg"><i style="background:'+r.color+'"></i>'+r.label+' <b>'+Math.round(r.val)+'</b>/'+r.target+(r.unit?' '+r.unit:'')+'</span>').join('');
+    const legend=ovRings.map(r=>{ const rv = r.label==="Sessions" ? round1(r.val) : Math.round(r.val);
+      return '<span class="rglg"><i style="background:'+r.color+'"></i>'+r.label+' <b>'+rv+'</b>/'+r.target+(r.unit?' '+r.unit:'')+'</span>'; }).join('');
     const deltaLine = delta!=null ? '<div class="ovdelta'+(delta>=0?' up':' down')+'">'+(delta>=0?'▲':'▼')+' Volume '+(delta>=0?'+':'')+delta+'% vs the month before</div>' : '';
     h+='<div class="ed-label">This week <span class="subhint">— tap for detail ›</span></div>';
     h+='<div class="group ovtap ovsnap"><div class="pad" style="display:flex; align-items:center; gap:16px;">'
@@ -2811,7 +2813,7 @@ function renderDash(){
   $("bwBar").style.width = pct+"%";
   $("bwGoalTxt").textContent = hasGoal ? g+" kg" : "—";
   $("bwLeft").textContent = !hasGoal ? "set a goal weight below" : (now!=null ? (now>=g?"goal reached — amazing":(g-now).toFixed(1)+" kg to go") : "log your first weigh-in");
-  $("stSessions").textContent = settings.sessions;
+  $("stSessions").textContent = Math.floor(settings.sessions||0);   // session-equivalents, whole part
   const hrs=(settings.timeTotal||0)/60;
   $("stTime").textContent = hrs>=10 ? Math.round(hrs) : round1(hrs);
   $("stSince").textContent = settings.sinceDeload;
@@ -3197,6 +3199,29 @@ function daySetMap(nDays){
 function sessionDays(nDays){ const m=daySetMap(nDays); return Object.keys(m).filter(k=>m[k]>=QUALIFY_SETS).length; }
 function setsToday(){ const t=new Date().toDateString(); return daySetMap(1)[t]||0; }
 function sessionToday(){ return setsToday()>=QUALIFY_SETS; }
+// ===== session credit: a workout counts toward your weekly Sessions ring and lifetime tally in
+// proportion to the work done, so short "micro sessions" aren't wasted. A full session (1.0) is your
+// own typical session volume (the median of recent real sessions); a half-volume day ≈ 0.5, capped at
+// 1.0/day. Until there's enough history to know your typical session, it falls back to a sets÷5 ramp. =====
+const SESSION_REF_DAYS=90, SESSION_MIN_SAMPLES=3;
+// effective volume per calendar day in the last nDays → { dateString: totalVol } (matches session.totalVol)
+function dayVolMap(nDays){ const cutoff=Date.now()-nDays*86400000, m={};
+  Object.keys(hist).forEach(n=> (hist[n]||[]).forEach(e=>{ if(e.d>=cutoff){ const k=new Date(e.d).toDateString(); m[k]=(m[k]||0)+(e.v||0); } }));
+  return m; }
+// your typical full-session volume = median volume of recent days that cleared the set gate (0 if too few)
+function refSessionVol(){
+  const setM=daySetMap(SESSION_REF_DAYS), volM=dayVolMap(SESSION_REF_DAYS);
+  const vols=Object.keys(setM).filter(k=>setM[k]>=QUALIFY_SETS).map(k=>volM[k]||0).filter(v=>v>0).sort((a,b)=>a-b);
+  return vols.length>=SESSION_MIN_SAMPLES ? (vols[Math.floor(vols.length/2)]||0) : 0;   // 0 → caller uses the sets ramp
+}
+function dayCredit(daySets, dayVol, ref){ ref=(ref!=null)?ref:refSessionVol();
+  return ref>0 ? Math.max(0,Math.min(1, dayVol/ref)) : Math.max(0,Math.min(1, (daySets||0)/QUALIFY_SETS)); }
+// session-equivalents over the last nDays — fractional, summing each day's credit
+function sessionCredit(nDays){ const setM=daySetMap(nDays), volM=dayVolMap(nDays), ref=refSessionVol(); let c=0;
+  Object.keys(setM).forEach(k=> c+= dayCredit(setM[k], volM[k]||0, ref)); return c; }
+// credit for one finished workout (its volume vs your typical session), for the lifetime tally
+function finishCredit(session){ const ref=refSessionVol();
+  return ref>0 ? Math.max(0,Math.min(1, (session.totalVol||0)/ref)) : Math.max(0,Math.min(1, (session.sets||0)/QUALIFY_SETS)); }
 // Progression follows an inverse-U over recent training frequency:
 //  • too sparse (after a layoff) → hold and rebuild   • regular & recovered → push
 //  • very frequent / fatigue stacked up → hold or ease off toward a deload
@@ -3427,11 +3452,14 @@ $("saveBtn").onclick=async()=>{
   if(mins>0){ settings.timeTotal=(settings.timeTotal||0)+mins; }
   session.mins=mins; session.beaten=beaten; session.sub=logged+" exercise"+(logged>1?"s":"");
   tmrReset(); restStop(); endLive(true);   // close any live broadcast; the finished workout posts to the feed below
-  // Only a session with real substance (>= QUALIFY_SETS sets) counts toward the lifetime tally,
-  // achievements, and the share/feed. The work is still logged below either way (history, PRs, rings-by-set).
+  // Every workout adds session-equivalents to the lifetime tally in proportion to the work done, so a
+  // short "micro session" still counts (see finishCredit). A full-substance session (>= QUALIFY_SETS sets)
+  // additionally unlocks the share/feed + the travel-vs-home comparison. Work is logged above either way.
+  const cred = finishCredit(session);
+  settings.sessions = (settings.sessions||0) + cred;
   const qualifies = session.sets >= QUALIFY_SETS;
-  if(qualifies){ settings.sessions++;
-    // travel-vs-home tally, so the user can isolate how travelling shifts their training
+  if(qualifies){
+    // travel-vs-home tally (full sessions only, so the home-vs-travel comparison stays clean)
     const tkey = tvCode===1?"gym" : tvCode===2?"nogym" : "home";
     const ts=settings.travelStats=settings.travelStats||{};
     const slot=ts[tkey]=ts[tkey]||{n:0,sets:0,vol:0,mins:0};
@@ -3457,9 +3485,9 @@ $("saveBtn").onclick=async()=>{
   if(qualifies){
     openShareTile(session);
     cloudPublish(session);   // post a summary to the friends feed (no raw weights), if signed in + sharing on
-  } else if(beaten===0){     // a token effort — log it, but be honest that it won't fill the week's Sessions ring
-    const more=QUALIFY_SETS-session.sets;
-    toast("Logged "+session.sets+" set"+(session.sets===1?"":"s")+" — "+more+" more and it counts as a full session this week.");
+  } else if(beaten===0){     // a micro session — counts in proportion to the work done (see finishCredit)
+    const pct=Math.round(cred*100);
+    toast("Logged "+session.sets+" set"+(session.sets===1?"":"s")+" — counts as "+pct+"% of a session toward your week. Every bit adds up.");
   }
   cloudTouchWorkout();     // reset the 2-day "train at home" reminder timer (any movement keeps the streak alive)
   if(fresh.length) setTimeout(()=>celebrateAch(fresh), beaten>0?1300:1200);
@@ -4239,13 +4267,13 @@ function renderTravelSeg(){
 }
 // global airplane badge — pinned to the same spot on EVERY page while travel mode is on, so it's
 // never silently active (the old in-page banner only showed on the workout tab; this replaces it).
-const TRAVEL_FAB_LBL={ gym:"With gym", nogym:"No gym" };   // the ✈ icon already signals "travel"
+const TRAVEL_FAB_LBL={ gym:"with gym", nogym:"no gym" };
 function renderTravelFab(){
   const f=$("travelFab"); if(!f) return;
   const m=settings.travelMode||"off";
   if(m==="off"){ f.style.display="none"; return; }
   f.style.display="";
-  $("travelFabTxt").textContent = TRAVEL_FAB_LBL[m] || "Travel";
+  f.setAttribute("aria-label","Travel mode on — "+(TRAVEL_FAB_LBL[m]||"")+" — tap to switch or end");
 }
 // kept as an alias so older call sites stay valid
 function renderTravelBanner(){ renderTravelFab(); }
@@ -4254,7 +4282,6 @@ function openTravelControl(){
   if($("openSettings")) $("openSettings").click();
   setTimeout(()=>{ const seg=$("travelSeg"); if(seg){ const d=seg.closest("details"); if(d) d.open=true; seg.scrollIntoView({behavior:"smooth",block:"center"}); } }, 140);
 }
-async function endTravel(){ settings.travelMode="off"; await sset("settings",settings); renderTravel(); toast("Back home — sessions log as normal."); }
 function renderTravelBreakdown(){
   const box=$("travelBreakdown"); if(!box) return;
   const ts=settings.travelStats||{};
@@ -4269,7 +4296,6 @@ function renderTravelBreakdown(){
 }
 function renderTravel(){ renderTravelSeg(); renderTravelFab(); renderTravelBreakdown(); }
 if($("travelFab")) $("travelFab").onclick=()=> openTravelControl();
-if($("travelFabEnd")) $("travelFabEnd").onclick=(e)=>{ e.stopPropagation(); endTravel(); };
 document.querySelectorAll("#travelSeg .s").forEach(s=>{
   s.onclick=async()=>{ settings.travelMode=s.dataset.tv; await sset("settings",settings); renderTravel();
     toast(settings.travelMode==="off" ? "Back home — sessions log as normal." : "Travel mode on — "+TRAVEL_LBL[settings.travelMode].toLowerCase()+". An ✈ badge stays on every page until you switch back."); };
@@ -5191,7 +5217,7 @@ function achStats(){
            vol:lifetimeVolume(), muscles:muscles.size, activities:acts.size, external:(extlog||[]).length };
 }
 const ACHIEVEMENTS=[
-  {id:"first",   icon:"🌱", t:"First Steps",        d:"Log your first workout",      test:s=>s.sessions>=1},
+  {id:"first",   icon:"🌱", t:"First Steps",        d:"Log your first workout",      test:s=>s.sessions>0},
   {id:"ten",     icon:"🔥", t:"Getting Consistent", d:"10 workouts logged",          test:s=>s.sessions>=10},
   {id:"fifty",   icon:"💪", t:"Committed",          d:"50 workouts logged",          test:s=>s.sessions>=50},
   {id:"hundred", icon:"🏆", t:"Centurion",          d:"100 workouts logged",         test:s=>s.sessions>=100},

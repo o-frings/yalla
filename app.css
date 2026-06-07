@@ -382,13 +382,10 @@
   /* Global travel indicator — pinned to the same spot on every page while travel mode is on.
      right offset hugs the centred 540px column on wide screens, falls back to 14px on phones. */
   .travelfab{ position:fixed; top:calc(env(safe-area-inset-top) + 8px); right:max(14px, calc((100vw - 540px)/2 + 14px));
-    z-index:45; display:flex; align-items:center; gap:7px; padding:7px 8px 7px 11px; border:none; border-radius:999px;
-    background:var(--accent); color:#fff; font:inherit; font-size:13px; font-weight:600; cursor:pointer;
+    z-index:45; display:flex; align-items:center; justify-content:center; width:36px; height:36px; padding:0;
+    border:none; border-radius:50%; background:var(--accent); color:#fff; cursor:pointer;
     box-shadow:0 4px 14px rgba(0,0,0,.22); -webkit-tap-highlight-color:transparent; }
-  .travelfab svg{ width:16px; height:16px; flex:0 0 auto; }
-  .travelfab #travelFabTxt{ white-space:nowrap; }
-  .travelfab .tvx{ display:flex; align-items:center; justify-content:center; width:20px; height:20px; flex:0 0 auto;
-    border-radius:50%; background:rgba(255,255,255,.22); font-size:11px; line-height:1; }
+  .travelfab svg{ width:18px; height:18px; flex:0 0 auto; }
   .tvbreak{ display:flex; flex-direction:column; gap:7px; margin:10px 0 2px; }
   .tvrow{ display:flex; align-items:center; justify-content:space-between; font-size:13px; color:var(--l2); }
   .tvrow b{ color:var(--ink); font-weight:600; }
