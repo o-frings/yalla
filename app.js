@@ -4074,10 +4074,10 @@ function radarVal(det, g, target){
   }
   return det[g]||0;
 }
-function drawRadar(totals, canvasId, target, noLabels, relative){
+function drawRadar(totals, canvasId, target, noLabels, relative, bare){
   const c=$(canvasId||"musRadar"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const det=expandLegacyMtot(totals||{}), G=roseGroups(musExpanded), n=G.length;
-  const cx=W/2, cy=H/2, R=W*(noLabels?0.42:0.33);
+  const cx=W/2, cy=H/2, R=W*(bare?0.45:(noLabels?0.42:0.33));
   const cs=getComputedStyle(document.documentElement);
   const accent=(cs.getPropertyValue("--accent")||"#0a84ff").trim();
   const lab=(cs.getPropertyValue("--l2")||"#888").trim();
@@ -4088,12 +4088,15 @@ function drawRadar(totals, canvasId, target, noLabels, relative){
   // Relative mode: spokes scale to your most-trained muscle so the BALANCE SHAPE stays full-size at any
   // time window (a month no longer collapses toward the centre); the target then shows as a dashed ring.
   const norm = (target && !relative) ? (g=>Math.min(1,val(g)/target)) : (g=>val(g)/max);
-  ctx.strokeStyle=grid; ctx.lineWidth=1.5;
-  [0.5,1].forEach(f=>{ ctx.beginPath(); ctx.arc(cx,cy,R*f,0,Math.PI*2); ctx.stroke(); });
-  if(target && !relative){ ctx.strokeStyle=accent; ctx.globalAlpha=.45; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; }
-  else if(target && relative){ const tr=R*Math.min(1,target/max);   // where the ~target/wk line falls on the relative scale
-    ctx.strokeStyle=accent; ctx.globalAlpha=.5; ctx.lineWidth=2; ctx.setLineDash([7,7]);
-    ctx.beginPath(); ctx.arc(cx,cy,tr,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; }
+  // bare: skip all guide rings (used by the Me-page hero, where the conic achievement ring is the only ring)
+  if(!bare){
+    ctx.strokeStyle=grid; ctx.lineWidth=1.5;
+    [0.5,1].forEach(f=>{ ctx.beginPath(); ctx.arc(cx,cy,R*f,0,Math.PI*2); ctx.stroke(); });
+    if(target && !relative){ ctx.strokeStyle=accent; ctx.globalAlpha=.45; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; }
+    else if(target && relative){ const tr=R*Math.min(1,target/max);   // where the ~target/wk line falls on the relative scale
+      ctx.strokeStyle=accent; ctx.globalAlpha=.5; ctx.lineWidth=2; ctx.setLineDash([7,7]);
+      ctx.beginPath(); ctx.arc(cx,cy,tr,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; }
+  }
   const half=Math.PI/n - 0.05;
   // Auxiliary (NO_TARGET) muscles have no weekly goal, so against the target ring they'd read as
   // permanent gaps. Match the small roses: show an aux spoke/label only when it was actually trained.
@@ -4197,7 +4200,9 @@ function meObjectiveScore(){
 function renderMeRadar(){
   const c=$("meRadar"); if(!c) return;
   const {totals}=muscleVolume(30, "sets", "total");
-  drawRadar(weeklyEquiv(totals,30), "meRadar", WEEKLY_SET_TARGET, true, false);   // noLabels balance shape
+  // relative + bare: fill the rose to your most-trained muscle (readable even when everything's under
+  // target) and drop the inner guide rings — the conic achievement ring around it is the only ring.
+  drawRadar(weeklyEquiv(totals,30), "meRadar", WEEKLY_SET_TARGET, true, true, true);
   const st=$("meBalStat"), cta=$("meBalCta"), ring=$("meRing");
   if(st) st.classList.remove("under","good");
   if(!Object.keys(hist).length){
