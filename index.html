@@ -175,7 +175,7 @@
   <div id="cdLogList"></div>
 </div>
 
-<div class="foot">On-device only · keep a backup · lift safely · build <span id="appVer">v103</span></div>
+<div class="foot">On-device only · keep a backup · lift safely · build <span id="appVer">v104</span></div>
 </div><!-- /pageWorkout -->
 
 <div class="exmenu-pop" id="exMenu"></div>
@@ -244,12 +244,7 @@
         <span class="mebalcta" id="meBalCta">tap for detail ›</span>
       </div>
     </div>
-    <div class="row" style="gap:8px; margin-bottom:16px;">
-      <button class="btn tinted sm" id="meOther" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;flex:0 0 auto"><path d="M3 12h4l2.5-7 4 14 2.5-7H21"/></svg>Other training</button>
-    </div>
-    <div class="row" style="margin-bottom:16px;">
-      <button class="btn tinted sm" id="meLearn" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;flex:0 0 auto"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>Learn — coaching library</button>
-    </div>
+    <div class="ed-label">Body weight</div>
     <div class="row" style="justify-content:space-between; align-items:flex-end;">
       <div class="bwnum"><span id="bwNow">—</span><small>kg</small></div>
       <div class="bwgoal">goal <b id="bwGoalTxt">75 kg</b><br><span id="bwLeft"></span></div>
@@ -259,6 +254,24 @@
     <div class="row" style="margin-top:12px;">
       <input id="bwInput" type="number" inputmode="decimal" placeholder="Log today's weight">
       <button class="btn sm" id="bwBtn">Log</button>
+    </div>
+    <!-- Goal weight lives here until it's set, then moves into Settings (see placeGoalBlock) -->
+    <div id="goalHomeMe"><div id="goalBlock">
+      <div class="ed-label">Goal weight</div>
+      <div class="gset">
+        <input id="goalStart" type="number" inputmode="decimal" placeholder="Start">
+        <span style="color:var(--l3)">→</span>
+        <input id="goalTarget" type="number" inputmode="decimal" placeholder="Goal">
+        <button class="btn tinted sm" id="goalSave">Save</button>
+      </div>
+    </div></div>
+
+    <div class="ed-label">Training</div>
+    <div class="stats" style="border:.5px solid var(--line); border-radius:12px;">
+      <div class="stat"><div class="n" id="stSessions">0</div><div class="k">Sessions</div></div>
+      <div class="stat"><div class="n" id="stTime">0</div><div class="k">Hours</div></div>
+      <div class="stat"><div class="n" id="stSince">0</div><div class="k">Since deload</div></div>
+      <div class="stat"><div class="n" id="stBeat">0</div><div class="k">Beat last</div></div>
     </div>
 
     <div class="ed-label">Progress</div>
@@ -276,6 +289,12 @@
     <div class="ed-label">Cardio</div>
     <div class="group" id="cardioCard"></div>
 
+    <details class="setcard" style="margin-top:20px;">
+      <summary>
+        <svg class="scicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+        <span class="sctitle">Coaching setup<span class="scsub"> — objective, focus, limits</span></span>
+      </summary>
+      <div class="scbody">
     <div class="ed-label">Main objective</div>
     <div class="chips wrap" id="objChips">
       <button class="chip" data-v="muscle">Build muscle</button><button class="chip" data-v="strength">Get stronger</button>
@@ -296,19 +315,10 @@
       <button class="chip" data-v="chest">Chest</button><button class="chip" data-v="back">Back</button><button class="chip" data-v="shoulders">Shoulders</button><button class="chip" data-v="arms">Arms</button><button class="chip" data-v="quads">Quads</button><button class="chip" data-v="hamstrings">Hamstrings</button><button class="chip" data-v="glutes">Glutes</button><button class="chip" data-v="calves">Calves</button><button class="chip" data-v="core">Core</button>
     </div>
 
-    <!-- Goal weight lives here until it's set, then moves into Settings (see placeGoalBlock) -->
-    <div id="goalHomeMe"><div id="goalBlock">
-      <div class="ed-label">Goal weight</div>
-      <div class="gset">
-        <input id="goalStart" type="number" inputmode="decimal" placeholder="Start">
-        <span style="color:var(--l3)">→</span>
-        <input id="goalTarget" type="number" inputmode="decimal" placeholder="Goal">
-        <button class="btn tinted sm" id="goalSave">Save</button>
-      </div>
-    </div></div>
-
     <div class="ed-label" style="margin-top:8px;">Niggle or injury <span class="subhint">— temporary; we work around it</span></div>
     <button class="btn tinted wide injrow ok" id="injuryRow"><span id="injuryRowTxt">Feeling good — no limits</span><span class="injchev">›</span></button>
+      </div>
+    </details>
 
     <div id="setBody">
     <details class="setcard" open>
@@ -344,14 +354,6 @@
     </details>
     </div><!-- /setBody -->
 
-    <div class="ed-label">Training</div>
-    <div class="stats" style="border:.5px solid var(--line); border-radius:12px;">
-      <div class="stat"><div class="n" id="stSessions">0</div><div class="k">Sessions</div></div>
-      <div class="stat"><div class="n" id="stTime">0</div><div class="k">Hours</div></div>
-      <div class="stat"><div class="n" id="stSince">0</div><div class="k">Since deload</div></div>
-      <div class="stat"><div class="n" id="stBeat">0</div><div class="k">Beat last</div></div>
-    </div>
-
     <details class="mefold">
       <summary>Achievements</summary>
       <div class="achcap">Lifetime volume moved: <b id="achVol">—</b></div>
@@ -370,6 +372,11 @@
       <div class="caldow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
       <div class="calgrid" id="calGrid"></div>
     </details>
+
+    <div class="row" style="gap:8px; margin-top:20px; margin-bottom:8px;">
+      <button class="btn tinted sm" id="meOther" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;flex:0 0 auto"><path d="M3 12h4l2.5-7 4 14 2.5-7H21"/></svg>Other training</button>
+      <button class="btn tinted sm" id="meLearn" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;flex:0 0 auto"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>Learn</button>
+    </div>
 
     <div id="setMisc">
 
