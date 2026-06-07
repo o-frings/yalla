@@ -991,6 +991,8 @@
   .mewintab{ position:relative; padding:1px 0 5px; background:none; border:none; font:inherit; font-size:13px; font-weight:600; color:var(--l3); cursor:pointer; -webkit-appearance:none; appearance:none; -webkit-tap-highlight-color:transparent; transition:color .15s; }
   .mewintab.active{ color:var(--ink); }
   .mewintab.active::after{ content:""; position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:2px; background:var(--accent); }
+  /* progress metric tabs: same underline style as the balance gauge, spread full-width under the chart */
+  .progtabs{ justify-content:space-between; gap:8px; margin:6px 2px 0; }
   /* per-muscle success gauge — an iOS-style 2-page carousel (Week / Month) the finger drags & snaps.
      The clip viewport is stretched to the panel's edges (negative side margins cancel the card padding),
      so the clip line sits at the panel margin, well outside the centred rose — no visible box around it. */

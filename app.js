@@ -3126,13 +3126,13 @@ function progTrackTo(idx, animate){ const tr=$("progTrack"); if(!tr) return;
 function applyProgMetric(idx, animate){
   idx=Math.max(0, Math.min(PROG_METRICS.length-1, idx));
   progIdx=idx; progMetric=PROG_METRICS[idx];
-  document.querySelectorAll("#progMetric .s").forEach(s=> s.classList.toggle("active", s.dataset.pm===progMetric));
+  document.querySelectorAll("#progMetric .mewintab").forEach(s=> s.classList.toggle("active", s.dataset.pm===progMetric));
   progTrackTo(idx, animate);
   const cap=$("progCap"), ve=$("progVerdict"), meta=progMeta[progMetric]||{capHTML:"",vData:null};
   if(cap) cap.innerHTML=meta.capHTML;
   if(ve){ if(meta.vData){ const v=progVerdict(progMetric, meta.vData); ve.style.display="flex"; ve.className="progverd v-"+v.lvl; ve.querySelector(".pvtxt").textContent=v.msg; } else ve.style.display="none"; }
 }
-document.querySelectorAll("#progMetric .s").forEach(s=> s.onclick=()=> applyProgMetric(PROG_METRICS.indexOf(s.dataset.pm), true));
+document.querySelectorAll("#progMetric .mewintab").forEach(s=> s.onclick=()=> applyProgMetric(PROG_METRICS.indexOf(s.dataset.pm), true));
 // iOS-style paged swipe across the five metric charts (one step per swipe; pager ignores .progswipe)
 (function(){ const sw=$("progSwipe"), tr=$("progTrack"); if(!sw||!tr) return;
   let x0=0,y0=0,w=1,start=0,active=false,drag=false; const last=PROG_METRICS.length-1;
@@ -6653,7 +6653,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v109";
+const APP_VER="v110";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
