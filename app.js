@@ -4253,14 +4253,17 @@ function drawSuccessGauge(canvasId, wk){
   const lab=(getComputedStyle(document.documentElement).getPropertyValue("--l2")||"#888").trim();
   const cx=W/2, cy=H/2, R=W*0.30, n=GAUGE_GROUPS.length, half=Math.PI/n-0.06;
   const val=g=>gaugeVal(det, g);
+  // light mode washes out translucent fills on the pale card, so push alpha up there for legibility
+  const dark=document.documentElement.classList.contains("dark");
+  const slotA=dark?.12:.18, fillHi=dark?.66:.85, fillLo=dark?.46:.66;
   ctx.strokeStyle="rgba(128,128,128,.25)"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();  // target rim
   GAUGE_GROUPS.forEach((g,i)=>{
     const a=(-90+i*360/n)*Math.PI/180, col=MCOLOR[g]||lab, succ=Math.min(1,(val(g)||0)/WEEKLY_SET_TARGET);
     ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,a-half,a+half); ctx.closePath();        // empty slot → the target
-    ctx.fillStyle=col; ctx.globalAlpha=.10; ctx.fill(); ctx.globalAlpha=1;
+    ctx.fillStyle=col; ctx.globalAlpha=slotA; ctx.fill(); ctx.globalAlpha=1;
     const rr=R*succ;
     if(rr>1){ ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rr,a-half,a+half); ctx.closePath();   // success fill
-      ctx.fillStyle=col; ctx.globalAlpha=succ>=1?.62:.42; ctx.fill(); ctx.globalAlpha=1; ctx.lineWidth=2; ctx.strokeStyle=col; ctx.stroke(); }
+      ctx.fillStyle=col; ctx.globalAlpha=succ>=1?fillHi:fillLo; ctx.fill(); ctx.globalAlpha=1; ctx.lineWidth=2.5; ctx.strokeStyle=col; ctx.stroke(); }
     const x=cx+(R+40)*Math.cos(a), y=cy+(R+40)*Math.sin(a), co=Math.cos(a);
     ctx.font="600 31px -apple-system,sans-serif"; ctx.textBaseline="middle";
     ctx.textAlign = Math.abs(co)<0.3 ? "center" : (co>0?"left":"right");
@@ -5251,11 +5254,13 @@ function cardioCoachLine(){
   if(easy>=tot*0.97 && cardioMinsWeek(14)>=tgt*2) return "Almost all easy lately — with a solid base, one weekly harder session or some intervals nudges your fitness up.";
   return null;
 }
+// in-card title so the Cardio card matches the Balance/Progress panels (title inside the card, with icon)
+const CARDIO_HEAD='<div class="panelhd" style="margin-bottom:12px;"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/></svg>Cardio</span></div>';
 function renderCardioCard(){
   const card=$("cardioCard"); if(!card) return; card.style.display="";
   if(!cardioList().length){
     card.classList.remove("ovtap"); card.onclick=null;
-    card.innerHTML='<div class="pad"><div class="ovk">Cardio</div><p class="ovp" style="margin-top:6px;">No cardio logged yet. Add a run, ride or swim from <b>Workout → Cardio</b> — it’s tracked here on its own, separate from your muscle balance.</p></div>';
+    card.innerHTML='<div class="pad">'+CARDIO_HEAD+'<p class="ovp" style="margin-top:2px;">No cardio logged yet. Add a run, ride or swim from <b>Workout → Cardio</b> — it’s tracked here on its own, separate from your muscle balance.</p></div>';
     return;
   }
   const raw=cardioMinsWeek(7), dose=cardioDoseWeek(7), mins=dose, tgt=cardioTargetMins(), sess=cardioSessionsWeek(7);
@@ -5269,7 +5274,7 @@ function renderCardioCard(){
     : mins>=tgt ? "Target met — strong aerobic week. 👏"
     : mins>=tgt*0.5 ? "Good base — a little more to reach your weekly target."
     : "Light so far — aim for ~"+tgt+" min/wk for "+esc((obj.label||"general fitness").toLowerCase())+".";
-  card.innerHTML='<div class="pad">'
+  card.innerHTML='<div class="pad">'+CARDIO_HEAD
     +'<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;">'
       +'<div><div class="ovk">This week</div><div class="ovbig"><b>'+mins+'</b> <small style="font-weight:500;color:var(--l2);">/ '+tgt+' min</small></div></div>'
       +'<div style="font-size:13px;color:var(--l2);text-align:right;">'+sess+' session'+(sess===1?'':'s')+(raw&&raw!==dose?'<br>'+raw+' min done':'')+'</div>'
@@ -6653,7 +6658,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v114";
+const APP_VER="v115";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH

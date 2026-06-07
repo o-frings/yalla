@@ -175,7 +175,7 @@
   <div id="cdLogList"></div>
 </div>
 
-<div class="foot">On-device only · keep a backup · lift safely · build <span id="appVer">v114</span></div>
+<div class="foot">On-device only · keep a backup · lift safely · build <span id="appVer">v115</span></div>
 </div><!-- /pageWorkout -->
 
 <div class="exmenu-pop" id="exMenu"></div>
@@ -230,6 +230,12 @@
   </div></div>
   <div class="pagebody">
     <div class="profcard" id="meProfile" style="display:none;"></div>
+    <div class="stats" style="border:.5px solid var(--line); border-radius:12px; margin-bottom:4px;">
+      <div class="stat"><div class="n" id="stSessions">0</div><div class="k">Sessions</div></div>
+      <div class="stat"><div class="n" id="stTime">0</div><div class="k">Hours</div></div>
+      <div class="stat"><div class="n" id="stSince">0</div><div class="k">Since deload</div></div>
+      <div class="stat"><div class="n" id="stBeat">0</div><div class="k">Beat last</div></div>
+    </div>
     <div class="mezone">Training</div>
     <div class="panel tap" id="meBalance" role="button" tabindex="0" aria-label="Open muscle balance">
       <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>Muscle balance</span></div>
@@ -259,15 +265,7 @@
       <div class="panelfoot stack"><div class="progcap" id="progCap"></div><div class="progverd" id="progVerdict" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div></div>
     </div>
 
-    <div class="ed-label">Cardio</div>
     <div class="group" id="cardioCard"></div>
-
-    <div class="stats" style="border:.5px solid var(--line); border-radius:12px; margin-top:16px;">
-      <div class="stat"><div class="n" id="stSessions">0</div><div class="k">Sessions</div></div>
-      <div class="stat"><div class="n" id="stTime">0</div><div class="k">Hours</div></div>
-      <div class="stat"><div class="n" id="stSince">0</div><div class="k">Since deload</div></div>
-      <div class="stat"><div class="n" id="stBeat">0</div><div class="k">Beat last</div></div>
-    </div>
 
     <div class="mezone">Body</div>
     <div class="row" style="justify-content:space-between; align-items:flex-end;">
@@ -291,7 +289,8 @@
       </div>
     </div></div>
 
-    <details class="setcard" style="margin-top:20px;">
+    <div class="mezone">Coaching</div>
+    <details class="setcard">
       <summary>
         <svg class="scicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
         <span class="sctitle">Coaching setup<span class="scsub"> — objective, focus, limits</span></span>
@@ -320,6 +319,13 @@
     <div class="ed-label" style="margin-top:8px;">Niggle or injury <span class="subhint">— temporary; we work around it</span></div>
     <button class="btn tinted wide injrow ok" id="injuryRow"><span id="injuryRowTxt">Feeling good — no limits</span><span class="injchev">›</span></button>
       </div>
+    </details>
+
+    <div class="ed-label" style="margin-top:18px;">What's slowing progress?</div>
+    <div class="insight" id="progInsight"></div>
+    <details class="hsrc" id="progSrcBox" style="display:none;">
+      <summary>Sources</summary>
+      <ul id="progSrc"></ul>
     </details>
 
     <div id="setBody">
@@ -363,12 +369,6 @@
       <div class="achgrid" id="achGrid"></div>
     </details>
 
-    <div class="ed-label" style="margin-top:20px;">What's slowing progress?</div>
-    <div class="insight" id="progInsight"></div>
-    <details class="hsrc" id="progSrcBox" style="display:none;">
-      <summary>Sources</summary>
-      <ul id="progSrc"></ul>
-    </details>
     <details class="mefold">
       <summary>Training calendar</summary>
       <div class="calcap" id="calCap"></div>
@@ -376,7 +376,8 @@
       <div class="calgrid" id="calGrid"></div>
     </details>
 
-    <div class="row" style="gap:8px; margin-top:20px; margin-bottom:8px;">
+    <div class="mezone">More</div>
+    <div class="row" style="gap:8px; margin-bottom:8px;">
       <button class="btn tinted sm" id="meOther" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;flex:0 0 auto"><path d="M3 12h4l2.5-7 4 14 2.5-7H21"/></svg>Other training</button>
       <button class="btn tinted sm" id="meLearn" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;flex:0 0 auto"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>Learn</button>
     </div>
