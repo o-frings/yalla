@@ -190,6 +190,8 @@
   .modebtn{ flex:0 0 auto; align-self:center; display:inline-flex; align-items:center; gap:6px; background:var(--accent-soft); color:var(--accent); border:none; font-family:inherit; font-size:13px; font-weight:600; padding:6px 11px; border-radius:16px; cursor:pointer; line-height:1; transition:transform .12s; }
   .modebtn:active{ transform:scale(.95); }
   .modebtn .mic{ width:16px; height:16px; flex:0 0 auto; }
+  .modebtn.travelbtn{ padding:6px 9px; }                 /* icon-only travel quick-access */
+  .modebtn.travelbtn.on{ background:var(--accent); color:#fff; }
   .modebtn .mic-car{ display:none; }
   .modebtn.cardio .mic-str{ display:none; }
   .modebtn.cardio .mic-car{ display:inline; }

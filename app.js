@@ -2403,6 +2403,7 @@ async function init(){
     await sset("plans",plans); await sset("settings",settings);
   }
   if(!settings.activePlanId) settings.activePlanId = plans[0].id;
+  travelAccrue(); await sset("settings",settings);   // bank time in the current context + start this launch's clock
   const ni = nextRotateIndex(activePlan()); curWk = ni>=0?ni:0;
   await loadEvidence(); // load canonical evidence.json → builds the coach-tip pool + Learn library
   decideTip();          // pick this launch's coach tip (if any) before the first render
@@ -3458,13 +3459,13 @@ $("saveBtn").onclick=async()=>{
   const cred = finishCredit(session);
   settings.sessions = (settings.sessions||0) + cred;
   const qualifies = session.sets >= QUALIFY_SETS;
-  if(qualifies){
-    // travel-vs-home tally (full sessions only, so the home-vs-travel comparison stays clean)
-    const tkey = tvCode===1?"gym" : tvCode===2?"nogym" : "home";
-    const ts=settings.travelStats=settings.travelStats||{};
-    const slot=ts[tkey]=ts[tkey]||{n:0,sets:0,vol:0,mins:0};
-    slot.n++; slot.sets+=session.sets; slot.vol+=Math.round(session.totalVol); slot.mins+=mins;
-  }
+  // per-context travel tally: every session's credit accrues (micro included) so we can later compare
+  // session-equivalents PER WEEK across home vs travel; the n/sets/vol/mins quality stats stay full-session-only.
+  const tkey = tvCode===1?"gym" : tvCode===2?"nogym" : "home";
+  const ts=settings.travelStats=settings.travelStats||{};
+  const slot=ts[tkey]=ts[tkey]||{n:0,sets:0,vol:0,mins:0,cred:0};
+  slot.cred=(slot.cred||0)+cred;
+  if(qualifies){ slot.n++; slot.sets+=session.sets; slot.vol+=Math.round(session.totalVol); slot.mins+=mins; }
   settings.beatTotal = (settings.beatTotal||0) + beaten;
   if(freeMode){ settings.sinceDeload++; }
   else if(w.rotate!==false){
@@ -4268,20 +4269,32 @@ function renderTravelSeg(){
 // global airplane badge — pinned to the same spot on EVERY page while travel mode is on, so it's
 // never silently active (the old in-page banner only showed on the workout tab; this replaces it).
 const TRAVEL_FAB_LBL={ gym:"with gym", nogym:"no gym" };
+// the global ✈ badge (on every page while travelling) AND the Workout-header ✈ both reflect on/off here
 function renderTravelFab(){
-  const f=$("travelFab"); if(!f) return;
-  const m=settings.travelMode||"off";
-  if(m==="off"){ f.style.display="none"; return; }
-  f.style.display="";
-  f.setAttribute("aria-label","Travel mode on — "+(TRAVEL_FAB_LBL[m]||"")+" — tap to switch or end");
+  const m=settings.travelMode||"off", on=m!=="off";
+  const f=$("travelFab"); if(f){ f.style.display=on?"":"none";
+    if(on) f.setAttribute("aria-label","Travel mode on — "+(TRAVEL_FAB_LBL[m]||"")+" — tap to switch or end"); }
+  const q=$("travelQuick"); if(q) q.classList.toggle("on", on);
 }
 // kept as an alias so older call sites stay valid
 function renderTravelBanner(){ renderTravelFab(); }
-// tapping the badge jumps to its control in Settings (switch context or end)
-function openTravelControl(){
-  if($("openSettings")) $("openSettings").click();
-  setTimeout(()=>{ const seg=$("travelSeg"); if(seg){ const d=seg.closest("details"); if(d) d.open=true; seg.scrollIntoView({behavior:"smooth",block:"center"}); } }, 140);
+// quick travel control — its own bottom sheet, reachable in one tap from the Workout header (✈),
+// the global ✈ badge, or Settings; no more digging through Settings.
+function openTravel(){ renderTravel(); openSheet("Travel"); }
+// ===== travel-consistency tracking =====
+// We bank the real time spent in each context (home / travel+gym / travel-no-gym) so we can later
+// compare training output PER WEEK across them — i.e. how strongly travel dents your consistency,
+// not just per-session quality. travelStats[ctx].cred = session-equivalents logged in that context.
+function travelCtx(m){ m=m||settings.travelMode||"off"; return m==="gym"?"gym":m==="nogym"?"nogym":"home"; }
+function travelAccrue(){   // call on every mode change + once per launch; persisted by the caller
+  const now=Date.now(), tt=settings.travelTime=settings.travelTime||{home:0,gym:0,nogym:0};
+  if(settings.travelSince) tt[travelCtx()]=(tt[travelCtx()]||0)+Math.max(0, now-settings.travelSince);
+  settings.travelSince=now;
 }
+// effective time in a context (weeks), incl. the still-open current segment — the consistency denominator
+function travelWeeks(ctx){ const tt=settings.travelTime||{};
+  let ms=tt[ctx]||0; if(settings.travelSince && travelCtx()===ctx) ms+=Math.max(0, Date.now()-settings.travelSince);
+  return ms/(7*86400000); }
 function renderTravelBreakdown(){
   const box=$("travelBreakdown"); if(!box) return;
   const ts=settings.travelStats||{};
@@ -4290,17 +4303,23 @@ function renderTravelBreakdown(){
   if(rows.length<2){ box.innerHTML=""; return; }   // nothing to compare against until there's travel data
   let h='<div class="ed-label">Travel vs home</div><div class="tvbreak">';
   rows.forEach(([k,lab])=>{ const s=ts[k]; const perSets=(s.sets/s.n), perVol=Math.round(s.vol/s.n);
-    h+='<div class="tvrow"><span>'+lab+'</span><span><b>'+s.n+'</b> session'+(s.n===1?'':'s')+' · <b>'+round1(perSets)+'</b> sets · <b>'+fmtKg(perVol)+'</b>/session</span></div>'; });
-  h+='</div><p class="levelcap" style="margin:8px 4px 0;">Average sets &amp; load per session in each context — so you can see what travel really costs.</p>';
+    const wks=travelWeeks(k), perWk = wks>=0.5 ? round1((s.cred||s.n)/wks) : null;   // sessions/wk = consistency
+    h+='<div class="tvrow"><span>'+lab+'</span><span>'+(perWk!=null?'<b>'+perWk+'</b>/wk · ':'')
+      +'<b>'+round1(perSets)+'</b> sets · <b>'+fmtKg(perVol)+'</b>/session</span></div>'; });
+  h+='</div><p class="levelcap" style="margin:8px 4px 0;">Sessions per week (your consistency) plus average sets &amp; load per session in each context — so you can see what travel really costs.</p>';
   box.innerHTML=h;
 }
 function renderTravel(){ renderTravelSeg(); renderTravelFab(); renderTravelBreakdown(); }
-if($("travelFab")) $("travelFab").onclick=()=> openTravelControl();
+if($("travelFab")) $("travelFab").onclick=()=> openTravel();
+if($("travelQuick")) $("travelQuick").onclick=()=> openTravel();
+if($("openTravelBtn")) $("openTravelBtn").onclick=()=> openTravel();
 document.querySelectorAll("#travelSeg .s").forEach(s=>{
-  s.onclick=async()=>{ settings.travelMode=s.dataset.tv; await sset("settings",settings); renderTravel();
+  s.onclick=async()=>{ if(s.dataset.tv===(settings.travelMode||"off")) return;   // no change → don't reset the clock
+    travelAccrue();                       // bank the time spent in the context you're leaving
+    settings.travelMode=s.dataset.tv; await sset("settings",settings); renderTravel();
     toast(settings.travelMode==="off" ? "Back home — sessions log as normal." : "Travel mode on — "+TRAVEL_LBL[settings.travelMode].toLowerCase()+". An ✈ badge stays on every page until you switch back."); };
 });
-renderTravelFab();   // boot: reflect any saved travel mode immediately
+renderTravel();   // boot: reflect any saved travel mode in the badge + header button immediately
 
 // ================= free workout =================
 function exerciseLibrary(){
