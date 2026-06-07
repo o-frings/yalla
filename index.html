@@ -34,6 +34,22 @@
 
 <div class="statusbar-bg"></div>
 
+<!-- ROTATE GUARD: Yalla is portrait-only. iOS Safari ignores the manifest/lock API, so this
+     CSS-driven overlay covers the app whenever a phone is held in landscape. -->
+<div class="rotateGuard" id="rotateGuard" aria-hidden="true">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.4"/><path d="M11 18.5h2"/><path d="M2.5 12a4.5 4.5 0 0 1 4.5-4.5" opacity=".5"/><path d="M5 6.2 7 7.5 5.6 9.6" opacity=".5"/></svg>
+  <div class="rgmsg">Rotate your phone upright</div>
+  <div class="rgsub">Yalla works in portrait.</div>
+</div>
+
+<!-- GLOBAL TRAVEL INDICATOR: a single airplane badge pinned to the same spot on every page while
+     travel mode is on, so it's never silently active. Tap the body to manage it, ✕ to end. -->
+<button class="travelfab" id="travelFab" type="button" style="display:none;" aria-label="Travel mode — tap to manage">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l5.2 4.2-2 4-2-1-1 1 3 2 2 3 1-1-1-2 4-2 4.2 5.2a.5.5 0 0 0 .8-.4z"/></svg>
+  <span id="travelFabTxt">Travel</span>
+  <span class="tvx" id="travelFabEnd" role="button" aria-label="End travel mode">✕</span>
+</button>
+
 <!-- ===== WORKOUT PAGE ===== -->
 <div class="page" id="pageWorkout" data-tab="workout">
 <div class="largeTitle" id="largeTitle">
@@ -56,13 +72,6 @@
     <p style="font-size:13px;color:var(--l2);margin:4px 0 12px;line-height:1.45;">You’ve put in real work. Take one lighter week (~40% less weight/sets) to recover — you’ll come back stronger.</p>
     <button class="btn tinted sm" id="deloadBtn">I did a deload — reset</button>
   </div>
-</div>
-
-<!-- TRAVEL MODE banner (only when travel mode is on) -->
-<div class="travelbar" id="travelBanner" style="display:none;">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;flex:0 0 auto;"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l5.2 4.2-2 4-2-1-1 1 3 2 2 3 1-1-1-2 4-2 4.2 5.2a.5.5 0 0 0 .8-.4z"/></svg>
-  <span id="travelBannerTxt">Travel mode</span>
-  <button class="tvx" id="travelEnd" type="button">End</button>
 </div>
 
 <div id="strengthWrap">
@@ -383,7 +392,7 @@
         </div>
 
         <div class="ed-label">Travel mode</div>
-        <p class="levelcap" style="margin:0 4px 8px;">Tag sessions while you're away so you can see how travel shifts your training. Stays on until you switch it back to Home.</p>
+        <p class="levelcap" style="margin:0 4px 8px;">Tag sessions while you're away so you can see how travel shifts your training. While it's on, an ✈ badge stays pinned to every page — tap it to switch back or end.</p>
         <div class="seg appearance" id="travelSeg">
           <div class="s" data-tv="off">Home</div>
           <div class="s" data-tv="gym">With gym</div>
@@ -898,6 +907,17 @@
       <p id="musMethod" style="color:var(--l2);font-size:13px;line-height:1.5;margin:8px 0 8px;"></p>
       <ul id="musSrcList"></ul>
     </details>
+  </div>
+</div>
+
+<!-- THIS-WEEK RINGS DETAIL SHEET — what each activity ring means + which muscles you've hit -->
+<div class="scrim" id="scrimRings"></div>
+<div class="sheet" id="sheetRings">
+  <div class="grabber"></div>
+  <div class="sheethdr"><span class="t">This week</span><button class="btn plain sm" id="ringsClose">Done</button></div>
+  <div class="sheetbody">
+    <p style="color:var(--l2);font-size:13px;margin:0 4px 12px;line-height:1.45;">Your week at a glance. Each ring fills toward a weekly target — close them all to round out a strong week.</p>
+    <div id="ringsBody"></div>
   </div>
 </div>
 

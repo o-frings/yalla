@@ -2493,6 +2493,42 @@ function drawRings(id, rings){
     r-=thick+gap;
   });
 }
+// ===== "This week" rings detail — tap the overview rings to see what each one means + which muscles
+// you've trained vs the ones your plan targets but you haven't hit yet =====
+function ringRow(color,label,val,target,desc,unit){
+  const pct=target?Math.min(100,Math.round(val/target*100)):0, done=target&&val>=target;
+  return '<div class="ringrow"><div class="ringrowhd"><span class="rrdot" style="background:'+color+'"></span>'
+    +'<span class="rrlbl">'+label+'</span>'
+    +'<span class="rrval"'+(done?' style="color:'+color+'"':'')+'>'+Math.round(val)+' <small>/ '+target+(unit?' '+unit:'')+'</small>'+(done?' ✓':'')+'</span></div>'
+    +'<div class="rrbar"><i style="width:'+pct+'%;background:'+color+'"></i></div>'
+    +'<p class="rrdesc">'+desc+'</p></div>';
+}
+function openRingsDetail(){ renderRingsDetail(); openSheet("Rings"); }
+function renderRingsDetail(){
+  const box=$("ringsBody"); if(!box) return;
+  const cut=Date.now()-7*86400000; let setsWk=0; const musWk=new Set();
+  Object.keys(hist).forEach(n=>{ const gs=muscleFor(n); (hist[n]||[]).forEach(e=>{ if(e.d>=cut){ setsWk+=(e.n||0); gs.forEach(g=>{ if(MGROUPS.indexOf(g)>=0) musWk.add(g); }); } }); });
+  const f7=sessionDays(7), sessTarget=Math.max(2,Math.min(5,planSessionsPerWeek(activePlan())||3)), setsTarget=Math.max(20,sessTarget*18);
+  let h="";
+  h+=ringRow("#ff6b3d","Sessions",f7,sessTarget,"Real workouts logged in the last 7 days (a quick token effort doesn't count). Aim for "+sessTarget+" to match your plan's schedule.");
+  h+=ringRow("#4dabf7","Hard sets",setsWk,setsTarget,"Working sets across every muscle this week — quality sets taken near failure are what drive growth.");
+  h+=ringRow("#51cf66","Muscles",musWk.size,12,"Distinct muscle groups you've trained this week. Spreading the work keeps you balanced and injury-resistant.");
+  // trained vs not-trained breakdown (the heart of the muscles ring)
+  const scope=planScopeMuscles(activePlan());
+  const trained=MGROUPS.filter(g=>musWk.has(g));
+  const missing=scope.filter(g=>!musWk.has(g));
+  let chips='<div class="ed-label" style="margin-top:2px;">Trained this week</div>';
+  chips+= trained.length ? '<div class="muschips">'+trained.map(g=>'<span class="muschip on">'+esc(MSHORT[g]||g)+'</span>').join('')+'</div>'
+                         : '<p class="rrdesc">Nothing logged yet this week — your first session lights these up.</p>';
+  if(missing.length){ chips+='<div class="ed-label" style="margin-top:10px;">Your plan targets — not yet this week</div>'
+    +'<div class="muschips">'+missing.map(g=>'<span class="muschip">'+esc(MSHORT[g]||g)+'</span>').join('')+'</div>'; }
+  h+='<div class="ringrow">'+chips+'</div>';
+  const cTgt=cardioTargetMins();
+  if(cTgt>0) h+=ringRow("#9775fa","Cardio",cardioDoseWeek(7),cTgt,"Effort-adjusted aerobic minutes — a vigorous minute counts up to ~2× an easy one (you logged "+cardioMinsWeek(7)+" actual min).","min");
+  h+='<div class="libteaser" id="ringsToMus" style="margin-top:8px;">See your full muscle balance →</div>';
+  box.innerHTML=h;
+  const link=$("ringsToMus"); if(link) link.onclick=()=>{ closeSheet("Rings"); openMuscles(); };
+}
 // small weekly-sets sparkline for the overview
 function drawOvSets(id){ const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const data=progWeeklyData("sets"), ac=accentHex(), hi=Math.max(1,...data), base=H-22, top=16, pad=12;
@@ -2669,7 +2705,7 @@ function renderOverview(){
     ovRings=[ {label:"Sessions", val:f7, target:sessTarget, color:"#ff6b3d"},
               {label:"Hard sets", val:setsWk, target:setsTarget, color:"#4dabf7"},
               {label:"Muscles", val:musWk.size, target:12, color:"#51cf66"} ];
-    const cTgt=cardioTargetMins(); if(cTgt>0) ovRings.push({label:"Cardio", val:cardioMinsWeek(7), target:cTgt, color:"#9775fa", unit:"min"});
+    const cTgt=cardioTargetMins(); if(cTgt>0) ovRings.push({label:"Cardio", val:cardioDoseWeek(7), target:cTgt, color:"#9775fa", unit:"min"});
     if(ovRings.every(r=>r.val>=r.target)) shareRingsClosed(setsWk);   // all rings closed → auto-share (gated inside)
     // month-over-month volume delta
     const vol=(loDays,hiDays)=>{ const lo=Date.now()-loDays*86400000, hi=Date.now()-hiDays*86400000; let v=0; Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ if(e.d>=lo&&e.d<hi) v+=(e.v||0); })); return v; };
@@ -2738,7 +2774,7 @@ function renderOverview(){
   const hb=host.querySelector(".ovhome"); if(hb) hb.onclick=startHomeWorkout;
   const ll=host.querySelector("#ovLibLink"); if(ll) ll.onclick=openLibrary;
   if(ovRings && $("ovRingsC")){ drawRings("ovRingsC", ovRings);
-    const snap=host.querySelector(".ovsnap"); if(snap) snap.onclick=()=>showTab("me"); }
+    const snap=host.querySelector(".ovsnap"); if(snap) snap.onclick=openRingsDetail; }
   host.querySelectorAll(".discx").forEach(x=> x.onclick=(ev)=>{ ev.stopPropagation(); dismissTip(x.dataset.tip, x.closest(".disccard")); });
   host.querySelectorAll(".ovdisc").forEach(b=> b.onclick=()=>{ if(b.dataset.tip){ settings.discRead=settings.discRead||{}; settings.discRead[b.dataset.tip]=1; sset("settings",settings); } ovAct(b.dataset.act); });
   const dw=$("discWrap"), dots=$("discDots");
@@ -3926,6 +3962,8 @@ $("musClose").onclick=()=>closeSheet("Mus");
 $("scrimMus").onclick=()=>closeSheet("Mus");
 if($("cardioClose")) $("cardioClose").onclick=()=>closeSheet("Cardio");
 if($("scrimCardio")) $("scrimCardio").onclick=()=>closeSheet("Cardio");
+if($("ringsClose")) $("ringsClose").onclick=()=>closeSheet("Rings");
+if($("scrimRings")) $("scrimRings").onclick=()=>closeSheet("Rings");
 $("libClose").onclick=()=>closeSheet("Library");
 $("scrimLibrary").onclick=()=>closeSheet("Library");
 $("libSearch").oninput=function(){ libQuery=this.value; renderLibrary(); };
@@ -4199,14 +4237,24 @@ function renderTravelSeg(){
   const m = settings.travelMode || "off";
   document.querySelectorAll("#travelSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.tv===m));
 }
-// banner on the workout page so it's obvious travel tagging is on (and easy to end)
-function renderTravelBanner(){
-  const b=$("travelBanner"); if(!b) return;
+// global airplane badge — pinned to the same spot on EVERY page while travel mode is on, so it's
+// never silently active (the old in-page banner only showed on the workout tab; this replaces it).
+const TRAVEL_FAB_LBL={ gym:"With gym", nogym:"No gym" };   // the ✈ icon already signals "travel"
+function renderTravelFab(){
+  const f=$("travelFab"); if(!f) return;
   const m=settings.travelMode||"off";
-  if(m==="off"){ b.style.display="none"; return; }
-  b.style.display="";
-  $("travelBannerTxt").textContent = m==="gym" ? "Travel mode — with gym access" : "Travel mode — no gym";
+  if(m==="off"){ f.style.display="none"; return; }
+  f.style.display="";
+  $("travelFabTxt").textContent = TRAVEL_FAB_LBL[m] || "Travel";
 }
+// kept as an alias so older call sites stay valid
+function renderTravelBanner(){ renderTravelFab(); }
+// tapping the badge jumps to its control in Settings (switch context or end)
+function openTravelControl(){
+  if($("openSettings")) $("openSettings").click();
+  setTimeout(()=>{ const seg=$("travelSeg"); if(seg){ const d=seg.closest("details"); if(d) d.open=true; seg.scrollIntoView({behavior:"smooth",block:"center"}); } }, 140);
+}
+async function endTravel(){ settings.travelMode="off"; await sset("settings",settings); renderTravel(); toast("Back home — sessions log as normal."); }
 function renderTravelBreakdown(){
   const box=$("travelBreakdown"); if(!box) return;
   const ts=settings.travelStats||{};
@@ -4219,12 +4267,14 @@ function renderTravelBreakdown(){
   h+='</div><p class="levelcap" style="margin:8px 4px 0;">Average sets &amp; load per session in each context — so you can see what travel really costs.</p>';
   box.innerHTML=h;
 }
-function renderTravel(){ renderTravelSeg(); renderTravelBanner(); renderTravelBreakdown(); }
-if($("travelEnd")) $("travelEnd").onclick=async()=>{ settings.travelMode="off"; await sset("settings",settings); renderTravel(); toast("Back home — sessions log as normal."); };
+function renderTravel(){ renderTravelSeg(); renderTravelFab(); renderTravelBreakdown(); }
+if($("travelFab")) $("travelFab").onclick=()=> openTravelControl();
+if($("travelFabEnd")) $("travelFabEnd").onclick=(e)=>{ e.stopPropagation(); endTravel(); };
 document.querySelectorAll("#travelSeg .s").forEach(s=>{
   s.onclick=async()=>{ settings.travelMode=s.dataset.tv; await sset("settings",settings); renderTravel();
-    toast(settings.travelMode==="off" ? "Back home — sessions log as normal." : "Travel mode on — "+TRAVEL_LBL[settings.travelMode].toLowerCase()+". Sessions tagged until you switch back."); };
+    toast(settings.travelMode==="off" ? "Back home — sessions log as normal." : "Travel mode on — "+TRAVEL_LBL[settings.travelMode].toLowerCase()+". An ✈ badge stays on every page until you switch back."); };
 });
+renderTravelFab();   // boot: reflect any saved travel mode immediately
 
 // ================= free workout =================
 function exerciseLibrary(){
@@ -4972,6 +5022,12 @@ function cardioMinsWeek(days){ days=days||7; const cut=Date.now()-days*86400000;
 function cardioSessionsWeek(days){ days=days||7; const cut=Date.now()-days*86400000; return cardioList().filter(e=>e.d>=cut).length; }
 function cardioZoneMix(days){ days=days||7; const cut=Date.now()-days*86400000; const mix={}; CZONES.forEach(z=>mix[z.z]=0);
   cardioList().forEach(e=>{ if(e.d<cut) return; const z=mix[e.zone]!=null?e.zone:"z2"; mix[z]+=cardioMinsOf(e); }); return mix; }
+// effort-adjusted "dose": minutes weighted by zone intensity, so a hard session counts for more toward
+// the weekly target. z2 (steady/moderate) is the 1.0 anchor; z5 ≈ 2.2× — mirroring the public-health
+// "150 min moderate OR 75 min vigorous" model where vigorous minutes count roughly double.
+function cardioZoneW(z){ const d=CZONES.find(x=>x.z===z); return d?d.w:1; }   // legacy/no-zone entries → 1.0
+function cardioDoseWeek(days){ days=days||7; const cut=Date.now()-days*86400000; let m=0;
+  cardioList().forEach(e=>{ if(e.d>=cut) m+=cardioMinsOf(e)*cardioZoneW(e.zone); }); return Math.round(m); }
 // objective-aware weekly aerobic-minutes target (Phase 3 layers coaching on top of this)
 // Dedicated cardio goal — a SEPARATE axis from the lifting objective; it sets the weekly-minutes target.
 // Editable in the Cardio detail sheet (settings.cardioGoal). Falls back to a sensible default derived from
@@ -4994,9 +5050,11 @@ function setCardioGoal(k){ if(!CARDIO_GOALS.some(x=>x.k===k)) return; settings.c
   if(document.querySelector('#pageFeed.active') && typeof renderOverview==="function") renderOverview();
   toast("Cardio goal: "+cardioGoalDef().lbl+" — "+cardioTargetMins()+" min/wk");
 }
-// 10-week weekly-minutes series for the sparkline (index N-1 = this week)
+// 10-week effort-adjusted weekly series for the sparkline (index N-1 = this week); weighted by zone so
+// the bars sit against the same target line the rings/card use (see cardioDoseWeek).
 function cardioWeeklySeries(){ const wkMs=7*86400000, now=Date.now(), N=PROG_WEEKS, out=new Array(N).fill(0);
-  cardioList().forEach(e=>{ const k=Math.floor((now-e.d)/wkMs), i=(k>=0&&k<N)?(N-1-k):-1; if(i>=0) out[i]+=cardioMinsOf(e); }); return out; }
+  cardioList().forEach(e=>{ const k=Math.floor((now-e.d)/wkMs), i=(k>=0&&k<N)?(N-1-k):-1; if(i>=0) out[i]+=cardioMinsOf(e)*cardioZoneW(e.zone); });
+  return out.map(v=>Math.round(v)); }
 const CZCOL={z1:"#74c0fc", z2:"#51cf66", z3:"#fcc419", z4:"#ff922b", z5:"#fa5252"};
 // objective-aware distribution nudge from the last 2 weeks of cardio (polarized base — rosenblat19;
 // keep cardio moderate when chasing size/strength — wilson12). null when there's too little to judge.
@@ -5017,8 +5075,8 @@ function renderCardioCard(){
     card.innerHTML='<div class="pad"><div class="ovk">Cardio</div><p class="ovp" style="margin-top:6px;">No cardio logged yet. Add a run, ride or swim from <b>Workout → Cardio</b> — it’s tracked here on its own, separate from your muscle balance.</p></div>';
     return;
   }
-  const mins=cardioMinsWeek(7), tgt=cardioTargetMins(), sess=cardioSessionsWeek(7);
-  const pct=tgt?Math.min(100,Math.round(mins/tgt*100)):0;
+  const raw=cardioMinsWeek(7), dose=cardioDoseWeek(7), mins=dose, tgt=cardioTargetMins(), sess=cardioSessionsWeek(7);
+  const pct=tgt?Math.min(100,Math.round(dose/tgt*100)):0;
   const mix=cardioZoneMix(7), mixTot=Object.values(mix).reduce((a,b)=>a+b,0);
   const segs=mixTot? CZONES.map(z=>{ const w=mix[z.z]||0; if(!w) return ""; return '<span style="display:block;height:100%;width:'+(w/mixTot*100)+'%;background:'+CZCOL[z.z]+'" title="'+z.lbl+' · '+Math.round(w)+' min"></span>'; }).join("") : "";
   const obj=planObjective(activePlan());
@@ -5031,8 +5089,9 @@ function renderCardioCard(){
   card.innerHTML='<div class="pad">'
     +'<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;">'
       +'<div><div class="ovk">This week</div><div class="ovbig"><b>'+mins+'</b> <small style="font-weight:500;color:var(--l2);">/ '+tgt+' min</small></div></div>'
-      +'<div style="font-size:13px;color:var(--l2);">'+sess+' session'+(sess===1?'':'s')+'</div>'
+      +'<div style="font-size:13px;color:var(--l2);text-align:right;">'+sess+' session'+(sess===1?'':'s')+(raw&&raw!==dose?'<br>'+raw+' min done':'')+'</div>'
     +'</div>'
+    +(raw&&raw!==dose?'<p class="levelcap" style="margin:6px 0 0;">Effort-adjusted — harder sessions count for more toward your target.</p>':'')
     +'<div style="height:7px;border-radius:4px;background:var(--sep);overflow:hidden;margin-top:10px;"><i style="display:block;height:100%;width:'+pct+'%;background:#9775fa;border-radius:4px;"></i></div>'
     +(segs?'<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:7px;gap:1px;">'+segs+'</div>':'')
     +'<canvas id="cardioSpark" width="500" height="46" style="width:100%;height:46px;margin-top:10px;display:block;"></canvas>'
@@ -5066,12 +5125,13 @@ function cardioZoneWeekly(weeks){ weeks=weeks||8; const wkMs=7*86400000, now=Dat
 }
 function openCardioDetail(){ renderCardioDetail(); openSheet("Cardio"); }
 function renderCardioDetail(){
-  const mins=cardioMinsWeek(7), tgt=cardioTargetMins(), m28=cardioMinsWeek(28);
+  const raw=cardioMinsWeek(7), mins=cardioDoseWeek(7), tgt=cardioTargetMins(), dose28=cardioDoseWeek(28);
   $("cdcSummary").innerHTML='<div class="group" style="margin-bottom:4px;"><div class="pad" style="display:flex;justify-content:space-around;text-align:center;gap:8px;">'
     +'<div><div class="ovbig"><b>'+mins+'</b></div><div class="ovk">min this week</div></div>'
     +'<div><div class="ovbig"><b>'+tgt+'</b></div><div class="ovk">weekly target</div></div>'
-    +'<div><div class="ovbig"><b>'+Math.round(m28/4)+'</b></div><div class="ovk">avg/wk (4wk)</div></div>'
-    +'</div></div>';
+    +'<div><div class="ovbig"><b>'+Math.round(dose28/4)+'</b></div><div class="ovk">avg/wk (4wk)</div></div>'
+    +'</div></div>'
+    +'<p class="levelcap" style="margin:0 4px 10px;">Effort-adjusted minutes — a vigorous minute counts up to ~2× an easy one (the 150-moderate-or-75-vigorous guideline). You logged <b>'+raw+'</b> actual min this week.</p>';
   // editable cardio goal — drives the weekly target (separate from the lifting objective)
   const gw=$("cdcGoalChips"); if(gw){ const cur=cardioGoalDef(); gw.innerHTML="";
     CARDIO_GOALS.forEach(g=>{ const c=document.createElement("button"); c.className="chip"+(cur.k===g.k?" on":""); c.textContent=g.lbl+" · "+g.mins+"m";
