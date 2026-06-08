@@ -2103,7 +2103,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi] || (rot[xi]!=null && !rotKeep.has(xi) ? rot[xi] : e.n); }
-let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{} };
+let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{}, baseActivity:null };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -2830,6 +2830,7 @@ function renderDash(){
   if($("bfIn") && document.activeElement!==$("bfIn")) $("bfIn").value = settings.bodyfatPct||"";
   renderCalc(now);
   renderCalendar();
+  renderBaseActivity();
   renderCardioCard();
   renderAchievements();
   renderInsight();
@@ -5370,7 +5371,58 @@ const CARDIO_GOALS=[
 function cardioGoalDef(){
   const g=CARDIO_GOALS.find(x=>x.k===settings.cardioGoal); if(g) return g;
   const map={ muscle:"maintain", strength:"maintain", fitness:"fitness", fatloss:"fatloss" };  // back-compat default
-  return CARDIO_GOALS.find(x=>x.k===(map[settings.objective]||"health"));
+  let def=CARDIO_GOALS.find(x=>x.k===(map[settings.objective]||"health"));
+  // A sedentary job/lifestyle nudges the default UP — the deskbound benefit most from deliberate cardio, and an
+  // active job does NOT replace it (physical-activity paradox, see paPara). Never lowers below the objective default.
+  const ba=baseActivityDef();
+  if(ba && ba.goalDefault){ const bg=CARDIO_GOALS.find(x=>x.k===ba.goalDefault); if(bg && bg.mins>def.mins) def=bg; }
+  return def;
+}
+// ===== base activity: habitual occupation/lifestyle level (Me → Daily activity) =====
+// PAL bands from the FAO/WHO/UNU consultation (palFao); baseMin = a labelled estimate of weekly moderate-or-more
+// movement the lifestyle adds beyond a desk baseline. It sets the smart cardio-goal default and shows context —
+// it is NOT counted as training, because occupational activity lacks leisure exercise's benefit (paPara, opaMort).
+const OCCUPATION_LEVELS=[
+  {k:"sedentary", lbl:"Mostly sitting", sub:"desk, office, driving",            pal:1.45, baseMin:0,   goalDefault:"fitness"},
+  {k:"light",     lbl:"Light",          sub:"standing, retail, teaching",       pal:1.60, baseMin:60,  goalDefault:"health"},
+  {k:"moderate",  lbl:"On your feet",   sub:"nursing, hospitality, cleaning",   pal:1.75, baseMin:150, goalDefault:null},
+  {k:"active",    lbl:"Active",         sub:"warehouse, farming, trades",       pal:1.90, baseMin:250, goalDefault:null},
+  {k:"heavy",     lbl:"Heavy labour",   sub:"construction, forestry, removals", pal:2.10, baseMin:400, goalDefault:null}
+];
+function baseActivityDef(){ return OCCUPATION_LEVELS.find(x=>x.k===settings.baseActivity)||null; }
+function setBaseActivity(k){ if(!OCCUPATION_LEVELS.some(x=>x.k===k)) return;
+  settings.baseActivity = (settings.baseActivity===k) ? null : k;   // tap again to clear
+  sset("settings",settings); renderBaseActivity(); renderCardioCard();
+  const d=baseActivityDef();
+  toast(d ? "Daily activity: "+d.lbl : "Daily activity cleared");
+}
+function renderBaseActivity(){
+  const cw=$("baseActChips"); if(!cw) return;
+  const cur=baseActivityDef();
+  cw.innerHTML="";
+  OCCUPATION_LEVELS.forEach(o=>{ const c=document.createElement("button"); c.className="chip"+(settings.baseActivity===o.k?" on":"");
+    c.innerHTML=esc(o.lbl)+' <small style="opacity:.55">'+esc(o.sub)+'</small>';
+    c.onclick=()=>setBaseActivity(o.k); cw.appendChild(c); });
+  const stat=$("baseActStat"), hint=$("baseActHint"), cite=$("baseActCite");
+  if(!cur){ if(stat) stat.style.display="none";
+    if(hint) hint.textContent="Pick the level that fits a normal week — it tailors your cardio target.";
+    if(cite) cite.style.display="none"; return; }
+  // the weekly picture: lifestyle baseline + what you've actually logged on top
+  const logged=cardioMinsWeek(7);
+  if(stat){ stat.style.display="";
+    stat.innerHTML = cur.baseMin
+      ? 'Lifestyle baseline ≈ <b>'+cur.baseMin+'</b> active min/wk'+(logged?' · you’ve logged <b>'+logged+'</b> on top':'')
+      : 'A sitting week adds little movement on its own'+(logged?' — you’ve logged <b>'+logged+'</b> min of training':'.'); }
+  if(hint) hint.innerHTML = cur.baseMin
+    ? 'Counts as context, <b>not</b> training: an active job supports health but doesn’t build fitness the way deliberate cardio does — so it doesn’t fill your cardio ring.'
+    : 'A mostly-sitting week is why your cardio target is set a little higher — deliberate movement matters most for you.';
+  if(cite){ const link=(k,label)=>{ const u=studyUrl(k), c=shortCite(k); if(!c) return "";
+      const inner=esc(label)+' <span style="opacity:.7">'+esc(c)+'</span>';
+      return u ? '<a class="srclink" href="'+u+'" target="_blank" rel="noopener">'+inner+' <span class="srcarrow">↗</span></a>' : inner; };
+    cite.innerHTML='<div class="actcitehd">Why these numbers</div>'
+      +'<div>PAL ~'+cur.pal.toFixed(2)+' · '+link("palFao","activity levels:")+'</div>'
+      +'<div>'+link("paPara","job activity ≠ training:")+'</div>';
+    cite.style.display=""; }
 }
 function cardioTargetMins(){ return cardioGoalDef().mins; }
 function setCardioGoal(k){ if(!CARDIO_GOALS.some(x=>x.k===k)) return; settings.cardioGoal=k; sset("settings",settings);

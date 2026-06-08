@@ -253,6 +253,17 @@
       <div class="stat"><div class="n" id="stSince">0</div><div class="k">Since deload</div></div>
       <div class="stat"><div class="n" id="stBeat">0</div><div class="k">Beat last</div></div>
     </div>
+    <div class="mezone">Daily activity</div>
+    <!-- Base activity: habitual occupation/lifestyle level (sedentary → heavy labour). Sets a smart cardio-goal
+         default and shows the baseline movement your week already has, with the physical-activity-paradox caveat. -->
+    <div class="panel" id="baseActPanel">
+      <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M6 21V10l6-5 6 5v11"/><path d="M9 21v-5h6v5"/></svg>Your week's baseline</span></div>
+      <p class="levelcap" id="baseActIntro" style="margin:0 4px 10px;">How active is a typical week for you — job, study and getting around — before any training?</p>
+      <div class="chips wrap" id="baseActChips"></div>
+      <div class="otherprev" id="baseActStat" style="display:none;"></div>
+      <div class="levelcap" id="baseActHint" style="margin:8px 4px 0;"></div>
+      <div class="actcite" id="baseActCite" style="display:none;"></div>
+    </div>
     <div class="mezone">Training</div>
     <div class="panel tap" id="meBalance" role="button" tabindex="0" aria-label="Open muscle balance">
       <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>Muscle balance</span></div>
