@@ -5192,8 +5192,10 @@ function renderCardioLog(){
   });
 }
 function renderCardio(){ renderCardioChips(); updateCardioPreview(); renderCardioLog(); }
+const TRAIN_MODES=["strength","cardio","activity"], TRAIN_LBL={strength:"Strength", cardio:"Cardio", activity:"Activity"};
 function setTrainMode(m){ trainMode=m;
-  document.querySelectorAll("#trainModeSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.m===m));
+  const b=$("trainModeBtn"); if(b){ b.classList.toggle("cardio", m==="cardio"); b.classList.toggle("activity", m==="activity"); }
+  const l=$("trainModeLbl"); if(l) l.textContent = TRAIN_LBL[m] || "Strength";
   const strength = m==="strength";
   $("strengthWrap").style.display = strength ? "" : "none";
   $("cardioPanel").style.display  = strength ? "none" : "";
@@ -5202,8 +5204,8 @@ function setTrainMode(m){ trainMode=m;
     renderCardio();
   }
 }
-document.querySelectorAll("#trainModeSeg .s").forEach(s=> s.onclick=()=> setTrainMode(s.dataset.m));
-if($("trainModeBtn")) $("trainModeBtn").onclick=()=> setTrainMode(trainMode==="strength" ? "cardio" : "strength");
+// one compact button, tap cycles Strength → Cardio → Activity → Strength
+if($("trainModeBtn")) $("trainModeBtn").onclick=()=>{ const i=TRAIN_MODES.indexOf(trainMode); setTrainMode(TRAIN_MODES[(i+1)%TRAIN_MODES.length]); };
 ["cdDist","cdTime","cdPace"].forEach(id=> $(id).addEventListener("input", cdRunCalc));
 $("cdMin").addEventListener("input", updateCardioPreview);
 $("cdLog").onclick=()=>{

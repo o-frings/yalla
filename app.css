@@ -195,6 +195,9 @@
   .modebtn .mic-car{ display:none; }
   .modebtn.cardio .mic-str{ display:none; }
   .modebtn.cardio .mic-car{ display:inline; }
+  .modebtn .mic-act{ display:none; }
+  .modebtn.activity .mic-str{ display:none; }
+  .modebtn.activity .mic-act{ display:inline; }
   .ic{ width:16px; height:16px; vertical-align:-3px; }
   .btn .ic{ margin-right:8px; }
   .swapnote .ic{ width:13px; height:13px; vertical-align:-2px; margin-right:4px; }
