@@ -5039,22 +5039,47 @@ const INTENS={ low:0.75, med:1.0, high:1.3 }, INTLBL={ low:"low", med:"medium", 
 // cat: "cardio" (steady endurance — full weekly-minutes credit, pace/zone trends) vs "activity" (mixed sport).
 // cf  = cardio fraction: how much a minute counts toward the weekly cardio goal (how aerobic it is).
 // mf  = muscle fraction: how much of its estimated load feeds the muscle-balance radar (strength-y sports only).
+// Each sport's numbers are evidence-grounded (see evidence.json + EVIDENCE.md):
+//   • cf / rate (how aerobic) ← MET from the Compendium of Physical Activities (`compendium24`).
+//     rate ≈ MET/12 (capped ~0.95) — a per-minute metabolic-load proxy, in the same band as the legacy values.
+//   • muscles / mf (which muscles, how much) ← per-sport EMG / activation studies.
+//   • src:{met,emg} keys resolve to those studies; the Cardio sheet shows them under the picked sport.
 const ACTIVITIES=[
-  // — Cardio (endurance) —
-  {n:"Running",    cat:"cardio",   cf:1,    muscles:["Quads","Hamstrings","Calves","Glutes"], run:true, k:7},
-  {n:"Cycling",    cat:"cardio",   cf:1,    muscles:["Quads","Glutes","Calves"], rate:0.5},
-  {n:"Swimming",   cat:"cardio",   cf:1,    muscles:["Back","Shoulders","Chest","Core"], rate:0.8},
-  {n:"Rowing",     cat:"cardio",   cf:1,    muscles:["Back","Biceps","Quads"], rate:0.8},
-  {n:"Hiking",     cat:"cardio",   cf:1,    muscles:["Quads","Glutes","Calves"], rate:0.45},
-  // — Activity (mixed sport): partial cardio credit by how aerobic it is; strength-y ones add a little to the radar —
-  {n:"Boxing",     cat:"activity", cf:0.8,  mf:0.15, muscles:["Shoulders","Core","Back"], rate:0.9},
-  {n:"MMA",        cat:"activity", cf:0.8,  mf:0.2,  muscles:["Shoulders","Core","Back","Quads"], rate:1.0},
-  {n:"Football",   cat:"activity", cf:0.8,  muscles:["Quads","Hamstrings","Calves"], rate:0.6},
-  {n:"Basketball", cat:"activity", cf:0.7,  muscles:["Quads","Calves","Shoulders"], rate:0.6},
-  {n:"Tennis",     cat:"activity", cf:0.6,  muscles:["Shoulders","Quads","Core"], rate:0.6},
-  {n:"Climbing",   cat:"activity", cf:0.3,  mf:0.4, muscles:["Back","Biceps","Core"], rate:0.7},
-  {n:"Bouldering", cat:"activity", cf:0.25, mf:0.4, muscles:["Back","Biceps","Core"], rate:0.6},
-  {n:"Yoga",       cat:"activity", cf:0.15, mf:0.1, muscles:["Core"], rate:0.3}
+  // — Cardio (steady endurance — full weekly-minutes credit) —
+  {n:"Running",     cat:"cardio",   cf:1,    muscles:["Quads","Hamstrings","Calves","Glutes"], run:true, k:7, met:9.8, src:{met:"compendium24", emg:"runEMG"}},
+  {n:"Cycling",     cat:"cardio",   cf:1,    muscles:["Quads","Glutes","Calves"], rate:0.5, met:7.5, src:{met:"compendium24", emg:"cycleEMG"}},
+  {n:"Swimming",    cat:"cardio",   cf:1,    muscles:["Back","Shoulders","Chest","Core"], rate:0.8, met:8.3, src:{met:"compendium24", emg:"swimEMG"}},
+  {n:"Rowing",      cat:"cardio",   cf:1,    muscles:["Back","Quads","Glutes","Biceps"], rate:0.8, met:7.0, src:{met:"compendium24", emg:"rowEMG"}},
+  {n:"Hiking",      cat:"cardio",   cf:1,    muscles:["Quads","Glutes","Calves"], rate:0.45, met:6.0, src:{met:"compendium24", emg:"hikeEMG"}},
+  {n:"Walking",     cat:"cardio",   cf:1,    muscles:["Quads","Glutes","Hamstrings","Calves"], run:true, k:6, met:5.0, src:{met:"compendium24", emg:"walkSyn"}},
+  {n:"Elliptical",  cat:"cardio",   cf:1,    muscles:["Quads","Hamstrings","Glutes"], rate:0.4, met:5.0, src:{met:"compendium24", emg:"ellipticalEMG"}},
+  {n:"Stair Climber",cat:"cardio",  cf:1,    muscles:["Glutes","Quads","Hamstrings","Calves"], rate:0.8, met:9.3, src:{met:"compendium24", emg:"stairEMG"}},
+  {n:"Jump Rope",   cat:"cardio",   cf:0.9,  muscles:["Calves","Quads"], rate:0.95, met:11.8, src:{met:"compendium24", emg:"jumpropeEMG"}},
+  {n:"Skating",     cat:"cardio",   cf:1,    muscles:["Glutes","Quads"], rate:0.6, met:7.3, src:{met:"compendium24", emg:"skatingEMG"}},
+  {n:"XC Skiing",   cat:"cardio",   cf:1,    muscles:["Back","Triceps","Core","Chest"], rate:0.7, met:8.5, src:{met:"compendium24", emg:"xcSkiEMG"}},
+  // — Activity (mixed sport): partial cardio credit by how aerobic it is; strength-y ones (mf) add a little to the radar —
+  {n:"Boxing",      cat:"activity", cf:0.8,  mf:0.15, muscles:["Shoulders","Core","Back"], rate:0.9, met:9.0, src:{met:"compendium24", emg:"boxEMG"}},
+  {n:"MMA",         cat:"activity", cf:0.8,  mf:0.2,  muscles:["Shoulders","Core","Back","Quads"], rate:1.0, met:10.3, src:{met:"compendium24", emg:"mmaEMG"}},
+  {n:"Grappling",   cat:"activity", cf:0.7,  mf:0.2,  muscles:["Biceps","Back","Core"], rate:0.5, met:6.0, src:{met:"compendium24", emg:"judoEMG"}},
+  {n:"Football",    cat:"activity", cf:0.8,  muscles:["Quads","Hamstrings","Calves"], rate:0.6, met:7.0, src:{met:"compendium24", emg:"soccerEMG"}},
+  {n:"Basketball",  cat:"activity", cf:0.7,  muscles:["Quads","Calves","Shoulders"], rate:0.6, met:6.5, src:{met:"compendium24", emg:"bballEMG"}},
+  {n:"Tennis",      cat:"activity", cf:0.6,  muscles:["Shoulders","Quads","Core"], rate:0.6, met:7.3, src:{met:"compendium24", emg:"tennisEMG"}},
+  {n:"Padel",       cat:"activity", cf:0.7,  muscles:["Quads","Glutes","Calves","Shoulders"], rate:0.5, met:6.0, src:{met:"padelDemand", emg:"padelDemand"}},
+  {n:"Squash",      cat:"activity", cf:0.85, muscles:["Quads","Glutes","Calves","Core"], rate:0.8, met:9.5, src:{met:"compendium24", emg:"racketDemand"}},
+  {n:"Badminton",   cat:"activity", cf:0.7,  muscles:["Quads","Glutes","Calves","Hamstrings"], rate:0.6, met:7.0, src:{met:"compendium24", emg:"badmintonEMG"}},
+  {n:"Volleyball",  cat:"activity", cf:0.55, muscles:["Quads","Glutes","Calves","Shoulders"], rate:0.5, met:6.0, src:{met:"compendium24", emg:"volleyballEMG"}},
+  {n:"Table Tennis",cat:"activity", cf:0.45, muscles:["Quads","Calves","Core"], rate:0.35, met:4.0, src:{met:"compendium24", emg:"ttEMG"}},
+  {n:"CrossFit",    cat:"activity", cf:0.8,  mf:0.35, muscles:["Quads","Glutes","Back","Core"], rate:0.8, met:9.5, src:{met:"crossfitMet", emg:"kbEMG"}},
+  {n:"Kettlebell",  cat:"activity", cf:0.6,  mf:0.4,  muscles:["Glutes","Hamstrings","Back","Core"], rate:0.8, met:9.8, src:{met:"kbVO2", emg:"kbEMG"}},
+  {n:"Climbing",    cat:"activity", cf:0.3,  mf:0.4, muscles:["Back","Biceps","Core"], rate:0.7, met:8.0, src:{met:"compendium24", emg:"climbEMG"}},
+  {n:"Bouldering",  cat:"activity", cf:0.25, mf:0.4, muscles:["Back","Biceps","Core"], rate:0.6, met:7.0, src:{met:"compendium24", emg:"climbEMG"}},
+  {n:"Skiing",      cat:"activity", cf:0.5,  mf:0.15, muscles:["Quads","Core","Glutes","Hamstrings"], rate:0.5, met:6.3, src:{met:"compendium24", emg:"alpineEMG"}},
+  {n:"Surfing",     cat:"activity", cf:0.5,  mf:0.1,  muscles:["Back","Shoulders","Chest","Core"], rate:0.4, met:5.0, src:{met:"compendium24", emg:"surfEMG"}},
+  {n:"Kayak / SUP", cat:"activity", cf:0.85, mf:0.12, muscles:["Back","Core","Shoulders"], rate:0.45, met:5.5, src:{met:"compendium24", emg:"kayakEMG"}},
+  {n:"Dancing",     cat:"activity", cf:0.7,  muscles:["Quads","Hamstrings","Calves","Glutes"], rate:0.4, met:4.5, src:{met:"compendium24", emg:"danceEMG"}},
+  {n:"Golf",        cat:"activity", cf:0.4,  muscles:["Core","Back","Glutes"], rate:0.35, met:4.3, src:{met:"compendium24", emg:"golfEMG"}},
+  {n:"Pilates",     cat:"activity", cf:0.15, mf:0.15, muscles:["Core"], rate:0.3, met:3.7, src:{met:"pilatesMet", emg:"pilatesEMG"}},
+  {n:"Yoga",        cat:"activity", cf:0.15, mf:0.1, muscles:["Core"], rate:0.3, met:3.0, src:{met:"compendium24", emg:"yogaEMG"}}
 ];
 function actsInCat(cat){ return ACTIVITIES.filter(a=>(a.cat||"cardio")===cat); }
 function cardioFracOf(e){ if(e.cf!=null) return e.cf; const a=actByName(e.name); return a&&a.cf!=null?a.cf:1; }
@@ -5157,10 +5182,25 @@ function updateCardioPreview(){
   $("cdLog").classList.toggle("dim", !ok);
   return {ok, mins, dist};
 }
+// "Why these numbers" for the picked sport: the MET source (how aerobic) and, where we have it, the EMG
+// source (which muscles). Both link to the DOI. Sports without a `src` (e.g. Boxing) simply show nothing.
+function renderActCite(){
+  const el=$("cdCite"); if(!el) return;
+  const act=cdAct(), src=act.src||{};
+  const link=(k,label)=>{ const u=studyUrl(k), c=shortCite(k); if(!c) return "";
+    const inner=esc(label)+' <span style="opacity:.7">'+esc(c)+'</span>';
+    return u ? '<a class="srclink" href="'+u+'" target="_blank" rel="noopener">'+inner+' <span class="srcarrow">↗</span></a>' : inner; };
+  const parts=[];
+  if(src.met) parts.push('<div>'+(act.met?'<b>~'+act.met+' MET</b> · ':'')+link(src.met,"cardio cost:")+'</div>');
+  if(src.emg && src.emg!==src.met) parts.push('<div>'+link(src.emg,"muscles:")+'</div>');
+  if(!parts.length){ el.style.display="none"; el.innerHTML=""; return; }
+  el.innerHTML='<div class="actcitehd">Why these numbers</div>'+parts.join("");
+  el.style.display="";
+}
 function renderCardioChips(){
   const aw=$("cdActChips"); aw.innerHTML="";
   actsInCat(cdCat).forEach(a=>{ const c=document.createElement("button"); c.className="chip"+(cdActSel===a.n?" on":""); c.textContent=a.n;
-    c.onclick=()=>{ cdActSel=a.n; renderCardioChips(); $("cdRun").style.display=a.run?"":"none"; $("cdDur").style.display=a.run?"none":""; updateCardioPreview(); }; aw.appendChild(c); });
+    c.onclick=()=>{ cdActSel=a.n; renderCardioChips(); $("cdRun").style.display=a.run?"":"none"; $("cdDur").style.display=a.run?"none":""; updateCardioPreview(); renderActCite(); }; aw.appendChild(c); });
   const act=cdAct(); $("cdRun").style.display=act.run?"":"none"; $("cdDur").style.display=act.run?"none":"";
   // GPX routes only make sense for distance cardio; intro copy reflects the category
   const imp=$("cdImport"); if(imp) imp.style.display = cdCat==="cardio" ? "" : "none";
@@ -5192,7 +5232,7 @@ function renderCardioLog(){
     wrap.appendChild(row);
   });
 }
-function renderCardio(){ renderCardioChips(); updateCardioPreview(); renderCardioLog(); }
+function renderCardio(){ renderCardioChips(); updateCardioPreview(); renderActCite(); renderCardioLog(); }
 const TRAIN_MODES=["strength","cardio","activity"], TRAIN_LBL={strength:"Strength", cardio:"Cardio", activity:"Activity"};
 function setTrainMode(m){ trainMode=m;
   const b=$("trainModeBtn"); if(b){ b.classList.toggle("cardio", m==="cardio"); b.classList.toggle("activity", m==="activity"); }
