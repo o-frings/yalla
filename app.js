@@ -5399,6 +5399,7 @@ function setBaseActivity(k){ if(!OCCUPATION_LEVELS.some(x=>x.k===k)) return;
 function renderBaseActivity(){
   const cw=$("baseActChips"); if(!cw) return;
   const cur=baseActivityDef();
+  const sum=$("baseActSummary"); if(sum) sum.innerHTML = "Daily activity" + (cur?' <span style="color:var(--l3);font-weight:400;">· '+esc(cur.lbl)+'</span>':"");
   cw.innerHTML="";
   OCCUPATION_LEVELS.forEach(o=>{ const c=document.createElement("button"); c.className="chip"+(settings.baseActivity===o.k?" on":"");
     c.innerHTML=esc(o.lbl)+' <small style="opacity:.55">'+esc(o.sub)+'</small>';
