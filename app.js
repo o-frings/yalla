@@ -2409,6 +2409,7 @@ async function init(){
   decideTip();          // pick this launch's coach tip (if any) before the first render
   renderAll();
   showTab("overview");   // open on the coach home
+  hideSplash();          // UI is painted — fade out the launch splash
   if(!settings.objective){ const ob=$("onboardWrap"); if(ob) ob.classList.add("show"); }   // ask the objective up front
   try{ if(location.hash && location.hash.indexOf("LIFTLOG1:")>=0){ openImport(decodeURIComponent(location.hash.slice(1))); } }catch(e){}
   maybeBackupNudge();
@@ -6742,6 +6743,17 @@ function updateRotateGuard(){ const g=$("rotateGuard"); if(!g) return;
 window.addEventListener("resize", updateRotateGuard);
 window.addEventListener("orientationchange", updateRotateGuard);
 updateRotateGuard();
+
+// Fade out the launch splash. Called when init() finishes; the timeout is a backstop so a thrown
+// init() (or an unexpectedly slow load) can never leave the splash stuck over the app.
+let splashHidden=false;
+function hideSplash(){
+  if(splashHidden) return; splashHidden=true;
+  const el=document.getElementById("splash"); if(!el) return;
+  el.classList.add("gone");
+  setTimeout(()=>{ el.remove(); }, 480);   // remove after the fade transition completes
+}
+setTimeout(hideSplash, 4000);
 
 init();
 

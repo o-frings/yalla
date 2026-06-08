@@ -32,6 +32,17 @@
 </head>
 <body>
 
+<!-- LAUNCH SPLASH: brand gradient + flame logo shown instantly so a cold start never flashes blank.
+     Faded out by hideSplash() once init() has rendered the UI (safety timeout in app.js as a backstop). -->
+<div class="splash" id="splash" aria-hidden="true">
+  <div class="splashInner">
+    <svg class="splashLogo" viewBox="0 0 1024 1024" width="112" height="112" aria-hidden="true">
+      <path d="M512 150 C 470 330 360 372 360 556 A 152 152 0 0 0 664 556 C 664 446 612 404 566 360 C 560 470 470 470 470 360 C 470 300 490 230 512 150 Z" fill="#fff"/>
+    </svg>
+    <div class="splashWord">Yalla</div>
+  </div>
+</div>
+
 <div class="statusbar-bg"></div>
 
 <!-- ROTATE GUARD: Yalla is portrait-only. iOS Safari ignores the manifest/lock API, so JS shows this

@@ -58,6 +58,20 @@
       var(--bg);
     transition:background .25s ease; }
 
+  /* LAUNCH SPLASH — brand gradient + flame logo over the whole window during cold start.
+     Covers the dynamic-viewport blank strip (100vh static) and sits above everything. */
+  .splash{ position:fixed; top:0; left:0; right:0; height:100vh; z-index:9999; pointer-events:none;
+    display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(160deg,#ff7a18 0%,#ff2f3d 100%);
+    opacity:1; transition:opacity .42s ease; }
+  .splash.gone{ opacity:0; }
+  .splashInner{ display:flex; flex-direction:column; align-items:center; gap:18px;
+    transform:translateY(-4%); animation:splashRise .5s ease both; }
+  .splashLogo{ filter:drop-shadow(0 6px 18px rgba(0,0,0,.18)); }
+  .splashWord{ color:#fff; font-size:30px; font-weight:800; letter-spacing:.5px; text-transform:lowercase; }
+  .splashWord::after{ content:"."; opacity:.85; }
+  @keyframes splashRise{ from{ opacity:0; transform:translateY(2%) scale(.96); } to{ opacity:1; transform:translateY(-4%) scale(1); } }
+
   .wordmark{ font-size:17px; font-weight:800; letter-spacing:.5px; text-transform:lowercase;
     background:var(--grad); -webkit-background-clip:text; -webkit-text-fill-color:transparent;
     background-clip:text; display:inline-block; }
