@@ -148,6 +148,9 @@
 <!-- CARDIO PANEL — logged here, tracked on its own minutes/zone axis (not muscle volume) -->
 <div id="cardioPanel" style="display:none;">
   <p class="levelcap" style="margin:0 4px 12px;">Log cardio &amp; conditioning. Tracked on its own — by minutes and effort zone — and kept separate from your muscle-volume balance.</p>
+  <button class="btn tinted wide" id="cdImport" type="button" style="margin-bottom:12px;"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M8 8l4-4 4 4M5 20h14"/></svg>Import route (GPX)</button>
+  <input type="file" id="cdGpx" accept=".gpx,application/gpx+xml,application/octet-stream" style="display:none;">
+  <div id="cdRoutePrev" style="display:none;margin-bottom:4px;"></div>
   <div class="ed-label">Activity</div>
   <div class="chips wrap" id="cdActChips"></div>
   <div id="cdRun" style="display:none;">
@@ -175,7 +178,7 @@
   <div id="cdLogList"></div>
 </div>
 
-<div class="foot">On-device only · keep a backup · lift safely · build <span id="appVer">v115</span></div>
+<div class="foot">On-device only · keep a backup · lift safely · build <span id="appVer">v116</span></div>
 </div><!-- /pageWorkout -->
 
 <div class="exmenu-pop" id="exMenu"></div>

@@ -5119,6 +5119,7 @@ const CZONES=[
   {z:"z5", lbl:"Max",    sub:"all-out intervals",     f:1.5, w:2.2}
 ];
 let trainMode="strength", cdActSel="Running", cdZone="z2";
+let cdRoute=null;   // an imported GPX route awaiting logging: {name, pts, dist, ascent, mins}
 function cdAct(){ return actByName(cdActSel); }
 function cdZoneDef(){ return CZONES.find(z=>z.z===cdZone)||CZONES[1]; }
 function cardioVol(){ const act=cdAct(), bw=bwNow(), f=cdZoneDef().f;
@@ -5137,12 +5138,12 @@ function cdRunCalc(){
 }
 function updateCardioPreview(){
   const act=cdAct(), mins=cardioMins(), z=cdZoneDef();
-  const dist = act.run ? (parseFloat($("cdDist").value)||0) : 0;
-  const ok = act.run ? (dist>0 || mins>0) : mins>0;
+  const dist = cdRoute ? cdRoute.dist : (act.run ? (parseFloat($("cdDist").value)||0) : 0);
+  const ok = cdRoute ? cdRoute.dist>0 : (act.run ? (dist>0 || mins>0) : mins>0);
   let html;
   if(ok){ const bits=[]; if(mins) bits.push('<b>'+mins+' min</b>'); if(dist) bits.push('<b>'+round1(dist)+' km</b>');
     bits.push(z.lbl+' · Z'+z.z.slice(1)); html=bits.join(' · ');
-  } else html='<span style="color:var(--l3)">Add a duration'+(act.run?' or distance':'')+' to log it.</span>';
+  } else html='<span style="color:var(--l3)">Add a duration'+(act.run?' or distance':'')+', or import a route, to log it.</span>';
   $("cdPrev").innerHTML=html;
   $("cdLog").classList.toggle("dim", !ok);
   return {ok, mins, dist};
@@ -5165,11 +5166,14 @@ function renderCardioLog(){
     const row=document.createElement("div"); row.className="planrow exrow";
     const days=Math.round((Date.now()-e.d)/86400000), when=days<=0?"today":days+"d ago";
     const z=CZONES.find(z=>z.z===e.zone);
-    const parts=[]; if(e.dist) parts.push(e.dist+"km"); if(e.mins) parts.push(e.mins+"min");
+    const parts=[]; if(e.dist) parts.push(e.dist+"km"); if(e.ascent) parts.push("↑"+e.ascent+"m"); if(e.mins) parts.push(e.mins+"min");
     parts.push(z?z.lbl:(INTLBL[e.intensity]||"")); parts.push(when);
-    row.innerHTML='<div class="info"><div class="nm">'+esc(e.name)+'</div><div class="meta">'+esc(parts.filter(Boolean).join(" · "))+'</div></div>'
+    const thumb = e.route ? '<canvas class="rthumb" width="120" height="76" style="width:44px;height:28px;flex:0 0 auto;margin-right:10px;border-radius:5px;background:var(--sep);"></canvas>' : '';
+    const title = esc(e.routeName || e.name) + (e.routeName ? ' <span style="color:var(--l3);font-weight:400;">· '+esc(e.name)+'</span>' : '');
+    row.innerHTML=thumb+'<div class="info"><div class="nm">'+title+'</div><div class="meta">'+esc(parts.filter(Boolean).join(" · "))+'</div></div>'
       +'<a class="lnkic rem" title="Delete">'+ICON.trash+'</a>';
-    row.querySelector(".rem").onclick=()=>{ confirmAsk("Delete this "+esc(e.name)+" entry?","Delete",()=>{ extlog=extlog.filter(x=>x!==e); sset("extlog",extlog); renderCardioLog(); renderDash(); toast("Deleted"); }); };
+    if(e.route){ const cv=row.querySelector(".rthumb"); if(cv) drawRoutePolyline(cv, e.route); }
+    row.querySelector(".rem").onclick=()=>{ confirmAsk("Delete this "+esc(e.routeName||e.name)+" entry?","Delete",()=>{ extlog=extlog.filter(x=>x!==e); sset("extlog",extlog); renderCardioLog(); renderDash(); toast("Deleted"); }); };
     wrap.appendChild(row);
   });
 }
@@ -5185,20 +5189,95 @@ if($("trainModeBtn")) $("trainModeBtn").onclick=()=> setTrainMode(trainMode==="c
 ["cdDist","cdTime","cdPace"].forEach(id=> $(id).addEventListener("input", cdRunCalc));
 $("cdMin").addEventListener("input", updateCardioPreview);
 $("cdLog").onclick=()=>{
-  const pv=updateCardioPreview(); if(!pv.ok){ toast("Add a duration or distance first"); return; }
-  const act=cdAct(), mins=pv.mins, dist=pv.dist;
-  const entry={ d:Date.now(), kind:"cardio", name:act.n, zone:cdZone, mins, vol:cardioVol(), muscles:act.muscles.slice(), src:"manual" };
+  const pv=updateCardioPreview(); if(!pv.ok){ toast("Add a duration or distance, or import a route, first"); return; }
+  const act=cdAct(); let mins=pv.mins; const dist = cdRoute ? cdRoute.dist : pv.dist;
+  if(cdRoute && !mins) mins=cdRoute.mins||0;
+  const entry={ d:Date.now(), kind:"cardio", name:act.n, zone:cdZone, mins, vol:cardioVol(), muscles:act.muscles.slice(), src: cdRoute?"gpx":"manual" };
   if(dist){ entry.dist=round1(dist); if(mins) entry.pace=round1(mins/dist); }
+  if(cdRoute){ if(cdRoute.ascent) entry.ascent=cdRoute.ascent; entry.route=decimatePts(cdRoute.pts,80); if(cdRoute.name) entry.routeName=cdRoute.name; }
   const hr=parseFloat($("cdHr").value)||0; if(hr) entry.avgHr=Math.round(hr);
   const rpe=parseFloat($("cdRpe").value)||0; if(rpe) entry.rpe=Math.min(10,Math.max(1,Math.round(rpe)));
   extlog.push(entry); sset("extlog",extlog);
   const fresh=checkAchievements(); sset("settings",settings);
   ["cdDist","cdTime","cdPace","cdMin","cdHr","cdRpe"].forEach(id=>{ $(id).value=""; });
+  clearCardioRoute();
   renderCardioLog(); updateCardioPreview(); renderDash();
   cloudTouchWorkout();
-  toast("Logged "+entry.name+(mins?" — "+mins+" min":"")+(dist?" · "+round1(dist)+" km":""));
+  toast("Logged "+(entry.routeName||entry.name)+(mins?" — "+mins+" min":"")+(dist?" · "+round1(dist)+" km":""));
   if(fresh.length) setTimeout(()=>celebrateAch(fresh), 1200);
 };
+
+// ===== GPX route import — free, fully client-side. Works with exports from Strava, Komoot, Garmin,
+// Maeander, etc. Parses the track, measures distance/ascent locally, and prefills a cardio log. =====
+function _gpxNum(s){ const n=parseFloat(s); return isFinite(n)?n:null; }
+function round5(x){ return Math.round(x*1e5)/1e5; }
+function haversineKm(a,b){ const R=6371, dLat=(b.lat-a.lat)*Math.PI/180, dLon=(b.lon-a.lon)*Math.PI/180,
+  la=a.lat*Math.PI/180, lb=b.lat*Math.PI/180;
+  const h=Math.sin(dLat/2)**2 + Math.cos(la)*Math.cos(lb)*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.min(1,Math.sqrt(h))); }
+function parseGpx(text){
+  let doc; try{ doc=new DOMParser().parseFromString(text,"application/xml"); }catch(e){ return null; }
+  if(!doc || doc.getElementsByTagName("parsererror").length) return null;
+  let nodes=[].slice.call(doc.getElementsByTagName("trkpt"));
+  if(!nodes.length) nodes=[].slice.call(doc.getElementsByTagName("rtept"));
+  if(!nodes.length) nodes=[].slice.call(doc.getElementsByTagName("wpt"));
+  const pts=[]; nodes.forEach(n=>{ const lat=_gpxNum(n.getAttribute("lat")), lon=_gpxNum(n.getAttribute("lon")); if(lat==null||lon==null) return;
+    const eleEl=n.getElementsByTagName("ele")[0], tEl=n.getElementsByTagName("time")[0];
+    pts.push({lat, lon, ele: eleEl?_gpxNum(eleEl.textContent):null, t: tEl?Date.parse(tEl.textContent):null}); });
+  if(pts.length<2) return null;
+  let name=""; const nm=doc.getElementsByTagName("name")[0]; if(nm) name=(nm.textContent||"").trim().slice(0,60);
+  let dist=0; for(let i=1;i<pts.length;i++) dist+=haversineKm(pts[i-1],pts[i]);
+  // ascent: only count cumulative rises ≥3 m to cut GPS elevation noise
+  let ascent=0, ref=null;
+  pts.forEach(p=>{ if(p.ele==null) return; if(ref==null){ ref=p.ele; return; } const d=p.ele-ref; if(d>=3){ ascent+=d; ref=p.ele; } else if(d<0){ ref=p.ele; } });
+  const ts=pts.map(p=>p.t).filter(t=>t&&isFinite(t)); let mins=0; if(ts.length>=2) mins=Math.max(0,Math.round((Math.max.apply(null,ts)-Math.min.apply(null,ts))/60000));
+  return { name, pts, dist: round1(dist), ascent: Math.round(ascent), mins };
+}
+// decimate to ≤max points for compact storage/sync; returns [[lat,lon],…]
+function decimatePts(pts, max){ max=max||80; if(pts.length<=max) return pts.map(p=>[round5(p.lat),round5(p.lon)]);
+  const step=(pts.length-1)/(max-1), out=[]; for(let i=0;i<max;i++){ const p=pts[Math.round(i*step)]; out.push([round5(p.lat),round5(p.lon)]); } return out; }
+function _ll(p){ return Array.isArray(p) ? {lat:p[0], lon:p[1]} : p; }
+function drawRoutePolyline(c, pts){ if(!c||!pts||pts.length<2) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  const P=pts.map(_ll), lats=P.map(p=>p.lat), lons=P.map(p=>p.lon);
+  const minLat=Math.min.apply(null,lats), maxLat=Math.max.apply(null,lats), minLon=Math.min.apply(null,lons), maxLon=Math.max.apply(null,lons);
+  const pad=8, w=W-pad*2, h=H-pad*2, midLat=(minLat+maxLat)/2*Math.PI/180;
+  const spanX=Math.max(1e-6,(maxLon-minLon)*Math.cos(midLat)), spanY=Math.max(1e-6,(maxLat-minLat)), sc=Math.min(w/spanX, h/spanY);
+  const offX=pad+(w-spanX*sc)/2, offY=pad+(h-spanY*sc)/2;
+  const X=lon=>offX+(lon-minLon)*Math.cos(midLat)*sc, Y=lat=>offY+(maxLat-lat)*sc;
+  ctx.strokeStyle="#9775fa"; ctx.lineWidth=Math.max(2,W/220); ctx.lineJoin="round"; ctx.lineCap="round"; ctx.beginPath();
+  P.forEach((p,i)=>{ const x=X(p.lon), y=Y(p.lat); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.stroke();
+  const f=P[0], l=P[P.length-1], r=Math.max(3,W/160);
+  ctx.fillStyle="#51cf66"; ctx.beginPath(); ctx.arc(X(f.lon),Y(f.lat),r,0,7); ctx.fill();
+  ctx.fillStyle="#fa5252"; ctx.beginPath(); ctx.arc(X(l.lon),Y(l.lat),r,0,7); ctx.fill();
+}
+function renderCardioRoutePrev(){
+  const box=$("cdRoutePrev"); if(!box) return;
+  if(!cdRoute){ box.style.display="none"; box.innerHTML=""; return; }
+  const r=cdRoute; box.style.display="";
+  box.innerHTML='<div class="group"><div class="pad">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">'
+      +'<div class="nm" style="font-weight:600;">'+esc(r.name||"Imported route")+'</div>'
+      +'<a class="lnkic" id="cdRouteClear" title="Remove route">'+ICON.trash+'</a></div>'
+    +'<canvas id="cdRouteCanvas" width="600" height="200" style="width:100%;height:150px;display:block;margin:8px 0 6px;"></canvas>'
+    +'<div class="meta" style="color:var(--l2);font-size:13px;"><b>'+round1(r.dist)+' km</b>'+(r.ascent?' · ↑ '+r.ascent+' m':'')+(r.mins?' · '+r.mins+' min':'')+' · pick an activity &amp; zone, then Log</div>'
+  +'</div></div>';
+  drawRoutePolyline($("cdRouteCanvas"), r.pts);
+  $("cdRouteClear").onclick=clearCardioRoute;
+}
+function setCardioRoute(r){
+  cdRoute=r; const act=cdAct();
+  if(act.run){ $("cdDist").value=r.dist||""; if(r.mins){ $("cdTime").value=r.mins; if(r.dist) $("cdPace").value=fmtPace(r.mins/r.dist); } }
+  else if(r.mins){ $("cdMin").value=r.mins; }
+  renderCardioRoutePrev(); updateCardioPreview();
+}
+function clearCardioRoute(){ cdRoute=null; renderCardioRoutePrev(); updateCardioPreview(); }
+if($("cdImport")) $("cdImport").onclick=()=>$("cdGpx").click();
+if($("cdGpx")) $("cdGpx").onchange=ev=>{ const file=ev.target.files&&ev.target.files[0]; if(!file) return;
+  const fr=new FileReader();
+  fr.onload=()=>{ const r=parseGpx(String(fr.result||"")); ev.target.value="";
+    if(!r){ toast("Couldn't read that GPX — is it a valid route file?"); return; }
+    setCardioRoute(r); toast("Imported "+(r.name||"route")+" — "+round1(r.dist)+" km"); };
+  fr.onerror=()=>{ toast("Couldn't read that file"); }; fr.readAsText(file); };
 
 // ===== cardio dose: weekly aerobic minutes + zone mix, a SEPARATE axis from muscle volume =====
 // (also folds in pre-Phase-1 kind:"activity" logs so old runs/rides still count toward the cardio picture)
