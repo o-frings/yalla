@@ -600,10 +600,10 @@ function muscleVolume(days, metric, volMode){
     // expand coarse legacy/cardio muscle tokens into the detailed groups so old logs still land on the radar
     const splitM=m=> m==="Shoulders" ? ["Front Delts","Side Delts","Rear Delts"]
                    : m==="Back" ? ["Lats","Upper Back","Lower Back"] : [m];
-    // Only resistance work done elsewhere (kind:"muscle") counts toward muscle volume. Cardio/activities
-    // (kind:"cardio"/"activity") are a separate training axis tracked by minutes & zone — never the radar.
-    (extlog||[]).forEach(e=>{ if(e.kind!=="muscle") return;
-      if(e.d>=cutoff && e.muscles && e.muscles.length){ const per=e.vol/e.muscles.length;
+    // Resistance done elsewhere (kind:"muscle") counts in full; pure cardio never touches the radar; strength-y
+    // activities (climbing, martial arts) contribute a fraction via the mvol baked in at log time. See ACTIVITIES.mf.
+    (extlog||[]).forEach(e=>{ const v = e.kind==="muscle" ? e.vol : (e.mvol||0); if(!v) return;
+      if(e.d>=cutoff && e.muscles && e.muscles.length){ const per=v/e.muscles.length;
         e.muscles.forEach(m=>{ const gs=splitM(m); gs.forEach(g=> totals[g]=(totals[g]||0)+per/gs.length); }); } });
   }
   return {totals, byEx};
@@ -5035,21 +5035,28 @@ const MUSCLE_TARGETS={
   Chest:["Chest"], Back:["Back"], Shoulders:["Front Delts","Side Delts","Rear Delts"], Arms:["Biceps","Triceps"],
   Legs:["Quads","Hamstrings","Glutes","Calves"], Core:["Core"] };
 const INTENS={ low:0.75, med:1.0, high:1.3 }, INTLBL={ low:"low", med:"medium", high:"high" };
+// cat: "cardio" (steady endurance — full weekly-minutes credit, pace/zone trends) vs "activity" (mixed sport).
+// cf  = cardio fraction: how much a minute counts toward the weekly cardio goal (how aerobic it is).
+// mf  = muscle fraction: how much of its estimated load feeds the muscle-balance radar (strength-y sports only).
 const ACTIVITIES=[
-  {n:"Running", muscles:["Quads","Hamstrings","Calves","Glutes"], run:true, k:7},
-  {n:"Cycling", muscles:["Quads","Glutes","Calves"], rate:0.5},
-  {n:"Swimming", muscles:["Back","Shoulders","Chest","Core"], rate:0.8},
-  {n:"Climbing", muscles:["Back","Biceps","Core"], rate:0.7},
-  {n:"Bouldering", muscles:["Back","Biceps","Core"], rate:0.6},
-  {n:"Rowing", muscles:["Back","Biceps","Quads"], rate:0.8},
-  {n:"Boxing", muscles:["Shoulders","Core","Back"], rate:0.9},
-  {n:"MMA", muscles:["Shoulders","Core","Back","Quads"], rate:1.0},
-  {n:"Hiking", muscles:["Quads","Glutes","Calves"], rate:0.45},
-  {n:"Football", muscles:["Quads","Hamstrings","Calves"], rate:0.6},
-  {n:"Basketball", muscles:["Quads","Calves","Shoulders"], rate:0.6},
-  {n:"Tennis", muscles:["Shoulders","Quads","Core"], rate:0.6},
-  {n:"Yoga", muscles:["Core"], rate:0.3}
+  // — Cardio (endurance) —
+  {n:"Running",    cat:"cardio",   cf:1,    muscles:["Quads","Hamstrings","Calves","Glutes"], run:true, k:7},
+  {n:"Cycling",    cat:"cardio",   cf:1,    muscles:["Quads","Glutes","Calves"], rate:0.5},
+  {n:"Swimming",   cat:"cardio",   cf:1,    muscles:["Back","Shoulders","Chest","Core"], rate:0.8},
+  {n:"Rowing",     cat:"cardio",   cf:1,    muscles:["Back","Biceps","Quads"], rate:0.8},
+  {n:"Hiking",     cat:"cardio",   cf:1,    muscles:["Quads","Glutes","Calves"], rate:0.45},
+  // — Activity (mixed sport): partial cardio credit by how aerobic it is; strength-y ones add a little to the radar —
+  {n:"Boxing",     cat:"activity", cf:0.8,  mf:0.15, muscles:["Shoulders","Core","Back"], rate:0.9},
+  {n:"MMA",        cat:"activity", cf:0.8,  mf:0.2,  muscles:["Shoulders","Core","Back","Quads"], rate:1.0},
+  {n:"Football",   cat:"activity", cf:0.8,  muscles:["Quads","Hamstrings","Calves"], rate:0.6},
+  {n:"Basketball", cat:"activity", cf:0.7,  muscles:["Quads","Calves","Shoulders"], rate:0.6},
+  {n:"Tennis",     cat:"activity", cf:0.6,  muscles:["Shoulders","Quads","Core"], rate:0.6},
+  {n:"Climbing",   cat:"activity", cf:0.3,  mf:0.4, muscles:["Back","Biceps","Core"], rate:0.7},
+  {n:"Bouldering", cat:"activity", cf:0.25, mf:0.4, muscles:["Back","Biceps","Core"], rate:0.6},
+  {n:"Yoga",       cat:"activity", cf:0.15, mf:0.1, muscles:["Core"], rate:0.3}
 ];
+function actsInCat(cat){ return ACTIVITIES.filter(a=>(a.cat||"cardio")===cat); }
+function cardioFracOf(e){ if(e.cf!=null) return e.cf; const a=actByName(e.name); return a&&a.cf!=null?a.cf:1; }
 let otherMuscleSel=null;
 function meanTargetVol(muscles){
   const set=new Set(muscles), byDay={};
@@ -5120,6 +5127,7 @@ const CZONES=[
 ];
 let trainMode="strength", cdActSel="Running", cdZone="z2";
 let cdRoute=null;   // an imported GPX route awaiting logging: {name, pts, dist, ascent, mins}
+let cdCat="cardio"; // which activity category the cardio panel shows: "cardio" | "activity"
 function cdAct(){ return actByName(cdActSel); }
 function cdZoneDef(){ return CZONES.find(z=>z.z===cdZone)||CZONES[1]; }
 function cardioVol(){ const act=cdAct(), bw=bwNow(), f=cdZoneDef().f;
@@ -5150,9 +5158,15 @@ function updateCardioPreview(){
 }
 function renderCardioChips(){
   const aw=$("cdActChips"); aw.innerHTML="";
-  ACTIVITIES.forEach(a=>{ const c=document.createElement("button"); c.className="chip"+(cdActSel===a.n?" on":""); c.textContent=a.n;
+  actsInCat(cdCat).forEach(a=>{ const c=document.createElement("button"); c.className="chip"+(cdActSel===a.n?" on":""); c.textContent=a.n;
     c.onclick=()=>{ cdActSel=a.n; renderCardioChips(); $("cdRun").style.display=a.run?"":"none"; $("cdDur").style.display=a.run?"none":""; updateCardioPreview(); }; aw.appendChild(c); });
   const act=cdAct(); $("cdRun").style.display=act.run?"":"none"; $("cdDur").style.display=act.run?"none":"";
+  // GPX routes only make sense for distance cardio; intro copy reflects the category
+  const imp=$("cdImport"); if(imp) imp.style.display = cdCat==="cardio" ? "" : "none";
+  if(cdCat!=="cardio" && cdRoute) clearCardioRoute();
+  const intro=$("cdIntro"); if(intro) intro.innerHTML = cdCat==="cardio"
+    ? "Log cardio &amp; conditioning. Tracked on its own — by minutes and effort zone — separate from your muscle-volume balance."
+    : "Log a sport or activity. It counts toward your weekly cardio by how aerobic it is; the strength-y ones (climbing, martial arts) also add a little to your muscle balance.";
   const zw=$("cdZoneChips"); zw.innerHTML="";
   CZONES.forEach(z=>{ const c=document.createElement("button"); c.className="chip"+(cdZone===z.z?" on":"");
     c.innerHTML=z.lbl+' <small style="opacity:.55">'+z.sub+'</small>';
@@ -5179,20 +5193,26 @@ function renderCardioLog(){
 }
 function renderCardio(){ renderCardioChips(); updateCardioPreview(); renderCardioLog(); }
 function setTrainMode(m){ trainMode=m;
-  const b=$("trainModeBtn"); if(b) b.classList.toggle("cardio", m==="cardio");
-  const l=$("trainModeLbl"); if(l) l.textContent = m==="cardio" ? "Cardio" : "Strength";
-  $("strengthWrap").style.display = m==="cardio" ? "none" : "";
-  $("cardioPanel").style.display  = m==="cardio" ? "" : "none";
-  if(m==="cardio") renderCardio();
+  document.querySelectorAll("#trainModeSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.m===m));
+  const strength = m==="strength";
+  $("strengthWrap").style.display = strength ? "" : "none";
+  $("cardioPanel").style.display  = strength ? "none" : "";
+  if(!strength){ cdCat = (m==="activity") ? "activity" : "cardio";
+    if(!actsInCat(cdCat).some(a=>a.n===cdActSel)) cdActSel=actsInCat(cdCat)[0].n;   // keep the picked activity valid for the category
+    renderCardio();
+  }
 }
-if($("trainModeBtn")) $("trainModeBtn").onclick=()=> setTrainMode(trainMode==="cardio" ? "strength" : "cardio");
+document.querySelectorAll("#trainModeSeg .s").forEach(s=> s.onclick=()=> setTrainMode(s.dataset.m));
+if($("trainModeBtn")) $("trainModeBtn").onclick=()=> setTrainMode(trainMode==="strength" ? "cardio" : "strength");
 ["cdDist","cdTime","cdPace"].forEach(id=> $(id).addEventListener("input", cdRunCalc));
 $("cdMin").addEventListener("input", updateCardioPreview);
 $("cdLog").onclick=()=>{
   const pv=updateCardioPreview(); if(!pv.ok){ toast("Add a duration or distance, or import a route, first"); return; }
   const act=cdAct(); let mins=pv.mins; const dist = cdRoute ? cdRoute.dist : pv.dist;
   if(cdRoute && !mins) mins=cdRoute.mins||0;
-  const entry={ d:Date.now(), kind:"cardio", name:act.n, zone:cdZone, mins, vol:cardioVol(), muscles:act.muscles.slice(), src: cdRoute?"gpx":"manual" };
+  const entry={ d:Date.now(), kind:"cardio", name:act.n, cat:act.cat||"cardio", zone:cdZone, mins, vol:cardioVol(), muscles:act.muscles.slice(), src: cdRoute?"gpx":"manual" };
+  entry.cf = act.cf!=null ? act.cf : 1;                       // cardio-credit fraction (frozen at log time)
+  if(act.mf && entry.vol) entry.mvol = Math.round(entry.vol*act.mf);   // partial muscle-volume for strength-y activities (feeds the radar)
   if(dist){ entry.dist=round1(dist); if(mins) entry.pace=round1(mins/dist); }
   if(cdRoute){ if(cdRoute.ascent) entry.ascent=cdRoute.ascent; entry.route=decimatePts(cdRoute.pts,80); if(cdRoute.name) entry.routeName=cdRoute.name; }
   const hr=parseFloat($("cdHr").value)||0; if(hr) entry.avgHr=Math.round(hr);
@@ -5292,7 +5312,7 @@ function cardioZoneMix(days){ days=days||7; const cut=Date.now()-days*86400000; 
 // "150 min moderate OR 75 min vigorous" model where vigorous minutes count roughly double.
 function cardioZoneW(z){ const d=CZONES.find(x=>x.z===z); return d?d.w:1; }   // legacy/no-zone entries → 1.0
 function cardioDoseWeek(days){ days=days||7; const cut=Date.now()-days*86400000; let m=0;
-  cardioList().forEach(e=>{ if(e.d>=cut) m+=cardioMinsOf(e)*cardioZoneW(e.zone); }); return Math.round(m); }
+  cardioList().forEach(e=>{ if(e.d>=cut) m+=cardioMinsOf(e)*cardioZoneW(e.zone)*cardioFracOf(e); }); return Math.round(m); }
 // objective-aware weekly aerobic-minutes target (Phase 3 layers coaching on top of this)
 // Dedicated cardio goal — a SEPARATE axis from the lifting objective; it sets the weekly-minutes target.
 // Editable in the Cardio detail sheet (settings.cardioGoal). Falls back to a sensible default derived from
@@ -5318,7 +5338,7 @@ function setCardioGoal(k){ if(!CARDIO_GOALS.some(x=>x.k===k)) return; settings.c
 // 10-week effort-adjusted weekly series for the sparkline (index N-1 = this week); weighted by zone so
 // the bars sit against the same target line the rings/card use (see cardioDoseWeek).
 function cardioWeeklySeries(){ const wkMs=7*86400000, now=Date.now(), N=PROG_WEEKS, out=new Array(N).fill(0);
-  cardioList().forEach(e=>{ const k=Math.floor((now-e.d)/wkMs), i=(k>=0&&k<N)?(N-1-k):-1; if(i>=0) out[i]+=cardioMinsOf(e)*cardioZoneW(e.zone); });
+  cardioList().forEach(e=>{ const k=Math.floor((now-e.d)/wkMs), i=(k>=0&&k<N)?(N-1-k):-1; if(i>=0) out[i]+=cardioMinsOf(e)*cardioZoneW(e.zone)*cardioFracOf(e); });
   return out.map(v=>Math.round(v)); }
 const CZCOL={z1:"#74c0fc", z2:"#51cf66", z3:"#fcc419", z4:"#ff922b", z5:"#fa5252"};
 // objective-aware distribution nudge from the last 2 weeks of cardio (polarized base — rosenblat19;
@@ -5358,7 +5378,7 @@ function renderCardioCard(){
       +'<div><div class="ovk">This week</div><div class="ovbig"><b>'+mins+'</b> <small style="font-weight:500;color:var(--l2);">/ '+tgt+' min</small></div></div>'
       +'<div style="font-size:13px;color:var(--l2);text-align:right;">'+sess+' session'+(sess===1?'':'s')+(raw&&raw!==dose?'<br>'+raw+' min done':'')+'</div>'
     +'</div>'
-    +(raw&&raw!==dose?'<p class="levelcap" style="margin:6px 0 0;">Effort-adjusted — harder sessions count for more toward your target.</p>':'')
+    +(raw&&raw!==dose?'<p class="levelcap" style="margin:6px 0 0;">Effort- &amp; activity-adjusted — harder, more-aerobic sessions count for more toward your target.</p>':'')
     +'<div style="height:7px;border-radius:4px;background:var(--sep);overflow:hidden;margin-top:10px;"><i style="display:block;height:100%;width:'+pct+'%;background:#9775fa;border-radius:4px;"></i></div>'
     +(segs?'<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:7px;gap:1px;">'+segs+'</div>':'')
     +'<canvas id="cardioSpark" width="500" height="46" style="width:100%;height:46px;margin-top:10px;display:block;"></canvas>'
