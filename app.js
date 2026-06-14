@@ -2912,6 +2912,7 @@ function renderDash(){
   renderCalc(now);
   renderCalendar();
   renderBaseActivity();
+  renderForecast();
   renderCardioCard();
   renderAchievements();
   renderInsight();
@@ -5781,25 +5782,93 @@ function renderInsight(){
   if(r.src && r.src.length){ sb.style.display=""; sl.innerHTML=r.src.map(srcLi).join(''); }
   else sb.style.display="none";
 }
+// ===== plan forecast — projects expected growth from the plan's weekly volume per muscle =====
+// Weekly sets per muscle from the rotation workouts (rotate:false alternates excluded), scaled by how many
+// sessions/week you actually run vs how many distinct workouts the rotation has.
+function planWeeklySets(plan){
+  const rot=(plan.workouts||[]).filter(w=>w.rotate!==false);
+  const totals={};
+  rot.forEach(w=>(w.ex||[]).forEach(e=>{ if(!e.n) return; const groups=muscleFor(e.n), n=Math.max(1,parseInt(e.s)||3);
+    groups.forEach((g,i)=> totals[g]=(totals[g]||0)+(i===0?n:n*0.5)); }));
+  // scale per-rotation volume to per-week by how often you actually run it; cap at 1.2× so an ambitious
+  // declared frequency on a short rotation doesn't over-promise weekly sets.
+  const nW=rot.length||1, perWk=planSessionsPerWeek(plan)||nW, scale=Math.min(1.2, perWk/nW);
+  const wk={}; Object.keys(totals).forEach(g=> wk[g]=totals[g]*scale);
+  return wk;
+}
+// Evidence-based outlook (sch17 dose-response; drr volume weighting; rpvol MEV/MAV landmarks ~10→20 sets).
+// Honest by design: no promised cm/kg — it reports the dose vs the growth window and what to fix.
+function planForecast(plan){
+  plan = plan || activePlan();
+  const wk = planWeeklySets(plan);
+  const major=["Chest","Lats","Upper Back","Front Delts","Side Delts","Rear Delts","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves","Core"];
+  const trained=major.filter(m=>(wk[m]||0) >= 1);
+  if(trained.length < 3)
+    return { v:"more", title:"Pick a plan to see its outlook", text:"Choose or build a training plan and this projects, muscle by muscle, whether its weekly volume is set to grow you, hold you, or fall short.", src:[] };
+  const grow=[], under=[], over=[];
+  trained.forEach(m=>{ const s=wk[m]||0;
+    if(s < WEEKLY_SET_MAINT) under.push(m);          // below maintenance
+    else if(s >= WEEKLY_SET_MIN && s <= 20) grow.push(m);   // productive growth window
+    else if(s > 20) over.push(m);                    // past the productive range
+    /* else WEEKLY_SET_MAINT..WEEKLY_SET_MIN = maintenance dose */ });
+  const hyp=planScores(plan).hyp, perWk=planSessionsPerWeek(plan), novice=(settings.sessions||0)<30, obj=settings.objective;
+  const sh=g=>MSHORT[g]||g, listm=arr=>listWords(arr.slice(0,3).map(sh))+(arr.length>3?", and more":"");
+  let v, title, text;
+  if(perWk < 2){
+    v="training"; title="Forecast: train a little more often";
+    text="As written this plan runs about "+perWk+" session"+(perWk===1?"":"s")+" a week. Most muscles grow best trained ~2× a week, so frequency is the biggest lever here before anything else.";
+  } else {
+    const growN=grow.length, t=trained.length;
+    const qual = hyp>=4 ? " on high-quality, stretch-loaded moves" : hyp>=3.3 ? " on solid exercise picks" : "";
+    const horizon = novice ? "As a newer lifter, expect noticeable gains over the first 8–12 weeks" : "Expect steady gains over 8–12 weeks";
+    if(under.length >= Math.ceil(t/2)){
+      v="training"; title="Forecast: under-dosed to grow";
+      text = under.length+" of "+t+" trained muscles get under ~"+WEEKLY_SET_MAINT+" hard sets a week — below what holds size, let alone builds it. Add sets to "+listm(under)+" to turn this into a growth plan.";
+    } else if(growN >= Math.round(t*0.6)){
+      v="grow"; title="Forecast: strong growth potential";
+      text = growN+" of "+t+" trained muscles get a growth dose (≈"+WEEKLY_SET_MIN+"–20 hard sets/week)"+qual+". "+horizon+" if you add a rep or a little load most weeks.";
+    } else if(growN >= Math.max(1, Math.round(t*0.3))){
+      v="ontrack"; title="Forecast: steady, room to push";
+      text = growN+" of "+t+" muscles get a growth dose; the rest sit around maintenance. "+horizon+" — fastest in the well-dosed groups. Nudge a few more past ~"+WEEKLY_SET_MIN+" sets to grow across the board.";
+    } else {
+      v="maintenance"; title="Forecast: maintenance-level volume";
+      text = "Most muscles get a maintenance dose (~"+WEEKLY_SET_MAINT+"–"+WEEKLY_SET_MIN+" sets/week)"+qual+" — enough to hold size and keep building strength through progressive overload, but under the ~"+WEEKLY_SET_MIN+"–20 sets that drive much new growth. Add a set or two to the muscles you most want to grow.";
+    }
+    if(under.length && !(under.length >= Math.ceil(t/2))) text += " "+(under.length===1?sh(under[0])+" is":listm(under)+" are")+" under ~"+WEEKLY_SET_MAINT+" sets — too little to hold; add a couple if they matter to you.";
+    if(over.length) text += " "+(over.length===1?sh(over[0])+" sits":listm(over)+" sit")+" above ~20 sets — past the productive range for most, so more won't help.";
+  }
+  if(obj==="strength") text += " For strength, keep the main lifts heavy and add load before reps.";
+  else if(obj==="fatloss") text += " In a deficit this volume is about protecting the muscle you have — keep the loads up.";
+  const src=["sch17","drr","rpvol"]; if(perWk<2) src.unshift("sch16");
+  return { v, title, text, src };
+}
+function renderForecast(){
+  const box=$("planForecast"); if(!box) return;
+  const r=planForecast(activePlan());
+  box.className="insight v-"+r.v;
+  box.innerHTML='<div class="ititle">'+esc(r.title)+'</div><div class="itext">'+esc(r.text)+'</div>';
+  const sb=$("planFcSrcBox"), sl=$("planFcSrc");
+  if(sb&&sl){ if(r.src&&r.src.length){ sb.style.display=""; sl.innerHTML=r.src.map(srcLi).join(''); } else sb.style.display="none"; }
+}
 
 // ================= automatic plan builder =================
 const BUILD_POOL={
-  chest:["Barbell Bench Press","Incline DB Press","Machine Chest Press","Weighted Dip","Dumbbell Bench Press","Cable Fly","Pec Deck","Push-Ups","Decline Push-Ups","Diamond Push-Ups","Incline Push-Ups","Kettlebell Floor Press"],
+  chest:["Barbell Bench Press","Incline Barbell Press","Incline DB Press","Machine Chest Press","Weighted Dip","Dumbbell Bench Press","Cable Fly","Pec Deck","Push-Ups","Decline Push-Ups","Diamond Push-Ups","Incline Push-Ups","Kettlebell Floor Press"],
   lats:["Weighted Pull-Up","Pull-Up","Lat Pulldown","Chin-Up","Straight-Arm Pulldown","Dumbbell Pullover","One-Arm DB Row"],
   upperback:["Chest-Supported Row","Bent-Over Row","Seated Row","One-Arm DB Row","T-Bar Row","Meadows Row","Face Pulls","Inverted / Backpack Row","Kettlebell Row"],
   lowerback:["Back Extension","Good Morning","Rack Pull","Superman","Romanian Deadlift"],
-  forearms:["Wrist Curl","Reverse Wrist Curl","Hammer Curl","Reverse Curl","Farmer's Carry"],
+  forearms:["Wrist Curl","Reverse Wrist Curl","Hammer Curl","Reverse Curl","Farmer's Carry","Dead Hang"],
   adductors:["Hip Adduction","Cable Adduction (inner)","Cossack Squat","Copenhagen Plank"],
   shoulders:["Overhead Press","Seated DB Press","Machine Shoulder Press","Arnold Press","Pike Push-Ups","Kettlebell Overhead Press","Kettlebell Push Press","Kettlebell Clean & Press"],
   sidedelts:["Lateral Raise","Cable Lateral Raise","Dumbbell Lateral Raise","Machine Lateral Raise","Upright Row","Kettlebell High Pull"],
   reardelts:["Rear Delt Fly","Face Pulls","Reverse Pec Deck","Cable Rear Delt Fly","Bent-Over Lateral Raise","Band Pull-Aparts","Prone Y-Raise"],
   triceps:["Overhead Triceps Extension","Triceps Pushdown","Close-Grip Bench Press","Skull Crusher","Diamond Push-Ups"],
   biceps:["EZ-Bar Curl","Incline DB Curl","Hammer Curl","Cable Curl","Preacher Curl","Chin-Up"],
-  quads:["Back Squat","Hack Squat","Leg Press","Front Squat","Goblet Squat","Leg Extension","Bulgarian Split Squat","Walking Lunge","Reverse Lunge","Step-Up","Sissy Squat","Kettlebell Front Squat","Kettlebell Reverse Lunge","Kettlebell Bulgarian Split Squat"],
+  quads:["Back Squat","Hack Squat","Leg Press","Front Squat","Goblet Squat","Leg Extension","Bulgarian Split Squat","Walking Lunge","Reverse Lunge","Step-Up","Sissy Squat","Wall Sit","Kettlebell Front Squat","Kettlebell Reverse Lunge","Kettlebell Bulgarian Split Squat"],
   hamstrings:["Romanian Deadlift","Seated Leg Curl","Lying Leg Curl","Single-Leg RDL","Nordic Curl","Kettlebell Romanian Deadlift","Two-Hand Kettlebell Swing"],
   glutes:["Hip Thrust","Bulgarian Split Squat","Cable Pull-Through","Glute Bridge","Single-Leg Glute Bridge","Reverse Lunge","Two-Hand Kettlebell Swing","One-Arm Kettlebell Swing","Kettlebell Snatch"],
   calves:["Standing Calf Raise","Seated Calf Raise","Leg-Press Calf Raise","Single-Leg Calf Raise"],
-  core:["Cable Crunch","Hanging Leg Raise","Ab Wheel Rollout","Pallof Press","Cable Woodchopper","Landmine Rotation","Russian Twist","Plank","Hollow Hold (sec)","Side Plank","Bicycle Crunch","Reverse Crunch","Dead Bug","Kettlebell Windmill"]
+  core:["Cable Crunch","Hanging Leg Raise","Hanging Knee Raise","Toes-to-Bar","Ab Wheel Rollout","Pallof Press","Cable Woodchopper","Landmine Rotation","Russian Twist","Plank","Reverse Plank","Hollow Hold (sec)","L-Sit","Side Plank","Bicycle Crunch","Reverse Crunch","V-Up","Decline Sit-Up","Flutter Kicks","Dead Bug","Kettlebell Windmill"]
 };
 const FB_GROUPS=["quads","chest","upperback","lats","shoulders","sidedelts","hamstrings","glutes","core"];
 // Kettlebell-only mode: a dedicated per-muscle pool (rep-based moves only — carries & get-ups stay

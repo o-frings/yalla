@@ -609,6 +609,8 @@
   .insight.v-training{ border-left-color:#4dabf7; }
   .insight.v-ontrack{ border-left-color:#51cf66; }
   .insight.v-more{ border-left-color:var(--line); }
+  .insight.v-grow{ border-left-color:#51cf66; }
+  .insight.v-maintenance{ border-left-color:#868e96; }
   .achcap b{ color:var(--accent); font-weight:700; }
   .achgrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
   .ach{ background:var(--row); border:.5px solid var(--line); border-radius:var(--r-md); padding:16px 8px 12px; text-align:center; opacity:.5; transition:opacity .2s, transform .12s; }
