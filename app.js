@@ -317,7 +317,7 @@ function muscleFor(name){
 function equipFor(name){
   const n=String(name).toLowerCase();
   if(/kettlebell|\bkb\b|turkish get-?up|goblet/.test(n)) return {key:"kb",label:"Kettlebell"};
-  if(/push.?up|pull.?up|chin.?up|\bdip\b|plank|hollow|hanging|inverted|pike|sit.?up|dead bug|burpee|pistol|nordic|handstand|chair dip|bodyweight|step.?up|bridge|prone|superman|wall slide|wall angel|wall sit|scapular|chin.?tuck|bird.?dog|snow.?angel|cat.?cow/.test(n)) return {key:"body",label:"Bodyweight"};
+  if(/push.?up|pull.?up|chin.?up|\bdip\b|plank|hollow|hanging|inverted|pike|sit.?up|dead bug|burpee|pistol|nordic|handstand|chair dip|bodyweight|leg.?raise|knee raise|flutter|toes.?to.?bar|v-?up|bicycle crunch|reverse crunch|russian twist|captain|\bl-?sit\b|dead hang|step.?up|bridge|prone|superman|wall slide|wall angel|wall sit|scapular|chin.?tuck|bird.?dog|snow.?angel|cat.?cow/.test(n)) return {key:"body",label:"Bodyweight"};
   if(/cable|pulldown|pushdown|pull-through|kickback|face.?pull|rope|crossover|abduction|woodchop|pallof|band /.test(n)) return {key:"cable",label:"Cable / band"};
   if(/machine|leg press|leg curl|leg extension|pec.?deck|hack|smith|seated row|lat pulldown|ab.?machine|reverse pec/.test(n)) return {key:"machine",label:"Machine"};
   return {key:"free",label:"Free weights"};
@@ -730,12 +730,32 @@ const BWLOAD={ "pull-up":1,"chin-up":1,"dip":1,"muscle-up":1,"push-up":0.65,"pik
   "inverted":0.6,"backpack row":0.6,"row":0.6,"bulgarian":0.85,"split squat":0.85,"lunge":0.8,
   "pistol":0.9,"step-up":0.85,"glute bridge":0.5,"bridge":0.5,"nordic":0.7,"handstand":0.9 };
 function isBW(name){ return equipFor(name).key==="body"; }
+// ---- isometric / timed holds: logged by SECONDS, not reps (plank, hollow, wall sit, dead hang, L-sit…) ----
+// \bhang\b matches "dead hang" but not "hanging" (that's a rep move); \bhold\b covers any "… Hold".
+const TIMED_RE=/plank|hollow|\(sec\)|\bhold\b|wall sit|\bl-?sit\b|dead hang|\bhang\b|isometric/i;
+function isTimed(name){ return TIMED_RE.test(String(name)); }
+// fraction of bodyweight a hold supports — used for the time-based volume proxy
+function holdFrac(name){ const n=String(name).toLowerCase();
+  if(/dead hang|\bhang\b/.test(n)) return 1;       // whole bodyweight on the grip/lats
+  if(/\bl-?sit\b/.test(n)) return 0.9;
+  if(/wall sit/.test(n)) return 0.6;
+  if(/side plank|copenhagen/.test(n)) return 0.45;
+  if(/reverse plank/.test(n)) return 0.5;
+  if(/hollow/.test(n)) return 0.45;
+  if(/superman/.test(n)) return 0.2;
+  if(/plank/.test(n)) return 0.6;
+  return 0.5;
+}
+const HOLD_SEC_PER_REP=3;                          // ~3s of time-under-tension ≈ one rep-equivalent
 function bwLoadFrac(name){
   const n=String(name).toLowerCase();
-  if(/plank|hollow|\(sec\)|hold|dead bug/.test(n)) return 0;   // isometric — no rep-volume
+  if(isTimed(name)) return 0;   // holds use the time-based proxy (see setVol/effVolume), not rep-volume
   // Postural / neck / scapular activation moves barely move bodyweight — counting them at the 0.65
   // default made e.g. Chin Tucks tally as much tonnage as a push-up. Treat them as a light fraction.
   if(/chin.?tuck|\bneck\b|wall slide|wall angel|scap(ula|ular)|snow.?angel|cat.?cow|bird.?dog|prone (y|t|w|i)\b|y-?raise|t-?raise|w-?raise/.test(n)) return 0.08;
+  // core flexion (leg raises, crunches, sit-ups, twists): you move your legs/torso, not your whole bodyweight —
+  // counting them at the 0.65 default massively overstated tonnage. ~0.18 of bodyweight is a fairer rep load.
+  if(/leg.?raise|knee raise|flutter|toes.?to.?bar|v-?up|bicycle|russian twist|reverse crunch|crunch|\bsit-?up\b|captain|dead bug/.test(n)) return 0.18;
   for(const k in BWLOAD){ if(n.includes(k)) return BWLOAD[k]; }
   return 0.65;
 }
@@ -746,6 +766,12 @@ function bwNow(){
 // effective session tonnage. mode "total" counts bodyweight load; "lifted" counts only external weight (conventional)
 function effVolume(name, e, mode){
   mode = mode || "total";
+  if(isTimed(name)){                                  // hold: seconds (in e.r) → rep-equivalents × hold load
+    const secs=parseInt(e.r)||0, sets=(e.n!=null)?e.n:1, ext=parseFloat(e.w)||0, reps=secs/HOLD_SEC_PER_REP;
+    if(mode==="lifted") return Math.round(ext*reps*sets);
+    const load=bwNow()*holdFrac(name)+ext; if(load<=0||secs<=0) return 0;
+    return Math.round(load*reps*sets);
+  }
   if(isBW(name)){
     const ext=(parseFloat(e.w)||0)*(parseInt(e.r)||0)*((e.n!=null)?e.n:1);
     if(mode==="lifted") return Math.round(ext);
@@ -757,7 +783,9 @@ function effVolume(name, e, mode){
 }
 // effective load & volume for a SINGLE set (bodyweight counted in), for the live volume column & PR detection
 function setLoad(name, w){ const wv=parseFloat(w)||0; if(isBW(name)){ const f=bwLoadFrac(name); return f? bwNow()*f+wv : wv; } return wv; }
-function setVol(name, w, r){ const reps=parseInt(r)||0; if(reps<=0) return 0; return Math.round(setLoad(name,w)*reps); }
+function setVol(name, w, r){
+  if(isTimed(name)){ const secs=parseInt(r)||0; if(secs<=0) return 0; return Math.round((bwNow()*holdFrac(name)+(parseFloat(w)||0))*(secs/HOLD_SEC_PER_REP)); }
+  const reps=parseInt(r)||0; if(reps<=0) return 0; return Math.round(setLoad(name,w)*reps); }
 function bestVol(name){ const h=hist[name]; if(!h||!h.length) return 0; let m=0; h.forEach(e=>{ const v=setVol(name,e.w,e.r); if(v>m) m=v; }); return m; }
 function fmtVol(v){ return v>=10000 ? (v/1000).toFixed(1).replace(/\.0$/,'')+'k' : ''+v; }
 
@@ -2246,7 +2274,29 @@ $("restTime").onclick=restEdit;
 $("exlist").addEventListener("change", e=>{ if(!e.target.classList||(!e.target.classList.contains("w")&&!e.target.classList.contains("r"))) return;
   const row=e.target.closest(".setrow"); if(!row) return;
   const wv=row.querySelector(".w").value.trim(), rv=row.querySelector(".r").value.trim();
-  if(wv!==""&&rv!=="") restStart(); captureDraft(); });
+  if(rv!=="" && (wv!=="" || row.classList.contains("timed"))) restStart(); captureDraft(); });
+// ---- per-set hold timer for isometric moves: tap the button to start a count-up, tap again to log the seconds ----
+let hold={ row:null, startedAt:0, iv:null };
+function holdStop(write){
+  if(hold.iv){ clearInterval(hold.iv); hold.iv=null; }
+  const row=hold.row, started=hold.startedAt; hold.row=null;
+  if(!row) return;
+  const btn=row.querySelector(".holdbtn"); if(btn){ btn.classList.remove("running"); btn.innerHTML=ICON.play; }
+  if(write){ const secs=Math.max(1,Math.round((Date.now()-started)/1000)); const rEl=row.querySelector(".r"); if(rEl) rEl.value=secs;
+    const g=row.closest(".group"); updateSetVol(row, g&&g.dataset.ex); captureDraft();
+    restStart();   // the hold IS the set — start the rest clock once it ends
+    if(navigator.vibrate) try{ navigator.vibrate([0,40,30,40]); }catch(e){} }
+}
+function holdStart(row){
+  if(hold.row) holdStop(true);                       // only one hold at a time
+  hold.row=row; hold.startedAt=Date.now();
+  const btn=row.querySelector(".holdbtn"); if(btn) btn.classList.add("running");
+  if(!timer.running && timer.elapsed===0) tmrStart();
+  hold.iv=setInterval(()=>{ const b=hold.row&&hold.row.querySelector(".holdbtn"); if(b) b.textContent=Math.round((Date.now()-hold.startedAt)/1000)+"s"; }, 200);
+}
+$("exlist").addEventListener("click", e=>{ const b=e.target.closest(".holdbtn"); if(!b) return; e.preventDefault();
+  const row=b.closest(".setrow"); if(!row) return;
+  if(hold.row===row) holdStop(true); else holdStart(row); });
 function activePlan(){ return plans.find(p=>p.id===settings.activePlanId) || plans[0]; }
 // intended sessions/week: a built plan stores it; otherwise collapse A/B/C variants of the same
 // slot ("Upper A"/"Upper B" → one session) so the activity ring's target isn't doubled by Variety.
@@ -3412,15 +3462,7 @@ function renderWorkout(){
          : blocker ? '<div class="swapnote warn">'+ICON.warn+'tough on your '+esc(INJ_LABEL[blocker]||'injury')+' — ease off or swap</div>' : '' }
       ${metaLine}${meta.show?meta.cue:''}</div>`;
     let rows="";
-    for(let i=0;i<e.s;i++){ const pv=prev[i];
-      const pvVol = pv ? setVol(name, pv.w, pv.r) : 0;
-      const pw = pv&&pv.w!=null?esc(pv.w):'', pr = pv&&pv.r!=null?esc(pv.r):'';
-      rows+=`<div class="setrow${pvVol?'':' novol'}" data-pvol="${pvVol||''}" data-pw="${pw}" data-pr="${pr}"><span class="sn">${i+1}</span>
-        <input class="w" type="text" inputmode="decimal" autocomplete="off" placeholder="${pv&&pv.w?esc(pv.w):'kg'}">
-        <span class="x">×</span>
-        <input class="r" type="number" inputmode="numeric" placeholder="${pv&&pv.r?esc(pv.r):'reps'}">
-        <span class="prtag">PR</span><span class="eq">=</span><span class="vol${pvVol&&(pw||pr)?' fillable':''}" title="${pvVol&&(pw||pr)?'Tap to fill last time':''}">${pvVol?fmtVol(pvVol):''}</span><button class="setdel" aria-label="Remove set">${ICON.minus}</button></div>`;
-    }
+    for(let i=0;i<e.s;i++){ rows+=buildSetRow(i+1, prev[i], name); }
     g.innerHTML=head+rows+'<div class="freeadd"><a class="demo addset">'+ICON.plus+'add set</a></div>'; list.appendChild(g);
     g.querySelector(".addset").onclick=()=>{ const n=g.querySelectorAll(".setrow").length+1;
       const tmp=document.createElement("div"); tmp.innerHTML=freeSetRow(n, null, name);
@@ -3495,7 +3537,8 @@ $("saveBtn").onclick=async()=>{
     g.querySelectorAll(".setrow").forEach(r=>{ const wv=r.querySelector(".w").value.trim(), rv=r.querySelector(".r").value.trim();
       if(rv!=="") sets.push({w:wv,r:rv}); });
     if(sets.length){ logged++; const nt=topSet(sets);
-      if(pt&&nt&&(parseFloat(nt.w)||0)>(parseFloat(pt.w)||0)) beaten++; last[name]=sets;
+      // "beaten" by effective volume so timed holds (more seconds) and bodyweight moves (more reps) count too, not just added kg
+      if(pt&&nt&&setVol(name, nt.w, nt.r)>setVol(name, pt.w, pt.r)) beaten++; last[name]=sets;
       const vol=sets.reduce((a,s)=>a+setVol(name, s.w, s.r),0);
       session.totalVol+=vol; session.sets+=sets.length;
       const tw=parseFloat(nt.w)||0, tr=parseInt(nt.r)||0;
@@ -4503,14 +4546,25 @@ function exerciseLibrary(){
   Object.keys(hist).forEach(n=>set.add(n));
   return [...set].filter(Boolean).sort((a,b)=>a.localeCompare(b));
 }
-function freeSetRow(i, pv, name){
+// one set row. Timed/hold moves (plank, wall sit, dead hang…) swap the × for a hold-timer button and log
+// seconds instead of reps; weighted moves keep weight × reps. Used by both the plan and free workout views.
+function buildSetRow(i, pv, name){
+  const timed=isTimed(name);
   const pvVol = (pv && name) ? setVol(name, pv.w, pv.r) : 0;
-  return '<div class="setrow'+(pvVol?'':' novol')+'" data-pvol="'+(pvVol||'')+'"><span class="sn">'+i+'</span>'
-    +'<input class="w" type="text" inputmode="decimal" autocomplete="off" placeholder="'+(pv&&pv.w?esc(pv.w):'kg')+'">'
-    +'<span class="x">×</span>'
-    +'<input class="r" type="number" inputmode="numeric" placeholder="'+(pv&&pv.r?esc(pv.r):'reps')+'">'
-    +'<span class="prtag">PR</span><span class="eq">=</span><span class="vol">'+(pvVol?fmtVol(pvVol):'')+'</span><button class="setdel" aria-label="Remove set">'+ICON.minus+'</button></div>';
+  const pw = pv&&pv.w!=null?esc(pv.w):'', pr = pv&&pv.r!=null?esc(pv.r):'';
+  const wPh = timed ? '+kg' : (pv&&pv.w?esc(pv.w):'kg');
+  const rPh = timed ? 'sec' : (pv&&pv.r?esc(pv.r):'reps');
+  const sep = timed
+    ? '<button class="holdbtn" type="button" aria-label="Hold timer — tap to start, tap to stop">'+ICON.play+'</button>'
+    : '<span class="x">×</span>';
+  const fill = (pvVol&&(pw||pr)) ? ' fillable' : '';
+  return '<div class="setrow'+(timed?' timed':'')+(pvVol?'':' novol')+'" data-pvol="'+(pvVol||'')+'" data-pw="'+pw+'" data-pr="'+pr+'"><span class="sn">'+i+'</span>'
+    +'<input class="w" type="text" inputmode="decimal" autocomplete="off" placeholder="'+wPh+'">'
+    +sep
+    +'<input class="r" type="number" inputmode="numeric" placeholder="'+rPh+'">'
+    +'<span class="prtag">PR</span><span class="eq">=</span><span class="vol'+fill+'" title="'+(fill?'Tap to fill last time':'')+'">'+(pvVol?fmtVol(pvVol):'')+'</span><button class="setdel" aria-label="Remove set">'+ICON.minus+'</button></div>';
 }
+function freeSetRow(i, pv, name){ return buildSetRow(i, pv, name); }
 function buildFreeGroup(name){
   const prev=last[name]||[];
   const g=document.createElement("div"); g.className="group"; g.dataset.ex=name;
@@ -4668,18 +4722,38 @@ $("exlist").addEventListener("click", e=>{ const a=e.target.closest(".rem"); if(
   document.addEventListener("scroll", close, true);   // any scroll dismisses it
 })();
 $("exlist").addEventListener("click", e=>{ const a=e.target.closest(".setdel"); if(a){ e.preventDefault(); removeSetRow(a.closest(".setrow")); } });
-// tap the previous-session volume to copy last time's weight × reps into an empty row
-$("exlist").addEventListener("click", e=>{ const v=e.target.closest(".vol.fillable"); if(!v) return;
+// Tap a set's volume number:
+//  • an empty row showing a dotted previous-session value → fills last time's weight × reps (the "fillable" hint)
+//  • a row you've just logged → copies its weight × reps into the next set, adding a fresh set if there isn't one
+$("exlist").addEventListener("click", e=>{ const v=e.target.closest(".vol"); if(!v) return; e.preventDefault();
   const r=v.closest(".setrow"), g=v.closest(".group"); if(!r||!g) return;
-  const wEl=r.querySelector(".w"), rEl=r.querySelector(".r");
-  if((wEl&&wEl.value.trim())||(rEl&&rEl.value.trim())) return;   // only fill an untouched row
-  const pw=r.dataset.pw||"", pr=r.dataset.pr||""; if(!pw&&!pr) return;
-  if(wEl) wEl.value=pw; if(rEl) rEl.value=pr;
-  if(!timer.running && timer.elapsed===0) tmrStart();
-  updateSetVol(r, g.dataset.ex); captureDraft();
+  const name=g.dataset.ex, wEl=r.querySelector(".w"), rEl=r.querySelector(".r");
+  const wv=wEl?wEl.value.trim():"", rv=rEl?rEl.value.trim():"";
+  if(wv===""&&rv===""){                                        // empty row → pull from last session
+    if(!v.classList.contains("fillable")) return;
+    const pw=r.dataset.pw||"", pr=r.dataset.pr||""; if(!pw&&!pr) return;
+    if(wEl) wEl.value=pw; if(rEl) rEl.value=pr;
+    if(!timer.running && timer.elapsed===0) tmrStart();
+    updateSetVol(r, name); captureDraft();
+  } else {                                                     // filled row → copy this set to the next one
+    if(!v.classList.contains("live")) return;
+    let next=r.nextElementSibling;
+    while(next && !next.classList.contains("setrow")) next=next.nextElementSibling;
+    if(next){ const nw=next.querySelector(".w"), nr=next.querySelector(".r");
+      if((nw&&nw.value.trim())||(nr&&nr.value.trim())) next=null; }   // next already has data → append instead
+    if(!next){ const n=g.querySelectorAll(".setrow").length+1;
+      const tmp=document.createElement("div"); tmp.innerHTML=freeSetRow(n,null,name); next=tmp.firstChild;
+      const fa=g.querySelector(".freeadd"); if(fa) fa.insertAdjacentElement("beforebegin", next); else r.insertAdjacentElement("afterend", next); }
+    const nw=next.querySelector(".w"), nr=next.querySelector(".r");
+    if(nw) nw.value=wv; if(nr) nr.value=rv;
+    if(!timer.running && timer.elapsed===0) tmrStart();
+    updateSetVol(next, name); captureDraft();
+  }
   if(navigator.vibrate) try{ navigator.vibrate(15); }catch(e){} });
 function removeSetRow(r){
-  if(!r) return; const g=r.closest(".group"); if(!g) return;
+  if(!r) return;
+  if(hold.row===r) holdStop(false);   // deleting the row mid-hold: kill the timer, don't write a partial time
+  const g=r.closest(".group"); if(!g) return;
   const rows=g.querySelectorAll(".setrow");
   if(rows.length<=1){ const w=r.querySelector(".w"), rp=r.querySelector(".r");
     if(w) w.value=""; if(rp) rp.value=""; r.dataset.pvol=""; updateSetVol(r, g.dataset.ex); captureDraft(); return; }
@@ -4696,6 +4770,7 @@ function updateSetVol(r, name){
   if(rv===""&&wv===""){ const pv=r.dataset.pvol; vEl.textContent=pv?fmtVol(+pv):""; vEl.classList.remove("live"); vEl.classList.toggle("fillable", !!pv && !!(r.dataset.pw||r.dataset.pr)); r.classList.toggle("novol", !pv); setRowPR(r,false); return; }
   const vol=setVol(name, wv, rv);
   vEl.textContent = vol?fmtVol(vol):""; vEl.classList.toggle("live", vol>0); vEl.classList.remove("fillable"); r.classList.toggle("novol", !vol);
+  vEl.title = vol>0 ? "Tap to copy this set to the next" : "";
   const best=bestVol(name);
   setRowPR(r, vol>0 && best>0 && vol>best);
 }

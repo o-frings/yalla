@@ -838,10 +838,19 @@
   .setrow .sn{ font-size:15px; color:var(--l3); font-weight:600; width:18px; flex:0 0 auto; text-align:center; }
   .setrow input{ text-align:center; padding:16px 4px; }
   .setrow .x{ color:var(--l3); flex:0 0 auto; font-weight:600; }
+  /* hold timer for timed/isometric moves — tap to count up, tap to log the seconds into the row */
+  .setrow .holdbtn{ flex:0 0 auto; min-width:50px; height:34px; padding:0 9px; border:none; border-radius:9px;
+    background:var(--accent-soft); color:var(--accent); font-weight:700; font-size:13px; font-variant-numeric:tabular-nums;
+    display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:transform .12s; }
+  .setrow .holdbtn svg{ width:16px; height:16px; }
+  .setrow .holdbtn:active{ transform:scale(.9); }
+  .setrow .holdbtn.running{ background:var(--accent); color:#fff; box-shadow:0 0 0 4px var(--accent-soft); }
+  .setrow.timed .w{ max-width:66px; }
   .setrow .eq{ color:var(--l3); flex:0 0 auto; font-weight:600; font-size:13px; }
   .setrow .vol{ font-size:18px; color:var(--l2); font-weight:700; min-width:56px; flex:0 0 auto; text-align:right; line-height:1; font-variant-numeric:tabular-nums; }
   .setrow.novol .eq, .setrow.novol .vol{ visibility:hidden; }   /* no number yet → hide the "= —" noise, keep column alignment */
-  .setrow .vol.live{ color:var(--ink); }
+  .setrow .vol.live{ color:var(--ink); cursor:pointer; }
+  .setrow .vol.live:active{ transform:scale(.9); opacity:.6; }
   /* previous-session volume doubles as a "tap to copy last time" target */
   .setrow .vol.fillable{ cursor:pointer; color:var(--accent); text-decoration:underline dotted var(--accent-soft); text-underline-offset:3px; transition:transform .12s, opacity .12s; }
   .setrow .vol.fillable:active{ transform:scale(.9); opacity:.6; }
