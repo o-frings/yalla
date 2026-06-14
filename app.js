@@ -343,6 +343,14 @@ Object.assign(MUSCLES, {
   "Reverse Crunch":["Core"], "Side Plank":["Core"], "Mountain Climbers":["Core"], "Bird Dog":["Core"],
   "Dead Bug":["Core"], "Superman":["Lower Back"]
 });
+// newer additions — incline barbell press, a reverse plank, extra core moves & isometric holds
+Object.assign(MUSCLES, {
+  "Incline Barbell Press":["Chest","Front Delts","Triceps"],
+  "Reverse Plank":["Glutes","Core","Hamstrings"],
+  "Hanging Knee Raise":["Core"], "Toes-to-Bar":["Core","Lats"], "V-Up":["Core"],
+  "Flutter Kicks":["Core"], "Decline Sit-Up":["Core"], "L-Sit":["Core"],
+  "Wall Sit":["Quads","Glutes"], "Dead Hang":["Forearms","Lats"]
+});
 // Rotational / anti-rotation core work (transverse-plane training) — recommended at least once a week.
 // Covers true rotation (woodchop, twist, throw) and anti-rotation (Pallof, windmill) — both train the
 // obliques/core to resist or produce trunk rotation, which straight-plane crunches/planks miss.
@@ -387,7 +395,8 @@ const LIBRARY=[
   "Seated Calf Raise","Single-Leg Calf Raise","Leg-Press Calf Raise",
   "Plank","Side Plank","Russian Twist","Cable Woodchopper","Pallof Press","Landmine Rotation","Cable Rotation",
   "Medicine Ball Rotational Throw","Bicycle Crunch","Reverse Crunch","Mountain Climbers","Bird Dog","Dead Bug","Superman",
-  "Lying Leg Raise"
+  "Lying Leg Raise","Hanging Knee Raise","Toes-to-Bar","V-Up","Flutter Kicks","Decline Sit-Up","L-Sit",
+  "Reverse Plank","Wall Sit","Dead Hang","Incline Barbell Press"
 ];
 const EXPLAIN={
  "Barbell Bench Press":{why:"The benchmark upper-body press — chest, front delts and triceps, and the clearest measure of pushing strength.",cues:["Shoulder blades pulled back and down, feet planted.","Lower the bar to your lower chest with control.","Drive up and slightly back toward your face."]},
@@ -421,6 +430,16 @@ const EXPLAIN={
  "Turkish Get-Up":{why:"Stand up and lie back down with a bell locked overhead — unmatched for shoulder stability and control.",cues:["Eyes on the bell, arm locked vertical throughout.","Move slowly through each step — roll, post, bridge, lunge, stand.","Reverse the steps with the same control."]},
  "Kettlebell Romanian Deadlift":{why:"A loaded hip hinge with the bells — hamstrings and glutes through a deep stretch.",cues:["Soft knees, push the hips back.","Lower the bells along your legs until you feel the stretch.","Drive the hips forward to stand tall."]},
  "Kettlebell Farmer's Carry":{why:"Pick up heavy bells and walk — grip, traps and a braced, upright core.",cues:["Stand tall, shoulders back, ribs down.","Take short, controlled steps.","Don't let the load tip you side to side."]},
+ "Incline Barbell Press":{why:"A heavy, loadable press tilted to bias the upper chest and front delts — the upper-chest equivalent of the flat bench.",cues:["Set the bench to about 30°; higher shifts work to the shoulders.","Lower the bar to your upper chest, elbows tucked ~45°.","Drive up and slightly back over the shoulders."]},
+ "Reverse Plank":{why:"A posterior-chain hold — glutes, hamstrings and lower back fight gravity while the shoulders and core brace. A balancing counter to all the front-side plank work.",cues:["Hands under the shoulders, fingers forward; hips up to a straight line.","Squeeze the glutes hard and keep the ribs down — don't sag.","Hold and breathe; build the time gradually."]},
+ "Hanging Knee Raise":{why:"A scalable lower-ab builder — easier than the straight-leg raise, with the same anti-swing demand.",cues:["Hang still, no swinging.","Curl the knees up toward the chest, rounding the pelvis.","Lower slowly under control."]},
+ "Toes-to-Bar":{why:"An advanced hanging raise — full hip and trunk flexion, with the lats and grip working hard to control the swing.",cues:["Start from a controlled hollow hang.","Drive the toes to the bar with straight-ish legs.","Lower with control, no kipping."]},
+ "V-Up":{why:"A full-body crunch — reach the hands and feet together so the abs flex top and bottom at once.",cues:["Lie long, arms overhead.","Fold to a V, hands toward the toes.","Lower slowly without slamming the legs down."]},
+ "Flutter Kicks":{why:"A high-rep lower-ab and hip-flexor burner that trains the abs to hold a hollow position under fatigue.",cues:["Press the low back into the floor.","Small, quick alternating kicks with straight legs.","Keep breathing — don't let the back arch."]},
+ "Decline Sit-Up":{why:"A loaded-friendly sit-up — the decline adds range and lets you hold a plate to progress the abs like any lift.",cues:["Anchor the feet, round up one vertebra at a time.","Don't yank the neck — lead with the ribs.","Lower slowly; add a plate once bodyweight is easy."]},
+ "L-Sit":{why:"A brutal isometric — the abs and hip flexors hold the legs out straight while the arms support your weight.",cues:["Press the floor or parallettes down hard, shoulders away from the ears.","Lift the legs to horizontal, toes pointed.","Hold; build the time, or tuck the knees to scale."]},
+ "Wall Sit":{why:"A simple, joint-friendly quad hold — sit against a wall and let the thighs burn. Great for building quad endurance anywhere.",cues:["Slide down until the thighs are parallel, knees over ankles.","Keep the back flat against the wall.","Hold and breathe; add time each session."]},
+ "Dead Hang":{why:"Hang from a bar to build grip, decompress the spine and stretch the lats — the foundation for every pull-up.",cues:["Full grip, arms straight, shoulders active (not fully shrugged up).","Relax the lower body and breathe.","Build the hold time; add load once it's easy."]},
 };
 function explainFor(name){
   if(EXPLAIN[name]) return EXPLAIN[name];
@@ -438,7 +457,9 @@ const DIFF={ "Deadlift":5,"Romanian Deadlift":4,"Single-Leg RDL":4,"Front Squat"
   "Kettlebell High Pull":3,"Kettlebell Clean & Press":4,"Kettlebell Front Squat":3,"Kettlebell Overhead Press":3,
   "Kettlebell Push Press":4,"Kettlebell Romanian Deadlift":3,"Kettlebell Row":3,"Kettlebell Floor Press":3,
   "Kettlebell Reverse Lunge":3,"Kettlebell Bulgarian Split Squat":4,"Turkish Get-Up":5,"Kettlebell Windmill":4,
-  "Kettlebell Halo":2,"Kettlebell Suitcase Carry":2,"Kettlebell Farmer's Carry":2 };
+  "Kettlebell Halo":2,"Kettlebell Suitcase Carry":2,"Kettlebell Farmer's Carry":2,
+  "Incline Barbell Press":3,"Reverse Plank":2,"Hanging Knee Raise":2,"Toes-to-Bar":4,"V-Up":2,
+  "Flutter Kicks":1,"Decline Sit-Up":2,"L-Sit":4,"Wall Sit":1,"Dead Hang":1 };
 function difficultyFor(name){
   if(DIFF[name]!=null) return DIFF[name];
   const n=name.toLowerCase();
@@ -541,6 +562,16 @@ const HSCORE={
  "Turkish Get-Up":[3,"A full-body stability and shoulder-control drill — superb skill, modest for size."],
  "Kettlebell Farmer's Carry":[3,"Loaded carry for grip, traps and a braced core; progress the load and distance."],
  "Kettlebell Suitcase Carry":[3,"Single-side carry that hammers the obliques to resist the lean."],
+ "Incline Barbell Press":[4,"Heavy, loadable upper-chest press with a good stretch at the bottom."],
+ "Reverse Plank":[2.5,"A posterior-chain endurance hold — great for posture and glute/hamstring tension, modest for size."],
+ "Hanging Knee Raise":[3,"Scalable hanging ab work; progress to straight legs, then add ankle weight."],
+ "Toes-to-Bar":[3.5,"Full hip-and-trunk flexion under a long lever — strong lower-ab builder."],
+ "V-Up":[3,"Hits the abs top and bottom at once; chase clean reps, then slow the lower."],
+ "Flutter Kicks":[2.5,"High-rep lower-ab endurance — light, best as a finisher."],
+ "Decline Sit-Up":[3.5,"Loadable ab flexion through a long range — hold a plate to progress like any lift."],
+ "L-Sit":[3,"A hard isometric for the abs and hip flexors — superb control, modest for size."],
+ "Wall Sit":[2.5,"A quad-endurance isometric — easy on the joints, capped for size; build the time."],
+ "Dead Hang":[2.5,"Grip, shoulder and lat decompression hold — supportive work, not a size driver."],
 };
 function hScore(name){
   if(HSCORE[name]) return {s:HSCORE[name][0], why:HSCORE[name][1]};
