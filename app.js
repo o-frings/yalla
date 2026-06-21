@@ -5931,7 +5931,7 @@ const BACK_M=["Lats","Upper Back"];
 // everything else — a balanced intent reads as a uniform wheel rather than punishing lower back / forearms.
 const AUX_EMPH=["Lower Back","Forearms","Adductors","Neck"];
 function baseEmphasis(){ const e={}; BUILD_GROUPS.forEach(m=>e[m]=0.5); return e; }
-let build={ exp:"intermediate", obj:"muscle", focus:["balanced"], bias:"balanced", time:60, freq:4, injuries:[], access:"gym", supersets:"on", vary:"on", kb:"off",
+let build={ exp:"intermediate", obj:"muscle", focus:["balanced"], bias:"balanced", time:60, freq:4, split:"auto", injuries:[], access:"gym", supersets:"on", vary:"on", kb:"off",
   emphasis:baseEmphasis() };
 function emphasisPreset(focus){
   const e=baseEmphasis();
@@ -6015,6 +6015,74 @@ function sbdSplit(freq, exp){
   if(freq===4) return [SQ,BN,DL,PR];
   if(freq===5) return [SQ,BN,DL,PR,SQ2];
   return [SQ,BN,DL,SQ2,BN2,PR];
+}
+// ===== user-selectable standard splits =====
+// The builder normally chooses a split for you (buildSplit). These let you override that with a named
+// classic split. Each generator returns the per-day muscle templates for a given frequency — the same
+// {name, g} shape buildSplit produces, fed straight into buildPlan. Powerlifting (sbdSplit) and
+// kettlebell-only (kbSplit) keep their own fixed structures and ignore this picker.
+const SPLIT_M={
+  push:["chest","shoulders","sidedelts","triceps"],
+  pull:["upperback","lats","reardelts","biceps"],
+  legs:["quads","hamstrings","glutes","calves","core"],
+  upper:["chest","upperback","lats","shoulders","sidedelts","reardelts","biceps","triceps"],
+  chestback:["chest","lats","upperback","reardelts"],
+  shoArms:["shoulders","sidedelts","biceps","triceps"]
+};
+const AZ=i=>String.fromCharCode(65+i);
+// suffix A/B/C only to day names that repeat (Upper, Upper → Upper A, Upper B; a lone Legs stays "Legs")
+function suffixRepeats(seq){
+  const total={}; seq.forEach(d=>total[d.name]=(total[d.name]||0)+1); const seen={};
+  seq.forEach(d=>{ if(total[d.name]>1){ seen[d.name]=(seen[d.name]||0)+1; d.name=d.name+" "+AZ(seen[d.name]-1); } });
+  return seq;
+}
+// cycle a fixed list of day templates out to `freq` days
+function cycleDays(freq, tmpls){ const out=[]; for(let i=0;i<freq;i++){ const t=tmpls[i%tmpls.length]; out.push({name:t.name, g:t.g.slice()}); } return suffixRepeats(out); }
+const STANDARD_SPLITS=[
+  { id:"fullbody", label:"Full Body", freqs:[1,2,3,4,5,6], days:(f)=>cycleDays(f,[
+      {name:"Full Body",g:["quads","chest","upperback","shoulders","core"]},
+      {name:"Full Body",g:["hamstrings","lats","glutes","sidedelts","biceps","core"]},
+      {name:"Full Body",g:["quads","chest","upperback","triceps","glutes","core"]}]) },
+  { id:"upperlower", label:"Upper / Lower", freqs:[2,4,6], days:(f)=>{
+      const seq=[]; for(let i=0;i<f;i++) seq.push(i%2===0?{name:"Upper",g:SPLIT_M.upper.slice()}:{name:"Lower",g:SPLIT_M.legs.slice()});
+      return suffixRepeats(seq); } },
+  { id:"ppl", label:"Push / Pull / Legs", freqs:[3,6], days:(f)=>cycleDays(f,[
+      {name:"Push",g:SPLIT_M.push.slice().concat(["core"])},{name:"Pull",g:SPLIT_M.pull.slice()},{name:"Legs",g:SPLIT_M.legs.slice()}]) },
+  { id:"arnold", label:"Arnold", freqs:[3,6], days:(f)=>cycleDays(f,[
+      {name:"Chest & Back",g:SPLIT_M.chestback.slice()},{name:"Shoulders & Arms",g:SPLIT_M.shoArms.slice().concat(["core"])},{name:"Legs",g:SPLIT_M.legs.slice()}]) },
+  { id:"bro", label:"Body-Part", freqs:[4,5,6], days:(f)=>{
+      if(f<=4) return suffixRepeats([{name:"Chest & Triceps",g:["chest","triceps"]},{name:"Back & Biceps",g:["lats","upperback","biceps"]},
+        {name:"Shoulders & Core",g:["shoulders","sidedelts","reardelts","core"]},{name:"Legs",g:SPLIT_M.legs.slice()}]);
+      const all=[{name:"Chest",g:["chest","triceps"]},{name:"Back",g:["lats","upperback","biceps"]},
+        {name:"Shoulders",g:["shoulders","sidedelts","reardelts","core"]},{name:"Legs",g:SPLIT_M.legs.slice()},{name:"Arms",g:["biceps","triceps","forearms"]}];
+      return f===5 ? all : all.concat([{name:"Legs & Core",g:["hamstrings","glutes","calves","core"]}]); } }
+];
+const SPLIT_LABEL={}; STANDARD_SPLITS.forEach(s=>SPLIT_LABEL[s.id]=s.label);
+// the splits offered at a given day count — "Recommended" (auto → buildSplit) always leads
+function availableSplits(freq){ const list=[{id:"auto",label:"Recommended"}];
+  STANDARD_SPLITS.forEach(s=>{ if(s.freqs.indexOf(freq)>=0) list.push({id:s.id,label:s.label}); }); return list; }
+// resolve the day templates for a build: an explicit valid split wins, else fall back to the auto pick
+function splitDays(b){
+  const sel=b.split||"auto";
+  if(sel!=="auto"){ const def=STANDARD_SPLITS.find(s=>s.id===sel);
+    if(def && def.freqs.indexOf(b.freq)>=0){ const d=def.days(b.freq, b.exp); if(d && d.length) return d; } }
+  return buildSplit(b.freq, b.exp);
+}
+// Concise three-way muscle-mass outlook for the builder preview: from this plan's weekly volume per
+// muscle, is it set to increase, hold, or risk losing the size you already carry? Same evidence-based
+// landmarks as planForecast (≥WEEKLY_SET_MIN = growth window; <WEEKLY_SET_MAINT = below maintenance).
+function buildOutlook(plan){
+  const wk=planWeeklySets(plan);
+  const major=["Chest","Lats","Upper Back","Front Delts","Side Delts","Rear Delts","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves","Core"];
+  const trained=major.filter(m=>(wk[m]||0)>=1), t=trained.length, perWk=planSessionsPerWeek(plan)||0;
+  if(t<3) return {v:"maintain", label:"Add a few days", detail:"Pick your days and split to project muscle growth."};
+  let grow=0, under=0;
+  trained.forEach(m=>{ const s=wk[m]||0; if(s<WEEKLY_SET_MAINT) under++; else if(s>=WEEKLY_SET_MIN) grow++; });
+  if(under>=Math.ceil(t/2))
+    return {v:"reduce", label:"May reduce muscle", detail:under+" of "+t+" trained muscles get under ~"+WEEKLY_SET_MAINT+" hard sets/week — below what holds size. Add days or sets to grow."};
+  if(grow>=Math.round(t*0.5))
+    return {v:"grow", label:"Builds muscle", detail:grow+" of "+t+" muscles land in the ~"+WEEKLY_SET_MIN+"+ set growth window"+(perWk<2?" — but ~"+perWk+"×/week limits it; most muscles grow best trained 2×":". Expect gains with steady progressive overload")+"."};
+  return {v:"maintain", label:"Maintains muscle", detail:"Volume sits near maintenance — enough to hold size and build strength, short of the ~"+WEEKLY_SET_MIN+"+ sets that drive much new growth."};
 }
 function exCount(time){ return time<=30?4 : time<=45?5 : time<=60?6 : 8; }
 const BUILD_REPS={ strength:{c:"4–6",a:"6–10"}, muscle:{c:"6–10",a:"8–12"}, fatloss:{c:"8–12",a:"12–15"}, fitness:{c:"8–12",a:"10–15"} };
@@ -6169,7 +6237,13 @@ function buildPlan(b){
   // KB count as gym equipment: the dedicated mode builds at the "gym" level so KB_POOL isn't venue-filtered out
   const primary = isKB ? "gym" : (access==="home"||access==="mostly_home") ? "none" : access==="park" ? "park" : "gym";
   const secondary = access==="mostly_gym" ? "none" : access==="mostly_home" ? "gym" : null;  // the "replacement" environment
-  const baseDays = isKB ? kbSplit(b.freq) : (primary==="none" ? null : (isPower ? sbdSplit(b.freq, b.exp) : buildSplit(b.freq, b.exp)));
+  const chosenSplit = (b.split||"auto")!=="auto";
+  // power → SBD; kettlebell → KB full-body; home/park with no explicit split → full-body fallback; else the
+  // resolved split (an explicit pick overrides, otherwise buildSplit's recommendation).
+  const baseDays = isKB ? kbSplit(b.freq)
+    : isPower ? sbdSplit(b.freq, b.exp)
+    : (primary==="none" && !chosenSplit) ? null
+    : splitDays(b);
   // Strength goal = heavy low-rep lifting: one fewer move per day so the session is built around the
   // main compounds, not padded with isolation. (REPSCHEME.strength already drops the rep brackets.) Powerlifting
   // is the purest form of this — its days are anchored on the squat/bench/deadlift below.
@@ -6328,7 +6402,8 @@ function buildPlan(b){
   workouts.forEach(wk=>{ delete wk._meta; delete wk._lvl; });
   const objLbl=isPower ? "Powerlifting" : ({muscle:"Hypertrophy",strength:"Strength",fatloss:"Fat-loss",fitness:"Fitness"}[b.obj]||"Custom");
   const accLbl={gym:"",park:" · park",home:" · home",mostly_gym:" · gym+home",mostly_home:" · home+gym",kb:" · kettlebell"}[access]||"";
-  return { id:"custom-"+Date.now(), name:objLbl+accLbl, level:b.exp, daysPerWeek:b.freq+(kbDay?1:0), workouts };
+  const splitLbl = (!isPower && !isKB && (b.split||"auto")!=="auto" && SPLIT_LABEL[b.split]) ? " · "+SPLIT_LABEL[b.split] : "";
+  return { id:"custom-"+Date.now(), name:objLbl+splitLbl+accLbl, level:b.exp, daysPerWeek:b.freq+(kbDay?1:0), workouts };
 }
 document.querySelectorAll("#sheetBuild .bopt").forEach(seg=>{ const k=seg.dataset.k; seg.querySelectorAll(".s").forEach(s=> s.onclick=()=>{
   seg.querySelectorAll(".s").forEach(x=>x.classList.toggle("active",x===s)); const v=s.dataset.v; build[k]=isNaN(+v)?v:+v; updateBuildPreview(); }); });
@@ -6386,11 +6461,30 @@ function drawEmphasisRadar(){
   G.forEach((g,i)=>{ const [x,y]=pt(i,R+50), co=Math.cos((-90+i*360/n)*Math.PI/180); ctx.textAlign=Math.abs(co)<0.3?"center":(co>0?"left":"right");
     const isParent=SUBGROUPS[g] && !buildExpanded.has(g); ctx.fillText((MSHORT[g]||g)+(isParent?" ›":""), x, y); });
 }
+// the standard-split picker — repopulated on every preview update so it tracks the chosen day count
+// (and steps aside for the power/kettlebell modes, which carry their own fixed structure)
+function renderSplitChips(){
+  const box=$("buildSplitChips"); if(!box) return;
+  const locked = build.bias==="power" ? "Powerlifting uses a fixed Squat · Bench · Deadlift split."
+    : build.access==="kb" ? "Kettlebell-only mode runs full-body kettlebell days." : null;
+  if(locked){ box.innerHTML='<p class="levelcap" style="margin:2px 4px 0;">'+locked+'</p>'; return; }
+  const opts=availableSplits(build.freq);
+  if(!opts.some(o=>o.id===(build.split||"auto"))) build.split="auto";   // current pick invalid at this day count → revert to recommended
+  box.innerHTML=opts.map(o=>'<button class="chip'+((build.split||"auto")===o.id?" on":"")+'" data-split="'+o.id+'">'+esc(o.label)+'</button>').join('');
+  box.querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ build.split=c.dataset.split; updateBuildPreview(); });
+}
+function renderBuildOutlook(plan){
+  const box=$("buildOutlook"); if(!box) return;
+  const o=buildOutlook(plan);
+  box.className="progverd v-"+o.v;
+  box.innerHTML='<span class="pvdot"></span><span><b>'+esc(o.label)+'</b> — '+esc(o.detail)+'</span>';
+}
 function updateBuildPreview(){
-  syncEmphasisChips(); drawEmphasisRadar();
+  syncEmphasisChips(); drawEmphasisRadar(); renderSplitChips();
   const bc=$("biasCap"); if(bc) bc.textContent=BIAS_CAP[build.bias||"balanced"]||"";
-  const sc=planScores(buildPlan(build));
+  const plan=buildPlan(build), sc=planScores(plan);
   $("buildPrevScores").innerHTML='<span class="psc"><b>Balance</b> '+sc.balance+'<small>/5</small></span><span class="psc"><b>Hypertrophy</b> '+sc.hyp+'<small>/5</small></span>';
+  renderBuildOutlook(plan);
 }
 (function(){ const c=$("buildRadar"); if(!c) return; let dragging=false, downX=0, downY=0, moved=false;
   const curG=()=>roseGroups(buildExpanded);

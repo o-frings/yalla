@@ -557,6 +557,9 @@
   .progverd.v-watch{ border-left-color:#f59f00; } .progverd.v-watch .pvdot{ background:#f59f00; }
   .progverd.v-bad{ border-left-color:var(--red); } .progverd.v-bad .pvdot{ background:var(--red); }
   .progverd.v-more{ border-left-color:var(--line); } .progverd.v-more .pvdot{ background:var(--l3); }
+  .progverd.v-grow{ border-left-color:#51cf66; } .progverd.v-grow .pvdot{ background:#51cf66; }
+  .progverd.v-maintain{ border-left-color:#4dabf7; } .progverd.v-maintain .pvdot{ background:#4dabf7; }
+  .progverd.v-reduce{ border-left-color:var(--red); } .progverd.v-reduce .pvdot{ background:var(--red); }
 
   .group{ background:var(--card); border:.5px solid var(--line); border-radius:var(--r-lg); overflow:hidden; margin-bottom:20px; box-shadow:var(--shadow), inset 0 .5px 0 var(--hi); }
   .pad{ padding:20px; }
