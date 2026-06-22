@@ -6048,6 +6048,12 @@ const STANDARD_SPLITS=[
       return suffixRepeats(seq); } },
   { id:"ppl", label:"Push / Pull / Legs", freqs:[3,6], days:(f)=>cycleDays(f,[
       {name:"Push",g:SPLIT_M.push.slice().concat(["core"])},{name:"Pull",g:SPLIT_M.pull.slice()},{name:"Legs",g:SPLIT_M.legs.slice()}]) },
+  // 2-way push/pull — legs split anatomically: knee-extension (quads/calves) on push, hip-hinge (hams/glutes) on pull
+  { id:"pushpull", label:"Push / Pull", freqs:[2,4,6], days:(f)=>{
+      const seq=[]; for(let i=0;i<f;i++) seq.push(i%2===0
+        ? {name:"Push",g:["chest","shoulders","sidedelts","triceps","quads","calves","core"]}
+        : {name:"Pull",g:["lats","upperback","reardelts","biceps","hamstrings","glutes","core"]});
+      return suffixRepeats(seq); } },
   { id:"arnold", label:"Arnold", freqs:[3,6], days:(f)=>cycleDays(f,[
       {name:"Chest & Back",g:SPLIT_M.chestback.slice()},{name:"Shoulders & Arms",g:SPLIT_M.shoArms.slice().concat(["core"])},{name:"Legs",g:SPLIT_M.legs.slice()}]) },
   { id:"bro", label:"Body-Part", freqs:[4,5,6], days:(f)=>{
