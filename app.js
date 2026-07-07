@@ -7012,6 +7012,19 @@ if($("inviteBtn")) $("inviteBtn").onclick=async()=>{
   try{ if(navigator.share){ await navigator.share({ title:"Yalla", text, url }); return; } }catch(e){ if(e&&e.name==="AbortError") return; }
   try{ await navigator.clipboard.writeText(text+"\n"+url); toast("Invite copied — paste it to a friend."); }catch(e){ toast(text+"\n"+url); }
 };
+// Me-tab share buttons — same mechanics as inviteBtn but surfaced where new users see them first
+if($("meInviteBtn")) $("meInviteBtn").onclick=async()=>{
+  if(!_myCode){ toast("Your code isn't ready yet — reopen this screen."); return; }
+  const url=inviteLink(), who=(settings.displayName||settings.name||"A friend");
+  const text=who+" invited you to follow them on Yalla 💪 Open the app and enter code "+(_myCode||"")+" — or tap the link.";
+  try{ if(navigator.share){ await navigator.share({ title:"Yalla", text, url }); return; } }catch(e){ if(e&&e.name==="AbortError") return; }
+  try{ await navigator.clipboard.writeText(text+"\n"+url); toast("Invite link copied — paste it to a friend."); }catch(e){ toast(url); }
+};
+if($("meShareAppBtn")) $("meShareAppBtn").onclick=async()=>{
+  const url=location.href.split("?")[0], text="I've been logging my workouts on Yalla — it's free and private. Try it:";
+  try{ if(navigator.share){ await navigator.share({ title:"Yalla", text, url }); return; } }catch(e){ if(e&&e.name==="AbortError") return; }
+  try{ await navigator.clipboard.writeText(url); toast("App link copied — share it with anyone."); }catch(e){ toast(url); }
+};
 // process an ?add=CODE invite once we're signed in and the friends schema is live
 async function processPendingAdd(){
   if(!pendingAddCode || !cloudReady() || !dbHardened) return;
