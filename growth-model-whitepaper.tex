@@ -264,19 +264,37 @@ where $\rho(D)$ is the dose--response of Section~4~\cite{sch17,drr}, $\eta$ scal
 \caption{Projected muscle gain for three standard plans, each executed with progressive overload (median, 10--90\% bands). More weekly volume per muscle projects more gain, with diminishing returns and heavily overlapping bands.}\label{fig:plangain}
 \end{figure}
 
+The starting point sets the scale. Figure~\ref{fig:start} runs the same adequate, progressing plan from three training-age base rates~\cite{damas}: a novice gains most and fastest, an advanced lifter least, and the bands overlap throughout. The app reads this base rate from the lifter's own logged history.
+
+\begin{figure}[t]\centering
+\begin{tikzpicture}\begin{axis}[simaxis, xmax=24, ymin=0, ylabel={projected muscle gain (\%)}, legend pos=north west, legend cell align=left]
+\addplot[draw=none, forget plot, name path=nH] table[x=week,y=novHi]{research/sim-start.dat};
+\addplot[draw=none, forget plot, name path=nL] table[x=week,y=novLo]{research/sim-start.dat};
+\addplot[appAccent!12, forget plot] fill between[of=nH and nL];
+\addplot[draw=none, forget plot, name path=aH] table[x=week,y=advHi]{research/sim-start.dat};
+\addplot[draw=none, forget plot, name path=aL] table[x=week,y=advLo]{research/sim-start.dat};
+\addplot[appBlue!12, forget plot] fill between[of=aH and aL];
+\addplot[appAccent] table[x=week,y=novMid]{research/sim-start.dat}; \addlegendentry{novice}
+\addplot[appViolet] table[x=week,y=intMid]{research/sim-start.dat}; \addlegendentry{intermediate}
+\addplot[appBlue] table[x=week,y=advMid]{research/sim-start.dat}; \addlegendentry{advanced}
+\end{axis}\end{tikzpicture}
+\caption{The same adequate, progressing plan from three starting points (training-age base rates): projected muscle gain, median and 10--90\% bands (novice and advanced). Newer lifters gain faster; all bands are wide and overlap.}\label{fig:start}
+\end{figure}
+
 Beyond the individual-response spread, Figure~\ref{fig:sens} shows how the median 16-week gain moves when each input is swung across a plausible range (the app draws the same tornado). Training experience and progression move it most; volume and age move it least over the ranges tested. This is a forecast-level companion to the threshold sensitivity of Section~\ref{sec:verification}.
 
 \begin{figure}[t]\centering
-\begin{tikzpicture}\begin{axis}[xbar, width=\linewidth, height=4.6cm, xmin=0, xmax=6.2,
-  bar width=9pt, enlarge y limits=0.18,
+\begin{tikzpicture}\begin{axis}[xbar, width=\linewidth, height=5cm, xmin=0, xmax=7,
+  bar width=10pt, enlarge y limits={abs=0.7}, y=0.72cm,
   nodes near coords, point meta=x,
   nodes near coords style={font=\footnotesize, /pgf/number format/fixed, /pgf/number format/precision=1},
   xlabel={swing in 16-week median gain (percentage points)}, xlabel style={font=\footnotesize},
-  tick label style={font=\footnotesize}, axis lines=left, grid=major, grid style={black!8},
-  ytick={0,1,2,3,4}, yticklabels={effort, progression, volume, age, experience}]
+  tick label style={font=\footnotesize}, axis lines=left, ytick align=outside,
+  grid=major, grid style={black!8},
+  ytick={0,1,2,3,4}, yticklabels={age, volume, effort, progression, experience}]
 \addplot[fill=appAccent!30, draw=appAccent] table[x=swing, y=y] {research/sim-sens.dat};
 \end{axis}\end{tikzpicture}
-\caption{Parameter sensitivity of the Monte Carlo forecast: how far the median 16-week gain swings as each input moves across a plausible range, around a novice plan baseline.}\label{fig:sens}
+\caption{Parameter sensitivity of the Monte Carlo forecast, sorted by influence: how far the median 16-week gain swings as each input moves across a plausible range, around a novice plan baseline. Training experience and progression dominate; age moves it least.}\label{fig:sens}
 \end{figure}
 
 \section{Scientific basis}\label{sec:basis}

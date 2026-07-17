@@ -150,6 +150,10 @@ const rgLoss = mcForecast(doseStimulus(1.5), false, { meanD: 1.5, W: RW });
 const planMeanDose = (name) => { const wk = {}; MUSCLES.forEach((m) => (wk[m] = 0)); PLANS[name].forEach((s) => Object.keys(s).forEach((m) => (wk[m] += s[m]))); return MUSCLES.reduce((a, m) => a + wk[m], 0) / MUSCLES.length; };
 const planGain = Object.fromEntries(Object.keys(PLANS).map((p) => [p, mcForecast(doseStimulus(planMeanDose(p)), true, { meanD: planMeanDose(p), W: RW })]));
 
+// Starting points: same adequate, progressing plan from three training-age base rates (Damas 2016).
+const startNov = mcForecast(doseStimulus(10), true, { baseRate: 0.9, meanD: 10, W: RW });
+const startInt = mcForecast(doseStimulus(10), true, { baseRate: 0.5, meanD: 10, W: RW });
+const startAdv = mcForecast(doseStimulus(10), true, { baseRate: 0.28, meanD: 10, W: RW });
 
 // Sensitivity: week-16 median gain when each key parameter is swung low↔high (novice plan baseline).
 const ageFor = (a) => (a > 30 ? Math.max(0.5, 1 - (a - 30) * 0.008) : 1);
@@ -161,7 +165,7 @@ const sens = [
   { label: "volume", lo: w16(mcForecast(doseStimulus(7), true)), hi: w16(mcForecast(doseStimulus(13), true)) },
   { label: "age", lo: w16(mcForecast(doseStimulus(10), true, { ageF: ageFor(45) })), hi: w16(mcForecast(doseStimulus(10), true, { ageF: ageFor(25) })) },
   { label: "experience", lo: w16(mcForecast(doseStimulus(10), true, { baseRate: 0.28 })), hi: w16(mcForecast(doseStimulus(10), true, { baseRate: 0.9 })) },
-];
+].sort((a, b) => Math.abs(a.hi - a.lo) - Math.abs(b.hi - b.lo)); // ascending swing -> smallest at bottom (y=0)
 
 // ---- console summary ----
 const growWeeks = (rec) => rec.reduce((p, w) => p + w.growing, 0);
@@ -352,9 +356,15 @@ writeFileSync(new URL("./sim-plangain.dat", import.meta.url),
       planGain[planKeys[0]].p10[t], planGain[planKeys[0]].p50[t], planGain[planKeys[0]].p90[t],
       planGain[planKeys[1]].p10[t], planGain[planKeys[1]].p50[t], planGain[planKeys[1]].p90[t],
       planGain[planKeys[2]].p10[t], planGain[planKeys[2]].p50[t], planGain[planKeys[2]].p90[t]])));
+writeFileSync(new URL("./sim-start.dat", import.meta.url),
+  dat("week novLo novMid novHi intLo intMid intHi advLo advMid advHi",
+    startNov.p50.map((_, t) => [t,
+      startNov.p10[t], startNov.p50[t], startNov.p90[t], startInt.p10[t], startInt.p50[t], startInt.p90[t],
+      startAdv.p10[t], startAdv.p50[t], startAdv.p90[t]])));
 writeFileSync(new URL("./sim-sens.dat", import.meta.url),
-  dat("y swing lo hi", sens.map((sv, i) => [i, Math.abs(sv.hi - sv.lo), Math.min(sv.lo, sv.hi), Math.max(sv.lo, sv.hi)])));
-console.log("Wrote sim-regimes.dat, sim-plangain.dat, sim-sens.dat");
+  dat("y swing lo hi label", sens.map((sv, i) => [i, Math.abs(sv.hi - sv.lo), Math.min(sv.lo, sv.hi), Math.max(sv.lo, sv.hi), sv.label])));
+console.log("Wrote sim-regimes.dat, sim-plangain.dat, sim-start.dat, sim-sens.dat");
+console.log(`\nStarting points — 24-wk median gain: novice ${startNov.p50[RW].toFixed(1)}%, intermediate ${startInt.p50[RW].toFixed(1)}%, advanced ${startAdv.p50[RW].toFixed(1)}%`);
 console.log(`\nRegimes — 24-wk median gain: progressing ${rgProg.p50[RW].toFixed(1)}%, no-overload ${rgFlat.p50[RW].toFixed(1)}%, irregular ${rgIrr.p50[RW].toFixed(1)}%, under-maintenance ${rgLoss.p50[RW].toFixed(1)}%`);
 console.log("Sensitivity of 16-wk median gain (baseline " + sBase.toFixed(1) + "%):");
 sens.forEach((sv) => console.log(`  ${sv.label.padEnd(12)} ${sv.lo.toFixed(1)}% … ${sv.hi.toFixed(1)}%`));
