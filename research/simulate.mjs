@@ -44,7 +44,7 @@ function makeRng(seed) {
 
 // Simulate one scenario. schedule: "regular" (every session) or "irregular" (each session ~55% done).
 // Returns per-week records with per-muscle {sets, stim, state}, plus counts and the overall verdict.
-function simulate(planName, schedule, seed) {
+function simulate(planName, schedule, seed, progress = true) {
   const sessions = PLANS[planName];
   const rng = makeRng(seed);
   const pDone = schedule === "regular" ? 1 : 0.55;
@@ -61,11 +61,13 @@ function simulate(planName, schedule, seed) {
       if (rng() > pDone) continue; // missed session (irregular only)
       for (const m of Object.keys(sess)) wkSets[m] += sess[m] * (0.94 + rng() * 0.12); // small execution noise
     }
-    // load progresses when the week's dose is a growth stimulus, holds at maintenance, decays below it
+    // load progresses when the week's dose is a growth stimulus, holds at maintenance, decays below it.
+    // progress=false models repeating the same loads (no progressive overload): loads stay flat while trained.
     MUSCLES.forEach((m) => {
       const s = wkSets[m];
       let g;
-      if (s >= MEV) g = 0.030 * Math.exp(-wk / 8) + 0.002; // newbie gains, decaying toward an intermediate rate
+      if (!progress) g = s >= MV ? 0 : -0.004;
+      else if (s >= MEV) g = 0.030 * Math.exp(-wk / 8) + 0.002; // newbie gains, decaying toward an intermediate rate
       else if (s >= MV) g = 0;
       else g = -0.004;
       load[m] *= 1 + g + (rng() - 0.5) * 0.004;
@@ -115,6 +117,26 @@ Object.keys(PLANS).forEach((p, i) => (regByPlan[p] = simulate(p, "regular", SEED
 const ulRegular = regByPlan["Upper/Lower 4x"];
 const ulIrregular = simulate("Upper/Lower 4x", "irregular", SEED + 99);
 
+// Progressive-overload contrast (didactic): one muscle held at a fixed adequate dose (10 sets/wk) for 16
+// weeks, progressing at a given weekly load rate vs repeating the same loads. Growth realised = ρ(D) gated
+// by how far the trend τ sits in the growth band [0.92, 1.08] — the same rule the app and the in-app
+// forecast use. Same volume in both, so the whole difference is progressive overload.
+function overloadContrast(rate) {
+  const D = 10, mean3 = (a) => a.slice(-3).reduce((x, y) => x + y, 0) / a.slice(-3).length,
+    earl3 = (a) => { const s = a.slice(-6, -3); return s.length ? s.reduce((x, y) => x + y, 0) / s.length : 0; };
+  const S = new Array(N).fill(D), L = new Array(N).fill(100), out = [];
+  for (let t = 1; t <= 16; t++) {
+    S.push(D); L.push(L[L.length - 1] * (1 + rate));
+    const Sw = S.slice(-N), Lw = L.slice(-N);
+    const tS = earl3(Sw) > 0 ? mean3(Sw) / earl3(Sw) : null, tL = earl3(Lw) > 0 ? mean3(Lw) / earl3(Lw) : null;
+    const tau = tS == null && tL == null ? null : Math.max(tS == null ? 0 : tS, tL == null ? 0 : tL);
+    const prog = tau == null ? 1 : Math.max(0, Math.min(1, (tau - 0.92) / (1.08 - 0.92)));
+    out.push(doseStimulus(mean3(Sw)) * prog * 100);
+  }
+  return out;
+}
+const olProg = overloadContrast(0.02), olFlat = overloadContrast(0.0);
+
 // ---- console summary ----
 const growWeeks = (rec) => rec.reduce((p, w) => p + w.growing, 0);
 const underWeeks = (rec) => rec.reduce((p, w) => p + w.shrink, 0);
@@ -128,6 +150,9 @@ Object.keys(PLANS).forEach((p) => {
 console.log("\nUpper/Lower — regular vs irregular (~55% of sessions):");
 console.log(`  regular    growing ${growWeeks(ulRegular)} muscle-weeks · under ${underWeeks(ulRegular)} · mean stimulus ${meanStimAll(ulRegular).toFixed(0)}%`);
 console.log(`  irregular  growing ${growWeeks(ulIrregular)} muscle-weeks · under ${underWeeks(ulIrregular)} · mean stimulus ${meanStimAll(ulIrregular).toFixed(0)}%`);
+console.log("\nProgressive overload — one muscle, fixed 10 sets/wk, week-16 growth realised:");
+console.log(`  progressing (+2%/wk load)  ${olProg[olProg.length - 1].toFixed(0)}%`);
+console.log(`  same loads repeated        ${olFlat[olFlat.length - 1].toFixed(0)}%  (identical volume; the difference is overload)`);
 
 // ================= SVG chart helpers =================
 const W = 760, H = 300, PAD = { l: 46, r: 96, t: 18, b: 34 };
@@ -303,4 +328,6 @@ const planKeys = Object.keys(PLANS);
 writeFileSync(new URL("./sim-plans.dat", import.meta.url),
   dat("week FullBody UpperLower PPL",
     regByPlan[planKeys[0]].map((w, t) => [wk1(t), w.meanStim * 100, regByPlan[planKeys[1]][t].meanStim * 100, regByPlan[planKeys[2]][t].meanStim * 100])));
-console.log("Wrote research/sim-ul.dat, sim-muscles.dat, sim-plans.dat");
+writeFileSync(new URL("./sim-overload.dat", import.meta.url),
+  dat("week progressing flat", olProg.map((v, t) => [t + 1, v, olFlat[t]])));
+console.log("Wrote research/sim-ul.dat, sim-muscles.dat, sim-plans.dat, sim-overload.dat");

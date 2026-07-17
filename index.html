@@ -267,6 +267,13 @@
     <div class="ed-label" style="margin-top:14px;">Your plan's outlook</div>
     <div class="insight" id="planForecast"></div>
     <details class="hsrc" id="planFcSrcBox" style="display:none;"><summary>Sources</summary><ul id="planFcSrc"></ul></details>
+    <!-- Forward projection: simulated growth stimulus if you keep this plan vs your current pace -->
+    <div class="fccard" id="fcCard" style="display:none;">
+      <div class="fchd">Growth forecast<span class="fcsub" id="fcSub"></span></div>
+      <canvas id="fcChart" width="760" height="300"></canvas>
+      <div class="fclegend" id="fcLegend"></div>
+      <p class="fcnote">A simulation of the growth you bank over the next 16 weeks if you keep to this plan (with the progressive overload it recommends — adding a little load or a rep) versus carrying on at your current pace and rate of progress. Growth counts only while both the volume and the loads keep climbing, so a stall flattens the curve. It projects accumulated training stimulus, not body size.</p>
+    </div>
     <div class="panel" id="progPanel">
       <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 2 5-6"/></svg>Progress</span></div>
       <div class="mewintabs paneltabs" id="progMetric">

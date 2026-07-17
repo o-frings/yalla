@@ -265,6 +265,16 @@ Figure~\ref{fig:plans} compares the three plans under regular execution. More we
 \caption{Mean growth stimulus across nine muscles for three standard plans, each executed regularly.}\label{fig:plans}
 \end{figure}
 
+Volume alone is not enough. Loads progress in these runs whenever a muscle's dose reaches the growth window, which is the progressive overload the app recommends; the trend axis is what rewards it. Figure~\ref{fig:overload} isolates that effect: one muscle held at a fixed adequate dose (10 sets/week) for 16 weeks, progressing at 2\% per week versus repeating the same loads. The volume is identical, so the whole gap is progressive overload. Realised growth is $\rho(D)$ scaled by how far the trend sits in the growth band; without added load the trend flattens and growth settles far below its potential. The in-app forecast projects the same two levers forward.
+
+\begin{figure}[t]\centering
+\begin{tikzpicture}\begin{axis}[simaxis, ylabel={growth realised (\%)}, xmax=16, ymin=0, ymax=100, legend pos=south east]
+\addplot[appAccent] table[x=week,y=progressing]{research/sim-overload.dat}; \addlegendentry{progressing (+2\%/wk load)}
+\addplot[appBlue] table[x=week,y=flat]{research/sim-overload.dat}; \addlegendentry{same loads repeated}
+\end{axis}\end{tikzpicture}
+\caption{Progressive overload at a fixed adequate volume (10 sets/week): realised growth when loads climb 2\% per week versus repeating the same loads. Identical volume; the difference is overload.}\label{fig:overload}
+\end{figure}
+
 \section{Scientific basis}\label{sec:basis}
 Each parameter and mechanism traces to a specific source. Effect sizes are context-dependent; the model uses the literature to set its structure and thresholds, and promises no outcomes.
 Grades are GRADE-style ratings of the underlying evidence: High (meta-analyses of RCTs), Moderate (individual RCTs or focused reviews), Low (practitioner framework). A Low grade flags a parameter that rests on weaker evidence and is the first candidate for revision.
