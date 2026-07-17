@@ -2162,7 +2162,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi] || (rot[xi]!=null && !rotKeep.has(xi) ? rot[xi] : e.n); }
-let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, theme:"auto", restSec:90, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{}, baseActivity:null };
+let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, age:null, theme:"auto", restSec:90, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{}, baseActivity:null };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -2910,6 +2910,7 @@ function renderDash(){
   animateProgBars();
   if($("heightIn") && document.activeElement!==$("heightIn")) $("heightIn").value = settings.heightCm||"";
   if($("bfIn") && document.activeElement!==$("bfIn")) $("bfIn").value = settings.bodyfatPct||"";
+  if($("ageIn") && document.activeElement!==$("ageIn")) $("ageIn").value = settings.age||"";
   renderCalc(now);
   renderCalendar();
   renderBaseActivity();
@@ -3737,7 +3738,7 @@ function showTab(name){
   if(window.__pageGo) window.__pageGo(name); else { try{ window.scrollTo(0,0); }catch(e){} }
   if(name==="me"){
     $("goalStart").value=settings.goalStart||""; $("goalTarget").value=settings.goalTarget||"";
-    $("heightIn").value=settings.heightCm||""; $("bfIn").value=settings.bodyfatPct||""; $("nameIn").value=settings.name||"";
+    $("heightIn").value=settings.heightCm||""; $("bfIn").value=settings.bodyfatPct||""; $("nameIn").value=settings.name||""; if($("ageIn")) $("ageIn").value=settings.age||"";
     renderDash(); renderAccount(); animateProgBars();
   } else if(name==="workout"){
     coach("workout","Tap a set to log your weight × reps. The coach tracks each exercise across all your plans, so progress carries over.");
@@ -3868,9 +3869,10 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
   if(vv){ vv.addEventListener("resize", show); }   // resize only — scroll fires constantly and would churn
 })();
 $("bodySave").onclick=async()=>{
-  const h=parseFloat($("heightIn").value), bf=parseFloat($("bfIn").value);
+  const h=parseFloat($("heightIn").value), bf=parseFloat($("bfIn").value), a=parseInt($("ageIn").value);
   settings.heightCm = (!isNaN(h)&&h>=100&&h<=250) ? h : null;
   settings.bodyfatPct = (!isNaN(bf)&&bf>=2&&bf<=60) ? bf : null;
+  settings.age = (!isNaN(a)&&a>=12&&a<=100) ? a : null;
   await sset("settings",settings); renderDash(); toast("Body details saved");
 };
 document.querySelectorAll("#sexSeg .s").forEach(s=> s.onclick=async()=>{ settings.sex=s.dataset.sex; await sset("settings",settings); renderDash(); });
@@ -5988,7 +5990,11 @@ function renderForecast(){
   box.innerHTML='<div class="ititle">'+esc(r.title)+'</div><div class="itext">'+esc(r.text)+'</div>';
   const sb=$("planFcSrcBox"), sl=$("planFcSrc");
   if(sb&&sl){ if(r.src&&r.src.length){ sb.style.display=""; sl.innerHTML=r.src.map(srcLi).join(''); } else sb.style.display="none"; }
-  drawForecast();
+  const card=$("fcCard"), f=(typeof growthForecast==="function")?growthForecast():null;
+  if(!card) return;
+  if(!f){ card.style.display="none"; return; }
+  card.style.display="";
+  drawForecast(f); drawForecastSens(f);
 }
 // ===== Monte Carlo growth forecast =====
 // A probabilistic projection of muscle gain over 16 weeks, so the output is a distribution, not a false
@@ -6010,9 +6016,10 @@ function growthForecast(){
   const mean3=a=>{ const s=a.slice(-3); return s.length ? s.reduce((x,y)=>x+y,0)/s.length : 0; };
   const earl3=a=>{ const s=a.slice(-6,-3); return s.length ? s.reduce((x,y)=>x+y,0)/s.length : 0; };
   const rhoMean=doseMap=>{ let r=0; muscles.forEach(g=>r+=doseStimulus(doseMap[g])); return r/muscles.length; };
+  const doseMean=doseMap=>{ let d=0; muscles.forEach(g=>d+=doseMap[g]); return d/muscles.length; };
   const planDose={}, paceDose={};
   muscles.forEach(g=>{ planDose[g]=planWk[g]||0; paceDose[g]=mean3(setsS[g]); });
-  const rhoPlan=rhoMean(planDose), rhoPace=rhoMean(paceDose);
+  const rhoPlan=rhoMean(planDose), rhoPace=rhoMean(paceDose), dPlan=doseMean(planDose), dPace=doseMean(paceDose);
   // effort efficacy from logged proximity-to-failure (avg effort factor → 0.6..1)
   let ef=0, en=0; Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ ef+=effortOf(e); en++; }));
   const effort = en ? Math.min(1, 0.6+0.4*(ef/en)) : 0.85;
@@ -6022,35 +6029,60 @@ function growthForecast(){
   // training-age base weekly rate (%/wk at full stimulus), from lifetime sessions
   const sess=settings.sessions||0;
   const baseRate = sess<40 ? 0.9 : sess<150 ? 0.9-(sess-40)/110*0.5 : Math.max(0.25, 0.4-(sess-150)/500*0.15);
+  // age and sex factors. Age: hypertrophy attenuates with age (Peterson 2011), ~1.0 to ~30 then declining.
+  // Sex: relative hypertrophy is comparable between sexes (Roberts 2020), so the %-gain factor is ~1 for both
+  // (sex is collected mainly for absolute-mass context). Both feed the same MC as multipliers.
+  const age=+settings.age||0;
+  const ageF = age>30 ? Math.max(0.5, 1-(age-30)*0.008) : 1;
+  const sexF = 1;   // ≈ equal relative gains; kept as an explicit lever
   // seeded PRNG so the bands are stable across re-renders; paired draws for a fair plan-vs-pace comparison
   let s=987654321>>>0; const u=()=>((s=(s*1103515245+12345)&0x7fffffff)/0x7fffffff);
   const nrm=(m,sd)=>{ const a=Math.max(1e-9,u()); return m+sd*Math.sqrt(-2*Math.log(a))*Math.cos(2*Math.PI*u()); };
   const draws=[]; for(let k=0;k<K;k++) draws.push({ indiv:Math.exp(nrm(0,0.55)), ovn:Math.max(0,nrm(0.5,0.08)) });
   const q=(arr,p)=>{ const a=arr.slice().sort((x,y)=>x-y); return a[Math.floor(p*(a.length-1))]; };
-  function bands(rho, progressing){
+  // Weekly increment: growth above maintenance, atrophy below it (so a starved scenario trends negative).
+  function bands(p){
     const traj=Array.from({length:AHEAD+1},()=>[]);
-    draws.forEach(dr=>{ const ov=progressing?1.0:dr.ovn; let C=0; traj[0].push(0);
-      for(let t=1;t<=AHEAD;t++){ C += baseRate*dr.indiv*rho*effort*ov*Math.exp(-t/32); traj[t].push(C); } });
+    draws.forEach(dr=>{ const ov=p.progressing?1.0:dr.ovn; let C=0; traj[0].push(0);
+      for(let t=1;t<=AHEAD;t++){
+        const inc = p.meanD>=WEEKLY_SET_MAINT
+          ? p.baseRate*dr.indiv*p.ageF*sexF*p.rho*p.effort*ov*Math.exp(-t/32)   // hypertrophy
+          : -0.4*dr.indiv*(1-p.meanD/WEEKLY_SET_MAINT);                          // atrophy below maintenance (~0.4%/wk, Mujika)
+        C += inc; traj[t].push(C);
+      } });
     return { p10:traj.map(a=>q(a,0.1)), p50:traj.map(a=>q(a,0.5)), p90:traj.map(a=>q(a,0.9)) };
   }
-  return { plan:bands(rhoPlan,true), pace:bands(rhoPace,paceProgressing), ahead:AHEAD, n:muscles.length };
+  const P={ rho:rhoPlan, meanD:dPlan, progressing:true, ageF, effort, baseRate };
+  const plan=bands(P), pace=bands({ rho:rhoPace, meanD:dPace, progressing:paceProgressing, ageF, effort, baseRate });
+  // sensitivity: week-16 median gain when each key parameter is swung low↔high around the plan baseline
+  const w16=b=>b.p50[AHEAD], rhoAt=d=>doseStimulus(Math.max(0,d)), ageFor=a=>a>30?Math.max(0.5,1-(a-30)*0.008):1;
+  const a0=age||30;
+  const sens=[
+    {label:"effort",       lo:w16(bands({...P,effort:0.6})),                          hi:w16(bands({...P,effort:1.0}))},
+    {label:"progression",  lo:w16(bands({...P,progressing:false})),                    hi:w16(bands({...P,progressing:true}))},
+    {label:"volume ±3",    lo:w16(bands({...P,rho:rhoAt(dPlan-3),meanD:dPlan-3})),      hi:w16(bands({...P,rho:rhoAt(dPlan+3),meanD:dPlan+3}))},
+    {label:"age ±15y",     lo:w16(bands({...P,ageF:ageFor(a0+15)})),                    hi:w16(bands({...P,ageF:ageFor(Math.max(18,a0-15))}))},
+    {label:"experience",   lo:w16(bands({...P,baseRate:0.28})),                         hi:w16(bands({...P,baseRate:0.9}))},
+  ];
+  return { plan, pace, ahead:AHEAD, n:muscles.length, base:w16(plan), sens };
 }
-function drawForecast(){
-  const card=$("fcCard"), c=$("fcChart"); if(!card||!c) return;
-  const f=growthForecast();
-  if(!f){ card.style.display="none"; return; }
-  card.style.display="";
+function drawForecast(f){
+  const c=$("fcChart"); if(!c||!f) return;
   const sub=$("fcSub"); if(sub) sub.textContent="projected muscle gain across "+f.n+" muscles · Monte Carlo, 500 runs";
   const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const cs=getComputedStyle(document.documentElement);
   const l3=(cs.getPropertyValue('--l3')||'#888').trim();
   const accent=accentHex(), blue="#4dabf7";
   const padL=42, padR=74, padT=14, padB=28, x1=f.ahead;
-  const ymax=Math.max(2, Math.ceil((Math.max(f.plan.p90[x1], f.pace.p90[x1])*1.1)/2)*2);
+  const hi=Math.max(f.plan.p90[x1], f.pace.p90[x1]);
+  const lo=Math.min(0, f.plan.p10[x1], f.pace.p10[x1], ...f.plan.p10, ...f.pace.p10);  // allow negative (loss)
+  const ymax=Math.max(2, Math.ceil(hi*1.1/2)*2), ymin=Math.min(0, Math.floor(lo*1.1/2)*2);
   const X=w=> padL + (w/x1)*(W-padL-padR);
-  const Y=v=> padT + (1-v/ymax)*(H-padT-padB);
+  const Y=v=> padT + (1-(v-ymin)/(ymax-ymin))*(H-padT-padB);
   ctx.font="12px -apple-system,system-ui,sans-serif"; ctx.textAlign="right";
-  for(let k=0;k<=4;k++){ const v=ymax*k/4, y=Y(v); ctx.strokeStyle=hexAlpha(l3,.18); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke(); ctx.fillStyle=l3; ctx.fillText(v.toFixed(0)+"%", padL-6, y+4); }
+  const ticks=5; for(let k=0;k<=ticks;k++){ const v=ymin+(ymax-ymin)*k/ticks, y=Y(v), zero=Math.abs(v)<1e-6;
+    ctx.strokeStyle=hexAlpha(l3, zero?.5:.18); ctx.lineWidth=zero?1.2:1; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+    ctx.fillStyle=l3; ctx.fillText(v.toFixed(0)+"%", padL-6, y+4); }
   ctx.fillStyle=l3; ctx.textAlign="center"; ctx.fillText("now", X(0), H-padB+16); ctx.fillText("+"+x1+"w", X(x1), H-padB+16);
   const band=(b,hex)=>{ ctx.fillStyle=hexAlpha(hex,.15); ctx.beginPath();
     b.p90.forEach((v,i)=>{ const x=X(i), y=Y(v); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
@@ -6060,10 +6092,33 @@ function drawForecast(){
   band(f.pace, blue); band(f.plan, accent);
   line(f.pace.p50, blue); line(f.plan.p50, accent);
   let yp=Y(f.plan.p50[x1]), yc=Y(f.pace.p50[x1]); if(Math.abs(yp-yc)<13){ const m=(yp+yc)/2; yp=m-7; yc=m+7; }
+  const sgn=v=>(v>=0?"+":"")+v.toFixed(1)+"%";
   ctx.font="600 12px -apple-system,system-ui,sans-serif"; ctx.textAlign="left";
-  ctx.fillStyle=accent; ctx.fillText("+"+f.plan.p50[x1].toFixed(1)+"%", X(x1)+5, yp+4);
-  ctx.fillStyle=blue;   ctx.fillText("+"+f.pace.p50[x1].toFixed(1)+"%", X(x1)+5, yc+4);
+  ctx.fillStyle=accent; ctx.fillText(sgn(f.plan.p50[x1]), X(x1)+5, yp+4);
+  ctx.fillStyle=blue;   ctx.fillText(sgn(f.pace.p50[x1]), X(x1)+5, yc+4);
   const lg=$("fcLegend"); if(lg) lg.innerHTML='<span class="fclg"><i style="background:'+accent+'"></i>this plan</span><span class="fclg"><i style="background:'+blue+'"></i>current pace</span><span class="fclg"><i class="fcbandi"></i>10–90% range</span>';
+}
+// tornado: how much the 16-week median gain swings as each key parameter goes low↔high (around the plan)
+function drawForecastSens(f){
+  const c=$("fcTornado"); if(!c||!f||!f.sens) return;
+  const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  const cs=getComputedStyle(document.documentElement);
+  const l3=(cs.getPropertyValue('--l3')||'#888').trim(), ink=(cs.getPropertyValue('--ink')||'#000').trim();
+  const accent=accentHex();
+  const rows=f.sens.map(s=>({label:s.label, lo:Math.min(s.lo,s.hi), hi:Math.max(s.lo,s.hi)}));
+  let vmin=f.base, vmax=f.base; rows.forEach(r=>{ vmin=Math.min(vmin,r.lo); vmax=Math.max(vmax,r.hi); });
+  const pad=6; vmin=Math.min(vmin,0)-pad*0; const span=Math.max(1,vmax-vmin);
+  const padL=96, padR=44, padT=6, padB=20, rowH=(H-padT-padB)/rows.length;
+  const X=v=> padL + (v-vmin)/span*(W-padL-padR);
+  // baseline (plan median)
+  ctx.strokeStyle=hexAlpha(l3,.5); ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(X(f.base),padT); ctx.lineTo(X(f.base),H-padB); ctx.stroke(); ctx.setLineDash([]);
+  ctx.font="11px -apple-system,system-ui,sans-serif"; ctx.fillStyle=l3; ctx.textAlign="center"; ctx.fillText("median "+f.base.toFixed(1)+"%", X(f.base), H-6);
+  rows.forEach((r,i)=>{ const cy=padT+i*rowH+rowH/2, x0=X(r.lo), x1=X(r.hi);
+    ctx.fillStyle=hexAlpha(accent,.28); ctx.strokeStyle=accent; ctx.lineWidth=1;
+    ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(x0, cy-7, Math.max(2,x1-x0), 14, 3); else ctx.rect(x0,cy-7,Math.max(2,x1-x0),14); ctx.fill(); ctx.stroke();
+    ctx.fillStyle=l3; ctx.textAlign="right"; ctx.font="11px -apple-system,system-ui,sans-serif"; ctx.fillText(r.label, padL-8, cy+4);
+    ctx.fillStyle=ink; ctx.textAlign="left"; ctx.font="10px -apple-system,system-ui,sans-serif"; ctx.fillText(r.hi.toFixed(1)+"%", x1+4, cy+3.5);
+  });
 }
 
 // ================= automatic plan builder =================
