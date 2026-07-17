@@ -2162,7 +2162,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi] || (rot[xi]!=null && !rotKeep.has(xi) ? rot[xi] : e.n); }
-let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, age:null, meTileOrder:null, theme:"auto", restSec:90, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{}, baseActivity:null };
+let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, age:null, exp:null, meTileOrder:null, theme:"auto", restSec:90, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{}, baseActivity:null };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -2964,6 +2964,7 @@ function ffmiCat(ffmi, sex){
 }
 function renderCalc(now){
   document.querySelectorAll("#sexSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.sex===settings.sex));
+  document.querySelectorAll("#expSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.exp===settings.exp));
   const box=$("calcRows"); if(!box) return;
   const h=settings.heightCm, bf=settings.bodyfatPct, rows=[];
   if(now!=null && h){
@@ -3882,6 +3883,7 @@ $("bodySave").onclick=async()=>{
   await sset("settings",settings); renderDash(); toast("Body details saved");
 };
 document.querySelectorAll("#sexSeg .s").forEach(s=> s.onclick=async()=>{ settings.sex=s.dataset.sex; await sset("settings",settings); renderDash(); });
+document.querySelectorAll("#expSeg .s").forEach(s=> s.onclick=async()=>{ settings.exp=s.dataset.exp; await sset("settings",settings); renderDash(); });
 $("nameIn").onchange=async()=>{ settings.name=$("nameIn").value.trim().slice(0,24); await sset("settings",settings); };
 
 function renderPlanList(){
@@ -6098,9 +6100,11 @@ function growthForecast(){
   // Overload factor a muscle earns from its own recent trend: building → full, flat → maintenance, easing → less.
   const paceOv=g=>{ const t=trendOf(g); if(t==null) return 0.5; if(t>=1.08) return 1.0; if(t>=0.92) return 0.5;
     return Math.max(0,(t-0.6)/0.32*0.5); };
-  // training-age base weekly rate (%/wk at full stimulus), from lifetime sessions
+  // base weekly rate (%/wk at full stimulus). Prefer the lifter's stated experience; otherwise infer it
+  // from lifetime logged sessions (newer lifters gain faster — Damas 2016).
   const sess=settings.sessions||0;
-  const baseRate = sess<40 ? 0.9 : sess<150 ? 0.9-(sess-40)/110*0.5 : Math.max(0.25, 0.4-(sess-150)/500*0.15);
+  const baseRate = settings.exp==="beginner" ? 0.9 : settings.exp==="intermediate" ? 0.5 : settings.exp==="advanced" ? 0.28
+    : sess<40 ? 0.9 : sess<150 ? 0.9-(sess-40)/110*0.5 : Math.max(0.25, 0.4-(sess-150)/500*0.15);
   // age and sex factors. Age: hypertrophy attenuates with age (Peterson 2011), ~1.0 to ~30 then declining.
   // Sex: relative hypertrophy is comparable between sexes (Roberts 2020), so the %-gain factor is ~1 for both
   // (sex is collected mainly for absolute-mass context). Both feed the same MC as multipliers.
@@ -6154,7 +6158,7 @@ function growthForecast(){
 }
 function drawForecast(f){
   const c=$("fcChart"); if(!c||!f) return;
-  const sub=$("fcSub"); if(sub) sub.textContent="projected muscle gain across "+f.n+" muscles · Monte Carlo, 500 runs";
+  const sub=$("fcSub"); if(sub) sub.textContent="projected muscle gain over the next "+f.ahead+" weeks · "+f.n+" muscles";
   const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const cs=getComputedStyle(document.documentElement);
   const l3=(cs.getPropertyValue('--l3')||'#888').trim();
@@ -6205,6 +6209,16 @@ function drawForecastSens(f){
     ctx.fillStyle=l3; ctx.textAlign="right"; ctx.font="11px -apple-system,system-ui,sans-serif"; ctx.fillText(r.label, padL-8, cy+4);
     ctx.fillStyle=ink; ctx.textAlign="left"; ctx.font="10px -apple-system,system-ui,sans-serif"; ctx.fillText(r.hi.toFixed(1)+"%", x1+4, cy+3.5);
   });
+  // actionable read-out: the biggest swing among the levers the lifter can actually change
+  const ACT={ effort:"push a little closer to failure on your hard sets",
+              progression:"add a rep or a bit of load most weeks",
+              "volume ±3":"add ~2–3 weekly sets to your lagging muscles" };
+  const top=f.sens.map(s=>({label:s.label, sw:Math.abs(s.hi-s.lo), act:ACT[s.label]}))
+                  .filter(s=>s.act).sort((a,b)=>b.sw-a.sw)[0];
+  const cap=$("fcSensCap");
+  if(cap) cap.textContent = top
+    ? "Each bar is how far the "+f.ahead+"-week gain swings when one input goes low→high. Biggest lever you control: "+top.label.replace(" ±3","")+" — "+top.act+"."
+    : "Each bar is how far the "+f.ahead+"-week gain swings when one input goes low→high.";
 }
 // per-muscle projected 16-week gain, one bar per muscle in its app colour (negative = below maintenance)
 function drawForecastMuscles(f, which){

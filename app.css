@@ -93,6 +93,7 @@
   .sexseg{ display:flex; background:var(--segtrack); border-radius:8px; padding:2px; }
   .sexseg .s{ padding:8px 16px; font-size:13px; font-weight:600; color:var(--l2); border-radius:8px; cursor:pointer; transition:background .15s,color .15s; }
   .sexseg .s.active{ background:var(--segthumb); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.12); }
+  #expSeg .s{ padding:8px 12px; }   /* three segments — a touch tighter so New/Some/Years fit the row */
   .calcnote{ font-size:12px; color:var(--l2); line-height:1.5; padding:12px 2px 2px; }
   .calcap{ font-size:12px; color:var(--l2); line-height:1.45; margin:2px 0 12px; }
   .caldow{ display:grid; grid-template-columns:repeat(7,30px); gap:6px; justify-content:center; margin-bottom:8px; }

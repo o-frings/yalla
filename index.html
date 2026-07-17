@@ -274,10 +274,10 @@
           <div class="growth" id="musGrowth" style="display:none;"></div>
         </details>
         <details class="fcdetails">
-          <summary>What moves this &amp; how it's estimated</summary>
-          <div class="fchd2">Swing in 16-week gain across key inputs</div>
+          <summary>What would move this most</summary>
           <canvas id="fcTornado" width="760" height="190"></canvas>
-          <p class="fcnote">A Monte Carlo simulation of muscle gain over the next 16 weeks — 500 runs with literature-backed parameters (dose, effort, progressive overload, your age and training experience, and individual variability) — if you keep to this plan versus your current pace and rate of progress. The shaded band is the 10–90% range, wide mostly because individual response varies a lot between people; the curve can dip below zero if training falls under maintenance. Add your age and sex under body details to personalise it. An estimate with real uncertainty, not a promise.</p>
+          <p class="fcnote" id="fcSensCap"></p>
+          <p class="fcnote">500-run Monte Carlo with literature-backed parameters — dose, effort, progressive overload, your age, sex and experience, and how differently people respond. The band is the 10–90% range, wide mostly because individual response varies a lot; it can dip below zero if training falls under maintenance. Set your age, sex and experience under Profile to personalise it. An estimate with real uncertainty, not a promise.</p>
         </details>
       </div>
       <!-- Progress (logged history) -->
@@ -397,6 +397,14 @@
         <div class="merow">
           <label>Age</label>
           <div class="meinput"><input id="ageIn" type="number" inputmode="numeric" placeholder="—"><span class="unit">yrs</span></div>
+        </div>
+        <div class="merow">
+          <label>Lifting experience</label>
+          <div class="sexseg" id="expSeg">
+            <div class="s" data-exp="beginner">New</div>
+            <div class="s" data-exp="intermediate">Some</div>
+            <div class="s" data-exp="advanced">Years</div>
+          </div>
         </div>
         <div class="merow">
           <label>Height</label>
