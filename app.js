@@ -2660,6 +2660,7 @@ function studyUrl(k){ const s=EVIDENCE.studies[k]; if(!s) return null; return s.
 function citeHTML(k){ const s=EVIDENCE.studies[k]; if(!s) return "";
   const t = esc(s.title||"");
   let h = esc(s.authors||"") + " (" + (s.year||"") + "). " + t + (/[?!.]$/.test(t)?" ":". ") + "<i>" + esc(s.journal||"") + "</i>.";
+  if(s.grade) h += ' <span class="egrade eg-'+esc(s.grade.toLowerCase())+'">'+esc(s.grade)+' evidence</span>';
   if(s.note) h += ' <span>— ' + esc(s.note) + '</span>';
   return h; }
 // short citation label, e.g. "Schoenfeld et al. 2017", from a study record
@@ -3126,7 +3127,14 @@ function growthStatus(){
       if(trend!==null && trend >= 1.15 && sets >= WEEKLY_SET_MIN-1){ state="grow"; why="climbing toward a growth dose"; }
       else { state="hold"; why="around maintenance volume — enough to hold size, under the ~"+WEEKLY_SET_MIN+"–"+WEEKLY_SET_TARGET+" sets that drive growth"; }
     }
-    per.push({g, state, sets, trend, why});
+    // Uncertainty: flag a muscle as borderline when its dose or trend sits within input-noise range of a
+    // decision boundary (fractional-set noise ~1 set; trend noise ~0.06), so a near-miss isn't shown as a
+    // crisp verdict. stim = fraction of attainable growth stimulus at this dose (continuous backbone).
+    const stim = doseStimulus(sets);
+    const near=(a,b,d)=>Math.abs(a-b)<d;
+    const borderline = near(sets,WEEKLY_SET_MAINT,1) || near(sets,WEEKLY_SET_MIN,1)
+      || (trend!==null && (near(trend,0.75,0.06) || near(trend,0.92,0.06) || near(trend,1.08,0.06)));
+    per.push({g, state, sets, trend, why, stim, borderline});
   });
   const rank={shrink:0, hold:1, grow:2};               // surface what needs attention first
   per.sort((a,b)=> rank[a.state]-rank[b.state] || b.sets-a.sets);
@@ -3155,8 +3163,11 @@ function renderGrowth(){
   let h='<div class="ghead"><span class="gdot '+r.combined.state+'"></span><span class="gtitle">'+esc(GST_HEAD[r.combined.state]||"Growth signal")+'</span></div>';
   h+='<p class="gsub">'+esc(r.combined.msg)+'</p>';
   if(r.per.length && r.combined.state!=="more"){
-    h+='<div class="grid">'+r.per.map(p=>'<span class="gchip '+p.state+'" title="'+esc(p.g+" · ~"+round1(p.sets)+" sets/wk — "+p.why)+'">'+esc(MSHORT[p.g]||p.g)+' <span class="garrow">'+GST_ARROW[p.state]+'</span></span>').join('')+'</div>';
-    h+='<p class="gsub" style="margin-top:11px;font-size:12px;color:var(--l3);">Per muscle over the last '+PROG_WEEKS+' weeks · ↑ growing · → holding · ↓ under-stimulated. An estimate of training stimulus, not a body measurement.</p>';
+    h+='<div class="grid">'+r.per.map(p=>{
+      const tip=p.g+" · ~"+round1(p.sets)+" sets/wk · ~"+Math.round(p.stim*100)+"% of the growth stimulus"+(p.borderline?" · borderline":"")+" — "+p.why;
+      return '<span class="gchip '+p.state+(p.borderline?" bord":"")+'" title="'+esc(tip)+'">'+esc(MSHORT[p.g]||p.g)+' <span class="garrow">'+GST_ARROW[p.state]+'</span>'+(p.borderline?'<span class="gq">~</span>':'')+'</span>';
+    }).join('')+'</div>';
+    h+='<p class="gsub" style="margin-top:11px;font-size:12px;color:var(--l3);">Per muscle over the last '+PROG_WEEKS+' weeks · ↑ growing · → holding · ↓ under-stimulated · ~ borderline. Tap a muscle for its weekly sets and estimated share of the growth stimulus. An estimate of training stimulus, not a body measurement.</p>';
   }
   h+='<p class="gsub" style="margin-top:9px;font-size:12px;"><a class="srclink" href="growth-model-whitepaper.pdf" target="_blank" rel="noopener">How this is calculated — the method &amp; evidence (PDF) ↗</a></p>';
   box.innerHTML=h;
@@ -3582,6 +3593,7 @@ $("saveBtn").onclick=async()=>{
   if(!logged){ toast(freeMode?"Add an exercise and log a set":"Log at least one set first"); return; }
   await sset("lastsets",last);
   await sset("history",hist);
+  _repDenom=null;   // new Max sets may shift the self-calibrated effort denominator
   const mins=Math.round(tmrElapsed()/60);
   if(mins>0){ settings.timeTotal=(settings.timeTotal||0)+mins; }
   session.mins=mins; session.beaten=beaten; session.sub=logged+" exercise"+(logged>1?"s":"");
@@ -4109,6 +4121,18 @@ const WEEKLY_SET_TARGET=10, WEEKLY_SET_MIN=6;
 // declines over weeks of insufficient stimulus (Mujika 2000). We collect no age, so use one conservative
 // floor of ~2 effective sets/wk; under it a previously-trained muscle reads as "under-stimulated / at risk".
 const WEEKLY_SET_MAINT=2;
+// ---- continuous dose–response backbone ----
+// The integer landmarks above discretise a continuous relationship: weekly effective sets → hypertrophy
+// stimulus, graded with diminishing returns (Schoenfeld 2017; Pelland 2026). We model the fraction of the
+// attainable per-muscle growth stimulus at s effective sets/week as a saturating curve, calibrated so the
+// practical target (~10 sets) captures ~80% of what is attainable:
+//     σ(s) = 1 − exp(−s / τ),   τ = TARGET / ln 5 ≈ 6.21
+// The landmarks are then read off this single curve rather than chosen independently:
+//     σ(MV=2) ≈ 0.28,  σ(MEV=6) ≈ 0.62,  σ(TARGET=10) ≈ 0.80,  σ(MAV=20) ≈ 0.96,
+// so MEV is the ~0.6 knee, TARGET the 0.8 point, and MAV the ~0.95 near-plateau. This grounds the
+// thresholds in one meta-analytic function instead of leaving four free parameters.
+const DOSE_TAU = WEEKLY_SET_TARGET / Math.log(5);
+function doseStimulus(sets){ return sets>0 ? 1 - Math.exp(-sets/DOSE_TAU) : 0; }   // fraction 0..1 of attainable growth stimulus
 // ---- effort / proximity-to-failure ----
 // Only sets taken reasonably close to failure drive much growth: hypertrophy scales with proximity to
 // failure and is roughly comparable across ~0–4 reps-in-reserve, dropping off with easier sets
@@ -4612,21 +4636,45 @@ function buildSetRow(i, pv, name){
     +'<span class="prtag">PR</span><span class="eq">=</span><span class="vol'+fill+'" title="'+(fill?'Tap to fill last time':'')+'">'+(pvVol?fmtVol(pvVol):'')+'</span><button class="setdel" aria-label="Remove set">'+ICON.minus+'</button></div>';
 }
 function freeSetRow(i, pv, name){ return buildSetRow(i, pv, name); }
-// Estimate this session's effort (proximity to failure) from the numbers: predict how many reps this
-// load should fail at, using your best-ever set for the lift as the anchor (Epley), then RIR ≈ predicted −
-// done. Returns 0 Easy / 1 Hard / 2 Max, or null when there's no trustworthy signal (no external load, or
-// no prior baseline yet → treated as Hard). It's only a default — one tap on the pill overrides it.
+// Self-calibrated Epley rep denominator. The load–rep relationship w(1+r/K) uses K=30 by default, but K
+// varies by person and lift. A set logged as "Max" (ef===2) is a near-true failure point, so two Max sets
+// of the SAME exercise at different loads pin K: w1(1+r1/K)=w2(1+r2/K) ⇒ K=(w2·r2 − w1·r1)/(w1 − w2). We
+// pool valid within-exercise pairs across the log, take the median, clamp to a sane range, and fall back to
+// 30 when there isn't enough failure data. This grounds the effort model in the user's own data.
+let _repDenom=null;   // memoised; invalidated on save (see saveBtn)
+function effortRepDenom(){
+  if(_repDenom!=null) return _repDenom;
+  const ks=[];
+  Object.keys(hist).forEach(name=>{
+    if(isTimed(name) || isBW(name)) return;
+    const mx=(hist[name]||[]).filter(e=>e.ef===2 && (parseFloat(e.w)||0)>0 && (parseInt(e.r)||0)>0)
+      .map(e=>({w:parseFloat(e.w), r:parseInt(e.r)}));
+    for(let i=0;i<mx.length;i++) for(let j=i+1;j<mx.length;j++){
+      const a=mx[i], b=mx[j]; if(a.w===b.w) continue;
+      const k=(b.w*b.r - a.w*a.r)/(a.w - b.w);
+      if(k>=15 && k<=50) ks.push(k);            // discard implausible fits (bad reps, warm-up mislabels)
+    }
+  });
+  ks.sort((x,y)=>x-y);
+  _repDenom = ks.length ? Math.max(20, Math.min(40, ks[Math.floor(ks.length/2)])) : 30;
+  return _repDenom;
+}
+// Estimate this session's effort (proximity to failure) from the numbers: predict how many reps this load
+// should fail at, using your best-ever set for the lift as the anchor and a self-calibrated Epley denominator
+// (effortRepDenom), then RIR ≈ predicted − done. Returns 0 Easy / 1 Hard / 2 Max, or null when there's no
+// trustworthy signal (no external load, or no prior baseline yet → treated as Hard). A tap on the pill overrides it.
 function inferEffort(name, g){
   if(isTimed(name) || isBW(name)) return null;                 // no external-load model for holds/bodyweight
+  const K=effortRepDenom();
   const h=hist[name]||[]; let anchor=0;                         // best e1RM from PRIOR sessions (excludes this one)
-  h.forEach(e=>{ const w=parseFloat(e.w)||0, r=parseInt(e.r)||0; if(w>0&&r>0){ const x=w*(1+r/30); if(x>anchor) anchor=x; } });
+  h.forEach(e=>{ const w=parseFloat(e.w)||0, r=parseInt(e.r)||0; if(w>0&&r>0){ const x=w*(1+r/K); if(x>anchor) anchor=x; } });
   if(anchor<=0) return null;                                    // first time on this lift → no baseline → Hard
   let bw=0, br=0, be=0;                                         // this session's hardest set (highest e1RM among filled rows)
   (g?g.querySelectorAll(".setrow"):[]).forEach(row=>{
     const w=parseFloat(row.querySelector(".w").value)||0, r=parseInt(row.querySelector(".r").value)||0;
-    if(w>0&&r>0){ const x=w*(1+r/30); if(x>be){ be=x; bw=w; br=r; } } });
+    if(w>0&&r>0){ const x=w*(1+r/K); if(x>be){ be=x; bw=w; br=r; } } });
   if(be<=0) return null;                                        // nothing logged yet → keep the current default
-  const rir = 30*(anchor/bw - 1) - br;                          // predicted reps-to-failure at this load, minus reps done
+  const rir = K*(anchor/bw - 1) - br;                          // predicted reps-to-failure at this load, minus reps done
   if(rir <= 1) return 2;                                        // 0–1 in reserve → Max
   if(rir >= 4) return 0;                                        // ~4+ in reserve → Easy
   return 1;                                                     // Hard
