@@ -621,7 +621,7 @@ function muscleVolume(days, metric, volMode){
       if(e.d>=cutoff){
         let amt;
         if(metric==="vol") amt = effVolume(name, e, volMode);
-        else amt = (e.n!=null) ? e.n : 1;
+        else amt = ((e.n!=null) ? e.n : 1) * effortOf(e);   // effort-weighted: easy sets count as half
         byEx[name]=(byEx[name]||0)+amt;
         groups.forEach((g,i)=> totals[g]=(totals[g]||0)+(i===0?amt:amt*0.5));
       }
@@ -2591,7 +2591,7 @@ function openRingsDetail(){ renderRingsDetail(); openSheet("Rings"); }
 function renderRingsDetail(){
   const box=$("ringsBody"); if(!box) return;
   const cut=Date.now()-7*86400000; let setsWk=0; const musWk=new Set();
-  Object.keys(hist).forEach(n=>{ const gs=muscleFor(n); (hist[n]||[]).forEach(e=>{ if(e.d>=cut){ setsWk+=(e.n||0); gs.forEach(g=>{ if(MGROUPS.indexOf(g)>=0) musWk.add(g); }); } }); });
+  Object.keys(hist).forEach(n=>{ const gs=muscleFor(n); (hist[n]||[]).forEach(e=>{ if(e.d>=cut){ setsWk+=(e.n||0)*effortOf(e); gs.forEach(g=>{ if(MGROUPS.indexOf(g)>=0) musWk.add(g); }); } }); });
   const f7=sessionCredit(7), sessTarget=Math.max(2,Math.min(5,planSessionsPerWeek(activePlan())||3)), setsTarget=Math.max(20,sessTarget*18);
   let h="";
   h+=ringRow("#ff6b3d","Sessions",f7,sessTarget,"Session-equivalents this week — a short session counts in proportion to the work done, so a couple of micro sessions add up to a full one. Aim for "+sessTarget+" to match your plan.",null,true);
@@ -2784,7 +2784,7 @@ function renderOverview(){
   let ovRings=null;
   if(Object.keys(hist).length || cardioList().length){
     const cut=Date.now()-7*86400000; let setsWk=0; const musWk=new Set();
-    Object.keys(hist).forEach(n=>{ const gs=muscleFor(n); (hist[n]||[]).forEach(e=>{ if(e.d>=cut){ setsWk+=(e.n||0); gs.forEach(g=>{ if(MGROUPS.indexOf(g)>=0) musWk.add(g); }); } }); });
+    Object.keys(hist).forEach(n=>{ const gs=muscleFor(n); (hist[n]||[]).forEach(e=>{ if(e.d>=cut){ setsWk+=(e.n||0)*effortOf(e); gs.forEach(g=>{ if(MGROUPS.indexOf(g)>=0) musWk.add(g); }); } }); });
     const sessTarget=Math.max(2,Math.min(5,planSessionsPerWeek(activePlan())||3)), setsTarget=Math.max(20,sessTarget*18);
     ovRings=[ {label:"Sessions", val:f7, target:sessTarget, color:"#ff6b3d"},
               {label:"Hard sets", val:setsWk, target:setsTarget, color:"#4dabf7"},
@@ -3018,7 +3018,7 @@ function progWeeklyData(metric){
     return out;
   }
   // volume (kg) or sets
-  Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ const i=idx(e.d); if(i>=0) out[i]+= metric==="sets" ? (e.n||0) : (e.v||0); }));
+  Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ const i=idx(e.d); if(i>=0) out[i]+= metric==="sets" ? ((e.n||0)*effortOf(e)) : (e.v||0); }));
   return out;
 }
 const PROG_LABELS={ volume:"Weekly volume", sets:"Weekly hard sets", sessions:"Sessions per week", weight:"Avg body weight", prs:"New PRs per week" };
@@ -3071,39 +3071,56 @@ function progMuscleWeekly(metric){
   const series={}; MGROUPS.forEach(g=> series[g]=new Array(N).fill(0));
   Object.keys(hist).forEach(name=>{ const groups=muscleFor(name);
     (hist[name]||[]).forEach(e=>{ const i=idx(e.d); if(i<0) return;
-      const amt = metric==="vol" ? effVolume(name,e,"total") : (e.n!=null?e.n:1);
+      const amt = metric==="vol" ? effVolume(name,e,"total") : ((e.n!=null?e.n:1) * effortOf(e));
       groups.forEach((g,gi)=>{ if(series[g]) series[g][i]+= gi===0?amt:amt*0.5; }); });
   });
   return series;
 }
+// per-muscle weekly best estimated 1RM (Epley: w·(1+r/30)), attributed to the PRIMARY muscle only.
+// Load progression is exercise-specific, so this tracks "are the lifts for this muscle getting heavier?"
+// — the other half of progressive overload alongside added sets/reps (Plotkin 2022).
+function progMuscleLoad(){
+  const wkMs=7*86400000, now=Date.now(), N=PROG_WEEKS;
+  const idx=d=>{ const k=Math.floor((now-d)/wkMs); return (k>=0 && k<N) ? (N-1-k) : -1; };
+  const series={}; MGROUPS.forEach(g=> series[g]=new Array(N).fill(0));
+  Object.keys(hist).forEach(name=>{ const g=muscleFor(name)[0]; if(!g||!series[g]) return;
+    (hist[name]||[]).forEach(e=>{ const i=idx(e.d); if(i<0) return;
+      const w=parseFloat(e.w)||0, r=parseInt(e.r)||0; if(w<=0||r<=0) return;   // bodyweight/timed carry no external-load signal
+      const e1rm=w*(1+r/30); if(e1rm>series[g][i]) series[g][i]=e1rm; }); });
+  return series;
+}
 // ===== Growth signal: is each muscle (and the body overall) being trained enough to grow, hold, or lose size? =====
 // Two evidence-based axes, combined per muscle:
-//   DOSE  — recent weekly sets vs landmarks. Growth needs ~6–10+ fractional sets/muscle/wk (sch17, drr, rpvol);
-//           size is merely *maintained* on as little as ~1/3 of that (bickel); below maintenance, fibres atrophy
-//           within weeks (mujika).
-//   TREND — recent vs earlier weekly *volume* (load×reps×sets). Hypertrophy requires progressive overload
-//           (sch10); it can come from more load OR more reps, so volume — not load alone — is the signal (plotkin).
+//   DOSE  — recent weekly *effort-weighted* sets vs landmarks. Growth needs ~6–10+ fractional sets/muscle/wk
+//           (sch17, drr, rpvol), and only sets taken near failure count fully — easy sets are halved
+//           (robinson/refalo). Size is *maintained* on very little (bickel); under that, it slowly declines (mujika).
+//   TREND — progressive overload, which can come from more effective sets OR heavier load (plotkin, sch10). We
+//           take the better of two ratios: recent-vs-earlier effort-weighted sets, and recent-vs-earlier best
+//           estimated 1RM. So adding weight while dropping reps still reads as progress, not a decline.
 // Output is an estimate of the TRAINING STIMULUS, not measured muscle size — the app can't see your body.
 function growthStatus(){
-  const setsS=progMuscleWeekly("sets"), volS=progMuscleWeekly("vol"), N=PROG_WEEKS;
+  const setsS=progMuscleWeekly("sets"), loadS=progMuscleLoad(), N=PROG_WEEKS;
   const mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
   const recent=a=>mean(a.slice(N-3)), earlier=a=>mean(a.slice(Math.max(0,N-6),N-3));
   let activeWeeks=0; for(let i=0;i<N;i++){ if(MGROUPS.some(g=>setsS[g][i]>0)) activeWeeks++; }
   const per=[];
   MGROUPS.forEach(g=>{
     if(NO_TARGET.has(g) || !setsS[g].some(v=>v>0)) return;   // exempt (Neck) or never trained → not shown
-    const sets=recent(setsS[g]);                       // current weekly-set dose (last-3-week mean)
-    const rv=recent(volS[g]), ev=earlier(volS[g]);
-    const trend = ev>0 ? rv/ev : null;                 // null = no earlier baseline (just started this muscle)
+    const sets=recent(setsS[g]);                       // current effort-weighted weekly-set dose (last-3-week mean)
+    // Progressive overload via EITHER more effective sets OR heavier load — take the better of the two ratios,
+    // so classic strength progression (add weight, drop reps) isn't misread as a decline.
+    const rs=recent(setsS[g]), es=earlier(setsS[g]), tSets = es>0 ? rs/es : null;
+    const rl=recent(loadS[g]), el=earlier(loadS[g]), tLoad = el>0 ? rl/el : null;
+    const trend = (tSets==null && tLoad==null) ? null : Math.max(tSets!=null?tSets:0, tLoad!=null?tLoad:0);
     let state, why;
     if(sets < WEEKLY_SET_MAINT){
       state="shrink"; why = sets<0.5 ? "barely trained lately — below what's needed to keep it"
-                                     : "below maintenance volume — too little to hold size";
+                                     : "under-stimulated — below the volume needed to hold size";
     } else if(trend!==null && trend < 0.75){
-      state="shrink"; why="weekly volume has dropped sharply — progress is at risk";
+      state="shrink"; why="training has eased off sharply — progress is at risk";
     } else if(sets >= WEEKLY_SET_MIN){                  // adequate growth dose
-      if(trend===null || trend >= 1.08){ state="grow"; why="enough volume and still climbing — a growth stimulus"; }
-      else if(trend >= 0.92){ state="hold"; why="plenty of volume but it's been flat — maintaining; add a rep or a little load to push growth"; }
+      if(trend===null || trend >= 1.08){ state="grow"; why="enough hard sets and still building — a growth stimulus"; }
+      else if(trend >= 0.92){ state="hold"; why="plenty of hard sets but it's been flat — maintaining; add a rep or a little load to push growth"; }
       else { state="hold"; why="good volume but easing off — holding for now"; }
     } else {                                            // WEEKLY_SET_MAINT..WEEKLY_SET_MIN: maintenance dose
       if(trend!==null && trend >= 1.15 && sets >= WEEKLY_SET_MIN-1){ state="grow"; why="climbing toward a growth dose"; }
@@ -3120,7 +3137,7 @@ function growthStatus(){
   if(activeWeeks<3 || active===0){
     cstate="more"; cmsg="Log a few weeks of training and this will estimate, per muscle, whether your current training is enough to grow, hold, or slowly lose size.";
   } else if(nShrink>nGrow && nShrink>=Math.ceil(active/3)){
-    cstate="shrink"; cmsg=nShrink+" of "+active+" trained muscles are getting too little to hold size — bump their weekly sets back up before you lose ground.";
+    cstate="shrink"; cmsg=nShrink+" of "+active+" trained muscles are under-stimulated — too little to hold size. Bump their weekly hard sets back up before you lose ground.";
   } else if(nGrow>=Math.max(1,Math.round(active*0.4)) && (trendAll===null || trendAll>=0.95)){
     cstate="grow"; cmsg=nGrow+" of "+active+" trained muscles are getting a growth stimulus"+(nHold?", "+nHold+" holding":"")+(nShrink?", "+nShrink+" slipping":"")+". Keep the progressive overload going.";
   } else {
@@ -3139,7 +3156,7 @@ function renderGrowth(){
   h+='<p class="gsub">'+esc(r.combined.msg)+'</p>';
   if(r.per.length && r.combined.state!=="more"){
     h+='<div class="grid">'+r.per.map(p=>'<span class="gchip '+p.state+'" title="'+esc(p.g+" · ~"+round1(p.sets)+" sets/wk — "+p.why)+'">'+esc(MSHORT[p.g]||p.g)+' <span class="garrow">'+GST_ARROW[p.state]+'</span></span>').join('')+'</div>';
-    h+='<p class="gsub" style="margin-top:11px;font-size:12px;color:var(--l3);">Per muscle over the last '+PROG_WEEKS+' weeks · ↑ growing · → holding · ↓ shrinking. An estimate of training stimulus, not a body measurement.</p>';
+    h+='<p class="gsub" style="margin-top:11px;font-size:12px;color:var(--l3);">Per muscle over the last '+PROG_WEEKS+' weeks · ↑ growing · → holding · ↓ under-stimulated. An estimate of training stimulus, not a body measurement.</p>';
   }
   box.innerHTML=h;
 }
@@ -3387,14 +3404,15 @@ function draftSig(){ return freeMode ? "free" : (activePlan().id + "|" + curWk);
 let _draftTimer=null;
 // snapshot every set row currently on screen so nothing typed is lost on a re-render or reload
 function captureDraft(){
-  const sig=draftSig(), map={};
+  const sig=draftSig(), map={}, efmap={}, efauto={};
   document.querySelectorAll("#exlist .group").forEach(g=>{
     const name=g.dataset.ex; if(!name) return; const arr=[];
     g.querySelectorAll(".setrow").forEach(r=>{ const w=r.querySelector(".w"), rp=r.querySelector(".r"); arr.push({w:w?w.value:"", r:rp?rp.value:""}); });
     map[name]=arr;
+    const bar=g.querySelector(".efbar"); if(bar){ efmap[name]=+bar.dataset.ef; efauto[name]=bar.dataset.auto==="1"?1:0; }
   });
   if(Object.keys(map).length===0) return; // nothing on screen (e.g. mid-unload) — don't clobber a saved draft
-  draft[sig]={ t:Date.now(), s:map };
+  draft[sig]={ t:Date.now(), s:map, ef:efmap, efa:efauto };
   clearTimeout(_draftTimer); _draftTimer=setTimeout(()=>{ sset("draft", draft); }, 350);
   liveTick();   // if broadcasting, stream the latest set to watchers (throttled)
   renderSessionRose();   // keep the bottom-of-page balance rose in step with what's logged
@@ -3416,6 +3434,13 @@ function applyDraft(){
       if(w) w.value=dv.w||""; if(rp) rp.value=dv.r||"";
       if((w&&w.value)||(rp&&rp.value)) updateSetVol(r, name);
     });
+    const bar=g.querySelector(".efbar");
+    if(bar){
+      const manual = d.efa && d.efa[name]===0;
+      bar.dataset.auto = manual ? "0" : "1";
+      if(manual){ const ev=d.ef&&d.ef[name]; if(ev!=null) setEffortSel(bar, +ev); }
+      else refreshAutoEffort(g);   // re-estimate from the restored set values
+    }
   });
 }
 // persist immediately when the app is hidden/closed (iOS may suspend before the debounced save fires)
@@ -3464,7 +3489,8 @@ function renderWorkout(){
       ${metaLine}${meta.show?meta.cue:''}</div>`;
     let rows="";
     for(let i=0;i<e.s;i++){ rows+=buildSetRow(i+1, prev[i], name); }
-    g.innerHTML=head+rows+'<div class="freeadd"><a class="demo addset">'+ICON.plus+'add set</a></div>'; list.appendChild(g);
+    g.innerHTML=head+rows+effortBar(name)+'<div class="freeadd"><a class="demo addset">'+ICON.plus+'add set</a></div>'; list.appendChild(g);
+    wireEffortBar(g);
     g.querySelector(".addset").onclick=()=>{ const n=g.querySelectorAll(".setrow").length+1;
       const tmp=document.createElement("div"); tmp.innerHTML=freeSetRow(n, null, name);
       g.querySelector(".freeadd").insertAdjacentElement("beforebegin", tmp.firstChild); captureDraft(); };
@@ -3518,6 +3544,7 @@ function repeatLastWorkout(){
     const name=g.dataset.ex, prev=name&&last[name]; if(!prev||!prev.length) return;
     g.querySelectorAll(".setrow").forEach((r,i)=>{ const dv=prev[Math.min(i,prev.length-1)]||{}, w=r.querySelector(".w"), rp=r.querySelector(".r");
       if(w) w.value=(dv.w!=null?dv.w:""); if(rp) rp.value=(dv.r!=null?dv.r:""); if((w&&w.value)||(rp&&rp.value)){ updateSetVol(r,name); filled++; } });
+    refreshAutoEffort(g);
   });
   if(filled){ captureDraft(); toast("Filled in last time — tweak any, then Finish"); }
   else toast("No previous numbers to copy yet");
@@ -3535,6 +3562,7 @@ $("saveBtn").onclick=async()=>{
   const session={ name: freeMode?"Free workout":(w?w.name:"Workout"), sub:"", totalVol:0, sets:0, beaten:0, top:null, mtot:{}, exercises:[], date:Date.now() };
   document.querySelectorAll("#exlist .group").forEach(g=>{
     const name=g.dataset.ex, pt=topSet(last[name]), sets=[];
+    const efbar=g.querySelector(".efbar"), ef = efbar ? (+efbar.dataset.ef) : 1;   // 0 easy · 1 hard (default) · 2 max
     g.querySelectorAll(".setrow").forEach(r=>{ const wv=r.querySelector(".w").value.trim(), rv=r.querySelector(".r").value.trim();
       if(rv!=="") sets.push({w:wv,r:rv}); });
     if(sets.length){ logged++; const nt=topSet(sets);
@@ -3547,6 +3575,7 @@ $("saveBtn").onclick=async()=>{
       muscleFor(name).forEach((grp,gi)=> session.mtot[grp]=(session.mtot[grp]||0)+vol*(gi===0?1:0.5));
       session.exercises.push({ name, sets: sets.map(s=>({w:s.w, r:s.r})) });
       const he={d:Date.now(), w:nt.w, r:nt.r, n:sets.length, v:Math.round(vol)}; if(tvCode) he.tv=tvCode;
+      if(ef!==1) he.ef=ef;   // store only non-default effort (Hard=1 is the implied baseline for older logs)
       (hist[name]=hist[name]||[]).push(he); }
   });
   if(!logged){ toast(freeMode?"Add an exercise and log a set":"Log at least one set first"); return; }
@@ -4074,10 +4103,26 @@ let meWindow=7;   // Me-page hero gauge window: 7 (this week) or 30 (this month)
 // lower bound (MEV) below which most trainees under-stimulate growth. One baseline for all groups —
 // real per-muscle landmarks differ, but a single target keeps the read honest and legible.
 const WEEKLY_SET_TARGET=10, WEEKLY_SET_MIN=6;
-// Maintenance volume (MV): size/strength built by a program are held on as little as ~1/3 of the volume
-// that built them (Bickel 2011); below roughly a third of the growth dose, fibres slowly atrophy (Mujika 2000).
-// ~1/3 of the ~10-set target → a 3-set/wk floor; under this, a previously-trained muscle reads as "shrinking".
-const WEEKLY_SET_MAINT=3;
+// Maintenance volume (MV): muscle built by a program is held on very little — as little as ~1/3 of the
+// building volume in older adults and ~1/9 in young trained adults (Bickel 2011); below that, size slowly
+// declines over weeks of insufficient stimulus (Mujika 2000). We collect no age, so use one conservative
+// floor of ~2 effective sets/wk; under it a previously-trained muscle reads as "under-stimulated / at risk".
+const WEEKLY_SET_MAINT=2;
+// ---- effort / proximity-to-failure ----
+// Only sets taken reasonably close to failure drive much growth: hypertrophy scales with proximity to
+// failure and is roughly comparable across ~0–4 reps-in-reserve, dropping off with easier sets
+// (Robinson/Pelland 2024 meta-regression; Refalo 2024 RCT). A logged set is credited by how hard it was:
+//   0 Easy (>4 in reserve) → 0.5 of a set · 1 Hard (~1–3 RIR, the default) → 1 · 2 Max (0–1 RIR) → 1.
+// "Max" gets no growth bonus over "Hard" (near-failure ≈ failure for size, and going to failure adds
+// fatigue) but it still shows up in the load/overload trend via the extra reps it buys.
+const EFFORT_FACTOR=[0.5, 1, 1];
+const EFFORT_OPTS=[
+  {lbl:"Easy", tip:"Left a lot in reserve (4+ reps). Counts as half a set toward growth."},
+  {lbl:"Hard", tip:"Pushed close to failure (~1–3 reps in reserve). A full growth set."},
+  {lbl:"Max",  tip:"Took it to failure (0–1 left). Full credit — no extra growth over Hard, just more fatigue."}
+];
+// effort factor for a logged history entry (defaults to Hard=1 for older logs with no effort field)
+function effortOf(e){ const f=e&&e.ef!=null?e.ef:1; return EFFORT_FACTOR[f]!=null?EFFORT_FACTOR[f]:1; }
 // span of the whole log in weeks (for converting "all time" totals to a weekly rate)
 function histSpanWeeks(){
   let lo=Infinity, hi=0;
@@ -4566,6 +4611,50 @@ function buildSetRow(i, pv, name){
     +'<span class="prtag">PR</span><span class="eq">=</span><span class="vol'+fill+'" title="'+(fill?'Tap to fill last time':'')+'">'+(pvVol?fmtVol(pvVol):'')+'</span><button class="setdel" aria-label="Remove set">'+ICON.minus+'</button></div>';
 }
 function freeSetRow(i, pv, name){ return buildSetRow(i, pv, name); }
+// Estimate this session's effort (proximity to failure) from the numbers: predict how many reps this
+// load should fail at, using your best-ever set for the lift as the anchor (Epley), then RIR ≈ predicted −
+// done. Returns 0 Easy / 1 Hard / 2 Max, or null when there's no trustworthy signal (no external load, or
+// no prior baseline yet → treated as Hard). It's only a default — one tap on the pill overrides it.
+function inferEffort(name, g){
+  if(isTimed(name) || isBW(name)) return null;                 // no external-load model for holds/bodyweight
+  const h=hist[name]||[]; let anchor=0;                         // best e1RM from PRIOR sessions (excludes this one)
+  h.forEach(e=>{ const w=parseFloat(e.w)||0, r=parseInt(e.r)||0; if(w>0&&r>0){ const x=w*(1+r/30); if(x>anchor) anchor=x; } });
+  if(anchor<=0) return null;                                    // first time on this lift → no baseline → Hard
+  let bw=0, br=0, be=0;                                         // this session's hardest set (highest e1RM among filled rows)
+  (g?g.querySelectorAll(".setrow"):[]).forEach(row=>{
+    const w=parseFloat(row.querySelector(".w").value)||0, r=parseInt(row.querySelector(".r").value)||0;
+    if(w>0&&r>0){ const x=w*(1+r/30); if(x>be){ be=x; bw=w; br=r; } } });
+  if(be<=0) return null;                                        // nothing logged yet → keep the current default
+  const rir = 30*(anchor/bw - 1) - br;                          // predicted reps-to-failure at this load, minus reps done
+  if(rir <= 1) return 2;                                        // 0–1 in reserve → Max
+  if(rir >= 4) return 0;                                        // ~4+ in reserve → Easy
+  return 1;                                                     // Hard
+}
+// per-exercise effort picker — auto-estimated from your load vs your best (see inferEffort), one tap to
+// override. Starts in "auto" mode (data-auto="1") and re-estimates as you type until you tap it.
+// Timed/hold moves have no meaningful proximity-to-failure, so they skip it (always counted as Hard).
+function effortBar(name){
+  if(isTimed(name)) return '';
+  return '<div class="efbar" data-ef="1" data-auto="1"><span class="eflbl">How hard?</span>'
+    + EFFORT_OPTS.map((o,ix)=>'<button type="button" class="efseg'+(ix===1?' on':'')+'" data-ef="'+ix+'" title="'+esc(o.tip)+'">'+esc(o.lbl)+'</button>').join('')
+    + '</div>';
+}
+function setEffortSel(bar, ef){ bar.dataset.ef=ef; bar.querySelectorAll(".efseg").forEach(s=> s.classList.toggle("on", +s.dataset.ef===ef)); }
+// re-estimate an auto pill from the group's current set inputs; no-op once the user has tapped (manual)
+function refreshAutoEffort(g){
+  const bar=g&&g.querySelector(".efbar"); if(!bar || bar.dataset.auto!=="1") return;
+  const inf=inferEffort(g.dataset.ex, g);
+  setEffortSel(bar, inf==null?1:inf);
+}
+function wireEffortBar(g){
+  const bar=g.querySelector(".efbar"); if(!bar) return;
+  refreshAutoEffort(g);   // seed from any prefilled values
+  bar.querySelectorAll(".efseg").forEach(b=> b.onclick=()=>{
+    bar.dataset.auto="0";   // user took control — stop auto-estimating for this log
+    setEffortSel(bar, +b.dataset.ef);
+    captureDraft();
+  });
+}
 function buildFreeGroup(name){
   const prev=last[name]||[];
   const g=document.createElement("div"); g.className="group"; g.dataset.ex=name;
@@ -4579,7 +4668,8 @@ function buildFreeGroup(name){
     +'<span class="lnks"><a class="lnkic info" data-ex="'+esc(name)+'" title="Info & demo">'+ICON.info+'</a></span>'
     +'<button class="freedel" title="Remove">×</button></div>'
     +metaLine+(meta.show?meta.cue:'')+'</div>'
-    +rows+'<div class="freeadd"><a class="demo addset">'+ICON.plus+'add set</a></div>';
+    +rows+effortBar(name)+'<div class="freeadd"><a class="demo addset">'+ICON.plus+'add set</a></div>';
+  wireEffortBar(g);
   g.querySelector(".freedel").onclick=()=>{ confirmAsk("Remove "+name+"?", "Remove", ()=>{ const sec=g.closest(".secgrp"); g.remove(); if(sec && !sec.querySelector(".group")) sec.remove(); captureDraft(); }); };
   g.querySelector(".addset").onclick=()=>{ const n=g.querySelectorAll(".setrow").length+1;
     const tmp=document.createElement("div"); tmp.innerHTML=freeSetRow(n,null,name);
@@ -4765,7 +4855,7 @@ function removeSetRow(r){
 $("exlist").addEventListener("input", e=>{ if(!e.target.classList||(!e.target.classList.contains("w")&&!e.target.classList.contains("r"))) return;
   if(e.target.classList.contains("w")){ let v=e.target.value.replace(/,/g,".").replace(/[^0-9.]/g,""); const i=v.indexOf("."); if(i>=0) v=v.slice(0,i+1)+v.slice(i+1).replace(/\./g,""); if(v!==e.target.value) e.target.value=v; }
   if(!timer.running && timer.elapsed===0 && e.target.value.trim()!=="") tmrStart();
-  const r=e.target.closest(".setrow"), g=e.target.closest(".group"); if(r&&g) updateSetVol(r, g.dataset.ex); captureDraft(); });
+  const r=e.target.closest(".setrow"), g=e.target.closest(".group"); if(r&&g){ updateSetVol(r, g.dataset.ex); refreshAutoEffort(g); } captureDraft(); });
 function updateSetVol(r, name){
   const wv=r.querySelector(".w").value.trim(), rv=r.querySelector(".r").value.trim(), vEl=r.querySelector(".vol");
   if(rv===""&&wv===""){ const pv=r.dataset.pvol; vEl.textContent=pv?fmtVol(+pv):""; vEl.classList.remove("live"); vEl.classList.toggle("fillable", !!pv && !!(r.dataset.pw||r.dataset.pr)); r.classList.toggle("novol", !pv); setRowPR(r,false); return; }

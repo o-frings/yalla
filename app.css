@@ -1079,6 +1079,13 @@
   .libev.ev-marker{ color:var(--l2); background:var(--row); }
   .libweak{ font-size:11px; font-weight:600; color:#c92a2a; background:#ff6b6b18; border:.5px solid #ff6b6b55; padding:3px 9px; border-radius:999px; }
   #libChips .s{ padding:7px 13px; border-radius:999px; font-size:13px; }
+  /* per-exercise effort picker (proximity to failure) — one tap, remembered from last time */
+  .efbar{ display:flex; align-items:center; gap:8px; padding:12px 20px; border-top:.5px solid var(--sep); }
+  .efbar .eflbl{ font-size:13px; color:var(--l3); font-weight:600; flex:0 0 auto; margin-right:auto; }
+  .efseg{ flex:0 0 auto; border:.5px solid var(--line); background:var(--card); color:var(--l2);
+    font-size:13px; font-weight:650; padding:7px 12px; border-radius:9px; cursor:pointer; transition:transform .12s, background .15s, color .15s, border-color .15s; }
+  .efseg:active{ transform:scale(.93); }
+  .efseg.on{ background:var(--accent-soft); color:var(--accent); border-color:var(--accent); }
   .freeadd{ padding:12px 16px 16px; border-top:.5px solid var(--sep); }
   .addset{ cursor:pointer; font-weight:600; display:inline-flex; align-items:center; gap:3px; padding:8px 8px; margin:-8px -8px; min-height:24px; }
   .exhead .freedel{ color:var(--red); background:none; border:none; font-size:24px; line-height:1; cursor:pointer; padding:8px; margin:-8px -4px; }
