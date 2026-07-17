@@ -117,54 +117,39 @@ Object.keys(PLANS).forEach((p, i) => (regByPlan[p] = simulate(p, "regular", SEED
 const ulRegular = regByPlan["Upper/Lower 4x"];
 const ulIrregular = simulate("Upper/Lower 4x", "irregular", SEED + 99);
 
-// Progressive-overload contrast (didactic): one muscle held at a fixed adequate dose (10 sets/wk) for 16
-// weeks, progressing at a given weekly load rate vs repeating the same loads. Growth realised = ρ(D) gated
-// by how far the trend τ sits in the growth band [0.92, 1.08] — the same rule the app and the in-app
-// forecast use. Same volume in both, so the whole difference is progressive overload.
-function overloadContrast(rate) {
-  const D = 10, mean3 = (a) => a.slice(-3).reduce((x, y) => x + y, 0) / a.slice(-3).length,
-    earl3 = (a) => { const s = a.slice(-6, -3); return s.length ? s.reduce((x, y) => x + y, 0) / s.length : 0; };
-  const S = new Array(N).fill(D), L = new Array(N).fill(100), out = [];
-  for (let t = 1; t <= 16; t++) {
-    S.push(D); L.push(L[L.length - 1] * (1 + rate));
-    const Sw = S.slice(-N), Lw = L.slice(-N);
-    const tS = earl3(Sw) > 0 ? mean3(Sw) / earl3(Sw) : null, tL = earl3(Lw) > 0 ? mean3(Lw) / earl3(Lw) : null;
-    const tau = tS == null && tL == null ? null : Math.max(tS == null ? 0 : tS, tL == null ? 0 : tL);
-    const prog = tau == null ? 1 : Math.max(0, Math.min(1, (tau - 0.92) / (1.08 - 0.92)));
-    out.push(doseStimulus(mean3(Sw)) * prog * 100);
-  }
-  return out;
-}
-const olProg = overloadContrast(0.02), olFlat = overloadContrast(0.0);
 
 // Monte Carlo muscle-gain forecast (mirrors the in-app forecast): each run accumulates a weekly fractional
 // gain baseRate·indiv·ρ(D)·effort·overload·e^(−t/32), with the inter-individual multiplier drawn lognormal
 // to span Hubal 2005's observed range. Plan = 10 sets/wk progressing; current pace = 6 sets/wk stalling.
 // Novice base rate, 500 paired runs; returns 10/50/90th-percentile trajectories.
-function mcForecast(rho, progressing, { baseRate = 0.9, effort = 0.9, ageF = 1, K = 500, W = 16 } = {}) {
+function mcForecast(rho, progressing, { baseRate = 0.9, effort = 0.9, ageF = 1, meanD = 99, K = 500, W = 16 } = {}) {
   let s = 987654321 >>> 0; const u = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
   const nrm = (m, sd) => { const a = Math.max(1e-9, u()); return m + sd * Math.sqrt(-2 * Math.log(a)) * Math.cos(2 * Math.PI * u()); };
   const tr = Array.from({ length: W + 1 }, () => []);
   for (let k = 0; k < K; k++) {
     const indiv = Math.exp(nrm(0, 0.55)), ov = progressing ? 1 : Math.max(0, nrm(0.5, 0.08));
     let C = 0; tr[0].push(0);
-    for (let t = 1; t <= W; t++) { C += baseRate * indiv * ageF * rho * effort * ov * Math.exp(-t / 32); tr[t].push(C); }
+    for (let t = 1; t <= W; t++) {
+      const inc = meanD >= MV
+        ? baseRate * indiv * ageF * rho * effort * ov * Math.exp(-t / 32)   // hypertrophy
+        : -0.4 * indiv * (1 - meanD / MV);                                   // atrophy below maintenance
+      C += inc; tr[t].push(C);
+    }
   }
   const q = (a, p) => { const b = a.slice().sort((x, y) => x - y); return b[Math.floor(p * (b.length - 1))]; };
   return { p10: tr.map((a) => q(a, 0.1)), p50: tr.map((a) => q(a, 0.5)), p90: tr.map((a) => q(a, 0.9)) };
 }
-const mcPlan = mcForecast(doseStimulus(10), true), mcPace = mcForecast(doseStimulus(6), false);
+// Training regimes over 24 weeks (novice), MC gain: adequate volume progressing / no progression /
+// irregular (~55% of sessions) / below maintenance. Same volume in the first two, so their gap is overload.
+const RW = 24;
+const rgProg = mcForecast(doseStimulus(10), true, { meanD: 10, W: RW });
+const rgFlat = mcForecast(doseStimulus(10), false, { meanD: 10, W: RW });
+const rgIrr = mcForecast(doseStimulus(5.5), false, { meanD: 5.5, W: RW });
+const rgLoss = mcForecast(doseStimulus(1.5), false, { meanD: 1.5, W: RW });
+// Plan comparison, MC gain: each plan's mean weekly effective sets across the nine muscles.
+const planMeanDose = (name) => { const wk = {}; MUSCLES.forEach((m) => (wk[m] = 0)); PLANS[name].forEach((s) => Object.keys(s).forEach((m) => (wk[m] += s[m]))); return MUSCLES.reduce((a, m) => a + wk[m], 0) / MUSCLES.length; };
+const planGain = Object.fromEntries(Object.keys(PLANS).map((p) => [p, mcForecast(doseStimulus(planMeanDose(p)), true, { meanD: planMeanDose(p), W: RW })]));
 
-// MC bands across execution seeds: rerun a scenario K times (varying only the random adherence/execution
-// noise) and take per-week percentiles of the mean stimulus. Regular runs are tight; irregular is wide.
-function mcBands(planName, schedule, K = 80) {
-  const runs = []; for (let k = 0; k < K; k++) runs.push(simulate(planName, schedule, SEED + 1000 + k));
-  const qq = (arr, p) => { const a = arr.slice().sort((x, y) => x - y); return a[Math.floor(p * (a.length - 1))]; };
-  const pct = (p) => Array.from({ length: WEEKS }, (_, t) => qq(runs.map((r) => r[t].meanStim * 100), p));
-  return { lo: pct(0.1), mid: pct(0.5), hi: pct(0.9) };
-}
-const bReg = mcBands("Upper/Lower 4x", "regular"), bIrr = mcBands("Upper/Lower 4x", "irregular");
-const bPlans = Object.fromEntries(Object.keys(PLANS).map((p) => [p, mcBands(p, "regular")]));
 
 // Sensitivity: week-16 median gain when each key parameter is swung low↔high (novice plan baseline).
 const ageFor = (a) => (a > 30 ? Math.max(0.5, 1 - (a - 30) * 0.008) : 1);
@@ -191,9 +176,6 @@ Object.keys(PLANS).forEach((p) => {
 console.log("\nUpper/Lower — regular vs irregular (~55% of sessions):");
 console.log(`  regular    growing ${growWeeks(ulRegular)} muscle-weeks · under ${underWeeks(ulRegular)} · mean stimulus ${meanStimAll(ulRegular).toFixed(0)}%`);
 console.log(`  irregular  growing ${growWeeks(ulIrregular)} muscle-weeks · under ${underWeeks(ulIrregular)} · mean stimulus ${meanStimAll(ulIrregular).toFixed(0)}%`);
-console.log("\nProgressive overload — one muscle, fixed 10 sets/wk, week-16 growth realised:");
-console.log(`  progressing (+2%/wk load)  ${olProg[olProg.length - 1].toFixed(0)}%`);
-console.log(`  same loads repeated        ${olFlat[olFlat.length - 1].toFixed(0)}%  (identical volume; the difference is overload)`);
 
 // ================= SVG chart helpers =================
 const W = 760, H = 300, PAD = { l: 46, r: 96, t: 18, b: 34 };
@@ -358,27 +340,21 @@ console.log("\nWrote research/simulations.html");
 
 // ---- pgfplots data files for the white paper (headers + one row per week) ----
 const dat = (header, rows) => header + "\n" + rows.map((r) => r.map((v) => (typeof v === "number" ? +v.toFixed(2) : v)).join(" ")).join("\n") + "\n";
-const wk1 = (t) => t + 1;
-writeFileSync(new URL("./sim-ul.dat", import.meta.url),
-  dat("week regLo regMid regHi irrLo irrMid irrHi",
-    bReg.mid.map((_, t) => [wk1(t), bReg.lo[t], bReg.mid[t], bReg.hi[t], bIrr.lo[t], bIrr.mid[t], bIrr.hi[t]])));
-writeFileSync(new URL("./sim-muscles.dat", import.meta.url),
-  dat("week " + trackMus.join(" "),
-    ulRegular.map((w, t) => [wk1(t), ...trackMus.map((m) => w.per[m].stim * 100)])));
 const planKeys = Object.keys(PLANS);
-writeFileSync(new URL("./sim-plans.dat", import.meta.url),
+writeFileSync(new URL("./sim-regimes.dat", import.meta.url),
+  dat("week progLo progMid progHi flatLo flatMid flatHi irrLo irrMid irrHi lossLo lossMid lossHi",
+    rgProg.p50.map((_, t) => [t,
+      rgProg.p10[t], rgProg.p50[t], rgProg.p90[t], rgFlat.p10[t], rgFlat.p50[t], rgFlat.p90[t],
+      rgIrr.p10[t], rgIrr.p50[t], rgIrr.p90[t], rgLoss.p10[t], rgLoss.p50[t], rgLoss.p90[t]])));
+writeFileSync(new URL("./sim-plangain.dat", import.meta.url),
   dat("week fbLo fbMid fbHi ulLo ulMid ulHi pplLo pplMid pplHi",
-    bPlans[planKeys[0]].mid.map((_, t) => [wk1(t),
-      bPlans[planKeys[0]].lo[t], bPlans[planKeys[0]].mid[t], bPlans[planKeys[0]].hi[t],
-      bPlans[planKeys[1]].lo[t], bPlans[planKeys[1]].mid[t], bPlans[planKeys[1]].hi[t],
-      bPlans[planKeys[2]].lo[t], bPlans[planKeys[2]].mid[t], bPlans[planKeys[2]].hi[t]])));
-writeFileSync(new URL("./sim-overload.dat", import.meta.url),
-  dat("week progressing flat", olProg.map((v, t) => [t + 1, v, olFlat[t]])));
-writeFileSync(new URL("./sim-mc.dat", import.meta.url),
-  dat("week planLo planMid planHi paceLo paceMid paceHi",
-    mcPlan.p10.map((_, t) => [t, mcPlan.p10[t], mcPlan.p50[t], mcPlan.p90[t], mcPace.p10[t], mcPace.p50[t], mcPace.p90[t]])));
+    planGain[planKeys[0]].p50.map((_, t) => [t,
+      planGain[planKeys[0]].p10[t], planGain[planKeys[0]].p50[t], planGain[planKeys[0]].p90[t],
+      planGain[planKeys[1]].p10[t], planGain[planKeys[1]].p50[t], planGain[planKeys[1]].p90[t],
+      planGain[planKeys[2]].p10[t], planGain[planKeys[2]].p50[t], planGain[planKeys[2]].p90[t]])));
 writeFileSync(new URL("./sim-sens.dat", import.meta.url),
   dat("y swing lo hi", sens.map((sv, i) => [i, Math.abs(sv.hi - sv.lo), Math.min(sv.lo, sv.hi), Math.max(sv.lo, sv.hi)])));
-console.log("Wrote sim-ul/muscles/plans/overload/mc/sens.dat");
-console.log("\nSensitivity of 16-wk median gain (baseline " + sBase.toFixed(1) + "%):");
+console.log("Wrote sim-regimes.dat, sim-plangain.dat, sim-sens.dat");
+console.log(`\nRegimes — 24-wk median gain: progressing ${rgProg.p50[RW].toFixed(1)}%, no-overload ${rgFlat.p50[RW].toFixed(1)}%, irregular ${rgIrr.p50[RW].toFixed(1)}%, under-maintenance ${rgLoss.p50[RW].toFixed(1)}%`);
+console.log("Sensitivity of 16-wk median gain (baseline " + sBase.toFixed(1) + "%):");
 sens.forEach((sv) => console.log(`  ${sv.label.padEnd(12)} ${sv.lo.toFixed(1)}% … ${sv.hi.toFixed(1)}%`));

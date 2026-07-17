@@ -17,6 +17,7 @@
 \definecolor{appAccent}{HTML}{E8551C}
 \definecolor{appBlue}{HTML}{4DABF7}
 \definecolor{appViolet}{HTML}{9775FA}
+\definecolor{appRed}{HTML}{E8353B}
 \definecolor{mChest}{HTML}{FF6B6B}
 \definecolor{mBack}{HTML}{4DABF7}
 \definecolor{mQuads}{HTML}{20C997}
@@ -222,86 +223,45 @@ Separately from the history-based signal, the plan forecast projects a plan's \e
 where $s_g$ is prescribed sets per rotation (primary plus half of secondary, as in \eqref{eq:alpha}), $p$ is planned sessions per week, and $W$ is the number of distinct rotation workouts. Each trained muscle is then sorted into under-dosed ($<\MV$), growth window ($\MEV$ to 20), past-productive ($>20$), or maintenance, and the counts drive a plain-language outlook. The forecast promises no centimetres or kilograms; it reports the dose against the growth window and what to change.
 
 \section{Simulations}\label{sec:sims}
-To show the model's behaviour, a lifter executes three standard plans over 24 weeks in a seeded simulation (\texttt{research/simulate.mjs}). Loads progress when a muscle's weekly dose reaches the growth window, hold at a maintenance dose, and drift down below it; the model reads each week from a rolling 10-week window. The plots use the app's own colours. Every number is reproducible: the same seed regenerates the data files these figures read.
-
-Every figure here is a Monte Carlo summary: each scenario is rerun many times over its random execution noise (missed sessions, session-to-session variation), and the plots show the median with a 10--90\% band. Figure~\ref{fig:regirr} contrasts regular execution of the Upper/Lower plan (every session) with an irregular schedule (about 55\% of sessions, at random). Regular execution settles high and steady with a tight band; the irregular schedule sits lower and its band is wide, because how much stimulus a haphazard week delivers depends heavily on which sessions happen to land.
-
-\begin{figure}[t]\centering
-\begin{tikzpicture}\begin{axis}[simaxis, ylabel={mean stimulus (\%)}, ymin=0, ymax=100, legend pos=south east]
-\addplot[draw=none, forget plot, name path=rHi] table[x=week,y=regHi]{research/sim-ul.dat};
-\addplot[draw=none, forget plot, name path=rLo] table[x=week,y=regLo]{research/sim-ul.dat};
-\addplot[appBlue!15, forget plot] fill between[of=rHi and rLo];
-\addplot[draw=none, forget plot, name path=iHi] table[x=week,y=irrHi]{research/sim-ul.dat};
-\addplot[draw=none, forget plot, name path=iLo] table[x=week,y=irrLo]{research/sim-ul.dat};
-\addplot[appAccent!15, forget plot] fill between[of=iHi and iLo];
-\addplot[appBlue] table[x=week,y=regMid]{research/sim-ul.dat}; \addlegendentry{regular}
-\addplot[appAccent] table[x=week,y=irrMid]{research/sim-ul.dat}; \addlegendentry{irregular}
-\end{axis}\end{tikzpicture}
-\caption{Regular (blue) versus irregular (orange) execution of the Upper/Lower plan: mean growth stimulus across nine muscles, median and 10--90\% band over 80 runs. Regular is tight and high; irregular is lower and wide.}\label{fig:regirr}
-\end{figure}
-
-Figure~\ref{fig:muscles} traces five muscles on the Upper/Lower plan under regular execution, each in its app colour. All climb as the rolling window fills; the higher-volume muscles settle higher, the diminishing-returns shape of $\rho$.
-
-\begin{figure}[t]\centering
-\begin{tikzpicture}\begin{axis}[simaxis, ylabel={growth stimulus (\%)}, ymin=0, ymax=100, legend columns=5, legend style={font=\footnotesize, draw=none, fill=none, at={(0.5,1.03)}, anchor=south}]
-\addplot[mChest] table[x=week,y=Chest]{research/sim-muscles.dat}; \addlegendentry{Chest}
-\addplot[mBack] table[x=week,y=Back]{research/sim-muscles.dat}; \addlegendentry{Back}
-\addplot[mQuads] table[x=week,y=Quads]{research/sim-muscles.dat}; \addlegendentry{Quads}
-\addplot[mBiceps] table[x=week,y=Biceps]{research/sim-muscles.dat}; \addlegendentry{Biceps}
-\addplot[mCalves] table[x=week,y=Calves]{research/sim-muscles.dat}; \addlegendentry{Calves}
-\end{axis}\end{tikzpicture}
-\caption{Per-muscle growth stimulus $\rho(D_g)$ on the Upper/Lower plan (regular), each muscle in its app colour.}\label{fig:muscles}
-\end{figure}
-
-Figure~\ref{fig:plans} compares the three plans under regular execution. More weekly volume per muscle lifts the whole-body stimulus, with the gap narrowing as the curve flattens.
-
-\begin{figure}[t]\centering
-\begin{tikzpicture}\begin{axis}[simaxis, ylabel={mean stimulus (\%)}, ymin=0, ymax=100, legend pos=south east]
-\addplot[draw=none, forget plot, name path=fbH] table[x=week,y=fbHi]{research/sim-plans.dat};
-\addplot[draw=none, forget plot, name path=fbL] table[x=week,y=fbLo]{research/sim-plans.dat};
-\addplot[appBlue!12, forget plot] fill between[of=fbH and fbL];
-\addplot[draw=none, forget plot, name path=ulH] table[x=week,y=ulHi]{research/sim-plans.dat};
-\addplot[draw=none, forget plot, name path=ulL] table[x=week,y=ulLo]{research/sim-plans.dat};
-\addplot[appViolet!12, forget plot] fill between[of=ulH and ulL];
-\addplot[draw=none, forget plot, name path=ppH] table[x=week,y=pplHi]{research/sim-plans.dat};
-\addplot[draw=none, forget plot, name path=ppL] table[x=week,y=pplLo]{research/sim-plans.dat};
-\addplot[appAccent!12, forget plot] fill between[of=ppH and ppL];
-\addplot[appBlue] table[x=week,y=fbMid]{research/sim-plans.dat}; \addlegendentry{Full-Body 3x}
-\addplot[appViolet] table[x=week,y=ulMid]{research/sim-plans.dat}; \addlegendentry{Upper/Lower 4x}
-\addplot[appAccent] table[x=week,y=pplMid]{research/sim-plans.dat}; \addlegendentry{Push/Pull/Legs 6x}
-\end{axis}\end{tikzpicture}
-\caption{Mean growth stimulus across nine muscles for three standard plans, each executed regularly: median and 10--90\% band over 80 runs. More weekly volume per muscle lifts the whole-body stimulus, with diminishing returns.}\label{fig:plans}
-\end{figure}
-
-Volume alone is not enough. Loads progress in these runs whenever a muscle's dose reaches the growth window, which is the progressive overload the app recommends; the trend axis is what rewards it. Figure~\ref{fig:overload} isolates that effect: one muscle held at a fixed adequate dose (10 sets/week) for 16 weeks, progressing at 2\% per week versus repeating the same loads. The volume is identical, so the whole gap is progressive overload. Realised growth is $\rho(D)$ scaled by how far the trend sits in the growth band; without added load the trend flattens and growth settles far below its potential. The in-app forecast projects the same two levers forward.
-
-\begin{figure}[t]\centering
-\begin{tikzpicture}\begin{axis}[simaxis, ylabel={growth realised (\%)}, xmax=16, ymin=0, ymax=100, legend pos=south east]
-\addplot[appAccent] table[x=week,y=progressing]{research/sim-overload.dat}; \addlegendentry{progressing (+2\%/wk load)}
-\addplot[appBlue] table[x=week,y=flat]{research/sim-overload.dat}; \addlegendentry{same loads repeated}
-\end{axis}\end{tikzpicture}
-\caption{Progressive overload at a fixed adequate volume (10 sets/week): realised growth when loads climb 2\% per week versus repeating the same loads. Identical volume; the difference is overload.}\label{fig:overload}
-\end{figure}
+The model's behaviour is clearest as projected muscle gain under different training regimes. A seeded, reproducible simulation (\texttt{research/simulate.mjs}) drives the Monte Carlo forecast below forward for each regime, in the app's colours; every number regenerates from the same seed.
 
 \subsection{Monte Carlo forecast}\label{sec:mc}
 A point prediction of muscle gain would overstate what the model knows, so the in-app forecast is probabilistic. Each of 500 runs accumulates a weekly fractional gain
 \begin{equation}\label{eq:mcgain}
 \Delta_t = b \cdot m \cdot \alpha \cdot \rho(D) \cdot \eta \cdot o \cdot e^{-t/32},
 \end{equation}
-where $\rho(D)$ is the dose--response of Section~4~\cite{sch17,drr}, $\eta$ scales with proximity to failure~\cite{failureprox}, $o$ is near 1 while progressing and drops without added load~\cite{plotkin}, $b$ is a training-age base rate~\cite{damas}, $\alpha$ is an age factor that attenuates hypertrophy past about 30~\cite{peterson}, and $m$ is the inter-individual response multiplier, drawn lognormal to span the range Hubal et~al.~\cite{hubal} observed (cross-sectional-area change from about $-2\%$ to $+59\%$). Sex enters as a separate lever but is set near neutral: relative hypertrophy is comparable between sexes~\cite{roberts}, so it informs absolute expectations rather than the percentage gain shown here. Below maintenance the increment turns negative (atrophy~\cite{mujika}), so a starved scenario trends down and the axis extends below zero. The first terms are well constrained by the literature; $b$ is literature-informed with a wide prior, and $m$ is the dominant source of spread, so the bands, not the median, carry the message. Figure~\ref{fig:mc} shows the median and 10--90\% range for the chosen plan against the current pace; the same scenarios drive the forecast in the app.
+where $\rho(D)$ is the dose--response of Section~4~\cite{sch17,drr}, $\eta$ scales with proximity to failure~\cite{failureprox}, $o$ is near 1 while progressing and drops without added load~\cite{plotkin}, $b$ is a training-age base rate~\cite{damas}, $\alpha$ is an age factor that attenuates hypertrophy past about 30~\cite{peterson}, and $m$ is the inter-individual response multiplier, drawn lognormal to span the range Hubal et~al.~\cite{hubal} observed (cross-sectional-area change from about $-2\%$ to $+59\%$). Sex enters as a separate lever but is set near neutral: relative hypertrophy is comparable between sexes~\cite{roberts}, so it informs absolute expectations rather than the percentage gain shown here. Below maintenance the increment turns negative (atrophy~\cite{mujika}), so a starved scenario trends down and the axis extends below zero. The first terms are well constrained by the literature; $b$ is literature-informed with a wide prior, and $m$ is the dominant source of spread, so the bands, not the median, carry the message. Figures~\ref{fig:regimes} and~\ref{fig:plangain} apply this forecast across regimes and plans; the same model drives the plan-versus-pace forecast in the app.
 
 \begin{figure}[t]\centering
-\begin{tikzpicture}\begin{axis}[simaxis, xmax=16, ylabel={projected muscle gain (\%)}, ymin=0, legend pos=north west]
-\addplot[draw=none, forget plot, name path=ppHi] table[x=week,y=planHi]{research/sim-mc.dat};
-\addplot[draw=none, forget plot, name path=ppLo] table[x=week,y=planLo]{research/sim-mc.dat};
-\addplot[appAccent!15, forget plot] fill between[of=ppHi and ppLo];
-\addplot[draw=none, forget plot, name path=qqHi] table[x=week,y=paceHi]{research/sim-mc.dat};
-\addplot[draw=none, forget plot, name path=qqLo] table[x=week,y=paceLo]{research/sim-mc.dat};
-\addplot[appBlue!15, forget plot] fill between[of=qqHi and qqLo];
-\addplot[appAccent, line width=1pt] table[x=week,y=planMid]{research/sim-mc.dat}; \addlegendentry{this plan}
-\addplot[appBlue, line width=1pt] table[x=week,y=paceMid]{research/sim-mc.dat}; \addlegendentry{current pace}
+\begin{tikzpicture}\begin{axis}[simaxis, xmax=24, ymin=-5, ymax=22, ylabel={projected muscle gain (\%)}, legend pos=north west, legend cell align=left]
+\addplot[black!35, forget plot] coordinates {(0,0) (24,0)};
+\addplot[draw=none, forget plot, name path=pgH] table[x=week,y=progHi]{research/sim-regimes.dat};
+\addplot[draw=none, forget plot, name path=pgL] table[x=week,y=progLo]{research/sim-regimes.dat};
+\addplot[appAccent!12, forget plot] fill between[of=pgH and pgL];
+\addplot[draw=none, forget plot, name path=lsH] table[x=week,y=lossHi]{research/sim-regimes.dat};
+\addplot[draw=none, forget plot, name path=lsL] table[x=week,y=lossLo]{research/sim-regimes.dat};
+\addplot[appRed!12, forget plot] fill between[of=lsH and lsL];
+\addplot[appAccent, line width=1pt] table[x=week,y=progMid]{research/sim-regimes.dat}; \addlegendentry{plan, progressing}
+\addplot[appBlue, line width=1pt] table[x=week,y=flatMid]{research/sim-regimes.dat}; \addlegendentry{plan, no overload}
+\addplot[appViolet, line width=1pt] table[x=week,y=irrMid]{research/sim-regimes.dat}; \addlegendentry{irregular ($\sim$55\%)}
+\addplot[appRed, line width=1pt] table[x=week,y=lossMid]{research/sim-regimes.dat}; \addlegendentry{below maintenance}
 \end{axis}\end{tikzpicture}
-\caption{Monte Carlo muscle-gain forecast over 16 weeks (median lines, 10--90\% bands) for a novice: keeping to an adequate, progressing plan versus a lower, stalling current pace. The wide bands are chiefly inter-individual variability~\cite{hubal}.}\label{fig:mc}
+\caption{Projected muscle gain over 24 weeks under four regimes at a novice base rate (median lines; shaded 10--90\% bands on the best and worst). Same volume drives the progressing and no-overload lines, so their gap is progressive overload; below maintenance the median crosses zero (net loss). Bands are chiefly inter-individual variability~\cite{hubal}.}\label{fig:regimes}
+\end{figure}
+
+\begin{figure}[t]\centering
+\begin{tikzpicture}\begin{axis}[simaxis, xmax=24, ymin=0, ylabel={projected muscle gain (\%)}, legend pos=north west, legend cell align=left]
+\addplot[draw=none, forget plot, name path=fH] table[x=week,y=fbHi]{research/sim-plangain.dat};
+\addplot[draw=none, forget plot, name path=fL] table[x=week,y=fbLo]{research/sim-plangain.dat};
+\addplot[appBlue!12, forget plot] fill between[of=fH and fL];
+\addplot[draw=none, forget plot, name path=pH] table[x=week,y=pplHi]{research/sim-plangain.dat};
+\addplot[draw=none, forget plot, name path=pL] table[x=week,y=pplLo]{research/sim-plangain.dat};
+\addplot[appAccent!12, forget plot] fill between[of=pH and pL];
+\addplot[appBlue] table[x=week,y=fbMid]{research/sim-plangain.dat}; \addlegendentry{Full-Body 3x}
+\addplot[appViolet] table[x=week,y=ulMid]{research/sim-plangain.dat}; \addlegendentry{Upper/Lower 4x}
+\addplot[appAccent] table[x=week,y=pplMid]{research/sim-plangain.dat}; \addlegendentry{Push/Pull/Legs 6x}
+\end{axis}\end{tikzpicture}
+\caption{Projected muscle gain for three standard plans, each executed with progressive overload (median, 10--90\% bands). More weekly volume per muscle projects more gain, with diminishing returns and heavily overlapping bands.}\label{fig:plangain}
 \end{figure}
 
 Beyond the individual-response spread, Figure~\ref{fig:sens} shows how the median 16-week gain moves when each input is swung across a plausible range (the app draws the same tornado). Training experience and progression move it most; volume and age move it least over the ranges tested. This is a forecast-level companion to the threshold sensitivity of Section~\ref{sec:verification}.
