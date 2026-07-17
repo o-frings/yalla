@@ -3125,7 +3125,7 @@ function growthStatus(){
       state="shrink"; why = sets<0.5 ? "barely trained lately — below what's needed to keep it"
                                      : "under-stimulated — below the volume needed to hold size";
     } else if(trend!==null && trend < 0.75){
-      state="shrink"; why="training has eased off sharply — progress is at risk";
+      state="hold"; why="above maintenance so size holds, but training has eased off sharply — add sets or load to keep progressing";
     } else if(sets >= WEEKLY_SET_MIN){                  // adequate growth dose
       if(trend===null || trend >= 1.08){ state="grow"; why="enough hard sets and still building — a growth stimulus"; }
       else if(trend >= 0.92){ state="hold"; why="plenty of hard sets but it's been flat — maintaining; add a rep or a little load to push growth"; }
@@ -6025,7 +6025,7 @@ function renderGrowthForecast(){
   _fcF=f;
   drawForecast(f); drawForecastMuscles(f, fcMuscleMode); drawForecastSens(f);
 }
-let fcMuscleMode="plan", _fcF=null;   // per-muscle graph scenario: "plan" or "pace"
+let fcMuscleMode="pace", _fcF=null;   // per-muscle graph scenario: "pace" (default) or "plan"
 (function initFcMuscleToggle(){
   const seg=$("fcMuscleSeg"); if(!seg) return;
   seg.querySelectorAll(".mewintab").forEach(b=> b.onclick=()=>{
@@ -6085,17 +6085,19 @@ function growthForecast(){
   const planWk=planWeeklySets(activePlan());
   const mean3=a=>{ const s=a.slice(-3); return s.length ? s.reduce((x,y)=>x+y,0)/s.length : 0; };
   const earl3=a=>{ const s=a.slice(-6,-3); return s.length ? s.reduce((x,y)=>x+y,0)/s.length : 0; };
-  const rhoMean=doseMap=>{ let r=0; muscles.forEach(g=>r+=doseStimulus(doseMap[g])); return r/muscles.length; };
-  const doseMean=doseMap=>{ let d=0; muscles.forEach(g=>d+=doseMap[g]); return d/muscles.length; };
   const planDose={}, paceDose={};
   muscles.forEach(g=>{ planDose[g]=planWk[g]||0; paceDose[g]=mean3(setsS[g]); });
-  const rhoPlan=rhoMean(planDose), rhoPace=rhoMean(paceDose), dPlan=doseMean(planDose), dPace=doseMean(paceDose);
   // effort efficacy from logged proximity-to-failure (avg effort factor → 0.6..1)
   let ef=0, en=0; Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ ef+=effortOf(e); en++; }));
   const effort = en ? Math.min(1, 0.6+0.4*(ef/en)) : 0.85;
-  // is the lifter currently adding load? (recent vs earlier whole-body e1RM)
-  let rl=0, el=0; muscles.forEach(g=>{ rl+=mean3(loadS[g]); el+=earl3(loadS[g]); });
-  const paceProgressing = el>0 ? (rl/el)>=1.01 : false;
+  // Per-muscle progressive-overload trend (recent vs earlier), the same signal the growth chips read:
+  // the better of effort-weighted-set growth and estimated-1RM growth, so add-weight-drop-reps still counts.
+  const trendOf=g=>{ const tS=earl3(setsS[g])>0?mean3(setsS[g])/earl3(setsS[g]):null,
+                           tL=earl3(loadS[g])>0?mean3(loadS[g])/earl3(loadS[g]):null;
+    return (tS==null&&tL==null)?null:Math.max(tS!=null?tS:0, tL!=null?tL:0); };
+  // Overload factor a muscle earns from its own recent trend: building → full, flat → maintenance, easing → less.
+  const paceOv=g=>{ const t=trendOf(g); if(t==null) return 0.5; if(t>=1.08) return 1.0; if(t>=0.92) return 0.5;
+    return Math.max(0,(t-0.6)/0.32*0.5); };
   // training-age base weekly rate (%/wk at full stimulus), from lifetime sessions
   const sess=settings.sessions||0;
   const baseRate = sess<40 ? 0.9 : sess<150 ? 0.9-(sess-40)/110*0.5 : Math.max(0.25, 0.4-(sess-150)/500*0.15);
@@ -6108,40 +6110,46 @@ function growthForecast(){
   // seeded PRNG so the bands are stable across re-renders; paired draws for a fair plan-vs-pace comparison
   let s=987654321>>>0; const u=()=>((s=(s*1103515245+12345)&0x7fffffff)/0x7fffffff);
   const nrm=(m,sd)=>{ const a=Math.max(1e-9,u()); return m+sd*Math.sqrt(-2*Math.log(a))*Math.cos(2*Math.PI*u()); };
-  const draws=[]; for(let k=0;k<K;k++) draws.push({ indiv:Math.exp(nrm(0,0.55)), ovn:Math.max(0,nrm(0.5,0.08)) });
+  const draws=[]; for(let k=0;k<K;k++) draws.push({ indiv:Math.exp(nrm(0,0.55)) });
   const q=(arr,p)=>{ const a=arr.slice().sort((x,y)=>x-y); return a[Math.floor(p*(a.length-1))]; };
-  // Weekly increment: growth above maintenance, atrophy below it (so a starved scenario trends negative).
-  function bands(p){
+  // One weekly increment per muscle: hypertrophy above maintenance, atrophy below it (starved → negative).
+  const inc=(d,rho,indiv,ov,aF,eff,bR,t)=> d>=WEEKLY_SET_MAINT
+    ? bR*indiv*aF*sexF*rho*eff*ov*Math.exp(-t/32)          // hypertrophy
+    : -0.4*indiv*(1-d/WEEKLY_SET_MAINT);                    // atrophy below maintenance (~0.4%/wk, Mujika)
+  // Whole-body forecast = mean of the per-muscle trajectories, so the chart and the per-muscle bars agree.
+  // ovOf(g) is the per-muscle overload factor (plan: full; pace: each muscle's own trend).
+  function bands(doseMap,o){
+    const ovOf=o.ovOf, eff=o.effort, aF=o.ageF, bR=o.baseRate;
+    const rho={}, ov={}; muscles.forEach(g=>{ rho[g]=doseStimulus(doseMap[g]); ov[g]=ovOf(g); });
     const traj=Array.from({length:AHEAD+1},()=>[]);
-    draws.forEach(dr=>{ const ov=p.progressing?1.0:dr.ovn; let C=0; traj[0].push(0);
-      for(let t=1;t<=AHEAD;t++){
-        const inc = p.meanD>=WEEKLY_SET_MAINT
-          ? p.baseRate*dr.indiv*p.ageF*sexF*p.rho*p.effort*ov*Math.exp(-t/32)   // hypertrophy
-          : -0.4*dr.indiv*(1-p.meanD/WEEKLY_SET_MAINT);                          // atrophy below maintenance (~0.4%/wk, Mujika)
-        C += inc; traj[t].push(C);
+    draws.forEach(dr=>{ let C=0; traj[0].push(0);
+      for(let t=1;t<=AHEAD;t++){ let wk=0;
+        muscles.forEach(g=>{ wk+=inc(doseMap[g],rho[g],dr.indiv,ov[g],aF,eff,bR,t); });
+        C+=wk/muscles.length; traj[t].push(C);
       } });
     return { p10:traj.map(a=>q(a,0.1)), p50:traj.map(a=>q(a,0.5)), p90:traj.map(a=>q(a,0.9)) };
   }
-  const P={ rho:rhoPlan, meanD:dPlan, progressing:true, ageF, effort, baseRate };
-  const plan=bands(P), pace=bands({ rho:rhoPace, meanD:dPace, progressing:paceProgressing, ageF, effort, baseRate });
+  const full=()=>1.0, maint=()=>0.5;
+  const baseOpts={ ovOf:full, effort, ageF, baseRate };
+  const plan=bands(planDose,baseOpts), pace=bands(paceDose,{ ...baseOpts, ovOf:paceOv });
   // sensitivity: week-16 median gain when each key parameter is swung low↔high around the plan baseline
-  const w16=b=>b.p50[AHEAD], rhoAt=d=>doseStimulus(Math.max(0,d)), ageFor=a=>a>30?Math.max(0.5,1-(a-30)*0.008):1;
-  const a0=age||30;
+  const w16=b=>b.p50[AHEAD], ageFor=a=>a>30?Math.max(0.5,1-(a-30)*0.008):1, a0=age||30;
+  const scaled=(dm,delta)=>{ const o={}; muscles.forEach(g=>o[g]=Math.max(0,dm[g]+delta)); return o; };
   const sens=[
-    {label:"effort",       lo:w16(bands({...P,effort:0.6})),                          hi:w16(bands({...P,effort:1.0}))},
-    {label:"progression",  lo:w16(bands({...P,progressing:false})),                    hi:w16(bands({...P,progressing:true}))},
-    {label:"volume ±3",    lo:w16(bands({...P,rho:rhoAt(dPlan-3),meanD:dPlan-3})),      hi:w16(bands({...P,rho:rhoAt(dPlan+3),meanD:dPlan+3}))},
-    {label:"age ±15y",     lo:w16(bands({...P,ageF:ageFor(a0+15)})),                    hi:w16(bands({...P,ageF:ageFor(Math.max(18,a0-15))}))},
-    {label:"experience",   lo:w16(bands({...P,baseRate:0.28})),                         hi:w16(bands({...P,baseRate:0.9}))},
+    {label:"effort",       lo:w16(bands(planDose,{...baseOpts,effort:0.6})),        hi:w16(bands(planDose,{...baseOpts,effort:1.0}))},
+    {label:"progression",  lo:w16(bands(planDose,{...baseOpts,ovOf:maint})),        hi:w16(bands(planDose,{...baseOpts,ovOf:full}))},
+    {label:"volume ±3",    lo:w16(bands(scaled(planDose,-3),baseOpts)),             hi:w16(bands(scaled(planDose,3),baseOpts))},
+    {label:"age ±15y",     lo:w16(bands(planDose,{...baseOpts,ageF:ageFor(a0+15)})),hi:w16(bands(planDose,{...baseOpts,ageF:ageFor(Math.max(18,a0-15))}))},
+    {label:"experience",   lo:w16(bands(planDose,{...baseOpts,baseRate:0.28})),     hi:w16(bands(planDose,{...baseOpts,baseRate:0.9}))},
   ];
-  // per-muscle projected gain (median run: individual=1), for both scenarios — plan volume progressing,
-  // and current pace at the lifter's own dose/progression. A muscle below maintenance trends negative.
-  const permusc=(doseMap, progressing)=> muscles.map(g=>{
-    const d=doseMap[g], rho=doseStimulus(d), ov=progressing?1:0.5; let C=0;
-    for(let t=1;t<=AHEAD;t++){ C += d>=WEEKLY_SET_MAINT ? baseRate*ageF*sexF*rho*effort*ov*Math.exp(-t/32) : -0.4*(1-d/WEEKLY_SET_MAINT); }
+  // per-muscle projected gain — the median run (individual=1) of the SAME per-muscle model the chart averages,
+  // so a muscle's bar and the whole-body line are guaranteed consistent.
+  const permusc=(doseMap, ovOf)=> muscles.map(g=>{
+    const d=doseMap[g], rho=doseStimulus(d), ov=ovOf(g); let C=0;
+    for(let t=1;t<=AHEAD;t++) C+=inc(d,rho,1,ov,ageF,effort,baseRate,t);
     return { g, gain:C };
   }).sort((a,b)=>b.gain-a.gain);
-  const perMuscle = { plan:permusc(planDose,true), pace:permusc(paceDose,paceProgressing) };
+  const perMuscle = { plan:permusc(planDose,full), pace:permusc(paceDose,paceOv) };
   return { plan, pace, ahead:AHEAD, n:muscles.length, base:w16(plan), sens, perMuscle };
 }
 function drawForecast(f){

@@ -11,6 +11,7 @@
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
 \usepgfplotslibrary{fillbetween}
+\usepackage{placeins}
 \usepackage[hidelinks]{hyperref}
 
 % app colours (Yalla): accent, muscle hues (MCOLOR), and the growth-state palette
@@ -61,7 +62,7 @@ The model synthesises several strands of resistance-training research.
 
 \emph{Effort and proximity to failure.} Sets far from failure contribute little; Refalo et~al.~\cite{failureprox} report that hypertrophy improves as sets approach failure, with roughly comparable outcomes across zero to four reps in reserve. Yalla scales each set by an effort factor \eqref{eq:eps} and, because reps in reserve cannot be read from load and reps alone, estimates it by default from the load--rep relationship~\cite{epley} against the lifter's own best set.
 
-\emph{Landmarks, maintenance, and decline.} The MEV/MAV volume-landmark framework popularised by Israetel et~al.~\cite{rpvol} informs the landmark structure, though as a practitioner synthesis it carries the weakest evidence grade here. Bickel et~al.~\cite{bickel} showed that built muscle is retained on a small fraction of the volume that built it, which sets the maintenance floor; Mujika \& Padilla~\cite{mujika} documented the timeline over which an insufficient stimulus leads to loss, which motivates treating a sustained low dose as decline. Plotkin et~al.~\cite{plotkin} found that progressing load or reps drives near-identical growth, which is why the trend axis credits progress from either.
+\emph{Landmarks, maintenance, and decline.} The volume-landmark framework of minimum effective volume (MEV) and maximum adaptive volume (MAV) popularised by Israetel et~al.~\cite{rpvol} informs the landmark structure, though as a practitioner synthesis it carries the weakest evidence grade here. Bickel et~al.~\cite{bickel} showed that built muscle is retained on a small fraction of the volume that built it, which sets the maintenance floor; Mujika \& Padilla~\cite{mujika} documented the timeline over which an insufficient stimulus leads to loss, which motivates treating a sustained low dose as decline. Plotkin et~al.~\cite{plotkin} found that progressing load or reps drives near-identical growth, which is why the trend axis credits progress from either.
 
 \emph{Positioning.} These landmarks and principles are widely used as coaching guidance but are rarely turned into a per-log computed signal. Yalla operationalises them into a transparent, per-muscle estimate with stated uncertainty and a reproducible verification suite (Section~\ref{sec:verification}).
 
@@ -84,7 +85,7 @@ Each exercise contributes to its primary muscle at full weight and to each secon
 The $0.5$ weight for indirect work is the fractional counting scheme that best fit the hypertrophy data in the Pelland et~al.\ dose--response meta-regression~\cite{drr}.
 
 \subsection{Effort weighting}
-Only sets taken reasonably close to failure drive much growth, so each set is scaled by an effort factor $\eps(f)$ before it counts:
+Only sets taken reasonably close to failure drive much growth, so each set is scaled by an effort factor $\eps(f)$ before it counts, where $f\in\{0,1,2\}$ is the entry's effort code:
 \begin{equation}\label{eq:eps}
 \eps(f)=
 \begin{cases}
@@ -98,29 +99,30 @@ Max carries no growth premium over Hard: hypertrophy is comparable across roughl
 \subsection{Weekly effective sets per muscle}
 Time is bucketed into $N=10$ rolling weeks; week index $k=9$ is the current week. The effective weekly sets for muscle $g$ in week $k$ sum every contributing entry:
 \begin{equation}\label{eq:S}
-S_{g,k}=\sum_{e\,\in\,\text{week }k} n_e\,\eps(f_e)\,\alpha(x_e,g).
+S_{g,k}=\sum_{e\,\in\,\text{week }k} n_e\,\eps(f_e)\,\alpha(x_e,g),
 \end{equation}
-This same effort-weighted, fractional count feeds the weekly-sets chart, the balance radar, and the ``hard sets'' ring, so every surface in the app reads consistently.
+where the sum runs over all entries $e$ logged in week $k$, and $n_e$, $f_e$, and $x_e$ are the entry's set count, effort code, and exercise. This same effort-weighted, fractional count feeds the weekly-sets chart, the balance radar, and the ``hard sets'' ring, so every surface in the app reads consistently.
 
 \section{Effort inference}
 Proximity to failure cannot be recovered from load and reps alone: the same $100\,\text{kg}\times 8$ can be an all-out set or an easy one. So effort is a self-report. To keep friction to one optional tap, its default is estimated from the numbers and shown pre-selected; the lifter overrides only when the estimate is wrong.
 
 \subsection{Estimated one-rep max (anchor)}
-Set strength is summarised by the Epley one-rep-max estimate~\cite{epley}, with a rep denominator $K$ (population default $K=30$; Section~\ref{sec:kcal} calibrates it per lifter):
+Set strength is summarised by the Epley one-rep-max (1RM) estimate~\cite{epley}:
 \begin{equation}\label{eq:epley}
-\varphi(w,r)=w\left(1+\frac{r}{K}\right).
+\varphi(w,r)=w\left(1+\frac{r}{K}\right),
 \end{equation}
-The anchor for exercise $x$ is the best estimate over the lifter's \emph{prior} sessions for that exercise (the current, in-progress session is excluded):
+where $w$ is the set's load (kg), $r$ its reps, and $K$ the rep denominator (population default $K=30$; Section~\ref{sec:kcal} calibrates it per lifter). The anchor for exercise $x$ is the best estimate over the lifter's \emph{prior} sessions for that exercise:
 \begin{equation}\label{eq:anchor}
-A_x=\max_{e\,\in\,\mathrm{hist}(x)}\varphi(w_e,r_e).
+A_x=\max_{e\,\in\,\mathrm{hist}(x)}\varphi(w_e,r_e),
 \end{equation}
+where $\mathrm{hist}(x)$ is the set of the lifter's prior logged entries for exercise $x$ (the current, in-progress session is excluded) and $w_e$, $r_e$ are each entry's load and reps.
 
 \subsection{Reps in reserve and classification}
-Inverting \eqref{eq:epley} gives the reps a lifter should complete at load $w$ before failure; subtracting the reps actually done estimates reps in reserve:
+Inverting \eqref{eq:epley} gives the reps a lifter should complete at load $w$ before failure; subtracting the reps actually done estimates the reps in reserve (RIR):
 \begin{equation}\label{eq:rir}
 \rir=K\left(\frac{A_x}{w}-1\right)-r,
 \end{equation}
-evaluated on the session's hardest set for that exercise (the one with the largest $\varphi$). The estimate maps to an effort code:
+where $A_x$ is the anchor \eqref{eq:anchor}, $w$ and $r$ are the load and reps of the set under evaluation, and $K$ is the rep denominator of \eqref{eq:epley}; the estimate is evaluated on the session's hardest set for that exercise (the one with the largest $\varphi$). It maps to an effort code:
 \begin{equation}\label{eq:fmap}
 f=
 \begin{cases}
@@ -134,21 +136,21 @@ The anchor is recomputed on every estimate. Because it rolls, it adapts to deloa
 \subsection{Self-calibrated rep denominator}\label{sec:kcal}
 The denominator $K$ in \eqref{eq:epley} varies by lifter and by lift. A set logged as Max is a near-true failure point, so two Max sets of the same exercise at different loads pin $K$: setting $\varphi$ equal for both, $w_1(1+r_1/K)=w_2(1+r_2/K)$, which solves to
 \begin{equation}\label{eq:kcal}
-K=\frac{w_2 r_2 - w_1 r_1}{w_1 - w_2}.
+K=\frac{w_2 r_2 - w_1 r_1}{w_1 - w_2},
 \end{equation}
-Valid within-exercise pairs are pooled across the whole log, the median is taken and clamped to $[20,40]$, and $K=30$ is used until enough failure data exists. This grounds the effort estimate in the lifter's own data.
+where $(w_1,r_1)$ and $(w_2,r_2)$ are the loads and reps of the two Max sets. Valid within-exercise pairs are pooled across the whole log, the median is taken and clamped to $[20,40]$, and $K=30$ is used until enough failure data exists. This grounds the effort estimate in the lifter's own data.
 
 \section{Volume landmarks}
 Four thresholds, in effective sets per muscle per week, define the dose axis. They follow the $\MEV/\MAV$ framework and the dose--response meta-analyses.
 \begin{center}
-\begin{tabular}{@{}llp{8.2cm}@{}}
+\begin{tabular}{@{}llp{7.6cm}@{}}
 \toprule
 \textbf{Symbol (value)} & \textbf{Name} & \textbf{Meaning}\\
 \midrule
 $\MV$ (2) & Maintenance volume & Floor to hold existing size. Below it, a previously-trained muscle reads as under-stimulated.\\
 $\MEV$ (6) & Minimum effective volume & Lower edge of the productive growth window; at or above it, an adequate dose is present.\\
 target (10) & Practical target & Where most of the dose--response benefit has accrued; the balance-radar goal.\\
-$\MAV$ (20) & Upper productive bound & Beyond it, added sets mostly add fatigue with little further growth.\\
+$\MAV$ (20) & Maximum adaptive volume & Upper productive bound; beyond it, added sets mostly add fatigue with little further growth.\\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -157,18 +159,18 @@ A single set of landmarks is applied to every muscle. Real per-muscle landmarks 
 \subsection{Continuous backbone}
 The four landmarks discretise a continuous relationship~\cite{sch17,drr}. We model the fraction of the attainable per-muscle growth stimulus at $s$ effective sets per week as a saturating curve $\rho(s)$, calibrated so the practical target captures about $80\%$ of what is attainable:
 \begin{equation}\label{eq:doseresp}
-\rho(s)=1-e^{-s/s_0},\qquad s_0=\frac{\text{target}}{\ln 5}\approx 6.21.
+\rho(s)=1-e^{-s/s_0},\qquad s_0=\frac{\text{target}}{\ln 5}\approx 6.21,
 \end{equation}
-The landmarks are read off this single curve: $\rho(\MV)\approx0.28$, $\rho(\MEV)\approx0.62$, $\rho(\text{target})\approx0.80$, and $\rho(\MAV)\approx0.96$. So MEV is the $\approx0.6$ knee, target the $0.8$ point, and MAV the $\approx0.95$ near-plateau. This replaces four independent thresholds with one meta-analytic function; the growth signal also reports $\rho(D_g)$ as a per-muscle share of the attainable growth stimulus.
+where $s$ is the muscle's effective weekly set count and the scale $s_0$ is fixed by requiring $\rho(\text{target})=0.8$ at the practical target of 10 sets. The landmarks are read off this single curve: $\rho(\MV)\approx0.28$, $\rho(\MEV)\approx0.62$, $\rho(\text{target})\approx0.80$, and $\rho(\MAV)\approx0.96$. So MEV is the $\approx0.6$ knee, target the $0.8$ point, and MAV the $\approx0.95$ near-plateau. This replaces four independent thresholds with one meta-analytic function; the growth signal also reports $\rho(D_g)$ as a per-muscle share of the attainable growth stimulus.
 
 \section{Temporal windows}
 Both axes compare a recent window against an earlier one, each a three-week mean over the 10-week series. For any weekly series $X_g$:
 \begin{equation}\label{eq:windows}
 \recent(X_g)=\frac{1}{3}\sum_{k=7}^{9} X_{g,k},
 \qquad
-\earlier(X_g)=\frac{1}{3}\sum_{k=4}^{6} X_{g,k}.
+\earlier(X_g)=\frac{1}{3}\sum_{k=4}^{6} X_{g,k},
 \end{equation}
-The three-week mean smooths single missed or heavy sessions. The recent window is weeks 8--10 (the last three), the earlier window is weeks 5--7; the oldest three weeks provide history for charts but do not enter the comparison. Because the window is recent, the signal responds within about three weeks of a genuine change in training.
+where $X_{g,k}$ is the series value for muscle $g$ in week $k$, with week indices running $k=0,\dots,9$ and $k=9$ the current week. The three-week mean smooths single missed or heavy sessions. The recent window is weeks 8--10 (the last three), the earlier window is weeks 5--7; the oldest three weeks provide history for charts but do not enter the comparison. Because the window is recent, the signal responds within about three weeks of a genuine change in training.
 
 \section{The two axes}
 \subsection{Dose}
@@ -182,9 +184,9 @@ Overload can come from more effective sets or from heavier load; either counts a
 \begin{equation}\label{eq:trends}
 T^{S}_{g}=\frac{\recent(S_g)}{\earlier(S_g)},
 \qquad
-T^{L}_{g}=\frac{\recent(L_g)}{\earlier(L_g)}.
+T^{L}_{g}=\frac{\recent(L_g)}{\earlier(L_g)},
 \end{equation}
-Each ratio is defined only when its earlier window is positive; otherwise it is treated as absent. The combined trend takes the better of the two:
+where $S_g$ is the effective-set series \eqref{eq:S}, $L_g$ the load series just defined, and $\recent$ and $\earlier$ the window means of \eqref{eq:windows}. Each ratio is defined only when its earlier window is positive; otherwise it is treated as absent. The combined trend takes the better of the two:
 \begin{equation}\label{eq:tau}
 \tau_g=\max\!\left(T^{S}_{g},\,T^{L}_{g}\right),
 \end{equation}
@@ -220,7 +222,7 @@ Separately from the history-based signal, the plan forecast projects a plan's \e
 \begin{equation}\label{eq:plan}
 \hat{s}_g = s_g \cdot \min\!\left(1.2,\ \frac{p}{W}\right),
 \end{equation}
-where $s_g$ is prescribed sets per rotation (primary plus half of secondary, as in \eqref{eq:alpha}), $p$ is planned sessions per week, and $W$ is the number of distinct rotation workouts. Each trained muscle is then sorted into under-dosed ($<\MV$), growth window ($\MEV$ to 20), past-productive ($>20$), or maintenance, and the counts drive a plain-language outlook. The forecast promises no centimetres or kilograms; it reports the dose against the growth window and what to change.
+where $\hat{s}_g$ is the forecast weekly sets for muscle $g$, $s_g$ is prescribed sets per rotation (primary plus half of secondary, as in \eqref{eq:alpha}), $p$ is planned sessions per week, and $W$ is the number of distinct rotation workouts. Each trained muscle is then sorted into under-dosed ($<\MV$), growth window ($\MEV$ to 20), past-productive ($>20$), or maintenance, and the counts drive a plain-language outlook. The forecast promises no centimetres or kilograms; it reports the dose against the growth window and what to change.
 
 \section{Simulations}\label{sec:sims}
 The figures that follow project muscle gain under different training regimes from the Monte Carlo forecast defined next. A seeded script (\texttt{research/simulate.mjs}) generates them and reproduces every value on re-run.
@@ -228,13 +230,13 @@ The figures that follow project muscle gain under different training regimes fro
 \subsection{Monte Carlo forecast}\label{sec:mc}
 A point prediction of muscle gain would overstate what the model knows, so the in-app forecast is probabilistic. Each of 500 runs accumulates a weekly fractional gain
 \begin{equation}\label{eq:mcgain}
-\Delta_t = b \cdot m \cdot \alpha \cdot \rho(D) \cdot \eta \cdot o \cdot e^{-t/32},
+\Delta_t = b \cdot m \cdot a \cdot \rho(D) \cdot \eta \cdot o \cdot e^{-t/32},
 \end{equation}
-where $\rho(D)$ is the dose--response of \eqref{eq:doseresp}~\cite{sch17,drr}, $\eta$ scales with proximity to failure~\cite{failureprox}, $o$ is near 1 while progressing and drops without added load~\cite{plotkin}, $b$ is a training-age base rate~\cite{damas}, $\alpha$ is an age factor that attenuates hypertrophy past about 30~\cite{peterson}, and $m$ is the inter-individual response multiplier, drawn lognormal to span the range Hubal et~al.~\cite{hubal} observed (cross-sectional-area change from about $-2\%$ to $+59\%$). Sex is a separate lever set near neutral: relative hypertrophy is comparable between sexes~\cite{roberts}, so it bears on absolute mass while the percentage gain here stays about the same for either. Below maintenance the increment turns negative (atrophy~\cite{mujika}), so a starved scenario trends down and the axis extends below zero. Most terms are well constrained by the literature; $b$ carries a wide prior, and $m$ dominates the spread, so the width of the band is the honest output.
+where $\Delta_t$ is the fractional muscle-size gain added in week $t$, $b$ is a training-age base rate~\cite{damas}, $m$ is the inter-individual response multiplier, drawn lognormal to span the range Hubal et~al.~\cite{hubal} observed (cross-sectional-area (CSA) change from about $-2\%$ to $+59\%$), $a$ is an age factor that attenuates hypertrophy past about 30~\cite{peterson}, $\rho(D)$ is the dose--response of \eqref{eq:doseresp}~\cite{sch17,drr} evaluated at the scenario's effective weekly dose $D$, $\eta$ scales with proximity to failure~\cite{failureprox}, $o$ is near 1 while progressing and drops without added load~\cite{plotkin}, and the factor $e^{-t/32}$ tapers the weekly rate toward the lifter's ceiling with a 32-week time constant. Sex is a separate lever set near neutral: relative hypertrophy is comparable between sexes~\cite{roberts}, so it bears on absolute mass while the percentage gain here stays about the same for either. Below maintenance the increment turns negative (atrophy~\cite{mujika}), so a starved scenario trends down and the axis extends below zero. Most terms are well constrained by the literature; $b$ carries a wide prior, and $m$ dominates the spread, so the width of the band is the honest output.
 
 At a novice base rate, an adequate plan trained with progressive overload gains most over 24 weeks; the same volume with no added load reaches about half that, an irregular schedule ($\sim$55\% of sessions) less again, and training below maintenance loses tissue. More weekly volume across the three standard plans gives more gain, with diminishing returns and heavily overlapping bands (Fig.~\ref{fig:regimes}).
 
-\begin{figure}[t]\centering
+\begin{figure}[!htb]\centering
 \begin{minipage}[t]{0.49\linewidth}\centering
 \begin{tikzpicture}\begin{axis}[simaxis, height=4.7cm, xtick={0,8,16,24}, xmax=24, ymin=-6, ymax=26, ylabel={muscle gain (\%)}, title={\footnotesize Training regimes}, legend pos=north west, legend style={font=\scriptsize, draw=none, fill=none}, legend cell align=left]
 \addplot[black!35, forget plot] coordinates {(0,0) (24,0)};
@@ -263,12 +265,12 @@ At a novice base rate, an adequate plan trained with progressive overload gains 
 \addplot[appAccent] table[x=week,y=pplMid]{research/sim-plangain.dat}; \addlegendentry{PPL 6x}
 \end{axis}\end{tikzpicture}
 \end{minipage}
-\caption{Projected muscle gain over 24 weeks (median; 10--90\% bands). \emph{Left:} four regimes at a novice base rate --- the progressing and no-overload lines share a volume, so their gap is progressive overload, and below maintenance the median crosses zero. \emph{Right:} the three standard plans, each progressing.}\label{fig:regimes}
+\caption{Projected muscle gain over 24 weeks (median; 10--90\% bands). \emph{Left:} four regimes at a novice base rate --- the progressing and no-overload lines share a volume, so their gap is progressive overload, and below maintenance the median crosses zero. \emph{Right:} the three standard plans --- Full-Body, Upper/Lower, and Push/Pull/Legs (PPL) --- each progressing.}\label{fig:regimes}
 \end{figure}
 
 On the same progressing plan, a novice gains most and an advanced lifter least across three training-age base rates~\cite{damas}. Across a plausible range for each input, training experience and progression move the 16-week median gain most and age least; Section~\ref{sec:verification} gives the matching threshold sensitivity (Fig.~\ref{fig:starts}).
 
-\begin{figure}[t]\centering
+\begin{figure}[!htb]\centering
 \begin{minipage}[t]{0.49\linewidth}\centering
 \begin{tikzpicture}\begin{axis}[simaxis, height=4.7cm, xtick={0,8,16,24}, xmax=24, ymin=0, ymax=26, ylabel={muscle gain (\%)}, title={\footnotesize Starting point}, legend pos=north west, legend style={font=\scriptsize, draw=none, fill=none}, legend cell align=left]
 \addplot[draw=none, forget plot, name path=nH] table[x=week,y=novHi]{research/sim-start.dat};
@@ -283,19 +285,20 @@ On the same progressing plan, a novice gains most and an advanced lifter least a
 \end{axis}\end{tikzpicture}
 \end{minipage}\hfill
 \begin{minipage}[t]{0.49\linewidth}\centering
-\begin{tikzpicture}\begin{axis}[xbar, width=\linewidth, height=4.7cm, xmin=0, xmax=7, bar width=7pt, ymin=-0.9, ymax=4.9, clip=false, nodes near coords, point meta=x, nodes near coords style={font=\scriptsize, /pgf/number format/fixed, /pgf/number format/precision=1}, xlabel={16-wk gain swing (pp)}, xlabel style={font=\footnotesize}, title={\footnotesize Parameter sensitivity}, tick label style={font=\footnotesize}, axis lines=left, grid=major, grid style={black!8}, ytick={0,1,2,3,4}, yticklabels={age, volume, effort, progression, experience}]
+\begin{tikzpicture}\begin{axis}[xbar, width=0.9\linewidth, height=4.7cm, xmin=0, xmax=7, bar width=7pt, ymin=-0.9, ymax=4.9, clip=false, nodes near coords, point meta=x, nodes near coords style={font=\scriptsize, /pgf/number format/fixed, /pgf/number format/precision=1}, xlabel={16-wk gain swing (pp)}, xlabel style={font=\footnotesize}, title={\footnotesize Parameter sensitivity}, tick label style={font=\footnotesize}, axis lines=left, grid=major, grid style={black!8}, ytick={0,1,2,3,4}, yticklabels={age, volume, effort, progression, experience}]
 \addplot[fill=appAccent!30, draw=appAccent] table[x=swing, y=y] {research/sim-sens.dat};
 \end{axis}\end{tikzpicture}
 \end{minipage}
-\caption{\emph{Left:} the same progressing plan from three starting points (training-age base rates); newer lifters gain faster, all bands wide and overlapping. \emph{Right:} swing in the 16-week median gain as each input moves across a plausible range, sorted by influence.}\label{fig:starts}
+\caption{\emph{Left:} the same progressing plan from three starting points (training-age base rates); newer lifters gain faster, all bands wide and overlapping. \emph{Right:} swing in the 16-week median gain, in percentage points (pp), as each input moves across a plausible range, sorted by influence.}\label{fig:starts}
 \end{figure}
 
+\FloatBarrier
 \section{Scientific basis}\label{sec:basis}
 Each parameter and mechanism traces to a specific source. Effect sizes are context-dependent; the model uses the literature to set its structure and thresholds, and promises no outcomes.
-Grades are GRADE-style ratings of the underlying evidence: High (meta-analyses of RCTs), Moderate (individual RCTs or focused reviews), Low (practitioner framework). A Low grade flags a parameter that rests on weaker evidence and is the first candidate for revision.
-\begin{center}
+Grades follow the GRADE approach (Grading of Recommendations, Assessment, Development and Evaluation) to rating the underlying evidence: High (meta-analyses of randomised controlled trials, RCTs), Moderate (individual RCTs or focused reviews), Low (practitioner framework). A Low grade flags a parameter that rests on weaker evidence and is the first candidate for revision (Table~\ref{tab:basis}).
+\begin{table}[!htb]\centering
 \small
-\begin{tabular}{@{}p{4.6cm}p{8.0cm}p{1.3cm}@{}}
+\begin{tabular}{@{}p{4.6cm}p{7.8cm}p{1.5cm}@{}}
 \toprule
 \textbf{Mechanism / parameter} & \textbf{Basis} & \textbf{Grade}\\
 \midrule
@@ -314,7 +317,8 @@ Forecast age factor & Peterson et~al.~\cite{peterson}; lean-mass gains attenuate
 Forecast sex lever ($\approx$ neutral for \%\ gain) & Roberts et~al.~\cite{roberts}; relative hypertrophy comparable between sexes. & High\\
 \bottomrule
 \end{tabular}
-\end{center}
+\caption{Evidence basis for each model parameter, with GRADE-style ratings.}\label{tab:basis}
+\end{table}
 
 \section{Verification}\label{sec:verification}
 No body-composition study validates the model (see the limitations that follow). Three reproducible checks accompany it (the \texttt{research/} folder in the repository), each raising rigor without new measurement.
@@ -326,7 +330,7 @@ No body-composition study validates the model (see the limitations that follow).
 
 \section{Assumptions and limitations}
 \begin{itemize}[leftmargin=*]
-\item \textbf{Validation status.} This is a mechanistic model, grounded in the literature and internally consistent. It has no validation against direct body-composition measurements (DXA, ultrasound, or MRI): its thresholds are derived from published dose--response findings, none are fitted to an outcome dataset, and it claims no predictive-accuracy interval. The checks in Section~\ref{sec:verification} cover internal consistency and coherence; external accuracy stays out of scope.
+\item \textbf{Validation status.} This is a mechanistic model, grounded in the literature and internally consistent. It has no validation against direct body-composition measurements (dual-energy X-ray absorptiometry, ultrasound, or magnetic resonance imaging): its thresholds are derived from published dose--response findings, none are fitted to an outcome dataset, and it claims no predictive-accuracy interval. The checks in Section~\ref{sec:verification} cover internal consistency and coherence; external accuracy stays out of scope.
 \item \textbf{A stimulus estimate.} Every output estimates the training stimulus from logs. The app cannot see the body; no measurement of muscle mass is implied.
 \item \textbf{Effort is self-reported.} Reps in reserve is not recoverable from load and reps alone; \eqref{eq:rir} sets only a default. Day-to-day max-rep variability ($\pm 1$--3 reps) sits at the resolution of the effort bands, so the estimate is noisy near failure and the manual override remains the ground truth.
 \item \textbf{Top-set inference.} History stores each exercise's top set and its set count, without the reps of every set, so within-session rep drop-off is not yet used as an effort cue.
@@ -366,7 +370,8 @@ $\alpha(x,g)$ & Muscle attribution weight: 1 primary, 0.5 secondary, 0 otherwise
 $\eps(f)$ & Effort factor: 0.5 / 1 / 1 for Easy / Hard / Max \eqref{eq:eps}\\
 $S_{g,k}$ & Effective weekly sets, muscle $g$, week $k$ \eqref{eq:S}\\
 $\varphi(w,r),\ K$ & Epley estimated one-rep max and its rep denominator ($K{=}30$ default, self-calibrated) \eqref{eq:epley},\,\eqref{eq:kcal}\\
-$A_x$ & Anchor: best prior $\varphi$ for exercise $x$ \eqref{eq:anchor}\\
+$A_x$ & Anchor: best prior $\varphi$ over $\mathrm{hist}(x)$, the prior logged entries for exercise $x$ \eqref{eq:anchor}\\
+$\rir$ & Estimated reps in reserve of a set \eqref{eq:rir}\\
 $L_{g,k}$ & Weekly peak $\varphi$ on primary exercises for $g$\\
 $D_g$ & Recent dose: recent mean of $S_g$ \eqref{eq:dose}\\
 $\rho(s),\ s_0$ & Dose--response stimulus fraction and its scale \eqref{eq:doseresp}\\
