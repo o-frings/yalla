@@ -5990,82 +5990,80 @@ function renderForecast(){
   if(sb&&sl){ if(r.src&&r.src.length){ sb.style.display=""; sl.innerHTML=r.src.map(srcLi).join(''); } else sb.style.display="none"; }
   drawForecast();
 }
-// ===== forward growth forecast (dose AND progressive overload) =====
-// Growth in the model needs both an adequate dose and a rising trend (progressive overload), so the forecast
-// projects both. For each future week we extend a muscle's weekly sets by the scenario dose and its estimated
-// 1RM by an overload rate, then read the rolling dose D and trend τ exactly as the growth signal does. The
-// week's growth is ρ(D) gated by how far τ sits in the growth band [0.92, 1.08]: full while progressing,
-// fading to zero when loads stop climbing. Accumulated and normalised, the y-axis is the share of an ideal
-// block (adequate volume, progressing every week) the schedule banks. Two scenarios:
-//   • this plan  — the plan's prescribed volume WITH the app's recommended progression (~1.5%/wk while the
-//                  dose is a growth dose);
-//   • current pace — recent logged volume, carried forward at the lifter's own recent overload rate (so a
-//                  stall stays a stall).
-// It forecasts accumulated training stimulus, a proxy for training effect — not body size.
+// ===== Monte Carlo growth forecast =====
+// A probabilistic projection of muscle gain over 16 weeks, so the output is a distribution, not a false
+// point estimate. Each of K runs draws literature-backed parameters and accumulates a weekly fractional gain
+//   Δ_t = baseRate · indiv · ρ(D) · effort · overload · e^(−t/32)
+// where ρ(D) is the dose–response (Schoenfeld 2017; Pelland 2026), effort scales with proximity to failure
+// (Refalo 2023), overload is ~1 while progressing and drops without it (Plotkin 2022), and `indiv` is the
+// inter-individual response multiplier — the dominant uncertainty — drawn lognormal to span the ±range Hubal
+// 2005 observed (CSA change ≈ −2% … +59%). baseRate is training-age dependent (Damas 2016), the one
+// literature-informed rather than tightly-pinned parameter; the wide bands own that uncertainty. Two paired
+// scenarios (same draws): keep to the plan with its recommended progression, or hold the current pace and
+// the lifter's own recent rate of load progress. It forecasts a plausible RANGE of gain, not a promise.
 function growthForecast(){
-  const AHEAD=16, N=PROG_WEEKS;
+  const AHEAD=16, N=PROG_WEEKS, K=500;
   const setsS=progMuscleWeekly("sets"), loadS=progMuscleLoad();
   const muscles=MGROUPS.filter(g=>!NO_TARGET.has(g) && setsS[g].some(v=>v>0));
   if(muscles.length<2) return null;                 // need a little history to seed the projection
   const planWk=planWeeklySets(activePlan());
   const mean3=a=>{ const s=a.slice(-3); return s.length ? s.reduce((x,y)=>x+y,0)/s.length : 0; };
   const earl3=a=>{ const s=a.slice(-6,-3); return s.length ? s.reduce((x,y)=>x+y,0)/s.length : 0; };
-  const paceDose={}, planDose={}, paceRate={};
-  muscles.forEach(g=>{
-    paceDose[g]=mean3(setsS[g]); planDose[g]=planWk[g]||0;
-    const rE=earl3(loadS[g]); const r = rE>0 ? Math.pow(mean3(loadS[g])/rE, 1/3)-1 : 0;  // recent per-week load rate
-    paceRate[g]=Math.max(-0.01, Math.min(0.03, r));
-  });
-  // recommended progression: progress while the dose is a growth dose, less at maintenance, none below
-  const planRate=(g,d)=> d>=WEEKLY_SET_MIN ? 0.015 : d>=WEEKLY_SET_MAINT ? 0.006 : 0;
-  function project(dose, rateFn){
-    const S={}, L={}; muscles.forEach(g=>{ S[g]=setsS[g].slice(); L[g]=loadS[g].slice(); });
-    const out=[0]; let c=0;
-    for(let t=1;t<=AHEAD;t++){
-      let wk=0;
-      muscles.forEach(g=>{
-        const d=dose[g], last=L[g][L[g].length-1]||0;
-        S[g].push(d);
-        L[g].push(d>=WEEKLY_SET_MAINT ? (last>0?last:100)*(1+rateFn(g,d)) : (last>0?last*0.997:0));
-        const Sw=S[g].slice(-N), Lw=L[g].slice(-N);
-        const D=mean3(Sw);
-        const tS=earl3(Sw)>0?mean3(Sw)/earl3(Sw):null, tL=earl3(Lw)>0?mean3(Lw)/earl3(Lw):null;
-        const tau=(tS==null&&tL==null)?null:Math.max(tS==null?0:tS, tL==null?0:tL);
-        const prog=tau==null?1:Math.max(0, Math.min(1, (tau-0.92)/(1.08-0.92)));  // growth realised ∝ progression
-        wk += doseStimulus(D)*prog;
-      });
-      c += wk/muscles.length;
-      out.push(c/AHEAD*100);
-    }
-    return out;
+  const rhoMean=doseMap=>{ let r=0; muscles.forEach(g=>r+=doseStimulus(doseMap[g])); return r/muscles.length; };
+  const planDose={}, paceDose={};
+  muscles.forEach(g=>{ planDose[g]=planWk[g]||0; paceDose[g]=mean3(setsS[g]); });
+  const rhoPlan=rhoMean(planDose), rhoPace=rhoMean(paceDose);
+  // effort efficacy from logged proximity-to-failure (avg effort factor → 0.6..1)
+  let ef=0, en=0; Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ ef+=effortOf(e); en++; }));
+  const effort = en ? Math.min(1, 0.6+0.4*(ef/en)) : 0.85;
+  // is the lifter currently adding load? (recent vs earlier whole-body e1RM)
+  let rl=0, el=0; muscles.forEach(g=>{ rl+=mean3(loadS[g]); el+=earl3(loadS[g]); });
+  const paceProgressing = el>0 ? (rl/el)>=1.01 : false;
+  // training-age base weekly rate (%/wk at full stimulus), from lifetime sessions
+  const sess=settings.sessions||0;
+  const baseRate = sess<40 ? 0.9 : sess<150 ? 0.9-(sess-40)/110*0.5 : Math.max(0.25, 0.4-(sess-150)/500*0.15);
+  // seeded PRNG so the bands are stable across re-renders; paired draws for a fair plan-vs-pace comparison
+  let s=987654321>>>0; const u=()=>((s=(s*1103515245+12345)&0x7fffffff)/0x7fffffff);
+  const nrm=(m,sd)=>{ const a=Math.max(1e-9,u()); return m+sd*Math.sqrt(-2*Math.log(a))*Math.cos(2*Math.PI*u()); };
+  const draws=[]; for(let k=0;k<K;k++) draws.push({ indiv:Math.exp(nrm(0,0.55)), ovn:Math.max(0,nrm(0.5,0.08)) });
+  const q=(arr,p)=>{ const a=arr.slice().sort((x,y)=>x-y); return a[Math.floor(p*(a.length-1))]; };
+  function bands(rho, progressing){
+    const traj=Array.from({length:AHEAD+1},()=>[]);
+    draws.forEach(dr=>{ const ov=progressing?1.0:dr.ovn; let C=0; traj[0].push(0);
+      for(let t=1;t<=AHEAD;t++){ C += baseRate*dr.indiv*rho*effort*ov*Math.exp(-t/32); traj[t].push(C); } });
+    return { p10:traj.map(a=>q(a,0.1)), p50:traj.map(a=>q(a,0.5)), p90:traj.map(a=>q(a,0.9)) };
   }
-  return { plan:project(planDose, planRate), pace:project(paceDose, (g)=>paceRate[g]), ahead:AHEAD, n:muscles.length };
+  return { plan:bands(rhoPlan,true), pace:bands(rhoPace,paceProgressing), ahead:AHEAD, n:muscles.length };
 }
 function drawForecast(){
   const card=$("fcCard"), c=$("fcChart"); if(!card||!c) return;
   const f=growthForecast();
   if(!f){ card.style.display="none"; return; }
   card.style.display="";
-  const sub=$("fcSub"); if(sub) sub.textContent="stimulus banked across "+f.n+" muscles · next "+f.ahead+" weeks";
+  const sub=$("fcSub"); if(sub) sub.textContent="projected muscle gain across "+f.n+" muscles · Monte Carlo, 500 runs";
   const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const cs=getComputedStyle(document.documentElement);
   const l3=(cs.getPropertyValue('--l3')||'#888').trim();
   const accent=accentHex(), blue="#4dabf7";
-  const padL=40, padR=70, padT=14, padB=28;
-  const x1=f.ahead;
+  const padL=42, padR=74, padT=14, padB=28, x1=f.ahead;
+  const ymax=Math.max(2, Math.ceil((Math.max(f.plan.p90[x1], f.pace.p90[x1])*1.1)/2)*2);
   const X=w=> padL + (w/x1)*(W-padL-padR);
-  const Y=v=> padT + (1-v/100)*(H-padT-padB);
+  const Y=v=> padT + (1-v/ymax)*(H-padT-padB);
   ctx.font="12px -apple-system,system-ui,sans-serif"; ctx.textAlign="right";
-  [0,25,50,75,100].forEach(v=>{ const y=Y(v); ctx.strokeStyle=hexAlpha(l3,.18); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke(); ctx.fillStyle=l3; ctx.fillText(v+"%", padL-6, y+4); });
+  for(let k=0;k<=4;k++){ const v=ymax*k/4, y=Y(v); ctx.strokeStyle=hexAlpha(l3,.18); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke(); ctx.fillStyle=l3; ctx.fillText(v.toFixed(0)+"%", padL-6, y+4); }
   ctx.fillStyle=l3; ctx.textAlign="center"; ctx.fillText("now", X(0), H-padB+16); ctx.fillText("+"+x1+"w", X(x1), H-padB+16);
+  const band=(b,hex)=>{ ctx.fillStyle=hexAlpha(hex,.15); ctx.beginPath();
+    b.p90.forEach((v,i)=>{ const x=X(i), y=Y(v); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+    for(let i=b.p10.length-1;i>=0;i--){ ctx.lineTo(X(i), Y(b.p10[i])); }
+    ctx.closePath(); ctx.fill(); };
   const line=(pts,color)=>{ ctx.strokeStyle=color; ctx.lineWidth=2.5; ctx.lineJoin="round"; ctx.lineCap="round"; ctx.beginPath(); pts.forEach((v,i)=>{ const x=X(i), y=Y(v); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.stroke(); };
-  line(f.pace, blue);
-  line(f.plan, accent);
-  let yp=Y(f.plan[x1]), yc=Y(f.pace[x1]); if(Math.abs(yp-yc)<13){ const m=(yp+yc)/2; yp=m-7; yc=m+7; }
+  band(f.pace, blue); band(f.plan, accent);
+  line(f.pace.p50, blue); line(f.plan.p50, accent);
+  let yp=Y(f.plan.p50[x1]), yc=Y(f.pace.p50[x1]); if(Math.abs(yp-yc)<13){ const m=(yp+yc)/2; yp=m-7; yc=m+7; }
   ctx.font="600 12px -apple-system,system-ui,sans-serif"; ctx.textAlign="left";
-  ctx.fillStyle=accent; ctx.fillText(Math.round(f.plan[x1])+"%", X(x1)+5, yp+4);
-  ctx.fillStyle=blue;   ctx.fillText(Math.round(f.pace[x1])+"%", X(x1)+5, yc+4);
-  const lg=$("fcLegend"); if(lg) lg.innerHTML='<span class="fclg"><i style="background:'+accent+'"></i>this plan</span><span class="fclg"><i style="background:'+blue+'"></i>current pace</span>';
+  ctx.fillStyle=accent; ctx.fillText("+"+f.plan.p50[x1].toFixed(1)+"%", X(x1)+5, yp+4);
+  ctx.fillStyle=blue;   ctx.fillText("+"+f.pace.p50[x1].toFixed(1)+"%", X(x1)+5, yc+4);
+  const lg=$("fcLegend"); if(lg) lg.innerHTML='<span class="fclg"><i style="background:'+accent+'"></i>this plan</span><span class="fclg"><i style="background:'+blue+'"></i>current pace</span><span class="fclg"><i class="fcbandi"></i>10–90% range</span>';
 }
 
 // ================= automatic plan builder =================
