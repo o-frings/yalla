@@ -28,7 +28,21 @@
 \noindent Yalla estimates, per muscle and for the body overall, whether recent training is enough to grow, hold, or slowly lose muscle size. The estimate is a read on \emph{training stimulus} inferred from logged sets, loads, and reps, not a measurement of the body. Two axes drive it: a \emph{dose} axis (effort-weighted weekly sets against volume landmarks) and a \emph{trend} axis (progressive overload measured as the better of a set trend and a load trend). Set effort is captured with a three-level control whose default is estimated from the load--rep relationship against the lifter's own best set. This document defines every quantity, the equations that combine them, the decision rules that produce a state, and the evidence each parameter rests on. It also states the model's assumptions, its validation status, and where it is deliberately conservative. The specification corresponds to the functions \texttt{growthStatus()}, \texttt{inferEffort()}, and \texttt{planForecast()} in \texttt{app.js}.
 \end{abstract}
 
-\section{Model overview}
+\section{Introduction}
+Most training apps record what was lifted; few say what it means for muscle. Yalla estimates, per muscle and for the body overall, whether recent training is enough to grow, maintain, or slowly lose size, using only the sets, loads, and reps a user logs. This document specifies that model: the quantities it computes, the equations that combine them, the decision rules that produce a per-muscle verdict, and the evidence behind each parameter. The goal is a feedback signal a user or coach can audit rather than a black box, and one whose parameters trace to the resistance-training literature. Sections~\ref{sec:overview}--\ref{sec:plan} define the model, Section~\ref{sec:basis} lists the evidence with a grade for each source, and Section~\ref{sec:verification} describes the checks that accompany the model in the absence of a body-composition study.
+
+\section{Background and related work}
+The model synthesises several strands of resistance-training research.
+
+\emph{Volume and its counting.} Schoenfeld, Ogborn \& Krieger~\cite{sch17} established a graded dose--response between weekly set volume and hypertrophy, with each added set contributing on average about $+0.37\%$ of muscle across the studied range. The larger meta-regression of Pelland et~al.~\cite{drr} (67 studies, 2{,}058 subjects) confirmed rising-but-diminishing returns, found that counting indirect (secondary) sets at about half best fit the data, and found frequency largely neutral once weekly volume is matched. Yalla adopts fractional set counting \eqref{eq:alpha} and derives its volume landmarks from a continuous dose--response curve \eqref{eq:doseresp} built on these findings.
+
+\emph{Effort and proximity to failure.} Sets far from failure contribute little; Refalo et~al.~\cite{failureprox} report that hypertrophy improves as sets approach failure, with roughly comparable outcomes across zero to four reps in reserve. Yalla scales each set by an effort factor \eqref{eq:eps} and, because reps in reserve cannot be read from load and reps alone, estimates it by default from the load--rep relationship~\cite{epley} against the lifter's own best set.
+
+\emph{Landmarks, maintenance, and decline.} The MEV/MAV volume-landmark framework popularised by Israetel et~al.~\cite{rpvol} informs the landmark structure, though as a practitioner synthesis it carries the weakest evidence grade here. Bickel et~al.~\cite{bickel} showed that built muscle is retained on a small fraction of the volume that built it, which sets the maintenance floor; Mujika \& Padilla~\cite{mujika} documented the timeline over which an insufficient stimulus leads to loss, which motivates treating a sustained low dose as decline. Plotkin et~al.~\cite{plotkin} found that progressing load or reps drives near-identical growth, which is why the trend axis credits either rather than tracking tonnage.
+
+\emph{Positioning.} These landmarks and principles are widely used as coaching guidance but are rarely turned into a per-log computed signal. Yalla operationalises them into a transparent, per-muscle estimate with stated uncertainty and a reproducible verification suite (Section~\ref{sec:verification}).
+
+\section{Model overview}\label{sec:overview}
 The unit of analysis is a muscle group $g$ (chest, lats, quads, and so on). Training history is a set of logged entries; each entry $e$ records one exercise in one session with a date $d_e$, a top-set load $w_e$ (kg), top-set reps $r_e$, a set count $n_e$, an effort code $f_e\in\{0,1,2\}$, and a stored volume-load $v_e$.
 
 Each muscle is placed in one of three states, combined from the two axes: \emph{growing} (adequate dose and progressing), \emph{holding} (a maintenance dose, or flat), and \emph{under-stimulated} (below the volume needed to hold size). The dose axis answers whether there is enough stimulus this week; the trend axis answers whether the stimulus is rising, flat, or falling. A muscle grows only when both are satisfied: enough sets and a rising trend. This mirrors the requirement that hypertrophy needs both sufficient volume and progressive overload.
@@ -178,14 +192,14 @@ Let $n_{\text{grow}}$, $n_{\text{hold}}$, $n_{\text{shrink}}$ count trained musc
 \end{enumerate}
 The ``at risk'' headline requires under-stimulated muscles to both outnumber growing ones and reach a third of those trained, so a few neglected small muscles do not flip the whole read. It resolves to ``at risk'' chiefly when most of recent training is genuinely sparse.
 
-\section{Plan forecast}
+\section{Plan forecast}\label{sec:plan}
 Separately from the history-based signal, the plan forecast projects a plan's \emph{prescribed} weekly sets before any of it is logged. Prescribed sets per rotation are scaled to a weekly rate by how often the plan is run, capped so an ambitious frequency on a short rotation cannot over-promise:
 \begin{equation}\label{eq:plan}
 \hat{s}_g = s_g \cdot \min\!\left(1.2,\ \frac{p}{W}\right),
 \end{equation}
 where $s_g$ is prescribed sets per rotation (primary plus half of secondary, as in \eqref{eq:alpha}), $p$ is planned sessions per week, and $W$ is the number of distinct rotation workouts. Each trained muscle is then sorted into under-dosed ($<\MV$), growth window ($\MEV$ to 20), past-productive ($>20$), or maintenance, and the counts drive a plain-language outlook. The forecast promises no centimetres or kilograms; it reports the dose against the growth window and what to change.
 
-\section{Scientific basis}
+\section{Scientific basis}\label{sec:basis}
 Each parameter and mechanism traces to a specific source. Effect sizes are context-dependent; the model uses the literature to set structure and thresholds, not to promise outcomes.
 Grades are GRADE-style ratings of the underlying evidence: High (meta-analyses of RCTs), Moderate (individual RCTs or focused reviews), Low (practitioner framework). A Low grade flags a parameter that rests on weaker evidence and is the first candidate for revision.
 \begin{center}
