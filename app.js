@@ -5983,11 +5983,30 @@ function planForecast(plan){
   const src=["sch17","drr","rpvol"]; if(perWk<2) src.unshift("sch16");
   return { v, title, text, src };
 }
+// Per-muscle plan outlook: classify each muscle the plan prescribes by its weekly sets vs the landmarks.
+function planMuscleStates(plan){
+  const wk=planWeeklySets(plan||activePlan());
+  const major=["Chest","Lats","Upper Back","Front Delts","Side Delts","Rear Delts","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves","Core"];
+  const out=[];
+  major.forEach(g=>{ const s=wk[g]||0; if(s<1 || NO_TARGET.has(g)) return;
+    let st = s<WEEKLY_SET_MAINT ? "shrink" : s>HIGH_SET_CAP ? "over" : s>=WEEKLY_SET_MIN ? "grow" : "hold";
+    out.push({g, sets:s, state:st}); });
+  const rank={shrink:0, hold:1, over:2, grow:3};
+  out.sort((a,b)=> rank[a.state]-rank[b.state] || b.sets-a.sets);
+  return out;
+}
+const PLAN_ARROW={grow:"↑", hold:"→", shrink:"↓", over:"≈"};
 function renderForecast(){
   const box=$("planForecast"); if(!box) return;
   const r=planForecast(activePlan());
   box.className="insight v-"+r.v;
-  box.innerHTML='<div class="ititle">'+esc(r.title)+'</div><div class="itext">'+esc(r.text)+'</div>';
+  let h='<div class="ititle">'+esc(r.title)+'</div><div class="itext">'+esc(r.text)+'</div>';
+  const pm=planMuscleStates(activePlan());
+  if(pm.length){
+    h+='<div class="pmgrid">'+pm.map(p=>'<span class="gchip '+p.state+'" title="'+esc(p.g+" · ~"+round1(p.sets)+" sets/wk in this plan")+'">'+esc(MSHORT[p.g]||p.g)+' <span class="garrow">'+PLAN_ARROW[p.state]+'</span></span>').join('')+'</div>'
+      +'<p class="pmcap">By muscle, from the plan’s weekly sets · ↑ growth dose · → maintenance · ↓ under-dosed · ≈ past the productive range.</p>';
+  }
+  box.innerHTML=h;
   const sb=$("planFcSrcBox"), sl=$("planFcSrc");
   if(sb&&sl){ if(r.src&&r.src.length){ sb.style.display=""; sl.innerHTML=r.src.map(srcLi).join(''); } else sb.style.display="none"; }
   const card=$("fcCard"), f=(typeof growthForecast==="function")?growthForecast():null;

@@ -606,7 +606,7 @@
   .pscbtn:active{ transform:scale(.96); }
   .pscbtn{ border-color:color-mix(in srgb, var(--accent) 40%, var(--line)); }
   /* forward growth-stimulus forecast chart */
-  .fccard{ border:.5px solid var(--line); border-radius:12px; padding:14px 14px 12px; background:var(--card); margin-top:10px; }
+  .fccard{ border:.5px solid var(--line); border-radius:12px; padding:14px 14px 12px; background:var(--card); margin:0 0 18px; }
   .fccard .fchd{ font-size:14px; font-weight:700; letter-spacing:-.2px; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
   .fccard .fcsub{ font-size:12px; font-weight:500; color:var(--l3); }
   .fccard canvas{ width:100%; height:auto; display:block; margin-top:8px; }
@@ -614,9 +614,15 @@
   .fclg{ display:inline-flex; align-items:center; gap:6px; }
   .fclg i{ width:11px; height:3px; border-radius:2px; display:inline-block; }
   .fclg .fcbandi{ height:10px; border-radius:2px; background:var(--l3); opacity:.28; }
-  .fchd2{ font-size:12.5px; font-weight:650; color:var(--l2); margin:14px 0 2px; }
+  .fchd2{ font-size:12.5px; font-weight:650; color:var(--l2); margin:2px 0 2px; }
   .fcnote{ font-size:12px; color:var(--l3); line-height:1.45; margin:8px 0 0; }
-  .insight{ border:.5px solid var(--line); border-left-width:3px; border-radius:12px; padding:16px 16px; background:var(--card); }
+  /* collapsed-by-default secondary detail inside the forecast card */
+  .fcdetails{ margin-top:10px; border-top:.5px solid var(--sep); padding-top:8px; }
+  .fcdetails summary{ cursor:pointer; list-style:none; font-size:12.5px; font-weight:650; color:var(--accent); -webkit-tap-highlight-color:transparent; }
+  .fcdetails summary::-webkit-details-marker{ display:none; }
+  .fcdetails summary::after{ content:" ›"; color:var(--l3); }
+  .fcdetails[open] summary::after{ content:" ⌄"; }
+  .insight{ border:.5px solid var(--line); border-left-width:3px; border-radius:12px; padding:16px 16px; background:var(--card); margin:0 0 18px; }
   .insight .ititle{ font-size:15px; font-weight:700; letter-spacing:-.2px; }
   .insight .itext{ font-size:15px; color:var(--l2); line-height:1.5; margin-top:8px; }
   .insight.v-nutrition{ border-left-color:#f59f00; }
@@ -1025,7 +1031,11 @@
   .gchip.hold{ color:#9c6500; border-color:#f59f0055; background:#f59f0018; }
   .gchip.shrink{ color:#c92a2a; border-color:#ff6b6b55; background:#ff6b6b18; }
   .gchip.bord{ border-style:dashed; }   /* borderline: within input-noise of a decision boundary */
+  .gchip.over{ color:var(--l2); border-color:var(--line); background:var(--row); }  /* past the productive range */
   .gchip .gq{ font-weight:800; opacity:.6; margin-left:-1px; }
+  /* per-muscle plan outlook (inside the plan-outlook insight card) */
+  .pmgrid{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+  .pmcap{ font-size:12px; color:var(--l3); line-height:1.45; margin:9px 0 0; }
   .growth.grow{ border-left-color:#51cf66; } .growth .gdot.grow{ background:#51cf66; }
   .growth.hold{ border-left-color:#f59f00; } .growth .gdot.hold{ background:#f59f00; }
   .growth.shrink{ border-left-color:var(--red); } .growth .gdot.shrink{ background:var(--red); }

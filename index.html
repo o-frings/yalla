@@ -272,9 +272,12 @@
       <div class="fchd">Growth forecast<span class="fcsub" id="fcSub"></span></div>
       <canvas id="fcChart" width="760" height="300"></canvas>
       <div class="fclegend" id="fcLegend"></div>
-      <div class="fchd2">What moves this — swing in 16-week gain across key inputs</div>
-      <canvas id="fcTornado" width="760" height="190"></canvas>
-      <p class="fcnote">A Monte Carlo simulation of muscle gain over the next 16 weeks — 500 runs with literature-backed parameters (dose, effort, progressive overload, your age and training experience, and individual variability) — if you keep to this plan versus your current pace and rate of progress. The shaded band is the 10–90% range, wide mostly because individual response varies a lot between people; the curve can dip below zero if training falls under maintenance. Add your age and sex under body details to personalise it. An estimate with real uncertainty, not a promise.</p>
+      <details class="fcdetails">
+        <summary>What moves this &amp; how it's estimated</summary>
+        <div class="fchd2">Swing in 16-week gain across key inputs</div>
+        <canvas id="fcTornado" width="760" height="190"></canvas>
+        <p class="fcnote">A Monte Carlo simulation of muscle gain over the next 16 weeks — 500 runs with literature-backed parameters (dose, effort, progressive overload, your age and training experience, and individual variability) — if you keep to this plan versus your current pace and rate of progress. The shaded band is the 10–90% range, wide mostly because individual response varies a lot between people; the curve can dip below zero if training falls under maintenance. Add your age and sex under body details to personalise it. An estimate with real uncertainty, not a promise.</p>
+      </details>
     </div>
     <div class="panel" id="progPanel">
       <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 2 5-6"/></svg>Progress</span></div>
