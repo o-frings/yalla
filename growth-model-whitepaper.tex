@@ -7,7 +7,28 @@
 \usepackage{mathtools}
 \usepackage{booktabs}
 \usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
 \usepackage[hidelinks]{hyperref}
+
+% app colours (Yalla): accent, muscle hues (MCOLOR), and the growth-state palette
+\definecolor{appAccent}{HTML}{E8551C}
+\definecolor{appBlue}{HTML}{4DABF7}
+\definecolor{appViolet}{HTML}{9775FA}
+\definecolor{mChest}{HTML}{FF6B6B}
+\definecolor{mBack}{HTML}{4DABF7}
+\definecolor{mQuads}{HTML}{20C997}
+\definecolor{mBiceps}{HTML}{9775FA}
+\definecolor{mCalves}{HTML}{74C0FC}
+\pgfplotsset{simaxis/.style={
+  width=\linewidth, height=5cm,
+  tick label style={font=\footnotesize}, label style={font=\footnotesize},
+  legend style={font=\footnotesize, draw=none, fill=none, row sep=-1pt},
+  grid=major, grid style={black!10}, axis lines=left,
+  xlabel={week}, xmin=1, xmax=24, enlarge x limits=false,
+  every axis plot/.append style={line width=1pt},
+}}
 
 \newcommand{\eps}{\varepsilon}
 \newcommand{\rir}{\mathrm{RIR}}
@@ -198,6 +219,51 @@ Separately from the history-based signal, the plan forecast projects a plan's \e
 \hat{s}_g = s_g \cdot \min\!\left(1.2,\ \frac{p}{W}\right),
 \end{equation}
 where $s_g$ is prescribed sets per rotation (primary plus half of secondary, as in \eqref{eq:alpha}), $p$ is planned sessions per week, and $W$ is the number of distinct rotation workouts. Each trained muscle is then sorted into under-dosed ($<\MV$), growth window ($\MEV$ to 20), past-productive ($>20$), or maintenance, and the counts drive a plain-language outlook. The forecast promises no centimetres or kilograms; it reports the dose against the growth window and what to change.
+
+\section{Simulations}\label{sec:sims}
+To show the model's behaviour, a lifter executes three standard plans over 24 weeks in a seeded simulation (\texttt{research/simulate.mjs}). Loads progress when a muscle's weekly dose reaches the growth window, hold at a maintenance dose, and drift down below it; the model reads each week from a rolling 10-week window. The plots use the app's own colours. Every number is reproducible: the same seed regenerates the data files these figures read.
+
+Figure~\ref{fig:regirr} contrasts regular execution of the Upper/Lower plan (every session) with an irregular schedule (about 55\% of sessions, at random). Regular execution settles at a high, steady mean stimulus and almost never drops a muscle below maintenance; the irregular schedule sits lower and choppier and spends many muscle-weeks under-stimulated (41 against 1 over the run).
+
+\begin{figure}[t]\centering
+\begin{minipage}{0.48\linewidth}\centering
+\begin{tikzpicture}\begin{axis}[simaxis, ylabel={mean stimulus (\%)}, ymin=0, ymax=100, legend pos=south east]
+\addplot[appBlue] table[x=week,y=regStim]{research/sim-ul.dat}; \addlegendentry{regular}
+\addplot[appAccent] table[x=week,y=irrStim]{research/sim-ul.dat}; \addlegendentry{irregular}
+\end{axis}\end{tikzpicture}
+\end{minipage}\hfill
+\begin{minipage}{0.48\linewidth}\centering
+\begin{tikzpicture}\begin{axis}[simaxis, ylabel={muscles under-stimulated}, ymin=0, ymax=9, ytick={0,3,6,9}]
+\addplot[appBlue] table[x=week,y=regUnder]{research/sim-ul.dat};
+\addplot[appAccent] table[x=week,y=irrUnder]{research/sim-ul.dat};
+\end{axis}\end{tikzpicture}
+\end{minipage}
+\caption{Regular (blue) versus irregular (orange) execution of the Upper/Lower plan: mean growth stimulus across nine muscles (left) and the count of under-stimulated muscles (right).}\label{fig:regirr}
+\end{figure}
+
+Figure~\ref{fig:muscles} traces five muscles on the Upper/Lower plan under regular execution, each in its app colour. All climb as the rolling window fills; the higher-volume muscles settle higher, the diminishing-returns shape of $\rho$.
+
+\begin{figure}[t]\centering
+\begin{tikzpicture}\begin{axis}[simaxis, ylabel={growth stimulus (\%)}, ymin=0, ymax=100, legend columns=5, legend style={font=\footnotesize, draw=none, fill=none, at={(0.5,1.03)}, anchor=south}]
+\addplot[mChest] table[x=week,y=Chest]{research/sim-muscles.dat}; \addlegendentry{Chest}
+\addplot[mBack] table[x=week,y=Back]{research/sim-muscles.dat}; \addlegendentry{Back}
+\addplot[mQuads] table[x=week,y=Quads]{research/sim-muscles.dat}; \addlegendentry{Quads}
+\addplot[mBiceps] table[x=week,y=Biceps]{research/sim-muscles.dat}; \addlegendentry{Biceps}
+\addplot[mCalves] table[x=week,y=Calves]{research/sim-muscles.dat}; \addlegendentry{Calves}
+\end{axis}\end{tikzpicture}
+\caption{Per-muscle growth stimulus $\rho(D_g)$ on the Upper/Lower plan (regular), each muscle in its app colour.}\label{fig:muscles}
+\end{figure}
+
+Figure~\ref{fig:plans} compares the three plans under regular execution. More weekly volume per muscle lifts the whole-body stimulus, with the gap narrowing as the curve flattens.
+
+\begin{figure}[t]\centering
+\begin{tikzpicture}\begin{axis}[simaxis, ylabel={mean stimulus (\%)}, ymin=0, ymax=100, legend pos=south east]
+\addplot[appBlue] table[x=week,y=FullBody]{research/sim-plans.dat}; \addlegendentry{Full-Body 3x}
+\addplot[appViolet] table[x=week,y=UpperLower]{research/sim-plans.dat}; \addlegendentry{Upper/Lower 4x}
+\addplot[appAccent] table[x=week,y=PPL]{research/sim-plans.dat}; \addlegendentry{Push/Pull/Legs 6x}
+\end{axis}\end{tikzpicture}
+\caption{Mean growth stimulus across nine muscles for three standard plans, each executed regularly.}\label{fig:plans}
+\end{figure}
 
 \section{Scientific basis}\label{sec:basis}
 Each parameter and mechanism traces to a specific source. Effect sizes are context-dependent; the model uses the literature to set its structure and thresholds, and promises no outcomes.

@@ -289,3 +289,18 @@ ${Object.keys(PLANS).map((p)=>{const l=regByPlan[p][weeks-1];return `<tr><td>${p
 
 writeFileSync(new URL("./simulations.html", import.meta.url), html);
 console.log("\nWrote research/simulations.html");
+
+// ---- pgfplots data files for the white paper (headers + one row per week) ----
+const dat = (header, rows) => header + "\n" + rows.map((r) => r.map((v) => (typeof v === "number" ? +v.toFixed(2) : v)).join(" ")).join("\n") + "\n";
+const wk1 = (t) => t + 1;
+writeFileSync(new URL("./sim-ul.dat", import.meta.url),
+  dat("week regStim irrStim regUnder irrUnder",
+    ulRegular.map((w, t) => [wk1(t), w.meanStim * 100, ulIrregular[t].meanStim * 100, w.shrink, ulIrregular[t].shrink])));
+writeFileSync(new URL("./sim-muscles.dat", import.meta.url),
+  dat("week " + trackMus.join(" "),
+    ulRegular.map((w, t) => [wk1(t), ...trackMus.map((m) => w.per[m].stim * 100)])));
+const planKeys = Object.keys(PLANS);
+writeFileSync(new URL("./sim-plans.dat", import.meta.url),
+  dat("week FullBody UpperLower PPL",
+    regByPlan[planKeys[0]].map((w, t) => [wk1(t), w.meanStim * 100, regByPlan[planKeys[1]][t].meanStim * 100, regByPlan[planKeys[2]][t].meanStim * 100])));
+console.log("Wrote research/sim-ul.dat, sim-muscles.dat, sim-plans.dat");
