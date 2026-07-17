@@ -6019,8 +6019,18 @@ function renderGrowthForecast(){
   const f=(typeof growthForecast==="function")?growthForecast():null;
   if(!f){ card.style.display="none"; return; }
   card.style.display="";
-  drawForecast(f); drawForecastMuscles(f); drawForecastSens(f);
+  _fcF=f;
+  drawForecast(f); drawForecastMuscles(f, fcMuscleMode); drawForecastSens(f);
 }
+let fcMuscleMode="plan", _fcF=null;   // per-muscle graph scenario: "plan" or "pace"
+(function initFcMuscleToggle(){
+  const seg=$("fcMuscleSeg"); if(!seg) return;
+  seg.querySelectorAll(".mewintab").forEach(b=> b.onclick=()=>{
+    fcMuscleMode=b.dataset.fm;
+    seg.querySelectorAll(".mewintab").forEach(x=>x.classList.toggle("active", x===b));
+    if(_fcF) drawForecastMuscles(_fcF, fcMuscleMode);
+  });
+})();
 // ===== reorderable Me tiles (drag the grip; order persists per user) =====
 function applyTileOrder(){
   const c=$("meTiles"); if(!c) return;
@@ -6121,13 +6131,14 @@ function growthForecast(){
     {label:"age ±15y",     lo:w16(bands({...P,ageF:ageFor(a0+15)})),                    hi:w16(bands({...P,ageF:ageFor(Math.max(18,a0-15))}))},
     {label:"experience",   lo:w16(bands({...P,baseRate:0.28})),                         hi:w16(bands({...P,baseRate:0.9}))},
   ];
-  // per-muscle projected gain under the plan (median run: individual=1, progressing) — a deterministic
-  // read of the same model, so muscles with more plan volume project more gain and neglected ones can be negative.
-  const perMuscle = muscles.map(g=>{
-    const d=planDose[g], rho=doseStimulus(d); let C=0;
-    for(let t=1;t<=AHEAD;t++){ C += d>=WEEKLY_SET_MAINT ? baseRate*ageF*sexF*rho*effort*Math.exp(-t/32) : -0.4*(1-d/WEEKLY_SET_MAINT); }
+  // per-muscle projected gain (median run: individual=1), for both scenarios — plan volume progressing,
+  // and current pace at the lifter's own dose/progression. A muscle below maintenance trends negative.
+  const permusc=(doseMap, progressing)=> muscles.map(g=>{
+    const d=doseMap[g], rho=doseStimulus(d), ov=progressing?1:0.5; let C=0;
+    for(let t=1;t<=AHEAD;t++){ C += d>=WEEKLY_SET_MAINT ? baseRate*ageF*sexF*rho*effort*ov*Math.exp(-t/32) : -0.4*(1-d/WEEKLY_SET_MAINT); }
     return { g, gain:C };
   }).sort((a,b)=>b.gain-a.gain);
+  const perMuscle = { plan:permusc(planDose,true), pace:permusc(paceDose,paceProgressing) };
   return { plan, pace, ahead:AHEAD, n:muscles.length, base:w16(plan), sens, perMuscle };
 }
 function drawForecast(f){
@@ -6185,12 +6196,12 @@ function drawForecastSens(f){
   });
 }
 // per-muscle projected 16-week gain, one bar per muscle in its app colour (negative = below maintenance)
-function drawForecastMuscles(f){
-  const c=$("fcMuscles"); if(!c||!f||!f.perMuscle||!f.perMuscle.length) return;
+function drawForecastMuscles(f, which){
+  const c=$("fcMuscles"); if(!c||!f||!f.perMuscle) return;
+  const rows=f.perMuscle[which||"plan"]||f.perMuscle.plan||[]; if(!rows.length) return;
   const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const cs=getComputedStyle(document.documentElement);
   const l3=(cs.getPropertyValue('--l3')||'#888').trim(), ink=(cs.getPropertyValue('--ink')||'#000').trim();
-  const rows=f.perMuscle;
   let gmax=0.5, gmin=0; rows.forEach(r=>{ gmax=Math.max(gmax,r.gain); gmin=Math.min(gmin,r.gain); });
   const padL=62, padR=52, padT=4, padB=4, span=Math.max(0.5, gmax-gmin);
   const X=v=> padL + (v-gmin)/span*(W-padL-padR);
