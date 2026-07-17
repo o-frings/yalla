@@ -25,11 +25,11 @@
 \maketitle
 
 \begin{abstract}
-\noindent Yalla estimates, per muscle and for the body overall, whether recent training is enough to grow, hold, or slowly lose muscle size. The estimate is a read on \emph{training stimulus} inferred from logged sets, loads, and reps, not a measurement of the body. Two axes drive it: a \emph{dose} axis (effort-weighted weekly sets against volume landmarks) and a \emph{trend} axis (progressive overload measured as the better of a set trend and a load trend). Set effort is captured with a three-level control whose default is estimated from the load--rep relationship against the lifter's own best set. This document defines every quantity, the equations that combine them, the decision rules that produce a state, and the evidence each parameter rests on. It also states the model's assumptions, its validation status, and where it is deliberately conservative. The specification corresponds to the functions \texttt{growthStatus()}, \texttt{inferEffort()}, and \texttt{planForecast()} in \texttt{app.js}.
+\noindent Yalla estimates, per muscle and for the body overall, whether recent training is enough to grow, hold, or slowly lose muscle size. The estimate reads \emph{training stimulus} from logged sets, loads, and reps; the app never sees the body itself. Two axes drive it: a \emph{dose} axis (effort-weighted weekly sets against volume landmarks) and a \emph{trend} axis (progressive overload measured as the better of a set trend and a load trend). Set effort is captured with a three-level control whose default is estimated from the load--rep relationship against the lifter's own best set. This document defines every quantity, the equations that combine them, the decision rules that produce a state, and the evidence each parameter rests on. It also states the model's assumptions, its validation status, and where it is deliberately conservative. The specification corresponds to the functions \texttt{growthStatus()}, \texttt{inferEffort()}, and \texttt{planForecast()} in \texttt{app.js}.
 \end{abstract}
 
 \section{Introduction}
-Most training apps record what was lifted; few say what it means for muscle. Yalla estimates, per muscle and for the body overall, whether recent training is enough to grow, maintain, or slowly lose size, using only the sets, loads, and reps a user logs. This document specifies that model: the quantities it computes, the equations that combine them, the decision rules that produce a per-muscle verdict, and the evidence behind each parameter. The goal is a feedback signal a user or coach can audit rather than a black box, and one whose parameters trace to the resistance-training literature. Sections~\ref{sec:overview}--\ref{sec:plan} define the model, Section~\ref{sec:basis} lists the evidence with a grade for each source, and Section~\ref{sec:verification} describes the checks that accompany the model in the absence of a body-composition study.
+Most training apps record what was lifted; few say what it means for muscle. Yalla estimates, per muscle and for the body overall, whether recent training is enough to grow, maintain, or slowly lose size, using only the sets, loads, and reps a user logs. This document specifies that model: the quantities it computes, the equations that combine them, the decision rules that produce a per-muscle verdict, and the evidence behind each parameter. The goal is an auditable feedback signal whose parameters trace to the resistance-training literature. Sections~\ref{sec:overview}--\ref{sec:plan} define the model, Section~\ref{sec:basis} lists the evidence with a grade for each source, and Section~\ref{sec:verification} describes the checks that accompany the model in the absence of a body-composition study.
 
 \section{Background and related work}
 The model synthesises several strands of resistance-training research.
@@ -38,7 +38,7 @@ The model synthesises several strands of resistance-training research.
 
 \emph{Effort and proximity to failure.} Sets far from failure contribute little; Refalo et~al.~\cite{failureprox} report that hypertrophy improves as sets approach failure, with roughly comparable outcomes across zero to four reps in reserve. Yalla scales each set by an effort factor \eqref{eq:eps} and, because reps in reserve cannot be read from load and reps alone, estimates it by default from the load--rep relationship~\cite{epley} against the lifter's own best set.
 
-\emph{Landmarks, maintenance, and decline.} The MEV/MAV volume-landmark framework popularised by Israetel et~al.~\cite{rpvol} informs the landmark structure, though as a practitioner synthesis it carries the weakest evidence grade here. Bickel et~al.~\cite{bickel} showed that built muscle is retained on a small fraction of the volume that built it, which sets the maintenance floor; Mujika \& Padilla~\cite{mujika} documented the timeline over which an insufficient stimulus leads to loss, which motivates treating a sustained low dose as decline. Plotkin et~al.~\cite{plotkin} found that progressing load or reps drives near-identical growth, which is why the trend axis credits either rather than tracking tonnage.
+\emph{Landmarks, maintenance, and decline.} The MEV/MAV volume-landmark framework popularised by Israetel et~al.~\cite{rpvol} informs the landmark structure, though as a practitioner synthesis it carries the weakest evidence grade here. Bickel et~al.~\cite{bickel} showed that built muscle is retained on a small fraction of the volume that built it, which sets the maintenance floor; Mujika \& Padilla~\cite{mujika} documented the timeline over which an insufficient stimulus leads to loss, which motivates treating a sustained low dose as decline. Plotkin et~al.~\cite{plotkin} found that progressing load or reps drives near-identical growth, which is why the trend axis credits progress from either.
 
 \emph{Positioning.} These landmarks and principles are widely used as coaching guidance but are rarely turned into a per-log computed signal. Yalla operationalises them into a transparent, per-muscle estimate with stated uncertainty and a reproducible verification suite (Section~\ref{sec:verification}).
 
@@ -106,14 +106,14 @@ f=
 1\ (\text{Hard}) & \text{otherwise.}
 \end{cases}
 \end{equation}
-The anchor is recomputed every time rather than frozen after a calibration period. A rolling anchor adapts to deloads and off days and never locks in a wrong baseline the way a one-time calibration could. When there is no prior baseline for the lift, or the exercise carries no external load (bodyweight or timed holds), \eqref{eq:rir} is not evaluated and the default stays Hard.
+The anchor is recomputed on every estimate. Because it rolls, it adapts to deloads and off days and cannot lock in a wrong baseline, the failure mode of a one-time calibration. When there is no prior baseline for the lift, or the exercise carries no external load (bodyweight or timed holds), \eqref{eq:rir} is not evaluated and the default stays Hard.
 
 \subsection{Self-calibrated rep denominator}\label{sec:kcal}
 The denominator $K$ in \eqref{eq:epley} varies by lifter and by lift. A set logged as Max is a near-true failure point, so two Max sets of the same exercise at different loads pin $K$: setting $\varphi$ equal for both, $w_1(1+r_1/K)=w_2(1+r_2/K)$, which solves to
 \begin{equation}\label{eq:kcal}
 K=\frac{w_2 r_2 - w_1 r_1}{w_1 - w_2}.
 \end{equation}
-Valid within-exercise pairs are pooled across the whole log, the median is taken and clamped to $[20,40]$, and $K=30$ is used until enough failure data exists. This grounds the effort estimate in the lifter's own data rather than a fixed population constant.
+Valid within-exercise pairs are pooled across the whole log, the median is taken and clamped to $[20,40]$, and $K=30$ is used until enough failure data exists. This grounds the effort estimate in the lifter's own data.
 
 \section{Volume landmarks}
 Four thresholds, in effective sets per muscle per week, define the dose axis. They follow the $\MEV/\MAV$ framework and the dose--response meta-analyses.
@@ -125,7 +125,7 @@ Four thresholds, in effective sets per muscle per week, define the dose axis. Th
 $\MV$ (2) & Maintenance volume & Floor to hold existing size. Below it, a previously-trained muscle reads as under-stimulated.\\
 $\MEV$ (6) & Minimum effective volume & Lower edge of the productive growth window; at or above it, an adequate dose is present.\\
 target (10) & Practical target & Where most of the dose--response benefit has accrued; the balance-radar goal.\\
-$\MAV$ (20) & Upper productive bound & Beyond it, added sets mostly add fatigue rather than growth.\\
+$\MAV$ (20) & Upper productive bound & Beyond it, added sets mostly add fatigue with little further growth.\\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -136,7 +136,7 @@ The four landmarks discretise a continuous relationship~\cite{sch17,drr}. We mod
 \begin{equation}\label{eq:doseresp}
 \rho(s)=1-e^{-s/s_0},\qquad s_0=\frac{\text{target}}{\ln 5}\approx 6.21.
 \end{equation}
-The landmarks are read off this single curve rather than chosen independently: $\rho(\MV)\approx0.28$, $\rho(\MEV)\approx0.62$, $\rho(\text{target})\approx0.80$, and $\rho(\MAV)\approx0.96$. So MEV is the $\approx0.6$ knee, target the $0.8$ point, and MAV the $\approx0.95$ near-plateau. This replaces four independent thresholds with one meta-analytic function; the growth signal also reports $\rho(D_g)$ as a per-muscle share of the attainable growth stimulus.
+The landmarks are read off this single curve: $\rho(\MV)\approx0.28$, $\rho(\MEV)\approx0.62$, $\rho(\text{target})\approx0.80$, and $\rho(\MAV)\approx0.96$. So MEV is the $\approx0.6$ knee, target the $0.8$ point, and MAV the $\approx0.95$ near-plateau. This replaces four independent thresholds with one meta-analytic function; the growth signal also reports $\rho(D_g)$ as a per-muscle share of the attainable growth stimulus.
 
 \section{Temporal windows}
 Both axes compare a recent window against an earlier one, each a three-week mean over the 10-week series. For any weekly series $X_g$:
@@ -165,7 +165,7 @@ Each ratio is defined only when its earlier window is positive; otherwise it is 
 \begin{equation}\label{eq:tau}
 \tau_g=\max\!\left(T^{S}_{g},\,T^{L}_{g}\right),
 \end{equation}
-with an absent ratio contributing $0$ to the maximum, and $\tau_g$ itself absent only when both ratios are absent (a muscle just started, with no earlier baseline). Taking the maximum prevents classic strength progression (add load, drop reps) from being misread as a decline: raw tonnage would fall, but $T^{L}$ rises.
+with an absent ratio contributing $0$ to the maximum, and $\tau_g$ itself absent only when both ratios are absent (a muscle just started, with no earlier baseline). Taking the maximum prevents classic strength progression (add load, drop reps) from being misread as a decline: raw tonnage would fall there while $T^{L}$ rises.
 
 An earlier version used tonnage, $V=w\,r\,n$, as the sole trend signal. Tonnage rewards total kilograms moved, so lighter high-rep work inflates it while heavier low-rep work deflates it; it is a poor proxy for stimulus, and \eqref{eq:tau} replaces it.
 
@@ -180,7 +180,7 @@ The state $\sigma_g$ is a function of the dose $D_g$ and the trend $\tau_g$, eva
 The asymmetry is intentional: a muscle grows only with both an adequate dose and a rising trend, but it can be flagged under-stimulated by a low dose alone. Holding is the wide middle band: enough volume to keep size, below the dose that adds it.
 
 \subsection{Borderline states}\label{sec:borderline}
-The inputs carry known noise: effort-weighted sets to about $\pm 1$ set, and each trend ratio to about $\pm 0.06$. When a muscle's dose or trend sits within that range of a decision boundary, it is flagged \emph{borderline} and shown with a tilde instead of a crisp verdict, so a near-miss is not read as certainty. The sensitivity analysis (Section~\ref{sec:verification}) shows the growth-trend boundary is where this matters most.
+The inputs carry known noise: effort-weighted sets to about $\pm 1$ set, and each trend ratio to about $\pm 0.06$. When a muscle's dose or trend sits within that range of a decision boundary, it is flagged \emph{borderline} and shown with a tilde to mark the verdict as provisional. The sensitivity analysis (Section~\ref{sec:verification}) shows the growth-trend boundary is where this matters most.
 
 \section{Overall verdict}\label{sec:overall}
 Let $n_{\text{grow}}$, $n_{\text{hold}}$, $n_{\text{shrink}}$ count trained muscles in each state, and $m$ be the number of trained muscles. Let $\tau_{\text{all}}$ be the recent-over-earlier ratio of whole-body weekly volume. The headline is:
@@ -200,7 +200,7 @@ Separately from the history-based signal, the plan forecast projects a plan's \e
 where $s_g$ is prescribed sets per rotation (primary plus half of secondary, as in \eqref{eq:alpha}), $p$ is planned sessions per week, and $W$ is the number of distinct rotation workouts. Each trained muscle is then sorted into under-dosed ($<\MV$), growth window ($\MEV$ to 20), past-productive ($>20$), or maintenance, and the counts drive a plain-language outlook. The forecast promises no centimetres or kilograms; it reports the dose against the growth window and what to change.
 
 \section{Scientific basis}\label{sec:basis}
-Each parameter and mechanism traces to a specific source. Effect sizes are context-dependent; the model uses the literature to set structure and thresholds, not to promise outcomes.
+Each parameter and mechanism traces to a specific source. Effect sizes are context-dependent; the model uses the literature to set its structure and thresholds, and promises no outcomes.
 Grades are GRADE-style ratings of the underlying evidence: High (meta-analyses of RCTs), Moderate (individual RCTs or focused reviews), Low (practitioner framework). A Low grade flags a parameter that rests on weaker evidence and is the first candidate for revision.
 \begin{center}
 \small
@@ -215,30 +215,30 @@ Effort factor $\eps$; hypertrophy comparable across ${\sim}0$--4 RIR, dropping o
 $\MEV/\MAV$ landmark structure (${\sim}10$ to 20 sets) & Israetel et~al.~\cite{rpvol}, volume-landmarks framework. & Low\\
 Maintenance floor $\MV$; size held on ${\sim}1/3$ (older) to ${\sim}1/9$ (young) of building volume & Bickel, Cross \& Bamman~\cite{bickel} (RCT, 16-wk build plus 32-wk reduced dose). & Moderate\\
 Decline below maintenance stimulus; ${\sim}2$--4-week strength retention, then loss & Mujika \& Padilla~\cite{mujika} detraining review; cross-sectional-area loss from ${\sim}2$--3 weeks of cessation. & Moderate\\
-Overload via added load \emph{or} reps, so the trend tracks both, not tonnage & Plotkin et~al.~\cite{plotkin} (RCT; load- and rep-progression gave near-identical growth); mechanism in Schoenfeld~\cite{sch10}. & Moderate\\
+Overload via added load \emph{or} reps; the trend tracks both & Plotkin et~al.~\cite{plotkin} (RCT; load- and rep-progression gave near-identical growth); mechanism in Schoenfeld~\cite{sch10}. & Moderate\\
 Epley one-rep-max $\varphi$; self-calibrated denominator $K$ & Standard load--rep relationship~\cite{epley}; $K$ fitted from the lifter's own Max sets \eqref{eq:kcal}. & Method\\
 \bottomrule
 \end{tabular}
 \end{center}
 
 \section{Verification}\label{sec:verification}
-The model is not validated against body-composition measurement (see the limitations that follow), but three reproducible checks accompany it (the \texttt{research/} folder in the repository), each raising rigor without new measurement.
+No body-composition study validates the model (see the limitations that follow). Three reproducible checks accompany it (the \texttt{research/} folder in the repository), each raising rigor without new measurement.
 \begin{itemize}[leftmargin=*]
 \item \textbf{Known-answer tests.} Canonical scenarios --- a returning lifter, a deload, easy versus hard sets, a hard stop --- paired with domain-expected verdicts, so miscalibration or later drift is caught in code.
 \item \textbf{Sensitivity analysis.} Perturbing each threshold by $\pm 10\%$ over a synthetic population shows the growth-trend cutoff is the most load-bearing parameter (about a quarter of muscles change state), while the maintenance floor and sharp-drop cutoff are nearly cosmetic. This is why the borderline band sits on the trend boundary.
-\item \textbf{Predictive-coherence backtest.} On a training log, muscles labelled growing should precede larger subsequent gains in estimated 1RM than those labelled holding or under-stimulated. Strength change is a proxy for hypertrophy, not a direct measure; a real body-composition study remains the standard this cannot replace.
+\item \textbf{Predictive-coherence backtest.} On a training log, muscles labelled growing should precede larger subsequent gains in estimated 1RM than those labelled holding or under-stimulated. Strength change is only a proxy for hypertrophy; a body-composition study remains the standard these checks cannot replace.
 \end{itemize}
 
 \section{Assumptions and limitations}
 \begin{itemize}[leftmargin=*]
-\item \textbf{Validation status.} This is a mechanistic model grounded in the literature and internally consistent, but it has not been validated against direct body-composition measurements (DXA, ultrasound, or MRI). Its thresholds are derived from published dose--response findings, not fitted to an outcome dataset, and no predictive accuracy interval is claimed. The checks in Section~\ref{sec:verification} test internal consistency and coherence, not external accuracy.
-\item \textbf{Stimulus, not size.} Every output estimates the training stimulus from logs. The app cannot see the body; no measurement of muscle mass is implied.
+\item \textbf{Validation status.} This is a mechanistic model, grounded in the literature and internally consistent. It has no validation against direct body-composition measurements (DXA, ultrasound, or MRI): its thresholds are derived from published dose--response findings, none are fitted to an outcome dataset, and it claims no predictive-accuracy interval. The checks in Section~\ref{sec:verification} cover internal consistency and coherence; external accuracy stays out of scope.
+\item \textbf{A stimulus estimate.} Every output estimates the training stimulus from logs. The app cannot see the body; no measurement of muscle mass is implied.
 \item \textbf{Effort is self-reported.} Reps in reserve is not recoverable from load and reps alone; \eqref{eq:rir} sets only a default. Day-to-day max-rep variability ($\pm 1$--3 reps) sits at the resolution of the effort bands, so the estimate is noisy near failure and the manual override remains the ground truth.
-\item \textbf{Top-set inference.} History stores the top set and a set count, not every set's reps, so within-session rep drop-off is not yet used as an effort cue.
+\item \textbf{Top-set inference.} History stores each exercise's top set and its set count, without the reps of every set, so within-session rep drop-off is not yet used as an effort cue.
 \item \textbf{One landmark set for all muscles.} Chosen for legibility; real landmarks vary by muscle and training age.
 \item \textbf{Load trend needs external load.} Bodyweight and timed work do not contribute to $T^{L}$; those muscles rely on the set trend alone.
 \item \textbf{Residual tonnage use.} The overall verdict's $\tau_{\text{all}}$ still uses whole-body volume; the per-muscle trend does not.
-\item \textbf{Conservative by design.} The maintenance floor and the ``at risk'' threshold are both set so the model under-reports muscle loss rather than over-reports it.
+\item \textbf{Conservative by design.} The maintenance floor and the ``at risk'' threshold are set conservatively, biasing the model toward under-reporting muscle loss.
 \end{itemize}
 
 \begin{thebibliography}{9}
