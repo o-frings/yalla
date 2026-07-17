@@ -3158,6 +3158,7 @@ function renderGrowth(){
     h+='<div class="grid">'+r.per.map(p=>'<span class="gchip '+p.state+'" title="'+esc(p.g+" · ~"+round1(p.sets)+" sets/wk — "+p.why)+'">'+esc(MSHORT[p.g]||p.g)+' <span class="garrow">'+GST_ARROW[p.state]+'</span></span>').join('')+'</div>';
     h+='<p class="gsub" style="margin-top:11px;font-size:12px;color:var(--l3);">Per muscle over the last '+PROG_WEEKS+' weeks · ↑ growing · → holding · ↓ under-stimulated. An estimate of training stimulus, not a body measurement.</p>';
   }
+  h+='<p class="gsub" style="margin-top:9px;font-size:12px;"><a class="srclink" href="growth-model-whitepaper.pdf" target="_blank" rel="noopener">How this is calculated — the method &amp; evidence (PDF) ↗</a></p>';
   box.innerHTML=h;
 }
 // Draw ONE progress metric into a given canvas (static — the swipe provides motion). Returns the

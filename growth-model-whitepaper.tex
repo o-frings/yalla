@@ -1,0 +1,229 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=25mm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{mathtools}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+\newcommand{\eps}{\varepsilon}
+\newcommand{\rir}{\mathrm{RIR}}
+\newcommand{\MV}{\mathrm{MV}}
+\newcommand{\MEV}{\mathrm{MEV}}
+\newcommand{\MAV}{\mathrm{MAV}}
+\newcommand{\recent}{\operatorname{recent}}
+\newcommand{\earlier}{\operatorname{earlier}}
+
+\title{Estimating Muscle Growth, Maintenance, and Decline from Training Logs\\
+\large The Yalla growth-signal and effort model}
+\author{Yalla training-stimulus model}
+\date{Version 2.0 (v120) \quad 17 July 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent Yalla estimates, per muscle and for the body overall, whether recent training is enough to grow, hold, or slowly lose muscle size. The estimate is a read on \emph{training stimulus} inferred from logged sets, loads, and reps --- not a measurement of the body. Two axes drive it: a \emph{dose} axis (effort-weighted weekly sets against volume landmarks) and a \emph{trend} axis (progressive overload measured as the better of a set trend and a load trend). Set effort is captured with a three-level control whose default is estimated from the load--rep relationship against the lifter's own best set. This document defines every quantity, the equations that combine them, the decision rules that produce a state, and the evidence each parameter rests on. It also states the model's assumptions, its validation status, and where it is deliberately conservative. The specification corresponds to the functions \texttt{growthStatus()}, \texttt{inferEffort()}, and \texttt{planForecast()} in \texttt{app.js}.
+\end{abstract}
+
+\section{Model overview}
+The unit of analysis is a muscle group $g$ (chest, lats, quads, and so on). Training history is a set of logged entries; each entry $e$ records one exercise in one session with a date $d_e$, a top-set load $w_e$ (kg), top-set reps $r_e$, a set count $n_e$, an effort code $f_e\in\{0,1,2\}$, and a stored volume-load $v_e$.
+
+Each muscle is placed in one of three states, combined from the two axes: \emph{growing} (adequate dose and progressing), \emph{holding} (a maintenance dose, or flat), and \emph{under-stimulated} (below the volume needed to hold size). The dose axis answers whether there is enough stimulus this week; the trend axis answers whether the stimulus is rising, flat, or falling. A muscle grows only when both are satisfied: enough sets and a rising trend. This mirrors the requirement that hypertrophy needs both sufficient volume and progressive overload.
+
+\section{Volume attribution}
+\subsection{Fractional set counting}
+Each exercise contributes to its primary muscle at full weight and to each secondary muscle at half. Writing the attribution weight of exercise $x$ to muscle $g$ as $\alpha(x,g)$:
+\begin{equation}\label{eq:alpha}
+\alpha(x,g)=
+\begin{cases}
+1 & \text{if $g$ is the primary mover of $x$,}\\
+0.5 & \text{if $g$ is a secondary mover of $x$,}\\
+0 & \text{otherwise.}
+\end{cases}
+\end{equation}
+The $0.5$ weight for indirect work is the fractional counting scheme that best fit the hypertrophy data in the Pelland et~al.\ dose--response meta-regression.
+
+\subsection{Effort weighting}
+Only sets taken reasonably close to failure drive much growth, so each set is scaled by an effort factor $\eps(f)$ before it counts:
+\begin{equation}\label{eq:eps}
+\eps(f)=
+\begin{cases}
+0.5 & \text{Easy}\ (f{=}0,\ \geq 4\text{ reps in reserve}),\\
+1 & \text{Hard}\ (f{=}1,\ {\sim}1\text{--}3\text{ in reserve; the default}),\\
+1 & \text{Max}\ (f{=}2,\ 0\text{--}1\text{ in reserve}).
+\end{cases}
+\end{equation}
+Max carries no growth premium over Hard: hypertrophy is comparable across roughly 0--4 reps in reserve, and training to failure mainly adds fatigue. Max still helps the load trend indirectly through the extra reps it buys. Entries with no recorded effort (all logs predating the feature) default to Hard, so $\eps=1$ and historical counts are unchanged.
+
+\subsection{Weekly effective sets per muscle}
+Time is bucketed into $N=10$ rolling weeks; week index $k=9$ is the current week. The effective weekly sets for muscle $g$ in week $k$ sum every contributing entry:
+\begin{equation}\label{eq:S}
+S_{g,k}=\sum_{e\,\in\,\text{week }k} n_e\,\eps(f_e)\,\alpha(x_e,g).
+\end{equation}
+This same effort-weighted, fractional count feeds the weekly-sets chart, the balance radar, and the ``hard sets'' ring, so every surface in the app reads consistently.
+
+\section{Effort inference}
+Proximity to failure cannot be recovered from load and reps alone --- the same $100\,\text{kg}\times 8$ can be an all-out set or an easy one. So effort is a self-report. To keep friction to one optional tap, its default is estimated from the numbers and shown pre-selected; the lifter overrides only when the estimate is wrong.
+
+\subsection{Estimated one-rep max (anchor)}
+Set strength is summarised by the Epley one-rep-max estimate:
+\begin{equation}\label{eq:epley}
+\varphi(w,r)=w\left(1+\frac{r}{30}\right).
+\end{equation}
+The anchor for exercise $x$ is the best estimate over the lifter's \emph{prior} sessions for that exercise (the current, in-progress session is excluded):
+\begin{equation}\label{eq:anchor}
+A_x=\max_{e\,\in\,\mathrm{hist}(x)}\varphi(w_e,r_e).
+\end{equation}
+
+\subsection{Reps in reserve and classification}
+Inverting \eqref{eq:epley} gives the reps a lifter should complete at load $w$ before failure; subtracting the reps actually done estimates reps in reserve:
+\begin{equation}\label{eq:rir}
+\rir=30\left(\frac{A_x}{w}-1\right)-r,
+\end{equation}
+evaluated on the session's hardest set for that exercise (the one with the largest $\varphi$). The estimate maps to an effort code:
+\begin{equation}\label{eq:fmap}
+f=
+\begin{cases}
+2\ (\text{Max}) & \text{if } \rir \leq 1,\\
+0\ (\text{Easy}) & \text{if } \rir \geq 4,\\
+1\ (\text{Hard}) & \text{otherwise.}
+\end{cases}
+\end{equation}
+The anchor is recomputed every time rather than frozen after a calibration period. A rolling anchor adapts to deloads and off days and never locks in a wrong baseline the way a one-time calibration could. When there is no prior baseline for the lift, or the exercise carries no external load (bodyweight or timed holds), \eqref{eq:rir} is not evaluated and the default stays Hard.
+
+\section{Volume landmarks}
+Four thresholds, in effective sets per muscle per week, anchor the dose axis. They follow the $\MEV/\MAV$ framework and the dose--response meta-analyses.
+\begin{center}
+\begin{tabular}{@{}llp{8.2cm}@{}}
+\toprule
+\textbf{Symbol (value)} & \textbf{Name} & \textbf{Meaning}\\
+\midrule
+$\MV$ (2) & Maintenance volume & Floor to hold existing size. Below it, a previously-trained muscle reads as under-stimulated.\\
+$\MEV$ (6) & Minimum effective volume & Lower edge of the productive growth window; at or above it, an adequate dose is present.\\
+target (10) & Practical target & Where most of the dose--response benefit has accrued; the balance-radar goal.\\
+$\MAV$ (20) & Upper productive bound & Beyond it, added sets mostly add fatigue rather than growth.\\
+\bottomrule
+\end{tabular}
+\end{center}
+A single set of landmarks is applied to every muscle. Real per-muscle landmarks differ, but one baseline keeps the read legible. The maintenance floor is deliberately conservative: built muscle is held on very little --- as little as roughly one-ninth of the building volume in young trained adults --- so a 2-set floor errs toward reassurance rather than false alarms.
+
+\section{Temporal windows}
+Both axes compare a recent window against an earlier one, each a three-week mean over the 10-week series. For any weekly series $X_g$:
+\begin{equation}\label{eq:windows}
+\recent(X_g)=\frac{1}{3}\sum_{k=7}^{9} X_{g,k},
+\qquad
+\earlier(X_g)=\frac{1}{3}\sum_{k=4}^{6} X_{g,k}.
+\end{equation}
+The three-week mean smooths single missed or heavy sessions. The recent window is weeks 8--10 (the last three), the earlier window is weeks 5--7; the oldest three weeks provide history for charts but do not enter the comparison. Because the window is recent, the signal responds within about three weeks of a genuine change in training.
+
+\section{The two axes}
+\subsection{Dose}
+The current dose for muscle $g$ is the recent mean of effective weekly sets:
+\begin{equation}\label{eq:dose}
+D_g=\recent(S_g).
+\end{equation}
+
+\subsection{Trend: progressive overload two ways}
+Overload can come from more effective sets or from heavier load; either counts as progress. A set trend and a load trend are formed as recent-over-earlier ratios. The load series $L_{g,k}$ is the best estimated one-rep max reached in week $k$ on exercises for which $g$ is the primary mover:
+\begin{equation}\label{eq:trends}
+T^{S}_{g}=\frac{\recent(S_g)}{\earlier(S_g)},
+\qquad
+T^{L}_{g}=\frac{\recent(L_g)}{\earlier(L_g)}.
+\end{equation}
+Each ratio is defined only when its earlier window is positive; otherwise it is treated as absent. The combined trend takes the better of the two:
+\begin{equation}\label{eq:tau}
+\tau_g=\max\!\left(T^{S}_{g},\,T^{L}_{g}\right),
+\end{equation}
+with an absent ratio contributing $0$ to the maximum, and $\tau_g$ itself absent only when both ratios are absent (a muscle just started, with no earlier baseline). Taking the maximum prevents classic strength progression --- add load, drop reps --- from being misread as a decline: raw tonnage would fall, but $T^{L}$ rises.
+
+An earlier version used tonnage, $V=w\,r\,n$, as the sole trend signal. Tonnage rewards total kilograms moved, so lighter high-rep work inflates it while heavier low-rep work deflates it; it is a poor proxy for stimulus, and \eqref{eq:tau} replaces it.
+
+\section{Per-muscle state}
+The state $\sigma_g$ is a function of the dose $D_g$ and the trend $\tau_g$, evaluated top to bottom (first matching rule wins):
+\begin{enumerate}[label=\arabic*.,leftmargin=*]
+\item \textbf{Under-stimulated} if $D_g < \MV$ (below the maintenance floor of 2).
+\item \textbf{Under-stimulated} if $\tau_g$ exists and $\tau_g < 0.75$ (training eased off sharply).
+\item Otherwise, if $D_g \geq \MEV$ (adequate dose, ${\geq}\,6$): \textbf{growing} if $\tau_g$ is absent or $\tau_g \geq 1.08$; \textbf{holding} otherwise ($0.75 \leq \tau_g < 1.08$).
+\item Otherwise (maintenance band, $2 \leq D_g < 6$): \textbf{growing} if $\tau_g \geq 1.15$ and $D_g \geq 5$ (climbing toward a growth dose); \textbf{holding} otherwise.
+\end{enumerate}
+The asymmetry is intentional: a muscle grows only with both an adequate dose and a rising trend, but it can be flagged under-stimulated by a low dose alone. Holding is the wide middle --- enough to keep size, not enough to add it.
+
+\section{Overall verdict}
+Let $n_{\text{grow}}$, $n_{\text{hold}}$, $n_{\text{shrink}}$ count trained muscles in each state, and $m$ be the number of trained muscles. Let $\tau_{\text{all}}$ be the recent-over-earlier ratio of whole-body weekly volume. The headline is:
+\begin{enumerate}[label=\arabic*.,leftmargin=*]
+\item \textbf{Need more data} if fewer than 3 weeks show any training, or $m=0$.
+\item \textbf{At risk} if $n_{\text{shrink}} > n_{\text{grow}}$ and $n_{\text{shrink}} \geq \lceil m/3 \rceil$.
+\item \textbf{Growing} if $n_{\text{grow}} \geq \max\!\left(1,\ \mathrm{round}(0.4\,m)\right)$ and $\tau_{\text{all}}$ is absent or ${\geq}\,0.95$.
+\item \textbf{Holding} otherwise.
+\end{enumerate}
+The ``at risk'' headline requires under-stimulated muscles to both outnumber growing ones and reach a third of those trained, so a few neglected small muscles do not flip the whole read. It resolves to ``at risk'' chiefly when most of recent training is genuinely sparse.
+
+\section{Plan forecast}
+Separately from the history-based signal, the plan forecast projects a plan's \emph{prescribed} weekly sets before any of it is logged. Prescribed sets per rotation are scaled to a weekly rate by how often the plan is run, capped so an ambitious frequency on a short rotation cannot over-promise:
+\begin{equation}\label{eq:plan}
+\hat{s}_g = s_g \cdot \min\!\left(1.2,\ \frac{p}{W}\right),
+\end{equation}
+where $s_g$ is prescribed sets per rotation (primary plus half of secondary, as in \eqref{eq:alpha}), $p$ is planned sessions per week, and $W$ is the number of distinct rotation workouts. Each trained muscle is then sorted into under-dosed ($<\MV$), growth window ($\MEV$ to 20), past-productive ($>20$), or maintenance, and the counts drive a plain-language outlook. The forecast promises no centimetres or kilograms; it reports the dose against the growth window and what to change.
+
+\section{Scientific basis}
+Each parameter and mechanism traces to a specific source. Effect sizes are context-dependent; the model uses the literature to set structure and thresholds, not to promise outcomes.
+\begin{center}
+\begin{tabular}{@{}p{5.4cm}p{8.4cm}@{}}
+\toprule
+\textbf{Mechanism / parameter} & \textbf{Basis}\\
+\midrule
+Graded volume dose--response; ${\sim}10$ sets as a practical target & Schoenfeld, Ogborn \& Krieger 2017, \emph{J Sports Sci}: each added weekly set ${\approx}\,{+}0.37\%$ muscle, benefit rising across the studied range.\\
+Fractional (0.5) counting of indirect sets; diminishing returns; frequency neutral at equal volume & Pelland et~al.\ 2026, \emph{Sports Medicine} (peer-reviewed; 67 studies, 2{,}058 subjects). doi:10.1007/s40279-025-02344-w\\
+Effort factor $\eps$; hypertrophy comparable across ${\sim}0$--4 RIR, dropping off when easier & Robinson/Pelland 2024 proximity-to-failure meta-regression; Refalo et~al.\ 2024 RCT (failure vs.\ 1--2 RIR).\\
+$\MEV/\MAV$ landmark structure (${\sim}10$ to 20 sets) & Israetel et~al.\ (Renaissance Periodization) volume-landmarks framework.\\
+Maintenance floor $\MV$; size held on ${\sim}1/3$ (older) to ${\sim}1/9$ (young) of building volume & Bickel, Cross \& Bamman 2011, \emph{Med Sci Sports Exerc} (RCT, 16-wk build plus 32-wk reduced dose).\\
+Decline below maintenance stimulus; ${\sim}2$--4-week strength retention, then loss & Mujika \& Padilla 2000 detraining review; measurable cross-sectional-area loss from ${\sim}2$--3 weeks of complete cessation.\\
+Overload via added load \emph{or} reps, so the trend tracks both, not tonnage & Plotkin et~al.\ 2022, \emph{PeerJ} (RCT; load- and rep-progression gave near-identical growth); mechanism in Schoenfeld 2010.\\
+Epley one-rep-max $\varphi$ for anchor and RIR inference & Standard load--rep relationship; used consistently for PR detection and effort estimation.\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Assumptions and limitations}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Validation status.} This is a mechanistic model grounded in the literature and internally consistent, but it has not been validated against direct body-composition measurements (DXA, ultrasound, or MRI). Its thresholds are set from published dose--response findings and practitioner frameworks, not fitted to an outcome dataset, and no predictive accuracy or uncertainty interval is claimed.
+\item \textbf{Stimulus, not size.} Every output estimates the training stimulus from logs. The app cannot see the body; no measurement of muscle mass is implied.
+\item \textbf{Effort is self-reported.} Reps in reserve is not recoverable from load and reps alone; \eqref{eq:rir} sets only a default. Day-to-day max-rep variability ($\pm 1$--3 reps) sits at the resolution of the effort bands, so the estimate is noisy near failure and the manual override remains the ground truth.
+\item \textbf{Top-set inference.} History stores the top set and a set count, not every set's reps, so within-session rep drop-off is not yet used as an effort cue.
+\item \textbf{One landmark set for all muscles.} Chosen for legibility; real landmarks vary by muscle and training age.
+\item \textbf{Load trend needs external load.} Bodyweight and timed work do not contribute to $T^{L}$; those muscles rely on the set trend alone.
+\item \textbf{Residual tonnage use.} The overall verdict's $\tau_{\text{all}}$ still uses whole-body volume; the per-muscle trend does not.
+\item \textbf{Conservative by design.} The maintenance floor and the ``at risk'' threshold both err toward not raising a false alarm rather than toward flattering the lifter.
+\end{itemize}
+
+\appendix
+\section{Symbol reference}
+\begin{center}
+\begin{tabular}{@{}lp{10.5cm}@{}}
+\toprule
+\textbf{Symbol} & \textbf{Definition}\\
+\midrule
+$g,\ x,\ e$ & Muscle group, exercise, logged entry\\
+$w,\ r,\ n,\ f$ & Top-set load (kg), top-set reps, set count, effort code $\{0,1,2\}$\\
+$\alpha(x,g)$ & Muscle attribution weight: 1 primary, 0.5 secondary, 0 otherwise \eqref{eq:alpha}\\
+$\eps(f)$ & Effort factor: 0.5 / 1 / 1 for Easy / Hard / Max \eqref{eq:eps}\\
+$S_{g,k}$ & Effective weekly sets, muscle $g$, week $k$ \eqref{eq:S}\\
+$\varphi(w,r)$ & Epley estimated one-rep max \eqref{eq:epley}\\
+$A_x$ & Anchor: best prior $\varphi$ for exercise $x$ \eqref{eq:anchor}\\
+$L_{g,k}$ & Weekly peak $\varphi$ on primary exercises for $g$\\
+$D_g$ & Recent dose: recent mean of $S_g$ \eqref{eq:dose}\\
+$T^{S},\ T^{L},\ \tau$ & Set trend, load trend, combined trend \eqref{eq:trends}--\eqref{eq:tau}\\
+$\MV,\MEV,\text{target},\MAV$ & Landmarks 2, 6, 10, 20 effective sets/muscle/week\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\vspace{6pt}
+\noindent\rule{\linewidth}{0.4pt}\\[2pt]
+\noindent\footnotesize Yalla training-stimulus model, v120. Estimates a training stimulus from logs; not medical or diagnostic advice, and not a measurement of muscle mass.
+
+\end{document}
