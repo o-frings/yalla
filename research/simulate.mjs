@@ -137,6 +137,24 @@ function overloadContrast(rate) {
 }
 const olProg = overloadContrast(0.02), olFlat = overloadContrast(0.0);
 
+// Monte Carlo muscle-gain forecast (mirrors the in-app forecast): each run accumulates a weekly fractional
+// gain baseRate·indiv·ρ(D)·effort·overload·e^(−t/32), with the inter-individual multiplier drawn lognormal
+// to span Hubal 2005's observed range. Plan = 10 sets/wk progressing; current pace = 6 sets/wk stalling.
+// Novice base rate, 500 paired runs; returns 10/50/90th-percentile trajectories.
+function mcForecast(rho, progressing, { baseRate = 0.9, effort = 0.9, K = 500, W = 16 } = {}) {
+  let s = 987654321 >>> 0; const u = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  const nrm = (m, sd) => { const a = Math.max(1e-9, u()); return m + sd * Math.sqrt(-2 * Math.log(a)) * Math.cos(2 * Math.PI * u()); };
+  const tr = Array.from({ length: W + 1 }, () => []);
+  for (let k = 0; k < K; k++) {
+    const indiv = Math.exp(nrm(0, 0.55)), ov = progressing ? 1 : Math.max(0, nrm(0.5, 0.08));
+    let C = 0; tr[0].push(0);
+    for (let t = 1; t <= W; t++) { C += baseRate * indiv * rho * effort * ov * Math.exp(-t / 32); tr[t].push(C); }
+  }
+  const q = (a, p) => { const b = a.slice().sort((x, y) => x - y); return b[Math.floor(p * (b.length - 1))]; };
+  return { p10: tr.map((a) => q(a, 0.1)), p50: tr.map((a) => q(a, 0.5)), p90: tr.map((a) => q(a, 0.9)) };
+}
+const mcPlan = mcForecast(doseStimulus(10), true), mcPace = mcForecast(doseStimulus(6), false);
+
 // ---- console summary ----
 const growWeeks = (rec) => rec.reduce((p, w) => p + w.growing, 0);
 const underWeeks = (rec) => rec.reduce((p, w) => p + w.shrink, 0);
@@ -330,4 +348,7 @@ writeFileSync(new URL("./sim-plans.dat", import.meta.url),
     regByPlan[planKeys[0]].map((w, t) => [wk1(t), w.meanStim * 100, regByPlan[planKeys[1]][t].meanStim * 100, regByPlan[planKeys[2]][t].meanStim * 100])));
 writeFileSync(new URL("./sim-overload.dat", import.meta.url),
   dat("week progressing flat", olProg.map((v, t) => [t + 1, v, olFlat[t]])));
+writeFileSync(new URL("./sim-mc.dat", import.meta.url),
+  dat("week planLo planMid planHi paceLo paceMid paceHi",
+    mcPlan.p10.map((_, t) => [t, mcPlan.p10[t], mcPlan.p50[t], mcPlan.p90[t], mcPace.p10[t], mcPace.p50[t], mcPace.p90[t]])));
 console.log("Wrote research/sim-ul.dat, sim-muscles.dat, sim-plans.dat, sim-overload.dat");

@@ -10,6 +10,7 @@
 \usepackage{xcolor}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
+\usepgfplotslibrary{fillbetween}
 \usepackage[hidelinks]{hyperref}
 
 % app colours (Yalla): accent, muscle hues (MCOLOR), and the growth-state palette
@@ -275,6 +276,27 @@ Volume alone is not enough. Loads progress in these runs whenever a muscle's dos
 \caption{Progressive overload at a fixed adequate volume (10 sets/week): realised growth when loads climb 2\% per week versus repeating the same loads. Identical volume; the difference is overload.}\label{fig:overload}
 \end{figure}
 
+\subsection{Monte Carlo forecast}\label{sec:mc}
+A point prediction of muscle gain would overstate what the model knows, so the in-app forecast is probabilistic. Each of 500 runs accumulates a weekly fractional gain
+\begin{equation}\label{eq:mcgain}
+\Delta_t = b \cdot m \cdot \rho(D) \cdot \eta \cdot o \cdot e^{-t/32},
+\end{equation}
+where $\rho(D)$ is the dose--response of Section~4~\cite{sch17,drr}, $\eta$ scales with proximity to failure~\cite{failureprox}, $o$ is near 1 while progressing and drops without added load~\cite{plotkin}, $b$ is a training-age base rate~\cite{damas}, and $m$ is the inter-individual response multiplier, drawn lognormal to span the range Hubal et~al.~\cite{hubal} observed (cross-sectional-area change from about $-2\%$ to $+59\%$). The first four terms are well constrained by the literature; $b$ is literature-informed with a wide prior, and $m$ is the dominant source of spread, so the bands, not the median, carry the message. Figure~\ref{fig:mc} shows the median and 10--90\% range for the chosen plan against the current pace; the same two scenarios drive the forecast in the app.
+
+\begin{figure}[t]\centering
+\begin{tikzpicture}\begin{axis}[simaxis, xmax=16, ylabel={projected muscle gain (\%)}, ymin=0, legend pos=north west]
+\addplot[draw=none, forget plot, name path=ppHi] table[x=week,y=planHi]{research/sim-mc.dat};
+\addplot[draw=none, forget plot, name path=ppLo] table[x=week,y=planLo]{research/sim-mc.dat};
+\addplot[appAccent!15, forget plot] fill between[of=ppHi and ppLo];
+\addplot[draw=none, forget plot, name path=qqHi] table[x=week,y=paceHi]{research/sim-mc.dat};
+\addplot[draw=none, forget plot, name path=qqLo] table[x=week,y=paceLo]{research/sim-mc.dat};
+\addplot[appBlue!15, forget plot] fill between[of=qqHi and qqLo];
+\addplot[appAccent, line width=1pt] table[x=week,y=planMid]{research/sim-mc.dat}; \addlegendentry{this plan}
+\addplot[appBlue, line width=1pt] table[x=week,y=paceMid]{research/sim-mc.dat}; \addlegendentry{current pace}
+\end{axis}\end{tikzpicture}
+\caption{Monte Carlo muscle-gain forecast over 16 weeks (median lines, 10--90\% bands) for a novice: keeping to an adequate, progressing plan versus a lower, stalling current pace. The wide bands are chiefly inter-individual variability~\cite{hubal}.}\label{fig:mc}
+\end{figure}
+
 \section{Scientific basis}\label{sec:basis}
 Each parameter and mechanism traces to a specific source. Effect sizes are context-dependent; the model uses the literature to set its structure and thresholds, and promises no outcomes.
 Grades are GRADE-style ratings of the underlying evidence: High (meta-analyses of RCTs), Moderate (individual RCTs or focused reviews), Low (practitioner framework). A Low grade flags a parameter that rests on weaker evidence and is the first candidate for revision.
@@ -293,6 +315,8 @@ Maintenance floor $\MV$; size held on ${\sim}1/3$ (older) to ${\sim}1/9$ (young)
 Decline below maintenance stimulus; ${\sim}2$--4-week strength retention, then loss & Mujika \& Padilla~\cite{mujika} detraining review; cross-sectional-area loss from ${\sim}2$--3 weeks of cessation. & Moderate\\
 Overload via added load \emph{or} reps; the trend tracks both & Plotkin et~al.~\cite{plotkin} (RCT; load- and rep-progression gave near-identical growth); mechanism in Schoenfeld~\cite{sch10}. & Moderate\\
 Epley one-rep-max $\varphi$; self-calibrated denominator $K$ & Standard load--rep relationship~\cite{epley}; $K$ fitted from the lifter's own Max sets \eqref{eq:kcal}. & Method\\
+Monte Carlo forecast: training-age base rate & Damas et~al.~\cite{damas}; hypertrophy rate depends on training status. & Moderate\\
+Monte Carlo forecast: inter-individual response spread & Hubal et~al.~\cite{hubal} (n=585); 12-wk CSA change ${\approx}\,{-}2\%$ to $+59\%$. & High\\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -320,7 +344,9 @@ No body-composition study validates the model (see the limitations that follow).
 \begin{thebibliography}{9}
 \small
 \bibitem{bickel} Bickel CS, Cross JM, Bamman MM. Exercise dosing to retain resistance-training adaptations in young and older adults. \emph{Med Sci Sports Exerc}. 2011;43(7):1177--1187. doi:10.1249/MSS.0b013e318207c15d
+\bibitem{damas} Damas F, Phillips SM, Libardi CA, et al. Resistance training-induced changes in integrated myofibrillar protein synthesis are related to hypertrophy only after attenuation of muscle damage. \emph{J Physiol}. 2016;594(18):5209--5222. doi:10.1113/JP272472
 \bibitem{epley} Epley B. Poundage chart. \emph{Boyd Epley Workout}. Lincoln, NE: Body Enterprises; 1985.
+\bibitem{hubal} Hubal MJ, Gordish-Dressman H, Thompson PD, et al. Variability in muscle size and strength gain after unilateral resistance training. \emph{Med Sci Sports Exerc}. 2005;37(6):964--972. doi:10.1249/01.mss.0000170469.90461.5f
 \bibitem{rpvol} Israetel M, Hoffmann J, Smith CW. Training volume landmarks for muscle growth (MEV/MAV/MRV). \emph{Renaissance Periodization}; 2017. \url{https://rpstrength.com/blogs/articles/training-volume-landmarks-muscle-growth}
 \bibitem{mujika} Mujika I, Padilla S. Detraining: loss of training-induced physiological and performance adaptations. Part I --- short-term insufficient training stimulus. \emph{Sports Med}. 2000;30(2):79--87. doi:10.2165/00007256-200030020-00002
 \bibitem{drr} Pelland JC, Remmert JF, Robinson ZP, Hinson SR, Zourdos MC. The resistance training dose response: meta-regressions exploring the effects of weekly volume and frequency on muscle hypertrophy and strength gains. \emph{Sports Med}. 2026. doi:10.1007/s40279-025-02344-w
