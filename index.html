@@ -262,6 +262,10 @@
         <canvas id="fcChart" width="760" height="300"></canvas>
         <div class="fclegend" id="fcLegend"></div>
         <p class="fcconn">Continues your recent logged trend — “current pace” follows it, “this plan” assumes progressive overload.</p>
+        <!-- Sensitivity: kept prominent (not collapsed) so the levers to change are always in view -->
+        <div class="fchd2">What would move this most</div>
+        <canvas id="fcTornado" width="760" height="190"></canvas>
+        <p class="fcnote" id="fcSensCap"></p>
         <details class="fcdetails">
           <summary>By muscle</summary>
           <div class="fchd2">Projected 16-week gain by muscle</div>
@@ -270,14 +274,12 @@
             <button class="mewintab active" data-fm="pace" type="button">Current pace</button>
           </div>
           <canvas id="fcMuscles" width="760" height="230"></canvas>
-          <div class="fchd2">Where each muscle stands now</div>
-          <div class="growth" id="musGrowth" style="display:none;"></div>
+          <p class="fcnote" id="fcLagCap"></p>
         </details>
         <details class="fcdetails">
-          <summary>What would move this most</summary>
-          <canvas id="fcTornado" width="760" height="190"></canvas>
-          <p class="fcnote" id="fcSensCap"></p>
+          <summary>How it's estimated</summary>
           <p class="fcnote">500-run Monte Carlo with literature-backed parameters — dose, effort, progressive overload, your age, sex and experience, and how differently people respond. The band is the 10–90% range, wide mostly because individual response varies a lot; it can dip below zero if training falls under maintenance. Set your age, sex and experience under Profile to personalise it. An estimate with real uncertainty, not a promise.</p>
+          <p class="fcnote"><a class="srclink" href="growth-model-whitepaper.pdf" target="_blank" rel="noopener">The method &amp; evidence (PDF) ↗</a></p>
         </details>
       </div>
       <!-- Progress (logged history) -->

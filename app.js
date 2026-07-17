@@ -3163,22 +3163,18 @@ function growthStatus(){
 }
 const GST_ARROW={grow:"↑", hold:"→", shrink:"↓"};
 const GST_HEAD={grow:"Overall: growing", hold:"Overall: holding", shrink:"Overall: at risk", more:"Growth signal"};
+// One actionable line under the per-muscle bars — what to fix first — instead of a second per-muscle view.
 function renderGrowth(){
-  const box=$("musGrowth"); if(!box) return;
+  const box=$("fcLagCap"); if(!box) return;
   const r=growthStatus();
+  if(r.combined.state==="more" || !r.per.length){ box.style.display="none"; box.textContent=""; return; }
   box.style.display="";
-  box.className="growth "+r.combined.state;
-  let h='<div class="ghead"><span class="gdot '+r.combined.state+'"></span><span class="gtitle">'+esc(GST_HEAD[r.combined.state]||"Growth signal")+'</span></div>';
-  h+='<p class="gsub">'+esc(r.combined.msg)+'</p>';
-  if(r.per.length && r.combined.state!=="more"){
-    h+='<div class="grid">'+r.per.map(p=>{
-      const tip=p.g+" · ~"+round1(p.sets)+" sets/wk · ~"+Math.round(p.stim*100)+"% of the growth stimulus"+(p.borderline?" · borderline":"")+" — "+p.why;
-      return '<span class="gchip '+p.state+(p.borderline?" bord":"")+'" title="'+esc(tip)+'">'+esc(MSHORT[p.g]||p.g)+' <span class="garrow">'+GST_ARROW[p.state]+'</span>'+(p.borderline?'<span class="gq">~</span>':'')+'</span>';
-    }).join('')+'</div>';
-    h+='<p class="gsub" style="margin-top:11px;font-size:12px;color:var(--l3);">Per muscle over the last '+PROG_WEEKS+' weeks · ↑ growing · → holding · ↓ under-stimulated · ~ borderline. Tap a muscle for its weekly sets and estimated share of the growth stimulus. An estimate of training stimulus, not a body measurement.</p>';
-  }
-  h+='<p class="gsub" style="margin-top:9px;font-size:12px;"><a class="srclink" href="growth-model-whitepaper.pdf" target="_blank" rel="noopener">How this is calculated — the method &amp; evidence (PDF) ↗</a></p>';
-  box.innerHTML=h;
+  const name=p=>MSHORT[p.g]||p.g;
+  const shrink=r.per.filter(p=>p.state==="shrink").map(name);
+  const hold=r.per.filter(p=>p.state==="hold").map(name);
+  if(shrink.length) box.textContent="Below maintenance — losing ground: "+shrink.join(", ")+". Add hard sets there first.";
+  else if(hold.length) box.textContent="Holding but not building: "+hold.join(", ")+". Add a rep or a little load to push these.";
+  else box.textContent="Every trained muscle is getting a growth stimulus — keep the overload going.";
 }
 // Draw ONE progress metric into a given canvas (static — the swipe provides motion). Returns the
 // caption HTML + the data the verdict needs, so the active page's meta can be shown below the carousel.
