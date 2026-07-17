@@ -26,7 +26,7 @@
 \maketitle
 
 \begin{abstract}
-\noindent Yalla estimates, per muscle and for the body overall, whether recent training is enough to grow, hold, or slowly lose muscle size. The estimate is a read on \emph{training stimulus} inferred from logged sets, loads, and reps --- not a measurement of the body. Two axes drive it: a \emph{dose} axis (effort-weighted weekly sets against volume landmarks) and a \emph{trend} axis (progressive overload measured as the better of a set trend and a load trend). Set effort is captured with a three-level control whose default is estimated from the load--rep relationship against the lifter's own best set. This document defines every quantity, the equations that combine them, the decision rules that produce a state, and the evidence each parameter rests on. It also states the model's assumptions, its validation status, and where it is deliberately conservative. The specification corresponds to the functions \texttt{growthStatus()}, \texttt{inferEffort()}, and \texttt{planForecast()} in \texttt{app.js}.
+\noindent Yalla estimates, per muscle and for the body overall, whether recent training is enough to grow, hold, or slowly lose muscle size. The estimate is a read on \emph{training stimulus} inferred from logged sets, loads, and reps, not a measurement of the body. Two axes drive it: a \emph{dose} axis (effort-weighted weekly sets against volume landmarks) and a \emph{trend} axis (progressive overload measured as the better of a set trend and a load trend). Set effort is captured with a three-level control whose default is estimated from the load--rep relationship against the lifter's own best set. This document defines every quantity, the equations that combine them, the decision rules that produce a state, and the evidence each parameter rests on. It also states the model's assumptions, its validation status, and where it is deliberately conservative. The specification corresponds to the functions \texttt{growthStatus()}, \texttt{inferEffort()}, and \texttt{planForecast()} in \texttt{app.js}.
 \end{abstract}
 
 \section{Model overview}
@@ -67,7 +67,7 @@ S_{g,k}=\sum_{e\,\in\,\text{week }k} n_e\,\eps(f_e)\,\alpha(x_e,g).
 This same effort-weighted, fractional count feeds the weekly-sets chart, the balance radar, and the ``hard sets'' ring, so every surface in the app reads consistently.
 
 \section{Effort inference}
-Proximity to failure cannot be recovered from load and reps alone --- the same $100\,\text{kg}\times 8$ can be an all-out set or an easy one. So effort is a self-report. To keep friction to one optional tap, its default is estimated from the numbers and shown pre-selected; the lifter overrides only when the estimate is wrong.
+Proximity to failure cannot be recovered from load and reps alone: the same $100\,\text{kg}\times 8$ can be an all-out set or an easy one. So effort is a self-report. To keep friction to one optional tap, its default is estimated from the numbers and shown pre-selected; the lifter overrides only when the estimate is wrong.
 
 \subsection{Estimated one-rep max (anchor)}
 Set strength is summarised by the Epley one-rep-max estimate:
@@ -96,7 +96,7 @@ f=
 The anchor is recomputed every time rather than frozen after a calibration period. A rolling anchor adapts to deloads and off days and never locks in a wrong baseline the way a one-time calibration could. When there is no prior baseline for the lift, or the exercise carries no external load (bodyweight or timed holds), \eqref{eq:rir} is not evaluated and the default stays Hard.
 
 \section{Volume landmarks}
-Four thresholds, in effective sets per muscle per week, anchor the dose axis. They follow the $\MEV/\MAV$ framework and the dose--response meta-analyses.
+Four thresholds, in effective sets per muscle per week, define the dose axis. They follow the $\MEV/\MAV$ framework and the dose--response meta-analyses.
 \begin{center}
 \begin{tabular}{@{}llp{8.2cm}@{}}
 \toprule
@@ -109,7 +109,7 @@ $\MAV$ (20) & Upper productive bound & Beyond it, added sets mostly add fatigue 
 \bottomrule
 \end{tabular}
 \end{center}
-A single set of landmarks is applied to every muscle. Real per-muscle landmarks differ, but one baseline keeps the read legible. The maintenance floor is deliberately conservative: built muscle is held on very little --- as little as roughly one-ninth of the building volume in young trained adults --- so a 2-set floor errs toward reassurance rather than false alarms.
+A single set of landmarks is applied to every muscle. Real per-muscle landmarks differ, but one baseline keeps the output legible. The maintenance floor is deliberately low: built muscle is held on very little (as little as roughly one-ninth of the building volume in young trained adults), so a 2-set floor avoids flagging loss too early.
 
 \section{Temporal windows}
 Both axes compare a recent window against an earlier one, each a three-week mean over the 10-week series. For any weekly series $X_g$:
@@ -138,7 +138,7 @@ Each ratio is defined only when its earlier window is positive; otherwise it is 
 \begin{equation}\label{eq:tau}
 \tau_g=\max\!\left(T^{S}_{g},\,T^{L}_{g}\right),
 \end{equation}
-with an absent ratio contributing $0$ to the maximum, and $\tau_g$ itself absent only when both ratios are absent (a muscle just started, with no earlier baseline). Taking the maximum prevents classic strength progression --- add load, drop reps --- from being misread as a decline: raw tonnage would fall, but $T^{L}$ rises.
+with an absent ratio contributing $0$ to the maximum, and $\tau_g$ itself absent only when both ratios are absent (a muscle just started, with no earlier baseline). Taking the maximum prevents classic strength progression (add load, drop reps) from being misread as a decline: raw tonnage would fall, but $T^{L}$ rises.
 
 An earlier version used tonnage, $V=w\,r\,n$, as the sole trend signal. Tonnage rewards total kilograms moved, so lighter high-rep work inflates it while heavier low-rep work deflates it; it is a poor proxy for stimulus, and \eqref{eq:tau} replaces it.
 
@@ -150,7 +150,7 @@ The state $\sigma_g$ is a function of the dose $D_g$ and the trend $\tau_g$, eva
 \item Otherwise, if $D_g \geq \MEV$ (adequate dose, ${\geq}\,6$): \textbf{growing} if $\tau_g$ is absent or $\tau_g \geq 1.08$; \textbf{holding} otherwise ($0.75 \leq \tau_g < 1.08$).
 \item Otherwise (maintenance band, $2 \leq D_g < 6$): \textbf{growing} if $\tau_g \geq 1.15$ and $D_g \geq 5$ (climbing toward a growth dose); \textbf{holding} otherwise.
 \end{enumerate}
-The asymmetry is intentional: a muscle grows only with both an adequate dose and a rising trend, but it can be flagged under-stimulated by a low dose alone. Holding is the wide middle --- enough to keep size, not enough to add it.
+The asymmetry is intentional: a muscle grows only with both an adequate dose and a rising trend, but it can be flagged under-stimulated by a low dose alone. Holding is the wide middle band: enough volume to keep size, below the dose that adds it.
 
 \section{Overall verdict}
 Let $n_{\text{grow}}$, $n_{\text{hold}}$, $n_{\text{shrink}}$ count trained muscles in each state, and $m$ be the number of trained muscles. Let $\tau_{\text{all}}$ be the recent-over-earlier ratio of whole-body weekly volume. The headline is:
@@ -197,7 +197,7 @@ Epley one-rep-max $\varphi$ for anchor and RIR inference & Standard load--rep re
 \item \textbf{One landmark set for all muscles.} Chosen for legibility; real landmarks vary by muscle and training age.
 \item \textbf{Load trend needs external load.} Bodyweight and timed work do not contribute to $T^{L}$; those muscles rely on the set trend alone.
 \item \textbf{Residual tonnage use.} The overall verdict's $\tau_{\text{all}}$ still uses whole-body volume; the per-muscle trend does not.
-\item \textbf{Conservative by design.} The maintenance floor and the ``at risk'' threshold both err toward not raising a false alarm rather than toward flattering the lifter.
+\item \textbf{Conservative by design.} The maintenance floor and the ``at risk'' threshold are both set so the model under-reports muscle loss rather than over-reports it.
 \end{itemize}
 
 \appendix
