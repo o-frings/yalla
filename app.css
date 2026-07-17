@@ -619,7 +619,7 @@
   .fcconn{ font-size:12px; color:var(--l2); line-height:1.45; margin:8px 0 2px; }
   /* collapsed-by-default secondary detail inside the forecast card */
   .fcdetails{ margin-top:10px; border-top:.5px solid var(--sep); padding-top:8px; }
-  .fcdetails summary{ cursor:pointer; list-style:none; font-size:12.5px; font-weight:650; color:var(--accent); -webkit-tap-highlight-color:transparent; }
+  .fcdetails summary{ cursor:pointer; list-style:none; font-size:15px; font-weight:600; color:var(--ink); -webkit-tap-highlight-color:transparent; }
   .fcdetails summary::-webkit-details-marker{ display:none; }
   .fcdetails summary::after{ content:" ›"; color:var(--l3); }
   .fcdetails[open] summary::after{ content:" ⌄"; }
