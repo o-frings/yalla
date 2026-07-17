@@ -25,6 +25,14 @@ Reproducible checks for Yalla's training-stimulus model (documented in
   With no argument it runs on synthetic data to demonstrate the method; pass a real
   exported history for the actual test.
 
+- **`simulate.mjs`** — behavioural showcase. Runs standard plans (Full-Body 3x,
+  Upper/Lower 4x, Push/Pull/Legs 6x) over 24 weeks with a seeded PRNG, feeds them
+  through the shared core, and contrasts regular against irregular (~55% of
+  sessions) training. Writes a self-contained report `simulations.html` (inline SVG
+  charts, colourblind-checked palette) and prints a console summary. Reproducible:
+  same seed reproduces every number and chart.
+  Run: `node research/simulate.mjs`
+
 These raise rigor without new measurement (grounded thresholds, honest uncertainty,
 falsifiable internal checks). Direct validation still requires longitudinal
 body-composition data; see the white paper's "Assumptions and limitations".
