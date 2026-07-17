@@ -253,49 +253,53 @@
       <div class="stat"><div class="n" id="stSince">0</div><div class="k">Since deload</div></div>
       <div class="stat"><div class="n" id="stBeat">0</div><div class="k">Beat last</div></div>
     </div>
-    <div class="mezone">Training</div>
-    <div class="panel tap" id="meBalance" role="button" tabindex="0" aria-label="Open muscle balance">
-      <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>Muscle balance</span></div>
-      <div class="mewintabs paneltabs" id="meWinSeg">
-        <button class="mewintab active" data-d="7" type="button">Week</button>
-        <button class="mewintab" data-d="30" type="button">Month</button>
+    <div class="mezone rowzone">Your training<button class="tilereset" id="tileReset" type="button">reset order</button></div>
+    <div class="metiles" id="meTiles">
+      <!-- Growth forecast (default first) — projection continuing from the logged history -->
+      <div class="panel metile" id="fcCard" data-tile="forecast" style="display:none;">
+        <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 3 6-7"/><path d="M14 4h5v5"/></svg>Growth forecast</span><span class="tilegrip" aria-label="Drag to reorder" title="Drag to reorder">⠿</span></div>
+        <div class="fcsub" id="fcSub"></div>
+        <canvas id="fcChart" width="760" height="300"></canvas>
+        <div class="fclegend" id="fcLegend"></div>
+        <p class="fcconn">Continues your recent logged trend — “current pace” follows it, “this plan” assumes progressive overload.</p>
+        <div class="fchd2">Projected 16-week gain by muscle</div>
+        <canvas id="fcMuscles" width="760" height="230"></canvas>
+        <details class="fcdetails">
+          <summary>What moves this &amp; how it's estimated</summary>
+          <div class="fchd2">Swing in 16-week gain across key inputs</div>
+          <canvas id="fcTornado" width="760" height="190"></canvas>
+          <p class="fcnote">A Monte Carlo simulation of muscle gain over the next 16 weeks — 500 runs with literature-backed parameters (dose, effort, progressive overload, your age and training experience, and individual variability) — if you keep to this plan versus your current pace and rate of progress. The shaded band is the 10–90% range, wide mostly because individual response varies a lot between people; the curve can dip below zero if training falls under maintenance. Add your age and sex under body details to personalise it. An estimate with real uncertainty, not a promise.</p>
+        </details>
       </div>
-      <div class="meRing" id="meRing"><div class="meRingTrack" id="meRingTrack"><div class="meRingPage"><canvas id="meRadar" width="900" height="900"></canvas></div><div class="meRingPage"><canvas id="meRadar2" width="900" height="900"></canvas></div></div></div>
-      <div class="panelfoot"><span class="mebalstat" id="meBalStat"></span><span class="mebalcta" id="meBalCta">tap for detail ›</span></div>
-    </div>
-    <div class="mezone">Progress &amp; forecast</div>
-    <div class="panel" id="progPanel">
-      <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 2 5-6"/></svg>Progress</span></div>
-      <div class="mewintabs paneltabs" id="progMetric">
-        <button class="mewintab active" data-pm="volume" type="button">Volume</button>
-        <button class="mewintab" data-pm="sets" type="button">Sets</button>
-        <button class="mewintab" data-pm="sessions" type="button">Sessions</button>
-        <button class="mewintab" data-pm="weight" type="button">Weight</button>
-        <button class="mewintab" data-pm="prs" type="button">PRs</button>
+      <!-- Progress (logged history) -->
+      <div class="panel metile" id="progPanel" data-tile="progress">
+        <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 2 5-6"/></svg>Progress</span><span class="tilegrip" aria-label="Drag to reorder" title="Drag to reorder">⠿</span></div>
+        <div class="mewintabs paneltabs" id="progMetric">
+          <button class="mewintab active" data-pm="volume" type="button">Volume</button>
+          <button class="mewintab" data-pm="sets" type="button">Sets</button>
+          <button class="mewintab" data-pm="sessions" type="button">Sessions</button>
+          <button class="mewintab" data-pm="weight" type="button">Weight</button>
+          <button class="mewintab" data-pm="prs" type="button">PRs</button>
+        </div>
+        <div class="progswipe" id="progSwipe"><div class="progtrack" id="progTrack">
+          <div class="progpage"><canvas id="progBars0" width="660" height="180"></canvas></div>
+          <div class="progpage"><canvas id="progBars1" width="660" height="180"></canvas></div>
+          <div class="progpage"><canvas id="progBars2" width="660" height="180"></canvas></div>
+          <div class="progpage"><canvas id="progBars3" width="660" height="180"></canvas></div>
+          <div class="progpage"><canvas id="progBars4" width="660" height="180"></canvas></div>
+        </div></div>
+        <div class="panelfoot stack"><div class="progcap" id="progCap"></div><div class="progverd" id="progVerdict" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div></div>
       </div>
-      <div class="progswipe" id="progSwipe"><div class="progtrack" id="progTrack">
-        <div class="progpage"><canvas id="progBars0" width="660" height="180"></canvas></div>
-        <div class="progpage"><canvas id="progBars1" width="660" height="180"></canvas></div>
-        <div class="progpage"><canvas id="progBars2" width="660" height="180"></canvas></div>
-        <div class="progpage"><canvas id="progBars3" width="660" height="180"></canvas></div>
-        <div class="progpage"><canvas id="progBars4" width="660" height="180"></canvas></div>
-      </div></div>
-      <div class="panelfoot stack"><div class="progcap" id="progCap"></div><div class="progverd" id="progVerdict" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div></div>
-    </div>
-    <!-- Forward projection: continues from the logged history above -->
-    <div class="fccard" id="fcCard" style="display:none;">
-      <div class="fchd">Growth forecast<span class="fcsub" id="fcSub"></span></div>
-      <canvas id="fcChart" width="760" height="300"></canvas>
-      <div class="fclegend" id="fcLegend"></div>
-      <p class="fcconn">Projected forward from your logged training above — “current pace” continues that trend, “this plan” assumes you follow it with progressive overload.</p>
-      <div class="fchd2">Projected 16-week gain by muscle</div>
-      <canvas id="fcMuscles" width="760" height="230"></canvas>
-      <details class="fcdetails">
-        <summary>What moves this &amp; how it's estimated</summary>
-        <div class="fchd2">Swing in 16-week gain across key inputs</div>
-        <canvas id="fcTornado" width="760" height="190"></canvas>
-        <p class="fcnote">A Monte Carlo simulation of muscle gain over the next 16 weeks — 500 runs with literature-backed parameters (dose, effort, progressive overload, your age and training experience, and individual variability) — if you keep to this plan versus your current pace and rate of progress. The shaded band is the 10–90% range, wide mostly because individual response varies a lot between people; the curve can dip below zero if training falls under maintenance. Add your age and sex under body details to personalise it. An estimate with real uncertainty, not a promise.</p>
-      </details>
+      <!-- Muscle balance -->
+      <div class="panel tap metile" id="meBalance" data-tile="balance" role="button" tabindex="0" aria-label="Open muscle balance">
+        <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>Muscle balance</span><span class="tilegrip" aria-label="Drag to reorder" title="Drag to reorder">⠿</span></div>
+        <div class="mewintabs paneltabs" id="meWinSeg">
+          <button class="mewintab active" data-d="7" type="button">Week</button>
+          <button class="mewintab" data-d="30" type="button">Month</button>
+        </div>
+        <div class="meRing" id="meRing"><div class="meRingTrack" id="meRingTrack"><div class="meRingPage"><canvas id="meRadar" width="900" height="900"></canvas></div><div class="meRingPage"><canvas id="meRadar2" width="900" height="900"></canvas></div></div></div>
+        <div class="panelfoot"><span class="mebalstat" id="meBalStat"></span><span class="mebalcta" id="meBalCta">tap for detail ›</span></div>
+      </div>
     </div>
 
     <div class="group" id="cardioCard"></div>

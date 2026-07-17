@@ -2162,7 +2162,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi] || (rot[xi]!=null && !rotKeep.has(xi) ? rot[xi] : e.n); }
-let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, age:null, theme:"auto", restSec:90, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{}, baseActivity:null };
+let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, age:null, meTileOrder:null, theme:"auto", restSec:90, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{}, baseActivity:null };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -2915,6 +2915,7 @@ function renderDash(){
   renderCalendar();
   renderBaseActivity();
   renderGrowthForecast();
+  applyTileOrder();
   renderCardioCard();
   renderAchievements();
   renderInsight();
@@ -6020,6 +6021,38 @@ function renderGrowthForecast(){
   card.style.display="";
   drawForecast(f); drawForecastMuscles(f); drawForecastSens(f);
 }
+// ===== reorderable Me tiles (drag the grip; order persists per user) =====
+function applyTileOrder(){
+  const c=$("meTiles"); if(!c) return;
+  const order=settings.meTileOrder; if(!order||!order.length) return;
+  order.forEach(t=>{ const el=c.querySelector('.metile[data-tile="'+t+'"]'); if(el) c.appendChild(el); });
+}
+function saveTileOrder(){
+  const c=$("meTiles"); if(!c) return;
+  settings.meTileOrder=[...c.querySelectorAll(".metile")].map(t=>t.dataset.tile);
+  sset("settings",settings);
+}
+(function initTileReorder(){
+  const c=$("meTiles"); if(!c) return;
+  let drag=null;
+  c.querySelectorAll(".tilegrip").forEach(grip=>{
+    grip.addEventListener("click", e=>e.stopPropagation());   // don't trigger the tile's own tap (muscle balance)
+    grip.addEventListener("pointerdown", e=>{ e.preventDefault(); e.stopPropagation();
+      drag=grip.closest(".metile"); if(!drag) return;
+      drag.classList.add("dragging"); try{ grip.setPointerCapture(e.pointerId); }catch(_){}
+    });
+    grip.addEventListener("pointermove", e=>{ if(!drag) return; e.preventDefault();
+      const sibs=[...c.querySelectorAll(".metile:not(.dragging)")]; let placed=false;
+      for(const s of sibs){ const r=s.getBoundingClientRect(); if(e.clientY < r.top + r.height/2){ c.insertBefore(drag,s); placed=true; break; } }
+      if(!placed) c.appendChild(drag);
+    });
+    const end=e=>{ if(!drag) return; drag.classList.remove("dragging"); drag=null; try{ grip.releasePointerCapture(e.pointerId); }catch(_){} saveTileOrder(); };
+    grip.addEventListener("pointerup", end);
+    grip.addEventListener("pointercancel", end);
+  });
+  const rst=$("tileReset"); if(rst) rst.onclick=()=>{ settings.meTileOrder=null; sset("settings",settings);
+    ["forecast","progress","balance"].forEach(t=>{ const el=c.querySelector('.metile[data-tile="'+t+'"]'); if(el) c.appendChild(el); }); toast&&toast("Tiles reset to default order"); };
+})();
 // ===== Monte Carlo growth forecast =====
 // A probabilistic projection of muscle gain over 16 weeks, so the output is a distribution, not a false
 // point estimate. Each of K runs draws literature-backed parameters and accumulates a weekly fractional gain

@@ -606,10 +606,9 @@
   .pscbtn:active{ transform:scale(.96); }
   .pscbtn{ border-color:color-mix(in srgb, var(--accent) 40%, var(--line)); }
   /* forward growth-stimulus forecast chart */
-  .fccard{ border:.5px solid var(--line); border-radius:12px; padding:14px 14px 12px; background:var(--card); margin:0 0 18px; }
-  .fccard .fchd{ font-size:14px; font-weight:700; letter-spacing:-.2px; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
-  .fccard .fcsub{ font-size:12px; font-weight:500; color:var(--l3); }
-  .fccard canvas{ width:100%; height:auto; display:block; margin-top:8px; }
+  /* growth-forecast internals (the card itself uses the shared .panel look) */
+  .fcsub{ display:block; font-size:12px; font-weight:500; color:var(--l3); margin-top:2px; }
+  #fcChart, #fcMuscles, #fcTornado{ width:100%; height:auto; display:block; margin-top:8px; }
   .fclegend{ display:flex; gap:14px; flex-wrap:wrap; margin-top:6px; font-size:12.5px; color:var(--l2); }
   .fclg{ display:inline-flex; align-items:center; gap:6px; }
   .fclg i{ width:11px; height:3px; border-radius:2px; display:inline-block; }
@@ -1037,6 +1036,14 @@
   /* per-muscle plan outlook (inside the plan-outlook insight card) */
   .pmgrid{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
   .pmcap{ font-size:12px; color:var(--l3); line-height:1.45; margin:9px 0 0; }
+  /* reorderable Me tiles */
+  .mezone.rowzone{ display:flex; align-items:baseline; justify-content:space-between; }
+  .tilereset{ background:none; border:none; cursor:pointer; color:var(--accent); font-size:11px; font-weight:700; text-transform:none; letter-spacing:0; padding:0; }
+  .metile.panel{ position:relative; }
+  .panelhd{ align-items:center; }
+  .tilegrip{ margin-left:auto; align-self:flex-start; color:var(--l3); font-size:17px; line-height:1; padding:2px 4px; cursor:grab; touch-action:none; -webkit-tap-highlight-color:transparent; user-select:none; }
+  .tilegrip:active{ cursor:grabbing; }
+  .metile.dragging{ opacity:.9; box-shadow:0 10px 26px rgba(0,0,0,.20); transform:scale(1.01); }
   .growth.grow{ border-left-color:#51cf66; } .growth .gdot.grow{ background:#51cf66; }
   .growth.hold{ border-left-color:#f59f00; } .growth .gdot.hold{ background:#f59f00; }
   .growth.shrink{ border-left-color:var(--red); } .growth .gdot.shrink{ background:var(--red); }
