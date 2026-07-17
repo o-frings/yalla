@@ -263,22 +263,7 @@
       <div class="meRing" id="meRing"><div class="meRingTrack" id="meRingTrack"><div class="meRingPage"><canvas id="meRadar" width="900" height="900"></canvas></div><div class="meRingPage"><canvas id="meRadar2" width="900" height="900"></canvas></div></div></div>
       <div class="panelfoot"><span class="mebalstat" id="meBalStat"></span><span class="mebalcta" id="meBalCta">tap for detail ›</span></div>
     </div>
-    <!-- Plan forecast: projects, from the active plan's weekly volume per muscle, whether it's set to grow you -->
-    <div class="ed-label" style="margin-top:14px;">Your plan's outlook</div>
-    <div class="insight" id="planForecast"></div>
-    <details class="hsrc" id="planFcSrcBox" style="display:none;"><summary>Sources</summary><ul id="planFcSrc"></ul></details>
-    <!-- Forward projection: simulated growth stimulus if you keep this plan vs your current pace -->
-    <div class="fccard" id="fcCard" style="display:none;">
-      <div class="fchd">Growth forecast<span class="fcsub" id="fcSub"></span></div>
-      <canvas id="fcChart" width="760" height="300"></canvas>
-      <div class="fclegend" id="fcLegend"></div>
-      <details class="fcdetails">
-        <summary>What moves this &amp; how it's estimated</summary>
-        <div class="fchd2">Swing in 16-week gain across key inputs</div>
-        <canvas id="fcTornado" width="760" height="190"></canvas>
-        <p class="fcnote">A Monte Carlo simulation of muscle gain over the next 16 weeks — 500 runs with literature-backed parameters (dose, effort, progressive overload, your age and training experience, and individual variability) — if you keep to this plan versus your current pace and rate of progress. The shaded band is the 10–90% range, wide mostly because individual response varies a lot between people; the curve can dip below zero if training falls under maintenance. Add your age and sex under body details to personalise it. An estimate with real uncertainty, not a promise.</p>
-      </details>
-    </div>
+    <div class="mezone">Progress &amp; forecast</div>
     <div class="panel" id="progPanel">
       <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 2 5-6"/></svg>Progress</span></div>
       <div class="mewintabs paneltabs" id="progMetric">
@@ -296,6 +281,21 @@
         <div class="progpage"><canvas id="progBars4" width="660" height="180"></canvas></div>
       </div></div>
       <div class="panelfoot stack"><div class="progcap" id="progCap"></div><div class="progverd" id="progVerdict" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div></div>
+    </div>
+    <!-- Forward projection: continues from the logged history above -->
+    <div class="fccard" id="fcCard" style="display:none;">
+      <div class="fchd">Growth forecast<span class="fcsub" id="fcSub"></span></div>
+      <canvas id="fcChart" width="760" height="300"></canvas>
+      <div class="fclegend" id="fcLegend"></div>
+      <p class="fcconn">Projected forward from your logged training above — “current pace” continues that trend, “this plan” assumes you follow it with progressive overload.</p>
+      <div class="fchd2">Projected 16-week gain by muscle</div>
+      <canvas id="fcMuscles" width="760" height="230"></canvas>
+      <details class="fcdetails">
+        <summary>What moves this &amp; how it's estimated</summary>
+        <div class="fchd2">Swing in 16-week gain across key inputs</div>
+        <canvas id="fcTornado" width="760" height="190"></canvas>
+        <p class="fcnote">A Monte Carlo simulation of muscle gain over the next 16 weeks — 500 runs with literature-backed parameters (dose, effort, progressive overload, your age and training experience, and individual variability) — if you keep to this plan versus your current pace and rate of progress. The shaded band is the 10–90% range, wide mostly because individual response varies a lot between people; the curve can dip below zero if training falls under maintenance. Add your age and sex under body details to personalise it. An estimate with real uncertainty, not a promise.</p>
+      </details>
     </div>
 
     <div class="group" id="cardioCard"></div>

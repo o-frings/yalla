@@ -2914,7 +2914,7 @@ function renderDash(){
   renderCalc(now);
   renderCalendar();
   renderBaseActivity();
-  renderForecast();
+  renderGrowthForecast();
   renderCardioCard();
   renderAchievements();
   renderInsight();
@@ -4254,6 +4254,7 @@ function openAbout(plan){
   h+='<div class="ed-label">The split</div><p class="ovp"><b>'+esc(sp.type)+'</b> — '+esc(sp.why)+'</p>';
   h+='<div class="ed-label">What I weighted it for</div><p class="ovp">Hypertrophy <b>'+sc.hyp+'/5</b> and balance <b>'+sc.balance+'/5</b> — '+hypTxt+' with '+balTxt+'.</p>';
   h+='<div class="ed-label">Things to look at</div><ul class="ovtodo">'+look.map(x=>'<li>'+x+'</li>').join('')+'</ul>';
+  h+=planOutlookHTML(plan);
   $("aboutTitle").textContent=plan.name;
   $("aboutBody").innerHTML=h;
   openSheet("About");
@@ -5996,24 +5997,28 @@ function planMuscleStates(plan){
   return out;
 }
 const PLAN_ARROW={grow:"↑", hold:"→", shrink:"↓", over:"≈"};
-function renderForecast(){
-  const box=$("planForecast"); if(!box) return;
-  const r=planForecast(activePlan());
-  box.className="insight v-"+r.v;
-  let h='<div class="ititle">'+esc(r.title)+'</div><div class="itext">'+esc(r.text)+'</div>';
-  const pm=planMuscleStates(activePlan());
+// Plan outlook block for the About-this-plan sheet: verdict + per-muscle chips + sources.
+function planOutlookHTML(plan){
+  plan=plan||activePlan();
+  const r=planForecast(plan);
+  let h='<div class="ed-label">Your plan’s outlook</div>';
+  h+='<div class="insight v-'+r.v+'" style="margin:0;"><div class="ititle">'+esc(r.title)+'</div><div class="itext">'+esc(r.text)+'</div>';
+  const pm=planMuscleStates(plan);
   if(pm.length){
     h+='<div class="pmgrid">'+pm.map(p=>'<span class="gchip '+p.state+'" title="'+esc(p.g+" · ~"+round1(p.sets)+" sets/wk in this plan")+'">'+esc(MSHORT[p.g]||p.g)+' <span class="garrow">'+PLAN_ARROW[p.state]+'</span></span>').join('')+'</div>'
       +'<p class="pmcap">By muscle, from the plan’s weekly sets · ↑ growth dose · → maintenance · ↓ under-dosed · ≈ past the productive range.</p>';
   }
-  box.innerHTML=h;
-  const sb=$("planFcSrcBox"), sl=$("planFcSrc");
-  if(sb&&sl){ if(r.src&&r.src.length){ sb.style.display=""; sl.innerHTML=r.src.map(srcLi).join(''); } else sb.style.display="none"; }
-  const card=$("fcCard"), f=(typeof growthForecast==="function")?growthForecast():null;
-  if(!card) return;
+  h+='</div>';
+  if(r.src&&r.src.length) h+='<details class="hsrc" style="margin-top:8px;"><summary>Sources</summary><ul>'+r.src.map(srcLi).join('')+'</ul></details>';
+  return h;
+}
+// Growth forecast card on the Me page (projection continuing from the logged history).
+function renderGrowthForecast(){
+  const card=$("fcCard"); if(!card) return;
+  const f=(typeof growthForecast==="function")?growthForecast():null;
   if(!f){ card.style.display="none"; return; }
   card.style.display="";
-  drawForecast(f); drawForecastSens(f);
+  drawForecast(f); drawForecastMuscles(f); drawForecastSens(f);
 }
 // ===== Monte Carlo growth forecast =====
 // A probabilistic projection of muscle gain over 16 weeks, so the output is a distribution, not a false
@@ -6083,7 +6088,14 @@ function growthForecast(){
     {label:"age ±15y",     lo:w16(bands({...P,ageF:ageFor(a0+15)})),                    hi:w16(bands({...P,ageF:ageFor(Math.max(18,a0-15))}))},
     {label:"experience",   lo:w16(bands({...P,baseRate:0.28})),                         hi:w16(bands({...P,baseRate:0.9}))},
   ];
-  return { plan, pace, ahead:AHEAD, n:muscles.length, base:w16(plan), sens };
+  // per-muscle projected gain under the plan (median run: individual=1, progressing) — a deterministic
+  // read of the same model, so muscles with more plan volume project more gain and neglected ones can be negative.
+  const perMuscle = muscles.map(g=>{
+    const d=planDose[g], rho=doseStimulus(d); let C=0;
+    for(let t=1;t<=AHEAD;t++){ C += d>=WEEKLY_SET_MAINT ? baseRate*ageF*sexF*rho*effort*Math.exp(-t/32) : -0.4*(1-d/WEEKLY_SET_MAINT); }
+    return { g, gain:C };
+  }).sort((a,b)=>b.gain-a.gain);
+  return { plan, pace, ahead:AHEAD, n:muscles.length, base:w16(plan), sens, perMuscle };
 }
 function drawForecast(f){
   const c=$("fcChart"); if(!c||!f) return;
@@ -6137,6 +6149,28 @@ function drawForecastSens(f){
     ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(x0, cy-7, Math.max(2,x1-x0), 14, 3); else ctx.rect(x0,cy-7,Math.max(2,x1-x0),14); ctx.fill(); ctx.stroke();
     ctx.fillStyle=l3; ctx.textAlign="right"; ctx.font="11px -apple-system,system-ui,sans-serif"; ctx.fillText(r.label, padL-8, cy+4);
     ctx.fillStyle=ink; ctx.textAlign="left"; ctx.font="10px -apple-system,system-ui,sans-serif"; ctx.fillText(r.hi.toFixed(1)+"%", x1+4, cy+3.5);
+  });
+}
+// per-muscle projected 16-week gain, one bar per muscle in its app colour (negative = below maintenance)
+function drawForecastMuscles(f){
+  const c=$("fcMuscles"); if(!c||!f||!f.perMuscle||!f.perMuscle.length) return;
+  const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  const cs=getComputedStyle(document.documentElement);
+  const l3=(cs.getPropertyValue('--l3')||'#888').trim(), ink=(cs.getPropertyValue('--ink')||'#000').trim();
+  const rows=f.perMuscle;
+  let gmax=0.5, gmin=0; rows.forEach(r=>{ gmax=Math.max(gmax,r.gain); gmin=Math.min(gmin,r.gain); });
+  const padL=62, padR=52, padT=4, padB=4, span=Math.max(0.5, gmax-gmin);
+  const X=v=> padL + (v-gmin)/span*(W-padL-padR);
+  const rowH=(H-padT-padB)/rows.length, zeroX=X(0);
+  ctx.strokeStyle=hexAlpha(l3,.4); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(zeroX,padT); ctx.lineTo(zeroX,H-padB); ctx.stroke();
+  rows.forEach((r,i)=>{ const cy=padT+i*rowH+rowH/2, x=X(r.gain), col=MCOLOR[r.g]||l3;
+    const bx=Math.min(zeroX,x), bw=Math.max(1.5,Math.abs(x-zeroX)), bh=Math.min(15,rowH*0.62);
+    ctx.fillStyle=hexAlpha(col,.9);
+    if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(bx, cy-bh/2, bw, bh, 3); ctx.fill(); } else ctx.fillRect(bx, cy-bh/2, bw, bh);
+    ctx.fillStyle=l3; ctx.textAlign="right"; ctx.font="11px -apple-system,system-ui,sans-serif"; ctx.fillText(MSHORT[r.g]||r.g, padL-8, cy+4);
+    ctx.fillStyle=ink; ctx.font="600 10px -apple-system,system-ui,sans-serif"; ctx.textAlign="left";
+    const lab=(r.gain>=0?"+":"")+r.gain.toFixed(1)+"%";
+    ctx.fillText(lab, (r.gain>=0 ? x+5 : zeroX+5), cy+3.5);   // negatives label right of the zero line, clear of names
   });
 }
 
