@@ -1044,6 +1044,11 @@
   .tilegrip{ margin-left:auto; align-self:flex-start; color:var(--l3); font-size:17px; line-height:1; padding:2px 4px; cursor:grab; touch-action:none; -webkit-tap-highlight-color:transparent; user-select:none; }
   .tilegrip:active{ cursor:grabbing; }
   .metile.dragging{ opacity:.9; box-shadow:0 10px 26px rgba(0,0,0,.20); transform:scale(1.01); }
+  /* objective-adherence line moved onto the Progress tile */
+  .progobj{ font-size:13px; font-weight:600; color:var(--l2); margin:2px 0 8px; }
+  .progobj.good{ color:#2b8a3e; } .progobj.under{ color:#c92a2a; }
+  /* growth signal folded into the forecast tile — strip its standalone-card chrome */
+  .metile .growth{ border:none; background:none; padding:0; margin:8px 0 0; border-radius:0; }
   .growth.grow{ border-left-color:#51cf66; } .growth .gdot.grow{ background:#51cf66; }
   .growth.hold{ border-left-color:#f59f00; } .growth .gdot.hold{ background:#f59f00; }
   .growth.shrink{ border-left-color:var(--red); } .growth .gdot.shrink{ background:var(--red); }

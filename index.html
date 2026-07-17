@@ -268,6 +268,8 @@
           <button class="mewintab" data-fm="pace" type="button">Current pace</button>
         </div>
         <canvas id="fcMuscles" width="760" height="230"></canvas>
+        <div class="fchd2">Where each muscle stands now</div>
+        <div class="growth" id="musGrowth" style="display:none;"></div>
         <details class="fcdetails">
           <summary>What moves this &amp; how it's estimated</summary>
           <div class="fchd2">Swing in 16-week gain across key inputs</div>
@@ -278,6 +280,7 @@
       <!-- Progress (logged history) -->
       <div class="panel metile" id="progPanel" data-tile="progress">
         <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 2 5-6"/></svg>Progress</span><span class="tilegrip" aria-label="Drag to reorder" title="Drag to reorder">⠿</span></div>
+        <div class="progobj" id="progObj"></div>
         <div class="mewintabs paneltabs" id="progMetric">
           <button class="mewintab active" data-pm="volume" type="button">Volume</button>
           <button class="mewintab" data-pm="sets" type="button">Sets</button>
@@ -961,7 +964,6 @@
   <div class="sheethdr"><span class="t">Muscle balance</span><button class="btn plain sm" id="musClose">Done</button></div>
   <div class="sheetbody">
     <p id="musIntro" style="color:var(--l2);font-size:13px;margin:0 4px 12px;line-height:1.45;">How balanced your training is — a full circle means even coverage, a dent means an undertrained group.</p>
-    <div class="growth" id="musGrowth" style="display:none;"></div>
     <div class="seg" id="musSrc" style="margin-bottom:8px;"></div>
     <div class="seg appearance" id="musSeg">
       <div class="s" data-d="7">This week</div>

@@ -2915,7 +2915,12 @@ function renderDash(){
   renderCalendar();
   renderBaseActivity();
   renderGrowthForecast();
+  renderGrowth();          // per-muscle current status, now folded into the forecast tile
   applyTileOrder();
+  const po=$("progObj");   // objective-adherence score, moved onto the Progress tile
+  if(po){ if(!Object.keys(hist).length){ po.textContent=""; po.className="progobj"; }
+    else { const os=meObjectiveScore(7); po.className="progobj "+(os.pct>=85?"good":os.pct<50?"under":"");
+      po.textContent=os.objLabel+" · "+os.pct+"% "+(os.pct>=85?"on track":os.pct<50?"behind":"on your way"); } }
   renderCardioCard();
   renderAchievements();
   renderInsight();
@@ -4177,10 +4182,9 @@ function applyMeWindow(win, animate){
   const st=$("meBalStat"), cta=$("meBalCta");
   if(st) st.classList.remove("under","good");
   if(!Object.keys(hist).length){ if(st) st.textContent="No sessions yet"; if(cta) cta.textContent="log a workout ›"; return; }
-  const {pct, objLabel}=meObjectiveScore(win);
-  if(st){ st.textContent=objLabel+" · "+pct+"%"; if(pct>=85) st.classList.add("good"); else if(pct<50) st.classList.add("under"); }
   const det=expandLegacyMtot(meCache[win]||{}), under=GAUGE_GROUPS.filter(g=>gaugeVal(det,g)<WEEKLY_SET_MIN).length;
-  if(cta) cta.textContent=(under ? under+" under target · " : "")+"detail ›";
+  if(st){ st.textContent = under ? (under+" muscle"+(under>1?"s":"")+" under target") : "All muscles on target"; st.classList.add(under?"under":"good"); }
+  if(cta) cta.textContent="detail ›";
 }
 document.querySelectorAll("#meWinSeg .mewintab").forEach(t=> t.onclick=(e)=>{ e.stopPropagation(); applyMeWindow(+t.dataset.d, true); });
 // the gauge track follows the finger and snaps to the nearest page on release (pager ignores canvas touches)
@@ -4458,7 +4462,6 @@ function renderMuscles(){
   const isLog = musSrc==="log";
   $("musSeg").style.display = isLog ? "" : "none";
   $("musMetric").style.display = isLog ? "" : "none";
-  if(isLog) renderGrowth(); else { const gb=$("musGrowth"); if(gb) gb.style.display="none"; }   // growth signal reads logged history, not plan projections
   let totals, byEx;
   if(isLog){
     document.querySelectorAll("#musSeg .s").forEach(s=> s.classList.toggle("active", +s.dataset.d===musWindow));
