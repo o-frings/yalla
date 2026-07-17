@@ -141,19 +141,42 @@ const olProg = overloadContrast(0.02), olFlat = overloadContrast(0.0);
 // gain baseRate·indiv·ρ(D)·effort·overload·e^(−t/32), with the inter-individual multiplier drawn lognormal
 // to span Hubal 2005's observed range. Plan = 10 sets/wk progressing; current pace = 6 sets/wk stalling.
 // Novice base rate, 500 paired runs; returns 10/50/90th-percentile trajectories.
-function mcForecast(rho, progressing, { baseRate = 0.9, effort = 0.9, K = 500, W = 16 } = {}) {
+function mcForecast(rho, progressing, { baseRate = 0.9, effort = 0.9, ageF = 1, K = 500, W = 16 } = {}) {
   let s = 987654321 >>> 0; const u = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
   const nrm = (m, sd) => { const a = Math.max(1e-9, u()); return m + sd * Math.sqrt(-2 * Math.log(a)) * Math.cos(2 * Math.PI * u()); };
   const tr = Array.from({ length: W + 1 }, () => []);
   for (let k = 0; k < K; k++) {
     const indiv = Math.exp(nrm(0, 0.55)), ov = progressing ? 1 : Math.max(0, nrm(0.5, 0.08));
     let C = 0; tr[0].push(0);
-    for (let t = 1; t <= W; t++) { C += baseRate * indiv * rho * effort * ov * Math.exp(-t / 32); tr[t].push(C); }
+    for (let t = 1; t <= W; t++) { C += baseRate * indiv * ageF * rho * effort * ov * Math.exp(-t / 32); tr[t].push(C); }
   }
   const q = (a, p) => { const b = a.slice().sort((x, y) => x - y); return b[Math.floor(p * (b.length - 1))]; };
   return { p10: tr.map((a) => q(a, 0.1)), p50: tr.map((a) => q(a, 0.5)), p90: tr.map((a) => q(a, 0.9)) };
 }
 const mcPlan = mcForecast(doseStimulus(10), true), mcPace = mcForecast(doseStimulus(6), false);
+
+// MC bands across execution seeds: rerun a scenario K times (varying only the random adherence/execution
+// noise) and take per-week percentiles of the mean stimulus. Regular runs are tight; irregular is wide.
+function mcBands(planName, schedule, K = 80) {
+  const runs = []; for (let k = 0; k < K; k++) runs.push(simulate(planName, schedule, SEED + 1000 + k));
+  const qq = (arr, p) => { const a = arr.slice().sort((x, y) => x - y); return a[Math.floor(p * (a.length - 1))]; };
+  const pct = (p) => Array.from({ length: WEEKS }, (_, t) => qq(runs.map((r) => r[t].meanStim * 100), p));
+  return { lo: pct(0.1), mid: pct(0.5), hi: pct(0.9) };
+}
+const bReg = mcBands("Upper/Lower 4x", "regular"), bIrr = mcBands("Upper/Lower 4x", "irregular");
+const bPlans = Object.fromEntries(Object.keys(PLANS).map((p) => [p, mcBands(p, "regular")]));
+
+// Sensitivity: week-16 median gain when each key parameter is swung low↔high (novice plan baseline).
+const ageFor = (a) => (a > 30 ? Math.max(0.5, 1 - (a - 30) * 0.008) : 1);
+const w16 = (o) => o.p50[16];
+const sBase = w16(mcForecast(doseStimulus(10), true, { baseRate: 0.9, effort: 0.9, ageF: 1 }));
+const sens = [
+  { label: "effort", lo: w16(mcForecast(doseStimulus(10), true, { effort: 0.6 })), hi: w16(mcForecast(doseStimulus(10), true, { effort: 1.0 })) },
+  { label: "progression", lo: w16(mcForecast(doseStimulus(10), false)), hi: w16(mcForecast(doseStimulus(10), true)) },
+  { label: "volume", lo: w16(mcForecast(doseStimulus(7), true)), hi: w16(mcForecast(doseStimulus(13), true)) },
+  { label: "age", lo: w16(mcForecast(doseStimulus(10), true, { ageF: ageFor(45) })), hi: w16(mcForecast(doseStimulus(10), true, { ageF: ageFor(25) })) },
+  { label: "experience", lo: w16(mcForecast(doseStimulus(10), true, { baseRate: 0.28 })), hi: w16(mcForecast(doseStimulus(10), true, { baseRate: 0.9 })) },
+];
 
 // ---- console summary ----
 const growWeeks = (rec) => rec.reduce((p, w) => p + w.growing, 0);
@@ -337,18 +360,25 @@ console.log("\nWrote research/simulations.html");
 const dat = (header, rows) => header + "\n" + rows.map((r) => r.map((v) => (typeof v === "number" ? +v.toFixed(2) : v)).join(" ")).join("\n") + "\n";
 const wk1 = (t) => t + 1;
 writeFileSync(new URL("./sim-ul.dat", import.meta.url),
-  dat("week regStim irrStim regUnder irrUnder",
-    ulRegular.map((w, t) => [wk1(t), w.meanStim * 100, ulIrregular[t].meanStim * 100, w.shrink, ulIrregular[t].shrink])));
+  dat("week regLo regMid regHi irrLo irrMid irrHi",
+    bReg.mid.map((_, t) => [wk1(t), bReg.lo[t], bReg.mid[t], bReg.hi[t], bIrr.lo[t], bIrr.mid[t], bIrr.hi[t]])));
 writeFileSync(new URL("./sim-muscles.dat", import.meta.url),
   dat("week " + trackMus.join(" "),
     ulRegular.map((w, t) => [wk1(t), ...trackMus.map((m) => w.per[m].stim * 100)])));
 const planKeys = Object.keys(PLANS);
 writeFileSync(new URL("./sim-plans.dat", import.meta.url),
-  dat("week FullBody UpperLower PPL",
-    regByPlan[planKeys[0]].map((w, t) => [wk1(t), w.meanStim * 100, regByPlan[planKeys[1]][t].meanStim * 100, regByPlan[planKeys[2]][t].meanStim * 100])));
+  dat("week fbLo fbMid fbHi ulLo ulMid ulHi pplLo pplMid pplHi",
+    bPlans[planKeys[0]].mid.map((_, t) => [wk1(t),
+      bPlans[planKeys[0]].lo[t], bPlans[planKeys[0]].mid[t], bPlans[planKeys[0]].hi[t],
+      bPlans[planKeys[1]].lo[t], bPlans[planKeys[1]].mid[t], bPlans[planKeys[1]].hi[t],
+      bPlans[planKeys[2]].lo[t], bPlans[planKeys[2]].mid[t], bPlans[planKeys[2]].hi[t]])));
 writeFileSync(new URL("./sim-overload.dat", import.meta.url),
   dat("week progressing flat", olProg.map((v, t) => [t + 1, v, olFlat[t]])));
 writeFileSync(new URL("./sim-mc.dat", import.meta.url),
   dat("week planLo planMid planHi paceLo paceMid paceHi",
     mcPlan.p10.map((_, t) => [t, mcPlan.p10[t], mcPlan.p50[t], mcPlan.p90[t], mcPace.p10[t], mcPace.p50[t], mcPace.p90[t]])));
-console.log("Wrote research/sim-ul.dat, sim-muscles.dat, sim-plans.dat, sim-overload.dat");
+writeFileSync(new URL("./sim-sens.dat", import.meta.url),
+  dat("y swing lo hi", sens.map((sv, i) => [i, Math.abs(sv.hi - sv.lo), Math.min(sv.lo, sv.hi), Math.max(sv.lo, sv.hi)])));
+console.log("Wrote sim-ul/muscles/plans/overload/mc/sens.dat");
+console.log("\nSensitivity of 16-wk median gain (baseline " + sBase.toFixed(1) + "%):");
+sens.forEach((sv) => console.log(`  ${sv.label.padEnd(12)} ${sv.lo.toFixed(1)}% … ${sv.hi.toFixed(1)}%`));
