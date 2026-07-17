@@ -44,7 +44,7 @@ Each exercise contributes to its primary muscle at full weight and to each secon
 0 & \text{otherwise.}
 \end{cases}
 \end{equation}
-The $0.5$ weight for indirect work is the fractional counting scheme that best fit the hypertrophy data in the Pelland et~al.\ dose--response meta-regression.
+The $0.5$ weight for indirect work is the fractional counting scheme that best fit the hypertrophy data in the Pelland et~al.\ dose--response meta-regression~\cite{drr}.
 
 \subsection{Effort weighting}
 Only sets taken reasonably close to failure drive much growth, so each set is scaled by an effort factor $\eps(f)$ before it counts:
@@ -56,7 +56,7 @@ Only sets taken reasonably close to failure drive much growth, so each set is sc
 1 & \text{Max}\ (f{=}2,\ 0\text{--}1\text{ in reserve}).
 \end{cases}
 \end{equation}
-Max carries no growth premium over Hard: hypertrophy is comparable across roughly 0--4 reps in reserve, and training to failure mainly adds fatigue. Max still helps the load trend indirectly through the extra reps it buys. Entries with no recorded effort (all logs predating the feature) default to Hard, so $\eps=1$ and historical counts are unchanged.
+Max carries no growth premium over Hard: hypertrophy is comparable across roughly 0--4 reps in reserve, and training to failure mainly adds fatigue~\cite{failureprox}. Max still helps the load trend indirectly through the extra reps it buys. Entries with no recorded effort (all logs predating the feature) default to Hard, so $\eps=1$ and historical counts are unchanged.
 
 \subsection{Weekly effective sets per muscle}
 Time is bucketed into $N=10$ rolling weeks; week index $k=9$ is the current week. The effective weekly sets for muscle $g$ in week $k$ sum every contributing entry:
@@ -69,7 +69,7 @@ This same effort-weighted, fractional count feeds the weekly-sets chart, the bal
 Proximity to failure cannot be recovered from load and reps alone: the same $100\,\text{kg}\times 8$ can be an all-out set or an easy one. So effort is a self-report. To keep friction to one optional tap, its default is estimated from the numbers and shown pre-selected; the lifter overrides only when the estimate is wrong.
 
 \subsection{Estimated one-rep max (anchor)}
-Set strength is summarised by the Epley one-rep-max estimate, with a rep denominator $K$ (population default $K=30$; Section~\ref{sec:kcal} calibrates it per lifter):
+Set strength is summarised by the Epley one-rep-max estimate~\cite{epley}, with a rep denominator $K$ (population default $K=30$; Section~\ref{sec:kcal} calibrates it per lifter):
 \begin{equation}\label{eq:epley}
 \varphi(w,r)=w\left(1+\frac{r}{K}\right).
 \end{equation}
@@ -115,10 +115,10 @@ $\MAV$ (20) & Upper productive bound & Beyond it, added sets mostly add fatigue 
 \bottomrule
 \end{tabular}
 \end{center}
-A single set of landmarks is applied to every muscle. Real per-muscle landmarks differ, but one baseline keeps the output legible. The maintenance floor is deliberately low: built muscle is held on very little (as little as roughly one-ninth of the building volume in young trained adults), so a 2-set floor avoids flagging loss too early.
+A single set of landmarks is applied to every muscle. Real per-muscle landmarks differ, but one baseline keeps the output legible. The maintenance floor is deliberately low: built muscle is held on very little (as little as roughly one-ninth of the building volume in young trained adults~\cite{bickel}), so a 2-set floor avoids flagging loss too early.
 
 \subsection{Continuous backbone}
-The four landmarks discretise a continuous relationship. We model the fraction of the attainable per-muscle growth stimulus at $s$ effective sets per week as a saturating curve $\rho(s)$, calibrated so the practical target captures about $80\%$ of what is attainable:
+The four landmarks discretise a continuous relationship~\cite{sch17,drr}. We model the fraction of the attainable per-muscle growth stimulus at $s$ effective sets per week as a saturating curve $\rho(s)$, calibrated so the practical target captures about $80\%$ of what is attainable:
 \begin{equation}\label{eq:doseresp}
 \rho(s)=1-e^{-s/s_0},\qquad s_0=\frac{\text{target}}{\ln 5}\approx 6.21.
 \end{equation}
@@ -141,7 +141,7 @@ D_g=\recent(S_g).
 \end{equation}
 
 \subsection{Trend: progressive overload two ways}
-Overload can come from more effective sets or from heavier load; either counts as progress. A set trend and a load trend are formed as recent-over-earlier ratios. The load series $L_{g,k}$ is the best estimated one-rep max reached in week $k$ on exercises for which $g$ is the primary mover:
+Overload can come from more effective sets or from heavier load; either counts as progress~\cite{plotkin,sch10}. A set trend and a load trend are formed as recent-over-earlier ratios. The load series $L_{g,k}$ is the best estimated one-rep max reached in week $k$ on exercises for which $g$ is the primary mover:
 \begin{equation}\label{eq:trends}
 T^{S}_{g}=\frac{\recent(S_g)}{\earlier(S_g)},
 \qquad
@@ -165,10 +165,10 @@ The state $\sigma_g$ is a function of the dose $D_g$ and the trend $\tau_g$, eva
 \end{enumerate}
 The asymmetry is intentional: a muscle grows only with both an adequate dose and a rising trend, but it can be flagged under-stimulated by a low dose alone. Holding is the wide middle band: enough volume to keep size, below the dose that adds it.
 
-\subsection{Borderline states}
+\subsection{Borderline states}\label{sec:borderline}
 The inputs carry known noise: effort-weighted sets to about $\pm 1$ set, and each trend ratio to about $\pm 0.06$. When a muscle's dose or trend sits within that range of a decision boundary, it is flagged \emph{borderline} and shown with a tilde instead of a crisp verdict, so a near-miss is not read as certainty. The sensitivity analysis (Section~\ref{sec:verification}) shows the growth-trend boundary is where this matters most.
 
-\section{Overall verdict}
+\section{Overall verdict}\label{sec:overall}
 Let $n_{\text{grow}}$, $n_{\text{hold}}$, $n_{\text{shrink}}$ count trained muscles in each state, and $m$ be the number of trained muscles. Let $\tau_{\text{all}}$ be the recent-over-earlier ratio of whole-body weekly volume. The headline is:
 \begin{enumerate}[label=\arabic*.,leftmargin=*]
 \item \textbf{Need more data} if fewer than 3 weeks show any training, or $m=0$.
@@ -194,15 +194,15 @@ Grades are GRADE-style ratings of the underlying evidence: High (meta-analyses o
 \toprule
 \textbf{Mechanism / parameter} & \textbf{Basis} & \textbf{Grade}\\
 \midrule
-Graded volume dose--response; ${\sim}10$ sets as a practical target & Schoenfeld, Ogborn \& Krieger 2017, \emph{J Sports Sci}: each added weekly set ${\approx}\,{+}0.37\%$ muscle, benefit rising across the studied range. & High\\
-Fractional (0.5) counting of indirect sets; diminishing returns; frequency neutral at equal volume & Pelland et~al.\ 2026, \emph{Sports Medicine} (peer-reviewed; 67 studies, 2{,}058 subjects). doi:10.1007/s40279-025-02344-w & High\\
-Continuous backbone $\rho(s)$ and landmark derivation & Derived from the dose--response curves above (Schoenfeld 2017; Pelland 2026). & High\\
-Effort factor $\eps$; hypertrophy comparable across ${\sim}0$--4 RIR, dropping off when easier & Robinson/Pelland 2024 proximity-to-failure meta-regression; Refalo et~al.\ 2024 RCT (failure vs.\ 1--2 RIR). & High\\
-$\MEV/\MAV$ landmark structure (${\sim}10$ to 20 sets) & Israetel et~al.\ (Renaissance Periodization) volume-landmarks framework. & Low\\
-Maintenance floor $\MV$; size held on ${\sim}1/3$ (older) to ${\sim}1/9$ (young) of building volume & Bickel, Cross \& Bamman 2011, \emph{Med Sci Sports Exerc} (RCT, 16-wk build plus 32-wk reduced dose). & Moderate\\
-Decline below maintenance stimulus; ${\sim}2$--4-week strength retention, then loss & Mujika \& Padilla 2000 detraining review; cross-sectional-area loss from ${\sim}2$--3 weeks of cessation. & Moderate\\
-Overload via added load \emph{or} reps, so the trend tracks both, not tonnage & Plotkin et~al.\ 2022, \emph{PeerJ} (RCT; load- and rep-progression gave near-identical growth); mechanism in Schoenfeld 2010. & Moderate\\
-Epley one-rep-max $\varphi$; self-calibrated denominator $K$ & Standard load--rep relationship; $K$ fitted from the lifter's own Max sets \eqref{eq:kcal}. & Method\\
+Graded volume dose--response; ${\sim}10$ sets as a practical target & Schoenfeld, Ogborn \& Krieger~\cite{sch17}: each added weekly set ${\approx}\,{+}0.37\%$ muscle, benefit rising across the studied range. & High\\
+Fractional (0.5) counting of indirect sets; diminishing returns; frequency neutral at equal volume & Pelland et~al.~\cite{drr} (peer-reviewed; 67 studies, 2{,}058 subjects). & High\\
+Continuous backbone $\rho(s)$ and landmark derivation & Derived from the dose--response curves above~\cite{sch17,drr}. & High\\
+Effort factor $\eps$; hypertrophy comparable across ${\sim}0$--4 RIR, dropping off when easier & Refalo et~al.~\cite{failureprox}, systematic review and meta-analysis of proximity-to-failure. & High\\
+$\MEV/\MAV$ landmark structure (${\sim}10$ to 20 sets) & Israetel et~al.~\cite{rpvol}, volume-landmarks framework. & Low\\
+Maintenance floor $\MV$; size held on ${\sim}1/3$ (older) to ${\sim}1/9$ (young) of building volume & Bickel, Cross \& Bamman~\cite{bickel} (RCT, 16-wk build plus 32-wk reduced dose). & Moderate\\
+Decline below maintenance stimulus; ${\sim}2$--4-week strength retention, then loss & Mujika \& Padilla~\cite{mujika} detraining review; cross-sectional-area loss from ${\sim}2$--3 weeks of cessation. & Moderate\\
+Overload via added load \emph{or} reps, so the trend tracks both, not tonnage & Plotkin et~al.~\cite{plotkin} (RCT; load- and rep-progression gave near-identical growth); mechanism in Schoenfeld~\cite{sch10}. & Moderate\\
+Epley one-rep-max $\varphi$; self-calibrated denominator $K$ & Standard load--rep relationship~\cite{epley}; $K$ fitted from the lifter's own Max sets \eqref{eq:kcal}. & Method\\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -227,6 +227,19 @@ The model is not validated against body-composition measurement (see the limitat
 \item \textbf{Conservative by design.} The maintenance floor and the ``at risk'' threshold are both set so the model under-reports muscle loss rather than over-reports it.
 \end{itemize}
 
+\begin{thebibliography}{9}
+\small
+\bibitem{bickel} Bickel CS, Cross JM, Bamman MM. Exercise dosing to retain resistance-training adaptations in young and older adults. \emph{Med Sci Sports Exerc}. 2011;43(7):1177--1187. doi:10.1249/MSS.0b013e318207c15d
+\bibitem{epley} Epley B. Poundage chart. \emph{Boyd Epley Workout}. Lincoln, NE: Body Enterprises; 1985.
+\bibitem{rpvol} Israetel M, Hoffmann J, Smith CW. Training volume landmarks for muscle growth (MEV/MAV/MRV). \emph{Renaissance Periodization}; 2017. \url{https://rpstrength.com/blogs/articles/training-volume-landmarks-muscle-growth}
+\bibitem{mujika} Mujika I, Padilla S. Detraining: loss of training-induced physiological and performance adaptations. Part I --- short-term insufficient training stimulus. \emph{Sports Med}. 2000;30(2):79--87. doi:10.2165/00007256-200030020-00002
+\bibitem{drr} Pelland JC, Remmert JF, Robinson ZP, Hinson SR, Zourdos MC. The resistance training dose response: meta-regressions exploring the effects of weekly volume and frequency on muscle hypertrophy and strength gains. \emph{Sports Med}. 2026. doi:10.1007/s40279-025-02344-w
+\bibitem{plotkin} Plotkin D, Coleman M, Van Every D, et al. Progressive overload without progressing load? The effects of load or repetition progression on muscular adaptations. \emph{PeerJ}. 2022;10:e14142. doi:10.7717/peerj.14142
+\bibitem{failureprox} Refalo MC, Helms ER, Trexler ET, Hamilton DL, Fyfe JJ. Influence of resistance training proximity-to-failure on skeletal muscle hypertrophy: a systematic review with meta-analysis. \emph{Sports Med}. 2023;53(3):649--665. doi:10.1007/s40279-022-01784-y
+\bibitem{sch10} Schoenfeld BJ. The mechanisms of muscle hypertrophy and their application to resistance training. \emph{J Strength Cond Res}. 2010;24(10):2857--2872. doi:10.1519/JSC.0b013e3181e840f3
+\bibitem{sch17} Schoenfeld BJ, Ogborn D, Krieger JW. Dose-response relationship between weekly resistance training volume and increases in muscle mass: a systematic review and meta-analysis. \emph{J Sports Sci}. 2017;35(11):1073--1082. doi:10.1080/02640414.2016.1210197
+\end{thebibliography}
+
 \appendix
 \section{Symbol reference}
 \begin{center}
@@ -247,6 +260,37 @@ $\rho(s),\ s_0$ & Dose--response stimulus fraction and its scale \eqref{eq:doser
 $T^{S},\ T^{L},\ \tau_g$ & Set trend, load trend, combined trend \eqref{eq:trends}--\eqref{eq:tau}\\
 $\sigma_g$ & Per-muscle state (growing / holding / under-stimulated)\\
 $\MV,\MEV,\text{target},\MAV$ & Landmarks 2, 6, 10, 20 effective sets/muscle/week\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Parameter values}
+Every numeric constant in the model, its value, and where it enters. These are the values used in production (v121); the sensitivity analysis (Section~\ref{sec:verification}) quantifies how much each one matters.
+\begin{center}
+\small
+\begin{tabular}{@{}p{5.2cm}p{4.7cm}p{4.3cm}@{}}
+\toprule
+\textbf{Parameter} & \textbf{Value} & \textbf{Where}\\
+\midrule
+Rolling window $N$ & 10 weeks & series length \eqref{eq:S}\\
+Recent / earlier windows & weeks 8--10 / weeks 5--7 & \eqref{eq:windows}\\
+Secondary-muscle weight & 0.5 & $\alpha$ \eqref{eq:alpha}\\
+Effort factors (Easy/Hard/Max) & 0.5 / 1 / 1 & $\eps$ \eqref{eq:eps}\\
+RIR $\to$ effort bands & Max ${\leq}1$, Easy ${\geq}4$, else Hard & \eqref{eq:fmap}\\
+Epley denominator $K$ & 30 default, fitted then clamped to $[20,40]$ & \eqref{eq:epley},\,\eqref{eq:kcal}\\
+Dose--response scale $s_0$ & $\text{target}/\ln 5 \approx 6.21$ & $\rho(s)$ \eqref{eq:doseresp}\\
+Maintenance volume $\MV$ & 2 effective sets/wk & state rule 1\\
+Min.\ effective volume $\MEV$ & 6 effective sets/wk & state rules 3--4\\
+Practical target & 10 effective sets/wk & radar goal; sets $s_0$\\
+Upper bound $\MAV$ & 20 effective sets/wk & plan forecast\\
+Sharp-drop trend cutoff & $\tau_g < 0.75$ & state rule 2\\
+Growth trend cutoff & $\tau_g \geq 1.08$ & state rule 3\\
+Maintenance-band climb & $\tau_g \geq 1.15$ and $D_g \geq 5$ & state rule 4\\
+Borderline margins & $\pm 1$ set; trend within 0.06 of $\{0.75, 0.92, 1.08\}$ & Section~\ref{sec:borderline}\\
+Overall ``at risk'' & $n_{\text{shrink}} > n_{\text{grow}}$ and $n_{\text{shrink}} \geq \lceil m/3 \rceil$ & Section~\ref{sec:overall}\\
+Overall ``growing'' & $n_{\text{grow}} \geq \max(1,\,\mathrm{round}(0.4m))$, $\tau_{\text{all}}$ absent or ${\geq}0.95$ & Section~\ref{sec:overall}\\
+``Need more data'' & fewer than 3 active weeks & Section~\ref{sec:overall}\\
+Plan frequency cap & $\min(1.2,\ p/W)$ & \eqref{eq:plan}\\
 \bottomrule
 \end{tabular}
 \end{center}
