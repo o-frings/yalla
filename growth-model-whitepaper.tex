@@ -223,17 +223,17 @@ Separately from the history-based signal, the plan forecast projects a plan's \e
 where $s_g$ is prescribed sets per rotation (primary plus half of secondary, as in \eqref{eq:alpha}), $p$ is planned sessions per week, and $W$ is the number of distinct rotation workouts. Each trained muscle is then sorted into under-dosed ($<\MV$), growth window ($\MEV$ to 20), past-productive ($>20$), or maintenance, and the counts drive a plain-language outlook. The forecast promises no centimetres or kilograms; it reports the dose against the growth window and what to change.
 
 \section{Simulations}\label{sec:sims}
-The model's behaviour is clearest as projected muscle gain under different training regimes. A seeded, reproducible simulation (\texttt{research/simulate.mjs}) drives the Monte Carlo forecast below forward for each regime, in the app's colours; every number regenerates from the same seed.
+The figures that follow project muscle gain under different training regimes from the Monte Carlo forecast defined next. A seeded script (\texttt{research/simulate.mjs}) generates them and reproduces every value on re-run.
 
 \subsection{Monte Carlo forecast}\label{sec:mc}
 A point prediction of muscle gain would overstate what the model knows, so the in-app forecast is probabilistic. Each of 500 runs accumulates a weekly fractional gain
 \begin{equation}\label{eq:mcgain}
 \Delta_t = b \cdot m \cdot \alpha \cdot \rho(D) \cdot \eta \cdot o \cdot e^{-t/32},
 \end{equation}
-where $\rho(D)$ is the dose--response of Section~4~\cite{sch17,drr}, $\eta$ scales with proximity to failure~\cite{failureprox}, $o$ is near 1 while progressing and drops without added load~\cite{plotkin}, $b$ is a training-age base rate~\cite{damas}, $\alpha$ is an age factor that attenuates hypertrophy past about 30~\cite{peterson}, and $m$ is the inter-individual response multiplier, drawn lognormal to span the range Hubal et~al.~\cite{hubal} observed (cross-sectional-area change from about $-2\%$ to $+59\%$). Sex enters as a separate lever but is set near neutral: relative hypertrophy is comparable between sexes~\cite{roberts}, so it informs absolute expectations rather than the percentage gain shown here. Below maintenance the increment turns negative (atrophy~\cite{mujika}), so a starved scenario trends down and the axis extends below zero. The first terms are well constrained by the literature; $b$ is literature-informed with a wide prior, and $m$ is the dominant source of spread, so the bands, not the median, carry the message. Figures~\ref{fig:regimes} and~\ref{fig:plangain} apply this forecast across regimes and plans; the same model drives the plan-versus-pace forecast in the app.
+where $\rho(D)$ is the dose--response of \eqref{eq:doseresp}~\cite{sch17,drr}, $\eta$ scales with proximity to failure~\cite{failureprox}, $o$ is near 1 while progressing and drops without added load~\cite{plotkin}, $b$ is a training-age base rate~\cite{damas}, $\alpha$ is an age factor that attenuates hypertrophy past about 30~\cite{peterson}, and $m$ is the inter-individual response multiplier, drawn lognormal to span the range Hubal et~al.~\cite{hubal} observed (cross-sectional-area change from about $-2\%$ to $+59\%$). Sex is a separate lever set near neutral: relative hypertrophy is comparable between sexes~\cite{roberts}, so it bears on absolute mass while the percentage gain here stays about the same for either. Below maintenance the increment turns negative (atrophy~\cite{mujika}), so a starved scenario trends down and the axis extends below zero. Most terms are well constrained by the literature; $b$ carries a wide prior, and $m$ dominates the spread, so the width of the band is the honest output.
 
 \begin{figure}[t]\centering
-\begin{tikzpicture}\begin{axis}[simaxis, xmax=24, ymin=-5, ymax=22, ylabel={projected muscle gain (\%)}, legend pos=north west, legend cell align=left]
+\begin{tikzpicture}\begin{axis}[simaxis, xmax=24, ymin=-6, ymax=25, ylabel={projected muscle gain (\%)}, legend pos=north west, legend cell align=left]
 \addplot[black!35, forget plot] coordinates {(0,0) (24,0)};
 \addplot[draw=none, forget plot, name path=pgH] table[x=week,y=progHi]{research/sim-regimes.dat};
 \addplot[draw=none, forget plot, name path=pgL] table[x=week,y=progLo]{research/sim-regimes.dat};
@@ -250,7 +250,7 @@ where $\rho(D)$ is the dose--response of Section~4~\cite{sch17,drr}, $\eta$ scal
 \end{figure}
 
 \begin{figure}[t]\centering
-\begin{tikzpicture}\begin{axis}[simaxis, xmax=24, ymin=0, ylabel={projected muscle gain (\%)}, legend pos=north west, legend cell align=left]
+\begin{tikzpicture}\begin{axis}[simaxis, xmax=24, ymin=0, ymax=25, ylabel={projected muscle gain (\%)}, legend pos=north west, legend cell align=left]
 \addplot[draw=none, forget plot, name path=fH] table[x=week,y=fbHi]{research/sim-plangain.dat};
 \addplot[draw=none, forget plot, name path=fL] table[x=week,y=fbLo]{research/sim-plangain.dat};
 \addplot[appBlue!12, forget plot] fill between[of=fH and fL];
@@ -264,10 +264,10 @@ where $\rho(D)$ is the dose--response of Section~4~\cite{sch17,drr}, $\eta$ scal
 \caption{Projected muscle gain for three standard plans, each executed with progressive overload (median, 10--90\% bands). More weekly volume per muscle projects more gain, with diminishing returns and heavily overlapping bands.}\label{fig:plangain}
 \end{figure}
 
-The starting point sets the scale. Figure~\ref{fig:start} runs the same adequate, progressing plan from three training-age base rates~\cite{damas}: a novice gains most and fastest, an advanced lifter least, and the bands overlap throughout. The app reads this base rate from the lifter's own logged history.
+On the same adequate, progressing plan, a novice gains most and an advanced lifter least across three training-age base rates~\cite{damas}, with bands that overlap throughout (Fig.~\ref{fig:start}).
 
 \begin{figure}[t]\centering
-\begin{tikzpicture}\begin{axis}[simaxis, xmax=24, ymin=0, ylabel={projected muscle gain (\%)}, legend pos=north west, legend cell align=left]
+\begin{tikzpicture}\begin{axis}[simaxis, xmax=24, ymin=-1, ymax=25, ylabel={projected muscle gain (\%)}, legend pos=north west, legend cell align=left]
 \addplot[draw=none, forget plot, name path=nH] table[x=week,y=novHi]{research/sim-start.dat};
 \addplot[draw=none, forget plot, name path=nL] table[x=week,y=novLo]{research/sim-start.dat};
 \addplot[appAccent!12, forget plot] fill between[of=nH and nL];
@@ -281,7 +281,7 @@ The starting point sets the scale. Figure~\ref{fig:start} runs the same adequate
 \caption{The same adequate, progressing plan from three starting points (training-age base rates): projected muscle gain, median and 10--90\% bands (novice and advanced). Newer lifters gain faster; all bands are wide and overlap.}\label{fig:start}
 \end{figure}
 
-Beyond the individual-response spread, Figure~\ref{fig:sens} shows how the median 16-week gain moves when each input is swung across a plausible range (the app draws the same tornado). Training experience and progression move it most; volume and age move it least over the ranges tested. This is a forecast-level companion to the threshold sensitivity of Section~\ref{sec:verification}.
+Across a plausible range for each input, training experience and progression move the 16-week median gain most and age least (Fig.~\ref{fig:sens}); Section~\ref{sec:verification} gives the matching sensitivity of the state thresholds.
 
 \begin{figure}[t]\centering
 \begin{tikzpicture}\begin{axis}[xbar, width=\linewidth, height=5cm, xmin=0, xmax=7,
