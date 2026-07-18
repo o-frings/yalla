@@ -326,7 +326,7 @@ function listWords(a){ return a.length<2?(a[0]||""):a.slice(0,-1).join(", ")+" a
 // extended catalogue — muscle mapping for items the keyword fallback can't place cleanly
 Object.assign(MUSCLES, {
   "Incline Bench Press":["Chest","Front Delts","Triceps"], "Decline Bench Press":["Chest","Triceps"],
-  "Cable Fly":["Chest"], "Pec Deck":["Chest"], "Dumbbell Fly":["Chest"], "Incline Dumbbell Fly":["Chest"],
+  "Cable Fly":["Chest"], "Pec Deck":["Chest"], "Machine Chest Fly":["Chest"], "Dumbbell Fly":["Chest"], "Incline Dumbbell Fly":["Chest"],
   "Cable Crossover":["Chest"], "Low-to-High Cable Fly":["Chest"], "Dumbbell Pullover":["Lats","Chest"],
   "Straight-Arm Pulldown":["Lats"], "T-Bar Row":["Upper Back","Lats","Biceps"], "Chest-Supported Row":["Upper Back","Lats","Biceps"],
   "Meadows Row":["Upper Back","Lats","Biceps"], "Front Raise":["Front Delts"], "Upright Row":["Side Delts","Upper Back"],
@@ -381,7 +381,7 @@ const LIBRARY=[
   "Kettlebell Bulgarian Split Squat","Turkish Get-Up","Kettlebell Windmill","Kettlebell Halo",
   "Kettlebell Suitcase Carry","Kettlebell Farmer's Carry",
   "Incline Bench Press","Decline Bench Press","Dumbbell Bench Press","Incline DB Press","Machine Chest Press",
-  "Cable Fly","Pec Deck","Dumbbell Fly","Incline Dumbbell Fly","Cable Crossover","Low-to-High Cable Fly","Push-Ups","Diamond Push-Ups","Incline Push-Ups","Decline Push-Ups",
+  "Cable Fly","Pec Deck","Machine Chest Fly","Dumbbell Fly","Incline Dumbbell Fly","Cable Crossover","Low-to-High Cable Fly","Push-Ups","Diamond Push-Ups","Incline Push-Ups","Decline Push-Ups",
   "Lat Pulldown","Seated Row","Chest-Supported Row","T-Bar Row","One-Arm DB Row","Meadows Row",
   "Chin-Up","Straight-Arm Pulldown","Dumbbell Pullover","Face Pulls",
   "Seated DB Press","Arnold Press","Machine Shoulder Press","Pike Push-Ups","Cable Lateral Raise","Rear Delt Fly","Upright Row","Front Raise",
@@ -452,7 +452,7 @@ function explainFor(name){
 const DIFF={ "Deadlift":5,"Romanian Deadlift":4,"Single-Leg RDL":4,"Front Squat":4,"Back Squat":4,"Overhead Press":4,
   "Bent-Over Row":4,"Bulgarian Split Squat":4,"Good Morning":4,"Nordic Curl":5,"Push Press":4,
   "Weighted Pull-Up":4,"Pull-Up":3,"Pull-Ups":3,"Weighted Dip":3,"Barbell Bench Press":3,"Hip Thrust":3,
-  "Hack Squat":2,"Leg Press":1,"Goblet Squat":2,"Pec Deck":1,"Cable Fly":2,
+  "Hack Squat":2,"Leg Press":1,"Goblet Squat":2,"Pec Deck":1,"Machine Chest Fly":1,"Cable Fly":2,
   "Two-Hand Kettlebell Swing":3,"One-Arm Kettlebell Swing":3,"Kettlebell Snatch":5,"Kettlebell Clean":4,
   "Kettlebell High Pull":3,"Kettlebell Clean & Press":4,"Kettlebell Front Squat":3,"Kettlebell Overhead Press":3,
   "Kettlebell Push Press":4,"Kettlebell Romanian Deadlift":3,"Kettlebell Row":3,"Kettlebell Floor Press":3,
@@ -506,6 +506,7 @@ const HSCORE={
  "Cable Crossover":[3.5,"Smooth constant-tension chest isolation; pick a setting that loads the stretch."],
  "Low-to-High Cable Fly":[3.5,"Targets the upper chest with constant tension; a solid finisher."],
  "Pec Deck":[3.5,"Stable, easy-to-progress chest isolation; limited stretch versus free-weight flyes."],
+ "Machine Chest Fly":[3.5,"Same movement as the pec deck — stable, easy-to-progress chest isolation."],
  "Romanian Deadlift":[4.5,"Loads hamstrings and glutes through a deep stretch — a top-tier growth move."],
  "Bulgarian Split Squat":[4.5,"Big loaded stretch on quads and glutes, one leg at a time."],
  "Seated Leg Curl":[4.5,"Trains the hamstrings stretched — research favours it over the lying curl."],
@@ -3590,8 +3591,9 @@ function metaHTML(name, t, xi){
   if(s.over && xi!=null){
     const btns=[];
     if(s.over.w) btns.push('<button type="button" class="cuebtn addw" data-i="'+xi+'" data-w="'+s.over.w+'">Load '+s.over.w+'kg</button>');
-    btns.push('<button type="button" class="cuebtn raise" data-i="'+xi+'" data-range="'+esc(s.over.range)+'">Raise target → '+esc(s.over.range)+'</button>');
-    actions='<div class="cueact">'+btns.join('')+'</div>';
+    // raising the target range writes to the plan — only offer it for plan slots (numeric index)
+    if(typeof xi==="number") btns.push('<button type="button" class="cuebtn raise" data-i="'+xi+'" data-range="'+esc(s.over.range)+'">Raise target → '+esc(s.over.range)+'</button>');
+    if(btns.length) actions='<div class="cueact">'+btns.join('')+'</div>';
   }
   return { lastText, soft:s.soft, show:s.show, over:!!s.over, cue:'<div class="cue'+(s.soft?' soft':'')+(s.over?' over':'')+'">'+s.cue+actions+'</div>' };
 }
@@ -4810,7 +4812,7 @@ function buildSetRow(i, pv, name){
   const timed=isTimed(name);
   const pvVol = (pv && name) ? setVol(name, pv.w, pv.r) : 0;
   const pw = pv&&pv.w!=null?esc(pv.w):'', pr = pv&&pv.r!=null?esc(pv.r):'';
-  const wPh = timed ? '+kg' : (pv&&pv.w?esc(pv.w):'kg');
+  const wPh = timed ? '+kg' : (pv&&pv.w?esc(pv.w):(isBW(name)?'BW':'kg'));   // weight is optional — blank logs as no extra weight
   const rPh = timed ? 'sec' : (pv&&pv.r?esc(pv.r):'reps');
   const sep = timed
     ? '<button class="holdbtn" type="button" aria-label="Hold timer — tap to start, tap to stop">'+ICON.play+'</button>'
@@ -4895,17 +4897,20 @@ function buildFreeGroup(name){
   const prev=last[name]||[];
   const g=document.createElement("div"); g.className="group"; g.dataset.ex=name;
   let rows=""; for(let i=0;i<3;i++) rows+=freeSetRow(i+1, prev[i], name);
-  const meta=metaHTML(name, ""), eq=equipFor(name);
+  // default hypertrophy rep target so the progressive-overload cues (layoff, topped-the-range…) fire
+  // in free sessions too — free mode has no plan target of its own. Timed holds keep the no-target path.
+  const meta=metaHTML(name, isTimed(name)?"":"3 × 8–12", "free"), eq=equipFor(name);
   const mcol=MCOLOR[muscleFor(name)[0]]||"#888888";
   const mp=[]; if(meta.lastText) mp.push('<span>'+meta.lastText+'</span>'); mp.push(scoreTag(name));
   const metaLine='<div class="exmeta">'+mp.join('<span class="dot">·</span>')+'</div>';
   g.innerHTML='<div class="pad" style="padding-bottom:0">'
     +'<div class="exhead"><span class="eqic tinted" style="background:'+hexAlpha(mcol,.15)+';color:'+mcol+'" title="'+esc(eq.label)+'">'+EQUIP[eq.key]+'</span><span class="nm">'+esc(name)+'</span>'
-    +'<span class="lnks"><a class="lnkic info" data-ex="'+esc(name)+'" title="Info & demo">'+ICON.info+'</a></span>'
+    +'<span class="lnks"><a class="lnkic swapfree" title="Swap exercise">'+ICON.swap+'</a><a class="lnkic info" data-ex="'+esc(name)+'" title="Info & demo">'+ICON.info+'</a></span>'
     +'<button class="freedel" title="Remove">×</button></div>'
     +metaLine+(meta.show?meta.cue:'')+'</div>'
     +rows+effortBar(name)+'<div class="freeadd"><a class="demo addset">'+ICON.plus+'add set</a></div>';
   wireEffortBar(g);
+  g.querySelector(".swapfree").onclick=e=>{ e.preventDefault(); openSwapFree(name); };
   g.querySelector(".freedel").onclick=()=>{ confirmAsk("Remove "+name+"?", "Remove", ()=>{ const sec=g.closest(".secgrp"); g.remove(); if(sec && !sec.querySelector(".group")) sec.remove(); captureDraft(); }); };
   g.querySelector(".addset").onclick=()=>{ const n=g.querySelectorAll(".setrow").length+1;
     const tmp=document.createElement("div"); tmp.innerHTML=freeSetRow(n,null,name);
@@ -5096,7 +5101,8 @@ function updateSetVol(r, name){
   const wv=r.querySelector(".w").value.trim(), rv=r.querySelector(".r").value.trim(), vEl=r.querySelector(".vol");
   if(rv===""&&wv===""){ const pv=r.dataset.pvol; vEl.textContent=pv?fmtVol(+pv):""; vEl.classList.remove("live"); vEl.classList.toggle("fillable", !!pv && !!(r.dataset.pw||r.dataset.pr)); r.classList.toggle("novol", !pv); setRowPR(r,false); return; }
   const vol=setVol(name, wv, rv);
-  vEl.textContent = vol?fmtVol(vol):""; vEl.classList.toggle("live", vol>0); vEl.classList.remove("fillable"); r.classList.toggle("novol", !vol);
+  // a row with reps entered is a logged set even with no weight (bodyweight / empty bar) — never gray it out
+  vEl.textContent = vol?fmtVol(vol):""; vEl.classList.toggle("live", vol>0); vEl.classList.remove("fillable"); r.classList.toggle("novol", !vol && rv==="");
   vEl.title = vol>0 ? "Tap to copy this set to the next" : "";
   const best=bestVol(name);
   setRowPR(r, vol>0 && best>0 && vol>best);
@@ -5159,12 +5165,44 @@ $("swapClose").onclick=()=>closeSheet("Swap");
 $("scrimSwap").onclick=()=>closeSheet("Swap");
 let swapScope="today";
 function openSwap(xi){
-  swapIdx=xi; swapScope="today"; const e=activePlan().workouts[curWk].ex[xi];
+  swapIdx=xi; swapFreeName=null; swapScope="today"; const e=activePlan().workouts[curWk].ex[xi];
   $("swapTitle").textContent="Swap: "+e.n;
+  $("swapScope").style.display="";
   document.querySelectorAll("#swapScope .s").forEach(s=> s.classList.toggle("active", s.dataset.scope==="today"));
   syncLevelSeg(); renderSwapList(); openSheet("Swap");
 }
+// swap inside a free/spontaneous session — same sheet, but it renames the on-screen group
+// instead of touching a plan (so there's no today/permanently scope to choose)
+let swapFreeName=null;
+function openSwapFree(name){
+  swapFreeName=name;
+  $("swapTitle").textContent="Swap: "+name;
+  $("swapScope").style.display="none";
+  syncLevelSeg(); renderSwapList(); openSheet("Swap");
+}
 function renderSwapList(){
+  if(swapFreeName){
+    const cur=swapFreeName, wrap=$("swapList"); wrap.innerHTML="";
+    let opts=swapOptions({n:cur}).filter(o=> o===cur || levelAllows(o));
+    if(exSort==="score") opts=opts.slice().sort((a,b)=> hScore(b).s-hScore(a).s || a.localeCompare(b));
+    opts.forEach(o=>{
+      const row=buildExRow(o, {checked:o===cur, meta:o===cur?"current":""});
+      row.querySelector(".info").onclick=()=>{
+        if(o!==cur){
+          const g=[...document.querySelectorAll("#exlist .group")].find(x=>x.dataset.ex===cur);
+          if(g){ const sec=g.closest(".secgrp"); g.replaceWith(buildFreeGroup(o));
+            if(sec && sec.dataset.sec!==sectionKeyFor(o)){                 // muscle changed → re-home the group
+              const ng=[...document.querySelectorAll("#exlist .group")].find(x=>x.dataset.ex===o);
+              if(ng){ freeSection(sectionKeyFor(o)).appendChild(ng); if(!sec.querySelector(".group")) sec.remove(); }
+            }
+            captureDraft(); }
+        }
+        closeSheet("Swap"); toast(o===cur?"Kept "+cur:"Swapped to "+o);
+      };
+      wrap.appendChild(row);
+    });
+    return;
+  }
   const e=activePlan().workouts[curWk].ex[swapIdx]; if(!e) return;
   const cur=dispName(e,swapIdx), wrap=$("swapList"); wrap.innerHTML="";
   let opts=swapOptions(e).filter(o=> o===e.n || levelAllows(o));
@@ -6423,7 +6461,7 @@ function drawForecastMuscles(f, which){
 
 // ================= automatic plan builder =================
 const BUILD_POOL={
-  chest:["Barbell Bench Press","Incline Barbell Press","Incline DB Press","Machine Chest Press","Weighted Dip","Dumbbell Bench Press","Cable Fly","Pec Deck","Push-Ups","Decline Push-Ups","Diamond Push-Ups","Incline Push-Ups","Kettlebell Floor Press"],
+  chest:["Barbell Bench Press","Incline Barbell Press","Incline DB Press","Machine Chest Press","Weighted Dip","Dumbbell Bench Press","Cable Fly","Pec Deck","Machine Chest Fly","Push-Ups","Decline Push-Ups","Diamond Push-Ups","Incline Push-Ups","Kettlebell Floor Press"],
   lats:["Weighted Pull-Up","Pull-Up","Lat Pulldown","Chin-Up","Straight-Arm Pulldown","Dumbbell Pullover","One-Arm DB Row"],
   upperback:["Chest-Supported Row","Bent-Over Row","Seated Row","One-Arm DB Row","T-Bar Row","Meadows Row","Face Pulls","Inverted / Backpack Row","Kettlebell Row"],
   lowerback:["Back Extension","Good Morning","Rack Pull","Superman","Romanian Deadlift"],
