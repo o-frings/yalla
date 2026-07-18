@@ -2162,7 +2162,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi] || (rot[xi]!=null && !rotKeep.has(xi) ? rot[xi] : e.n); }
-let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, age:null, exp:null, meTileOrder:null, theme:"auto", restSec:90, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{}, baseActivity:null };
+let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, age:null, exp:null, sponLen:null, meTileOrder:null, theme:"auto", restSec:90, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{}, baseActivity:null };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -2649,8 +2649,14 @@ const SPON_DAYS=[
   { id:"lower", name:"Lower body", g:["quads","hamstrings","glutes","calves","adductors","core"] },
   { id:"full",  name:"Full body",  g:["chest","lats","quads","hamstrings","shoulders","core"] },
 ];
-const SPON_N={ push:4, pull:4, legs:4, upper:6, lower:6, full:5 };
-let _sponDays=[], _sponSel=0;
+const SPON_N={ push:4, pull:4, legs:4, upper:6, lower:6, full:5 };   // base counts ≈ a standard ~45-min session
+let _sponDays=[], _sponSel=0, _sponPr=null, _sponLen="standard";
+// session length scales the exercise count (each pick ≈ 3 sets ≈ 9 min)
+function sponCount(id){
+  const base=SPON_N[id]||4, f=_sponLen==="quick"?0.65:_sponLen==="full"?1.35:1;
+  return Math.max(3, Math.min(7, Math.round(base*f)));   // 7 ≈ 63 min, keeps "full" honest to ~60m
+}
+function sponMins(nEx){ return nEx*9; }
 function sponWeakMatch(gl, weak){
   for(const w of weak){
     if(w==="back" && /back|lats/.test(gl)) return true;
@@ -2717,29 +2723,44 @@ function sponWhy(day, pr){
   });
   return reasons.join(" · ");
 }
-function buildSponDay(day, pr){
-  const n=SPON_N[day.id]||4, inj=activeInjuries(), exp=settings.exp||"intermediate", obj=settings.objective||"muscle";
+// swap options for a slot: rotationPool's cross-family picks first, then same-muscle variants
+// from the pool/library (same family allowed — e.g. another bench angle), up to 6 total
+function sponAlts(name, inj, exp, taken){
+  const primary=muscleFor(name)[0]||"";
+  const out=rotationPool(name, equipLevel, inj, exp, taken).slice();
+  const usedN=(taken&&taken.names)||new Set();
+  const add=n=>{ if(out.length>=6 || !n || out.includes(n) || (n!==name&&usedN.has(n))) return;
+    if((muscleFor(n)[0]||"")!==primary) return;
+    if(injuryBlocks(n,inj) || !allowsAt(n,equipLevel) || !suitsExp(n,exp)) return;
+    out.push(n); };
+  (BUILD_POOL[buildKey(primary)]||[]).forEach(add);
+  exerciseLibrary().forEach(add);
+  return out;
+}
+function buildSponDay(day, pr, shuffle){
+  const n=sponCount(day.id), inj=activeInjuries(), exp=settings.exp||"intermediate", obj=settings.objective||"muscle";
   const vals=day.g.map(k=>pr[k]!=null?pr[k]:0.5), mn=Math.min(...vals), mx=Math.max(...vals), rg=Math.max(1e-6,mx-mn);
   const W={}; day.g.forEach(k=>{ const v=pr[k]!=null?pr[k]:0.5; W[k]=0.45+((v-mn)/rg)*0.4; });   // neediest → more slots
-  const offset = lastWorkoutTs() ? daysSince(lastWorkoutTs()) : 0;
+  const offset = (lastWorkoutTs() ? daysSince(lastWorkoutTs()) : 0) + (shuffle||0)*7;   // shuffle rotates every slot
   let picks=pickWorkoutWeighted(day.g, n, inj, equipLevel, W, offset, exp, obj, "balanced", BUILD_POOL)||[];
   if(!picks.length) picks=day.g.slice(0,n).map(k=>({n:(BUILD_POOL[k]||[])[0]})).filter(p=>p.n);
   const lastMoves=lastSessionMoves(), taken={ names:new Set(picks.map(p=>p.n)), fams:new Set(picks.map(p=>familyKey(p.n))) };
   const ex=picks.map(p=>{
-    let name=p.n; const alts=rotationPool(name, equipLevel, inj, exp, taken);
+    let name=p.n; const alts=sponAlts(name, inj, exp, taken);
     if(lastMoves.has(name) && alts.length>1) name=alts[1];     // did it last session → offer a familiar alternate
     return { n:name, alts };
   });
-  return { id:day.id, name:day.name, why:sponWhy(day, pr), ex };
+  return { id:day.id, name:day.name, why:sponWhy(day, pr), ex, tpl:day, shuffle:shuffle||0 };
 }
 function spontaneousDays(){
-  const pr=sponPriorities();
+  const pr=_sponPr=sponPriorities();
   return SPON_DAYS
     .map(d=>({ d, score:d.g.map(k=>pr[k]!=null?pr[k]:0.5).reduce((a,b)=>a+b,0)/d.g.length }))
     .sort((a,b)=>b.score-a.score).slice(0,3)
-    .map(s=>buildSponDay(s.d, pr));
+    .map(s=>buildSponDay(s.d, pr, 0));
 }
 function openSpontaneous(){
+  _sponLen=settings.sponLen||"standard";
   _sponDays=spontaneousDays(); _sponSel=0;
   if(!_sponDays.length || !_sponDays.some(d=>d.ex.length)){ toast("Log a session or two first — then I can suggest one."); return; }
   renderSpon(); openSheet("Spon");
@@ -2750,7 +2771,13 @@ function renderSpon(){
     '<button class="sponcard'+(i===_sponSel?' on':'')+'" type="button" data-i="'+i+'"><span class="spname">'+esc(d.name)+'</span><span class="spwhy">'+esc(d.why)+'</span></button>'
   ).join('')+'</div>';
   const day=_sponDays[_sponSel];
-  h+='<div class="ed-label" style="margin-top:14px;">Exercises <span class="subhint">— tap ↻ to swap</span></div><div class="sponex">'
+  h+='<div class="ed-label" style="margin-top:14px;">Session length</div>'
+    +'<div class="mewintabs paneltabs" id="sponLenSeg">'
+    +[["quick","Quick ~30m"],["standard","Standard ~45m"],["full","Full ~60m"]].map(([v,l])=>
+      '<button class="mewintab'+(_sponLen===v?' active':'')+'" data-sl="'+v+'" type="button">'+l+'</button>').join('')
+    +'</div>';
+  h+='<div class="ed-label sponexhd" style="margin-top:14px;"><span>Exercises <span class="subhint">— ≈'+sponMins(day.ex.length)+' min · tap ↻ to swap</span></span>'
+    +'<button class="spshuffle" id="sponShuf" type="button">↻ shuffle all</button></div><div class="sponex">'
     +day.ex.map((e,xi)=>{
       const mcol=MCOLOR[muscleFor(e.n)[0]]||"#888", meta=metaHTML(e.n,""), lt=(meta&&meta.lastText)?meta.lastText:"new to you";
       const canSwap=e.alts && e.alts.length>1;
@@ -2761,7 +2788,17 @@ function renderSpon(){
   h+='<button class="btn wide" id="sponStart" type="button" style="margin-top:16px;">Start this session</button>';
   box.innerHTML=h;
   box.querySelectorAll(".sponcard").forEach(c=> c.onclick=()=>{ _sponSel=+c.dataset.i; renderSpon(); });
+  box.querySelectorAll("#sponLenSeg .mewintab").forEach(b=> b.onclick=async()=>{
+    _sponLen=b.dataset.sl; settings.sponLen=_sponLen; await sset("settings",settings);
+    _sponDays=_sponDays.map(d=>buildSponDay(d.tpl, _sponPr, d.shuffle));   // re-fit every day to the new length
+    renderSpon();
+  });
   box.querySelectorAll(".spswap").forEach(b=> b.onclick=()=>sponSwap(+b.dataset.xi));
+  const sh=$("sponShuf"); if(sh) sh.onclick=()=>{
+    const d=_sponDays[_sponSel];
+    _sponDays[_sponSel]=buildSponDay(d.tpl, _sponPr, d.shuffle+1);         // fresh picks for the whole day
+    renderSpon();
+  };
   $("sponStart").onclick=sponStart;
 }
 function sponSwap(xi){
