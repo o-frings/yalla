@@ -59,6 +59,10 @@
 <div class="largeTitle" id="largeTitle">
   <div class="ltmain">
     <span class="titleBtn" id="openPlans"><span id="ltName">Yalla</span><svg class="tchev" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+    <!-- spontaneous session — a data-picked day for when you just want to train now -->
+    <button class="modebtn" id="sponQuick" type="button" aria-label="Suggest a session">
+      <svg class="mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
+    </button>
     <!-- travel mode quick-access — one tap to tag sessions when you're away from your usual gym -->
     <button class="modebtn travelbtn" id="travelQuick" type="button" aria-label="Travel mode">
       <svg class="mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l5.2 4.2-2 4-2-1-1 1 3 2 2 3 1-1-1-2 4-2 4.2 5.2a.5.5 0 0 0 .8-.4z"/></svg>
@@ -1022,6 +1026,17 @@
       <div class="s" data-tv="nogym">No gym</div>
     </div>
     <div id="travelBreakdown"></div>
+  </div>
+</div>
+
+<!-- SPONTANEOUS SESSION SHEET — pick a suggested split day, swap any exercise, start -->
+<div class="scrim" id="scrimSpon"></div>
+<div class="sheet" id="sheetSpon">
+  <div class="grabber"></div>
+  <div class="sheethdr"><span class="t">Suggest a session</span><button class="btn plain sm" id="sponClose">Done</button></div>
+  <div class="sheetbody">
+    <p style="color:var(--l2);font-size:13px;margin:0 4px 12px;line-height:1.45;">Picked from your recent training, goals and what's slipping. Choose a day, swap anything you like, and start — it logs like any workout.</p>
+    <div id="sponBody"></div>
   </div>
 </div>
 

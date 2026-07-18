@@ -2638,6 +2638,142 @@ function startHomeWorkout(){
   showTab("workout");
   toast("Home workout ready — no equipment needed. Let's go!");
 }
+// ===== Spontaneous session — a coherent split day picked from your recent training, goals & growth signal. =====
+// Standard day templates (pool build-keys). We score each against what's slipping / stale / under-projected,
+// surface the best few, fill them from the exercise engine, and seed each pick from what you last lifted.
+const SPON_DAYS=[
+  { id:"push",  name:"Push",       g:["chest","shoulders","sidedelts","triceps"] },
+  { id:"pull",  name:"Pull",       g:["lats","upperback","reardelts","biceps"] },
+  { id:"legs",  name:"Legs",       g:["quads","hamstrings","glutes","calves"] },
+  { id:"upper", name:"Upper body", g:["chest","lats","upperback","shoulders","sidedelts","triceps","biceps"] },
+  { id:"lower", name:"Lower body", g:["quads","hamstrings","glutes","calves","adductors","core"] },
+  { id:"full",  name:"Full body",  g:["chest","lats","quads","hamstrings","shoulders","core"] },
+];
+const SPON_N={ push:4, pull:4, legs:4, upper:6, lower:6, full:5 };
+let _sponDays=[], _sponSel=0;
+function sponWeakMatch(gl, weak){
+  for(const w of weak){
+    if(w==="back" && /back|lats/.test(gl)) return true;
+    if(w==="arms" && /biceps|triceps|forearm/.test(gl)) return true;
+    if(w==="shoulders" && /delt/.test(gl)) return true;
+    if(gl.includes(w)) return true;
+  }
+  return false;
+}
+function sponFocusMatch(gl){
+  const f=settings.focusAreas||[]; if(!f.length || f.includes("balanced")) return false;
+  return f.some(x=>{
+    if(x==="upper") return /chest|lat|back|delt|biceps|triceps|forearm/.test(gl);
+    if(x==="lower"||x==="glutes") return /quad|hamstring|glute|calf|calves|adductor/.test(gl);
+    if(x==="arms") return /biceps|triceps|forearm/.test(gl);
+    if(x==="shoulders") return /delt/.test(gl);
+    if(x==="chest") return /chest/.test(gl);
+    if(x==="back") return /lat|back/.test(gl);
+    return false;
+  });
+}
+// priority per pool build-key: higher = more worth training today
+function sponPriorities(){
+  const gs=growthStatus(), stat={}; gs.per.forEach(p=>stat[p.g]=p);
+  const fc=growthForecast(), gain={};
+  if(fc && fc.perMuscle) fc.perMuscle.pace.forEach(m=>gain[m.g]=m.gain);
+  const gvals=Object.values(gain), gmax=gvals.length?Math.max(...gvals):0, gmin=gvals.length?Math.min(...gvals):0, grange=Math.max(1e-6,gmax-gmin);
+  const lastTs={}; Object.keys(hist).forEach(n=>{ let t=0; (hist[n]||[]).forEach(e=>{ if(e.d>t) t=e.d; });
+    if(t) muscleFor(n).forEach(g=>{ if(!lastTs[g]||t>lastTs[g]) lastTs[g]=t; }); });
+  const weak=new Set((settings.weakSpots||[]).map(w=>String(w).toLowerCase()));
+  const pr={};
+  MGROUPS.forEach(g=>{
+    if(NO_TARGET.has(g)) return;
+    const gl=g.toLowerCase(); let s=0, st=stat[g];
+    if(st){ s += st.state==="shrink"?2.5 : st.state==="hold"?1.2 : 0.3; s += (1-(st.stim||0))*1.0; }
+    else s += 1.4;                                              // trainable but quiet lately → keep balance
+    if(gain[g]!=null) s += (gmax-gain[g])/grange*0.8;          // less projected gain now → more to unlock
+    const ds = lastTs[g] ? daysSince(lastTs[g]) : 99;
+    if(ds<2) s -= 2.2;                                          // hit in the last 2 days → let it recover
+    else s += Math.min((ds-2)/3, 1.5)*0.8;                     // the longer since, the fresher
+    if(sponWeakMatch(gl, weak)) s += 0.7;
+    if(sponFocusMatch(gl))      s += 0.6;
+    const k=buildKey(g); if(pr[k]==null || s>pr[k]) pr[k]=s;   // bucket to pool key, keep the neediest member
+  });
+  return pr;
+}
+// exercises performed in the single most-recent training day (to rotate away from repeating them)
+function lastSessionMoves(){
+  let mx=0; Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ if(e.d>mx) mx=e.d; }));
+  if(!mx) return new Set();
+  const day=new Date(mx).toDateString(), set=new Set();
+  Object.keys(hist).forEach(n=>{ if((hist[n]||[]).some(e=>new Date(e.d).toDateString()===day)) set.add(n); });
+  return set;
+}
+function sponWhy(day, pr){
+  const gs=growthStatus(), stat={}; gs.per.forEach(p=>stat[p.g]=p);
+  const members=MGROUPS.filter(g=>!NO_TARGET.has(g) && day.g.includes(buildKey(g)))
+    .sort((a,b)=>(pr[buildKey(b)]||0)-(pr[buildKey(a)]||0));
+  const reasons=members.slice(0,2).map(g=>{
+    const st=stat[g], short=((typeof MSHORT!=="undefined"&&MSHORT[g])||g).toLowerCase();
+    if(st && st.state==="shrink") return short+" slipping";
+    if(st && st.state==="hold")   return short+" stalled";
+    return short+" ready to grow";
+  });
+  return reasons.join(" · ");
+}
+function buildSponDay(day, pr){
+  const n=SPON_N[day.id]||4, inj=activeInjuries(), exp=settings.exp||"intermediate", obj=settings.objective||"muscle";
+  const vals=day.g.map(k=>pr[k]!=null?pr[k]:0.5), mn=Math.min(...vals), mx=Math.max(...vals), rg=Math.max(1e-6,mx-mn);
+  const W={}; day.g.forEach(k=>{ const v=pr[k]!=null?pr[k]:0.5; W[k]=0.45+((v-mn)/rg)*0.4; });   // neediest → more slots
+  const offset = lastWorkoutTs() ? daysSince(lastWorkoutTs()) : 0;
+  let picks=pickWorkoutWeighted(day.g, n, inj, equipLevel, W, offset, exp, obj, "balanced", BUILD_POOL)||[];
+  if(!picks.length) picks=day.g.slice(0,n).map(k=>({n:(BUILD_POOL[k]||[])[0]})).filter(p=>p.n);
+  const lastMoves=lastSessionMoves(), taken={ names:new Set(picks.map(p=>p.n)), fams:new Set(picks.map(p=>familyKey(p.n))) };
+  const ex=picks.map(p=>{
+    let name=p.n; const alts=rotationPool(name, equipLevel, inj, exp, taken);
+    if(lastMoves.has(name) && alts.length>1) name=alts[1];     // did it last session → offer a familiar alternate
+    return { n:name, alts };
+  });
+  return { id:day.id, name:day.name, why:sponWhy(day, pr), ex };
+}
+function spontaneousDays(){
+  const pr=sponPriorities();
+  return SPON_DAYS
+    .map(d=>({ d, score:d.g.map(k=>pr[k]!=null?pr[k]:0.5).reduce((a,b)=>a+b,0)/d.g.length }))
+    .sort((a,b)=>b.score-a.score).slice(0,3)
+    .map(s=>buildSponDay(s.d, pr));
+}
+function openSpontaneous(){
+  _sponDays=spontaneousDays(); _sponSel=0;
+  if(!_sponDays.length || !_sponDays.some(d=>d.ex.length)){ toast("Log a session or two first — then I can suggest one."); return; }
+  renderSpon(); openSheet("Spon");
+}
+function renderSpon(){
+  const box=$("sponBody"); if(!box) return;
+  let h='<div class="sponpick">'+_sponDays.map((d,i)=>
+    '<button class="sponcard'+(i===_sponSel?' on':'')+'" type="button" data-i="'+i+'"><span class="spname">'+esc(d.name)+'</span><span class="spwhy">'+esc(d.why)+'</span></button>'
+  ).join('')+'</div>';
+  const day=_sponDays[_sponSel];
+  h+='<div class="ed-label" style="margin-top:14px;">Exercises <span class="subhint">— tap ↻ to swap</span></div><div class="sponex">'
+    +day.ex.map((e,xi)=>{
+      const mcol=MCOLOR[muscleFor(e.n)[0]]||"#888", meta=metaHTML(e.n,""), lt=(meta&&meta.lastText)?meta.lastText:"new to you";
+      const canSwap=e.alts && e.alts.length>1;
+      return '<div class="sponrow"><span class="cdot" style="background:'+mcol+'"></span>'
+        +'<span class="sptext"><span class="spx">'+esc(e.n)+'</span><span class="spmeta">'+esc(lt)+'</span></span>'
+        +(canSwap?'<button class="spswap" type="button" data-xi="'+xi+'" aria-label="Swap exercise">↻</button>':'')+'</div>';
+    }).join('')+'</div>';
+  h+='<button class="btn wide" id="sponStart" type="button" style="margin-top:16px;">Start this session</button>';
+  box.innerHTML=h;
+  box.querySelectorAll(".sponcard").forEach(c=> c.onclick=()=>{ _sponSel=+c.dataset.i; renderSpon(); });
+  box.querySelectorAll(".spswap").forEach(b=> b.onclick=()=>sponSwap(+b.dataset.xi));
+  $("sponStart").onclick=sponStart;
+}
+function sponSwap(xi){
+  const e=_sponDays[_sponSel].ex[xi]; if(!e.alts || e.alts.length<2) return;
+  e.n=e.alts[(e.alts.indexOf(e.n)+1)%e.alts.length]; renderSpon();
+}
+function sponStart(){
+  const day=_sponDays[_sponSel], s={}; day.ex.forEach(e=> s[e.n]=[]);
+  draft["free"]={ t:Date.now(), s }; sset("draft", draft);
+  freeMode=true; swaps={}; closeSheet("Spon"); renderSeg(); renderFree(); showTab("workout");
+  toast(day.name+" session ready — picked from your recent training. Let's go!");
+}
 // Short, research-backed coach tips. Each maps to a paper in PROG_SRC (full citation lives on the Muscle-balance
 // sheet); `src` is the short attribution shown on the card. `id` is stable so recency tracking survives edits.
 // `goals` (optional) restricts a tip to matching objectives (muscle/strength/fatloss/fitness) — mostly the
@@ -2781,6 +2917,11 @@ function renderOverview(){
   const f7=sessionCredit(7);
   const motiv = f7>=4?"Strong week — you’re putting in the work." : f7>=2?"Good momentum — keep it rolling." : f7>=1?"You’ve started — one more session lifts the whole week." : "Fresh week. The first session is the hardest — let’s go.";
   h+='<p class="ovp" style="margin:12px 0 0;">'+motiv+'</p>';
+  // --- Spontaneous session — a data-picked day for whenever you just want to train now ---
+  if(!did && !due){
+    h+='<div class="ed-label" style="margin-top:18px;">Feeling spontaneous?</div>';
+    h+='<div class="group ovtap ovspon"><div class="pad ovstartpad"><div class="ovstarttext"><div class="ovbig">Suggest a session</div><div class="ovmeta">a day picked from your recent training &amp; goals</div></div><span class="ovchev ovgo">›</span></div></div>';
+  }
   // --- visual snapshot: three activity rings to fill this week + a "vs last month" delta ---
   let ovRings=null;
   if(Object.keys(hist).length || cardioList().length){
@@ -2858,6 +2999,7 @@ function renderOverview(){
   host.innerHTML=h;
   const sb=host.querySelector(".ovstart"); if(sb) sb.onclick=()=>showTab("workout");
   const hb=host.querySelector(".ovhome"); if(hb) hb.onclick=startHomeWorkout;
+  const sp=host.querySelector(".ovspon"); if(sp) sp.onclick=openSpontaneous;
   const ll=host.querySelector("#ovLibLink"); if(ll) ll.onclick=openLibrary;
   if(ovRings && $("ovRingsC")){ drawRings("ovRingsC", ovRings);
     const snap=host.querySelector(".ovsnap"); if(snap) snap.onclick=openRingsDetail; }
@@ -4216,6 +4358,8 @@ if($("ringsClose")) $("ringsClose").onclick=()=>closeSheet("Rings");
 if($("scrimRings")) $("scrimRings").onclick=()=>closeSheet("Rings");
 if($("travelClose")) $("travelClose").onclick=()=>closeSheet("Travel");
 if($("scrimTravel")) $("scrimTravel").onclick=()=>closeSheet("Travel");
+if($("sponClose")) $("sponClose").onclick=()=>closeSheet("Spon");
+if($("scrimSpon")) $("scrimSpon").onclick=()=>closeSheet("Spon");
 $("libClose").onclick=()=>closeSheet("Library");
 $("scrimLibrary").onclick=()=>closeSheet("Library");
 $("libSearch").oninput=function(){ libQuery=this.value; renderLibrary(); };
@@ -4605,6 +4749,7 @@ function renderTravelBreakdown(){
 }
 function renderTravel(){ renderTravelSeg(); renderTravelFab(); renderTravelBreakdown(); }
 if($("travelQuick")) $("travelQuick").onclick=()=> openTravel();
+if($("sponQuick")) $("sponQuick").onclick=()=> openSpontaneous();
 if($("openTravelBtn")) $("openTravelBtn").onclick=()=> openTravel();
 document.querySelectorAll("#travelSeg .s").forEach(s=>{
   s.onclick=async()=>{ if(s.dataset.tv===(settings.travelMode||"off")) return;   // no change → don't reset the clock
