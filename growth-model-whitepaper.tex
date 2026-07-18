@@ -82,7 +82,7 @@ Each exercise contributes to its primary muscle at full weight and to each secon
 0 & \text{otherwise.}
 \end{cases}
 \end{equation}
-The $0.5$ weight for indirect work is the fractional counting scheme that best fit the hypertrophy data in the Pelland et~al.\ dose--response meta-regression~\cite{drr}.
+The intuition: a bench press trains the chest first, but the triceps also work hard in it, so each pressing set counts as half a set of triceps work. The $0.5$ weight is the fractional counting scheme that best fit the hypertrophy data in the Pelland et~al.\ dose--response meta-regression~\cite{drr}.
 
 \subsection{Effort weighting}
 Only sets taken reasonably close to failure drive much growth, so each set is scaled by an effort factor $\eps(f)$ before it counts, where $f\in\{0,1,2\}$ is the entry's effort code:
@@ -94,35 +94,39 @@ Only sets taken reasonably close to failure drive much growth, so each set is sc
 1 & \text{Max}\ (f{=}2,\ 0\text{--}1\text{ in reserve}).
 \end{cases}
 \end{equation}
-Max carries no growth premium over Hard: hypertrophy is comparable across roughly 0--4 reps in reserve, and training to failure mainly adds fatigue~\cite{failureprox}. Max still helps the load trend indirectly through the extra reps it buys. Entries with no recorded effort (all logs predating the feature) default to Hard, so $\eps=1$ and historical counts are unchanged.
+The intuition: a set stopped far short of failure delivers roughly half the growth signal of a hard set, so it counts half. Max carries no growth premium over Hard: hypertrophy is comparable across roughly 0--4 reps in reserve, and training to failure mainly adds fatigue~\cite{failureprox}. Max still helps the load trend indirectly through the extra reps it buys. Entries with no recorded effort (all logs predating the feature) default to Hard, so $\eps=1$ and historical counts are unchanged.
 
 \subsection{Weekly effective sets per muscle}
-Time is bucketed into $N=10$ rolling weeks; week index $k=9$ is the current week. The effective weekly sets for muscle $g$ in week $k$ sum every contributing entry:
+Time is bucketed into $N=10$ rolling weeks; week index $k=9$ is the current week. The effective weekly sets $S_{g,k}$ for muscle $g$ in week $k$ sum every contributing entry:
 \begin{equation}\label{eq:S}
 S_{g,k}=\sum_{e\,\in\,\text{week }k} n_e\,\eps(f_e)\,\alpha(x_e,g),
 \end{equation}
-where the sum runs over all entries $e$ logged in week $k$, and $n_e$, $f_e$, and $x_e$ are the entry's set count, effort code, and exercise. This same effort-weighted, fractional count feeds the weekly-sets chart, the balance radar, and the ``hard sets'' ring, so every surface in the app reads consistently.
+where the sum runs over all entries $e$ logged in week $k$, and $n_e$, $f_e$, and $x_e$ are the entry's set count, effort code, and exercise. In plain terms, the week's training for a muscle is counted set by set, with easy sets discounted and helper-muscle work counted at half. This same effort-weighted, fractional count feeds the weekly-sets chart, the balance radar, and the ``hard sets'' ring, so every surface in the app reads consistently.
 
 \section{Effort inference}
 Proximity to failure cannot be recovered from load and reps alone: the same $100\,\text{kg}\times 8$ can be an all-out set or an easy one. So effort is a self-report. To keep friction to one optional tap, its default is estimated from the numbers and shown pre-selected; the lifter overrides only when the estimate is wrong.
 
 \subsection{Estimated one-rep max (anchor)}
-Set strength is summarised by the Epley one-rep-max (1RM) estimate~\cite{epley}:
+Set strength is summarised by the Epley one-rep-max (1RM) estimate $\varphi(w,r)$~\cite{epley}:
 \begin{equation}\label{eq:epley}
 \varphi(w,r)=w\left(1+\frac{r}{K}\right),
 \end{equation}
-where $w$ is the set's load (kg), $r$ its reps, and $K$ the rep denominator (population default $K=30$; Section~\ref{sec:kcal} calibrates it per lifter). The anchor for exercise $x$ is the best estimate over the lifter's \emph{prior} sessions for that exercise:
+where $w$ is the set's load (kg), $r$ its reps, and $K$ the rep denominator (population default $K=30$; Section~\ref{sec:kcal} calibrates it per lifter). $K$ is the exchange rate between reps and load: every rep completed at a weight raises the implied one-rep ceiling by $1/K$ of that weight, so at $K=30$ a set of ten signals a max about a third above the bar weight. A small $K$ describes a lifter whose reps fall off quickly as the bar approaches their limit; a large $K$, one who can grind out many reps near it.
+
+Epley is one of several standard one-rep-max formulas (Brzycki, Lombardi, and Wathan are common alternatives), and all agree closely over the one-to-ten-rep range where the estimate is used. It is preferred here because it is the simplest --- linear in reps, with one parameter --- and that simplicity pays twice: the formula inverts in closed form to predict the reps a load allows \eqref{eq:rir}, and $K$ can be recovered from two of the lifter's own sets \eqref{eq:kcal} without curve fitting. A measured max would be more direct, but deliberate max attempts are risky, rarely performed, and go stale as the lifter progresses; the estimate reads strength from the sets a lifter logs anyway.
+
+The anchor $A_x$ for exercise $x$ is the best estimate over the lifter's \emph{prior} sessions for that exercise:
 \begin{equation}\label{eq:anchor}
 A_x=\max_{e\,\in\,\mathrm{hist}(x)}\varphi(w_e,r_e),
 \end{equation}
-where $\mathrm{hist}(x)$ is the set of the lifter's prior logged entries for exercise $x$ (the current, in-progress session is excluded) and $w_e$, $r_e$ are each entry's load and reps.
+where $\mathrm{hist}(x)$ is the set of the lifter's prior logged entries for exercise $x$ (the current, in-progress session is excluded) and $w_e$, $r_e$ are each entry's load and reps. The anchor is simply the strongest set the lifter has shown on that exercise so far --- the yardstick today's sets are judged against.
 
 \subsection{Reps in reserve and classification}
 Inverting \eqref{eq:epley} gives the reps a lifter should complete at load $w$ before failure; subtracting the reps actually done estimates the reps in reserve (RIR):
 \begin{equation}\label{eq:rir}
 \rir=K\left(\frac{A_x}{w}-1\right)-r,
 \end{equation}
-where $A_x$ is the anchor \eqref{eq:anchor}, $w$ and $r$ are the load and reps of the set under evaluation, and $K$ is the rep denominator of \eqref{eq:epley}; the estimate is evaluated on the session's hardest set for that exercise (the one with the largest $\varphi$). It maps to an effort code:
+where $A_x$ is the anchor \eqref{eq:anchor}, $w$ and $r$ are the load and reps of the set under evaluation, and $K$ is the rep denominator of \eqref{eq:epley}; the estimate is evaluated on the session's hardest set for that exercise (the one with the largest $\varphi$). In words: from the anchor the model predicts how many reps today's load should allow; whatever the lifter left undone is the estimated reps in reserve. It maps to an effort code $f$:
 \begin{equation}\label{eq:fmap}
 f=
 \begin{cases}
@@ -131,14 +135,14 @@ f=
 1\ (\text{Hard}) & \text{otherwise.}
 \end{cases}
 \end{equation}
-The anchor is recomputed on every estimate. Because it rolls, it adapts to deloads and off days and cannot lock in a wrong baseline, the failure mode of a one-time calibration. When there is no prior baseline for the lift, or the exercise carries no external load (bodyweight or timed holds), \eqref{eq:rir} is not evaluated and the default stays Hard.
+The bands are deliberately coarse: day-to-day strength varies by a rep or two, so finer distinctions would mostly be noise. The anchor is recomputed on every estimate. Because it rolls, it adapts to deloads and off days and cannot lock in a wrong baseline, the failure mode of a one-time calibration. When there is no prior baseline for the lift, or the exercise carries no external load (bodyweight or timed holds), \eqref{eq:rir} is not evaluated and the default stays Hard.
 
 \subsection{Self-calibrated rep denominator}\label{sec:kcal}
-The denominator $K$ in \eqref{eq:epley} varies by lifter and by lift. A set logged as Max is a near-true failure point, so two Max sets of the same exercise at different loads pin $K$: setting $\varphi$ equal for both, $w_1(1+r_1/K)=w_2(1+r_2/K)$, which solves to
+The denominator $K$ --- the reps-to-load exchange rate of \eqref{eq:epley} --- varies by lifter and by lift. A set logged as Max is a near-true failure point, so two Max sets of the same exercise at different loads pin $K$: setting $\varphi$ equal for both, $w_1(1+r_1/K)=w_2(1+r_2/K)$, which solves to
 \begin{equation}\label{eq:kcal}
 K=\frac{w_2 r_2 - w_1 r_1}{w_1 - w_2},
 \end{equation}
-where $(w_1,r_1)$ and $(w_2,r_2)$ are the loads and reps of the two Max sets. Valid within-exercise pairs are pooled across the whole log, the median is taken and clamped to $[20,40]$, and $K=30$ is used until enough failure data exists. This grounds the effort estimate in the lifter's own data.
+where $(w_1,r_1)$ and $(w_2,r_2)$ are the loads and reps of the two Max sets. Intuitively, two all-out sets at different weights trace the lifter's personal trade-off between load and reps, and $K$ is the steepness of that trade-off. Valid within-exercise pairs are pooled across the whole log, the median is taken and clamped to $[20,40]$, and $K=30$ is used until enough failure data exists. This grounds the effort estimate in the lifter's own data.
 
 \section{Volume landmarks}
 Four thresholds, in effective sets per muscle per week, define the dose axis. They follow the $\MEV/\MAV$ framework and the dose--response meta-analyses.
@@ -161,36 +165,37 @@ The four landmarks discretise a continuous relationship~\cite{sch17,drr}. We mod
 \begin{equation}\label{eq:doseresp}
 \rho(s)=1-e^{-s/s_0},\qquad s_0=\frac{\text{target}}{\ln 5}\approx 6.21,
 \end{equation}
-where $s$ is the muscle's effective weekly set count and the scale $s_0$ is fixed by requiring $\rho(\text{target})=0.8$ at the practical target of 10 sets. The landmarks are read off this single curve: $\rho(\MV)\approx0.28$, $\rho(\MEV)\approx0.62$, $\rho(\text{target})\approx0.80$, and $\rho(\MAV)\approx0.96$. So MEV is the $\approx0.6$ knee, target the $0.8$ point, and MAV the $\approx0.95$ near-plateau. This replaces four independent thresholds with one meta-analytic function; the growth signal also reports $\rho(D_g)$ as a per-muscle share of the attainable growth stimulus.
+where $s$ is the muscle's effective weekly set count and the scale $s_0$ is fixed by requiring $\rho(\text{target})=0.8$ at the practical target of 10 sets. The curve encodes diminishing returns: the first few weekly sets buy the most stimulus, each added set buys less, and past twenty there is almost nothing left to buy. The landmarks are read off this single curve: $\rho(\MV)\approx0.28$, $\rho(\MEV)\approx0.62$, $\rho(\text{target})\approx0.80$, and $\rho(\MAV)\approx0.96$. So MEV is the $\approx0.6$ knee, target the $0.8$ point, and MAV the $\approx0.95$ near-plateau. This replaces four independent thresholds with one meta-analytic function; the growth signal also reports $\rho(D_g)$ as a per-muscle share of the attainable growth stimulus.
 
 \section{Temporal windows}
-Both axes compare a recent window against an earlier one, each a three-week mean over the 10-week series. For any weekly series $X_g$:
+Both axes compare a recent window against an earlier one, each a three-week mean over the 10-week series. For any weekly series $X_g$, the window means $\recent(X_g)$ and $\earlier(X_g)$ are:
 \begin{equation}\label{eq:windows}
 \recent(X_g)=\frac{1}{3}\sum_{k=7}^{9} X_{g,k},
 \qquad
 \earlier(X_g)=\frac{1}{3}\sum_{k=4}^{6} X_{g,k},
 \end{equation}
-where $X_{g,k}$ is the series value for muscle $g$ in week $k$, with week indices running $k=0,\dots,9$ and $k=9$ the current week. The three-week mean smooths single missed or heavy sessions. The recent window is weeks 8--10 (the last three), the earlier window is weeks 5--7; the oldest three weeks provide history for charts but do not enter the comparison. Because the window is recent, the signal responds within about three weeks of a genuine change in training.
+where $X_{g,k}$ is the series value for muscle $g$ in week $k$, with week indices running $k=0,\dots,9$ and $k=9$ the current week. The comparison simply asks how the last three weeks stack up against the three before them. The three-week mean smooths single missed or heavy sessions. The recent window is weeks 8--10 (the last three), the earlier window is weeks 5--7; the oldest three weeks provide history for charts but do not enter the comparison. Because the window is recent, the signal responds within about three weeks of a genuine change in training.
 
 \section{The two axes}
 \subsection{Dose}
-The current dose for muscle $g$ is the recent mean of effective weekly sets:
+The current dose $D_g$ for muscle $g$ is the recent mean of effective weekly sets:
 \begin{equation}\label{eq:dose}
-D_g=\recent(S_g).
+D_g=\recent(S_g),
 \end{equation}
+where $S_g$ is the effective-set series \eqref{eq:S} and $\recent$ the window mean of \eqref{eq:windows}. This is the model's answer to ``how much is this muscle being trained right now?''
 
 \subsection{Trend: progressive overload two ways}
-Overload can come from more effective sets or from heavier load; either counts as progress~\cite{plotkin,sch10}. A set trend and a load trend are formed as recent-over-earlier ratios. The load series $L_{g,k}$ is the best estimated one-rep max reached in week $k$ on exercises for which $g$ is the primary mover:
+Overload can come from more effective sets or from heavier load; either counts as progress~\cite{plotkin,sch10}. A set trend $T^{S}_{g}$ and a load trend $T^{L}_{g}$ are formed as recent-over-earlier ratios. The load series $L_{g,k}$ is the best estimated one-rep max reached in week $k$ on exercises for which $g$ is the primary mover:
 \begin{equation}\label{eq:trends}
 T^{S}_{g}=\frac{\recent(S_g)}{\earlier(S_g)},
 \qquad
 T^{L}_{g}=\frac{\recent(L_g)}{\earlier(L_g)},
 \end{equation}
-where $S_g$ is the effective-set series \eqref{eq:S}, $L_g$ the load series just defined, and $\recent$ and $\earlier$ the window means of \eqref{eq:windows}. Each ratio is defined only when its earlier window is positive; otherwise it is treated as absent. The combined trend takes the better of the two:
+where $S_g$ is the effective-set series \eqref{eq:S}, $L_g$ the load series just defined, and $\recent$ and $\earlier$ the window means of \eqref{eq:windows}. Each ratio is defined only when its earlier window is positive; otherwise it is treated as absent. The combined trend $\tau_g$ takes the better of the two:
 \begin{equation}\label{eq:tau}
 \tau_g=\max\!\left(T^{S}_{g},\,T^{L}_{g}\right),
 \end{equation}
-with an absent ratio contributing $0$ to the maximum, and $\tau_g$ itself absent only when both ratios are absent (a muscle just started, with no earlier baseline). Taking the maximum prevents classic strength progression (add load, drop reps) from being misread as a decline: raw tonnage would fall there while $T^{L}$ rises.
+with an absent ratio contributing $0$ to the maximum, and $\tau_g$ itself absent only when both ratios are absent (a muscle just started, with no earlier baseline). In words: is the muscle doing more sets, or lifting heavier, than it did a month ago? Whichever answer is more favourable is the trend. Taking the maximum prevents classic strength progression (add load, drop reps) from being misread as a decline: raw tonnage would fall there while $T^{L}$ rises.
 
 An earlier version used tonnage, $V=w\,r\,n$, as the sole trend signal. Tonnage rewards total kilograms moved, so lighter high-rep work inflates it while heavier low-rep work deflates it; it is a poor proxy for stimulus, and \eqref{eq:tau} replaces it.
 
@@ -218,21 +223,21 @@ Let $n_{\text{grow}}$, $n_{\text{hold}}$, $n_{\text{shrink}}$ count trained musc
 The ``at risk'' headline requires under-stimulated muscles to both outnumber growing ones and reach a third of those trained, so a few neglected small muscles do not flip the whole read. It resolves to ``at risk'' chiefly when most of recent training is genuinely sparse.
 
 \section{Plan forecast}\label{sec:plan}
-Separately from the history-based signal, the plan forecast projects a plan's \emph{prescribed} weekly sets before any of it is logged. Prescribed sets per rotation are scaled to a weekly rate by how often the plan is run, capped so an ambitious frequency on a short rotation cannot over-promise:
+Separately from the history-based signal, the plan forecast projects a plan's \emph{prescribed} weekly sets before any of it is logged. Prescribed sets per rotation are scaled to a weekly rate $\hat{s}_g$ by how often the plan is run, capped so an ambitious frequency on a short rotation cannot over-promise:
 \begin{equation}\label{eq:plan}
 \hat{s}_g = s_g \cdot \min\!\left(1.2,\ \frac{p}{W}\right),
 \end{equation}
-where $\hat{s}_g$ is the forecast weekly sets for muscle $g$, $s_g$ is prescribed sets per rotation (primary plus half of secondary, as in \eqref{eq:alpha}), $p$ is planned sessions per week, and $W$ is the number of distinct rotation workouts. Each trained muscle is then sorted into under-dosed ($<\MV$), growth window ($\MEV$ to 20), past-productive ($>20$), or maintenance, and the counts drive a plain-language outlook. The forecast promises no centimetres or kilograms; it reports the dose against the growth window and what to change.
+where $s_g$ is prescribed sets per rotation for muscle $g$ (primary plus half of secondary, as in \eqref{eq:alpha}), $p$ is planned sessions per week, and $W$ is the number of distinct rotation workouts. In words: cycling through the rotation more often than once a week delivers proportionally more weekly sets, and the cap keeps an ambitious schedule from projecting more weekly work than anyone sustains. Each trained muscle is then sorted into under-dosed ($<\MV$), growth window ($\MEV$ to 20), past-productive ($>20$), or maintenance, and the counts drive a plain-language outlook. The forecast promises no centimetres or kilograms; it reports the dose against the growth window and what to change.
 
 \section{Simulations}\label{sec:sims}
 The figures that follow project muscle gain under different training regimes from the Monte Carlo forecast defined next. A seeded script (\texttt{research/simulate.mjs}) generates them and reproduces every value on re-run.
 
 \subsection{Monte Carlo forecast}\label{sec:mc}
-A point prediction of muscle gain would overstate what the model knows, so the in-app forecast is probabilistic. Each of 500 runs accumulates a weekly fractional gain
+A point prediction of muscle gain would overstate what the model knows, so the in-app forecast is probabilistic. Each of 500 runs accumulates a weekly fractional gain $\Delta_t$
 \begin{equation}\label{eq:mcgain}
 \Delta_t = b \cdot m \cdot a \cdot \rho(D) \cdot \eta \cdot o \cdot e^{-t/32},
 \end{equation}
-where $\Delta_t$ is the fractional muscle-size gain added in week $t$, $b$ is a training-age base rate~\cite{damas}, $m$ is the inter-individual response multiplier, drawn lognormal to span the range Hubal et~al.~\cite{hubal} observed (cross-sectional-area (CSA) change from about $-2\%$ to $+59\%$), $a$ is an age factor that attenuates hypertrophy past about 30~\cite{peterson}, $\rho(D)$ is the dose--response of \eqref{eq:doseresp}~\cite{sch17,drr} evaluated at the scenario's effective weekly dose $D$, $\eta$ scales with proximity to failure~\cite{failureprox}, $o$ is near 1 while progressing and drops without added load~\cite{plotkin}, and the factor $e^{-t/32}$ tapers the weekly rate toward the lifter's ceiling with a 32-week time constant. Sex is a separate lever set near neutral: relative hypertrophy is comparable between sexes~\cite{roberts}, so it bears on absolute mass while the percentage gain here stays about the same for either. Below maintenance the increment turns negative (atrophy~\cite{mujika}), so a starved scenario trends down and the axis extends below zero. Most terms are well constrained by the literature; $b$ carries a wide prior, and $m$ dominates the spread, so the width of the band is the honest output.
+where $t$ counts weeks, $b$ is a training-age base rate~\cite{damas}, $m$ is the inter-individual response multiplier, drawn lognormal to span the range Hubal et~al.~\cite{hubal} observed (cross-sectional-area (CSA) change from about $-2\%$ to $+59\%$), $a$ is an age factor that attenuates hypertrophy past about 30~\cite{peterson}, $\rho(D)$ is the dose--response of \eqref{eq:doseresp}~\cite{sch17,drr} evaluated at the scenario's effective weekly dose $D$, $\eta$ scales with proximity to failure~\cite{failureprox}, $o$ is near 1 while progressing and drops without added load~\cite{plotkin}, and the factor $e^{-t/32}$ tapers the weekly rate toward the lifter's ceiling with a 32-week time constant. In words: each week adds a small slice of growth --- bigger with a larger dose, harder sets, and continued progression; how big varies a lot between people; and every slice shrinks as the lifter nears their ceiling. Sex is a separate lever set near neutral: relative hypertrophy is comparable between sexes~\cite{roberts}, so it bears on absolute mass while the percentage gain here stays about the same for either. Below maintenance the increment turns negative (atrophy~\cite{mujika}), so a starved scenario trends down and the axis extends below zero. Most terms are well constrained by the literature; $b$ carries a wide prior, and $m$ dominates the spread, so the width of the band is the honest output.
 
 At a novice base rate, an adequate plan trained with progressive overload gains most over 24 weeks; the same volume with no added load reaches about half that, an irregular schedule ($\sim$55\% of sessions) less again, and training below maintenance loses tissue. More weekly volume across the three standard plans gives more gain, with diminishing returns and heavily overlapping bands (Fig.~\ref{fig:regimes}).
 
@@ -369,7 +374,7 @@ $w,\ r,\ n,\ f$ & Top-set load (kg), top-set reps, set count, effort code $\{0,1
 $\alpha(x,g)$ & Muscle attribution weight: 1 primary, 0.5 secondary, 0 otherwise \eqref{eq:alpha}\\
 $\eps(f)$ & Effort factor: 0.5 / 1 / 1 for Easy / Hard / Max \eqref{eq:eps}\\
 $S_{g,k}$ & Effective weekly sets, muscle $g$, week $k$ \eqref{eq:S}\\
-$\varphi(w,r),\ K$ & Epley estimated one-rep max and its rep denominator ($K{=}30$ default, self-calibrated) \eqref{eq:epley},\,\eqref{eq:kcal}\\
+$\varphi(w,r),\ K$ & Epley estimated one-rep max and its rep denominator, the reps-to-load exchange rate ($K{=}30$ default, self-calibrated) \eqref{eq:epley},\,\eqref{eq:kcal}\\
 $A_x$ & Anchor: best prior $\varphi$ over $\mathrm{hist}(x)$, the prior logged entries for exercise $x$ \eqref{eq:anchor}\\
 $\rir$ & Estimated reps in reserve of a set \eqref{eq:rir}\\
 $L_{g,k}$ & Weekly peak $\varphi$ on primary exercises for $g$\\

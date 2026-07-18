@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023) (preloaded format=pdflatex 2023.7.4)  17 JUL 2026 19:55
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023) (preloaded format=pdflatex 2023.7.4)  17 JUL 2026 23:45
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -975,11 +975,11 @@ al/texlive/2023/texmf-dist/fonts/enc/dvips/lm/lm-ec.enc}{/usr/local/texlive/202
 onts/enc/dvips/lm/lm-mathit.enc}] [2{/usr/local/texlive/2023/texmf-dist/fonts/e
 nc/dvips/lm/lm-mathsy.enc}{/usr/local/texlive/2023/texmf-dist/fonts/enc/dvips/l
 m/lm-mathex.enc}] [3]
-Underfull \hbox (badness 1320) in paragraph at lines 150--151
+Underfull \hbox (badness 1320) in paragraph at lines 154--155
 \T1/lmr/m/n/10.95 previously-trained mus-cle reads as under-
  []
 
-[4] [5] [6]
+[4] [5] [6] [7]
 PGFPlots: reading {research/sim-regimes.dat}
 PGFPlots: reading {research/sim-regimes.dat}
 PGFPlots: reading {research/sim-regimes.dat}
@@ -988,7 +988,7 @@ PGFPlots: reading {research/sim-regimes.dat}
 PGFPlots: reading {research/sim-regimes.dat}
 PGFPlots: reading {research/sim-regimes.dat}
 PGFPlots: reading {research/sim-regimes.dat}
-Package pgfplots info on input line 253: fill between: activating layered graph
+Package pgfplots info on input line 258: fill between: activating layered graph
 ics
 \pgf@layerbox@axis background=\box69
 \pgf@layerboxsaved@axis background=\box70
@@ -1006,11 +1006,11 @@ ics
 \pgf@layerboxsaved@axis descriptions=\box82
 \pgf@layerbox@axis foreground=\box83
 \pgf@layerboxsaved@axis foreground=\box84
-Package pgfplots info on input line 253: Setting layers 'axis background,axis g
+Package pgfplots info on input line 258: Setting layers 'axis background,axis g
 rid,axis ticks,axis lines,axis tick labels,pre main,main,axis descriptions,axis
  foreground'...
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <9> on input line 253.
+(Font)              <9> on input line 258.
 PGFPlots: reading {research/sim-plangain.dat}
 PGFPlots: reading {research/sim-plangain.dat}
 PGFPlots: reading {research/sim-plangain.dat}
@@ -1018,9 +1018,9 @@ PGFPlots: reading {research/sim-plangain.dat}
 PGFPlots: reading {research/sim-plangain.dat}
 PGFPlots: reading {research/sim-plangain.dat}
 PGFPlots: reading {research/sim-plangain.dat}
-Package pgfplots info on input line 266: fill between: activating layered graph
+Package pgfplots info on input line 271: fill between: activating layered graph
 ics
-Package pgfplots info on input line 266: Setting layers 'axis background,axis g
+Package pgfplots info on input line 271: Setting layers 'axis background,axis g
 rid,axis ticks,axis lines,axis tick labels,pre main,main,axis descriptions,axis
  foreground'...
 PGFPlots: reading {research/sim-start.dat}
@@ -1030,94 +1030,93 @@ PGFPlots: reading {research/sim-start.dat}
 PGFPlots: reading {research/sim-start.dat}
 PGFPlots: reading {research/sim-start.dat}
 PGFPlots: reading {research/sim-start.dat}
-Package pgfplots info on input line 285: fill between: activating layered graph
+Package pgfplots info on input line 290: fill between: activating layered graph
 ics
-Package pgfplots info on input line 285: Setting layers 'axis background,axis g
+Package pgfplots info on input line 290: Setting layers 'axis background,axis g
 rid,axis ticks,axis lines,axis tick labels,pre main,main,axis descriptions,axis
  foreground'...
 PGFPlots: reading {research/sim-sens.dat}
- [7]
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <10> on input line 301.
+(Font)              <10> on input line 306.
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <7> on input line 301.
+(Font)              <7> on input line 306.
 
-Underfull \hbox (badness 10000) in paragraph at lines 305--305
+Underfull \hbox (badness 10000) in paragraph at lines 310--310
 []\T1/lmr/m/n/10 Graded vol-ume dose--
  []
 
 
-Underfull \hbox (badness 6220) in paragraph at lines 305--305
+Underfull \hbox (badness 6220) in paragraph at lines 310--310
 \T1/lmr/m/n/10 response; $[]\OT1/lmr/m/n/10 10$ \T1/lmr/m/n/10 sets as a
  []
 
 
-Underfull \hbox (badness 1168) in paragraph at lines 306--306
+Underfull \hbox (badness 1168) in paragraph at lines 311--311
 \T1/lmr/m/n/10 turns; fre-quency neu-tral at
  []
 
 
-Underfull \hbox (badness 5147) in paragraph at lines 311--311
+Underfull \hbox (badness 5147) in paragraph at lines 316--316
 []\T1/lmr/m/n/10 Decline be-low main-te-nance
  []
 
 
-Underfull \hbox (badness 1681) in paragraph at lines 313--313
+Underfull \hbox (badness 1681) in paragraph at lines 318--318
 []\T1/lmr/m/n/10 Epley one-rep-max $\OML/lmm/m/it/10 '$\T1/lmr/m/n/10 ; self-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 314--314
+Underfull \hbox (badness 10000) in paragraph at lines 319--319
 []\T1/lmr/m/n/10 Monte Carlo fore-cast:
  []
 
 LaTeX Font Info:    Trying to load font information for TS1+lmr on input line 3
-25.
+30.
 (/usr/local/texlive/2023/texmf-dist/tex/latex/lm/ts1lmr.fd
 File: ts1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
-)
-Overfull \hbox (4.98894pt too wide) in paragraph at lines 328--329
+) [8]
+Overfull \hbox (4.98894pt too wide) in paragraph at lines 333--334
 \T1/lmr/m/n/10.95 cede larger sub-se-quent gains in es-ti-mated 1RM than those 
 la-belled hold-ing or under-stimulated.
  []
 
-[8{/usr/local/texlive/2023/texmf-dist/fonts/enc/dvips/lm/lm-ts1.enc}] [9]
-Underfull \hbox (badness 3590) in paragraph at lines 348--349
+[9{/usr/local/texlive/2023/texmf-dist/fonts/enc/dvips/lm/lm-ts1.enc}]
+Underfull \hbox (badness 3590) in paragraph at lines 353--354
 []\T1/lmr/m/n/10 Hubal MJ, Gordish-Dressman H, Thomp-son PD, et al. Vari-abil-i
 ty in mus-cle size and
  []
 
 
-Underfull \hbox (badness 1117) in paragraph at lines 348--349
+Underfull \hbox (badness 1117) in paragraph at lines 353--354
 \T1/lmr/m/n/10 strength gain af-ter uni-lat-eral re-sis-tance train-ing. \T1/lm
 r/m/it/10 Med Sci Sports Ex-erc\T1/lmr/m/n/10 . 2005;37(6):964--972.
  []
 
 
-Underfull \hbox (badness 6978) in paragraph at lines 349--350
+Underfull \hbox (badness 6978) in paragraph at lines 354--355
 []\T1/lmr/m/n/10 Israetel M, Hoff-mann J, Smith CW. Train-ing vol-ume land-mark
 s for mus-cle growth
  []
 
 
-Underfull \hbox (badness 2418) in paragraph at lines 350--351
+Underfull \hbox (badness 2418) in paragraph at lines 355--356
 \T1/lmr/m/n/10 ta-tions. Part I --- short-term in-suf-fi-cient train-ing stim-u
 -lus. \T1/lmr/m/it/10 Sports Med\T1/lmr/m/n/10 . 2000;30(2):79--87.
  []
 
-[10] [11] (./growth-model-whitepaper.aux)
+[10] [11] [12] (./growth-model-whitepaper.aux)
 Package rerunfilecheck Info: File `growth-model-whitepaper.out' has not changed
 .
 (rerunfilecheck)             Checksum: 7F6B64BA53A1848755DBA8A2F95B05B2;4194.
  ) 
 Here is how much of TeX's memory you used:
- 33152 strings out of 476025
- 782731 string characters out of 5790018
- 1886388 words of memory out of 5000000
+ 33153 strings out of 476025
+ 782738 string characters out of 5790018
+ 1900388 words of memory out of 5000000
  52951 multiletter control sequences out of 15000+600000
  597132 words of font info for 94 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 99i,18n,94p,1294b,2409s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 99i,18n,94p,1463b,2409s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2023/texmf-dist/fonts/type1/public/lm/lmbx10.pfb></usr/lo
 cal/texlive/2023/texmf-dist/fonts/type1/public/lm/lmbx12.pfb></usr/local/texliv
 e/2023/texmf-dist/fonts/type1/public/lm/lmex10.pfb></usr/local/texlive/2023/tex
@@ -1133,10 +1132,10 @@ blic/lm/lmr9.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/lm/lmri
 10.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/lm/lmsy10.pfb></u
 sr/local/texlive/2023/texmf-dist/fonts/type1/public/lm/lmsy8.pfb></usr/local/te
 xlive/2023/texmf-dist/fonts/type1/public/lm/lmtt10.pfb>
-Output written on growth-model-whitepaper.pdf (11 pages, 391022 bytes).
+Output written on growth-model-whitepaper.pdf (12 pages, 394087 bytes).
 PDF statistics:
- 432 PDF objects out of 1000 (max. 8388607)
- 376 compressed objects within 4 object streams
- 80 named destinations out of 1000 (max. 500000)
+ 440 PDF objects out of 1000 (max. 8388607)
+ 383 compressed objects within 4 object streams
+ 81 named destinations out of 1000 (max. 500000)
  237 words of extra memory for PDF output out of 10000 (max. 10000000)
 
