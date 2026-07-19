@@ -3206,7 +3206,7 @@ function progWeeklyData(metric){
   if(metric==="prs"){
     Object.keys(hist).forEach(n=>{
       const es=(hist[n]||[]).slice().sort((a,b)=>a.d-b.d); let best=0;
-      es.forEach(e=>{ const w=parseFloat(e.w)||0, r=parseInt(e.r)||0, score=w>0?w*(1+r/30):r;
+      es.forEach(e=>{ const w=parseFloat(e.w)||0, r=parseInt(e.r)||0, score=w>0?e1rm(w,r):r;
         if(score>best){ if(best>0){ const i=idx(e.d); if(i>=0) out[i]++; } best=score; } });
     });
     return out;
@@ -3270,8 +3270,9 @@ function progMuscleWeekly(metric){
   });
   return series;
 }
-// per-muscle weekly best estimated 1RM (Epley: w·(1+r/30)), attributed to the PRIMARY muscle only.
-// Load progression is exercise-specific, so this tracks "are the lifts for this muscle getting heavier?"
+// per-muscle weekly best estimated 1RM (Epley φ with the self-calibrated denominator — same e1rm() the
+// PRs chart, effort model and prediction ledger use), attributed to the PRIMARY muscle only. Load
+// progression is exercise-specific, so this tracks "are the lifts for this muscle getting heavier?"
 // — the other half of progressive overload alongside added sets/reps (Plotkin 2022).
 function progMuscleLoad(){
   const wkMs=7*86400000, now=Date.now(), N=PROG_WEEKS;
@@ -3279,8 +3280,7 @@ function progMuscleLoad(){
   const series={}; MGROUPS.forEach(g=> series[g]=new Array(N).fill(0));
   Object.keys(hist).forEach(name=>{ const g=muscleFor(name)[0]; if(!g||!series[g]) return;
     (hist[name]||[]).forEach(e=>{ const i=idx(e.d); if(i<0) return;
-      const w=parseFloat(e.w)||0, r=parseInt(e.r)||0; if(w<=0||r<=0) return;   // bodyweight/timed carry no external-load signal
-      const e1rm=w*(1+r/30); if(e1rm>series[g][i]) series[g][i]=e1rm; }); });
+      const x=e1rm(e.w,e.r); if(x>series[g][i]) series[g][i]=x; }); });   // 0 for bodyweight/timed (no external load)
   return series;
 }
 // ===== Growth signal: is each muscle (and the body overall) being trained enough to grow, hold, or lose size? =====
@@ -4854,6 +4854,10 @@ function effortRepDenom(){
   _repDenom = ks.length ? Math.max(20, Math.min(40, ks[Math.floor(ks.length/2)])) : 30;
   return _repDenom;
 }
+// Single estimated-1RM (Epley φ) used by EVERY strength/1RM surface — the growth-signal load trend, the
+// Monte Carlo trend seed, the PRs count, the effort default, and the prediction ledger — so all graphs read
+// the same φ. Uses the self-calibrated denominator (whitepaper §effort), not a hardcoded 30.
+function e1rm(w,r){ w=parseFloat(w)||0; r=parseInt(r)||0; return w>0&&r>0 ? w*(1+r/effortRepDenom()) : 0; }
 // Estimate this session's effort (proximity to failure) from the numbers: predict how many reps this load
 // should fail at, using your best-ever set for the lift as the anchor and a self-calibrated Epley denominator
 // (effortRepDenom), then RIR ≈ predicted − done. Returns 0 Easy / 1 Hard / 2 Max, or null when there's no
@@ -6261,13 +6265,18 @@ let fcMuscleMode="pace", _fcF=null;   // per-muscle graph scenario: "pace" (defa
 // ===== reorderable Me tiles (drag the grip; order persists per user) =====
 function applyTileOrder(){
   const c=$("meTiles"); if(!c) return;
-  const order=settings.meTileOrder; if(!order||!order.length) return;
+  const tiles=[...c.querySelectorAll(".metile")].map(el=>el.dataset.tile);
+  const saved=settings.meTileOrder||[];
+  // Deterministic full order: saved order (for tiles that still exist) first, then any tiles missing
+  // from it (newly added, e.g. the ledger tile) appended in their default DOM order. This keeps a
+  // stale saved order from stranding a new tile at the front — the previous bug that scrambled the layout.
+  const order=[...saved.filter(t=>tiles.includes(t)), ...tiles.filter(t=>!saved.includes(t))];
   order.forEach(t=>{ const el=c.querySelector('.metile[data-tile="'+t+'"]'); if(el) c.appendChild(el); });
 }
-function saveTileOrder(){
+async function saveTileOrder(){
   const c=$("meTiles"); if(!c) return;
   settings.meTileOrder=[...c.querySelectorAll(".metile")].map(t=>t.dataset.tile);
-  sset("settings",settings);
+  await sset("settings",settings);
 }
 (function initTileReorder(){
   const c=$("meTiles"); if(!c) return;
@@ -6288,7 +6297,7 @@ function saveTileOrder(){
     grip.addEventListener("pointercancel", end);
   });
   const rst=$("tileReset"); if(rst) rst.onclick=()=>{ settings.meTileOrder=null; sset("settings",settings);
-    ["forecast","ledger","progress","balance"].forEach(t=>{ const el=c.querySelector('.metile[data-tile="'+t+'"]'); if(el) c.appendChild(el); }); toast&&toast("Tiles reset to default order"); };
+    ["forecast","ledger","balance","progress"].forEach(t=>{ const el=c.querySelector('.metile[data-tile="'+t+'"]'); if(el) c.appendChild(el); }); toast&&toast("Tiles reset to default order"); };
 })();
 // ===== Part II: prediction ledger — predict → observe → re-parameterize =====
 // Mirrors research/ledger-core.mjs (the reference implementation; keep the two in sync). The protocol
@@ -7924,7 +7933,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v117";
+const APP_VER="v118";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH

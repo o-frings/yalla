@@ -294,6 +294,16 @@
           <p class="fcnote">Each week the model predicts your strength change per exercise over the next 4 weeks and writes it down before the outcome exists. When the weeks have passed, the prediction is graded against what you actually lifted, and your personal response parameters update from the errors — so the forecasts get sharper the longer you log. Estimated 1RM is the yardstick: the app can see strength, not muscle size.</p>
         </details>
       </div>
+      <!-- Muscle balance (default: above the Progress logs) -->
+      <div class="panel tap metile" id="meBalance" data-tile="balance" role="button" tabindex="0" aria-label="Open muscle balance">
+        <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>Muscle balance</span><span class="tilegrip" aria-label="Drag to reorder" title="Drag to reorder">⠿</span></div>
+        <div class="mewintabs paneltabs" id="meWinSeg">
+          <button class="mewintab active" data-d="7" type="button">Week</button>
+          <button class="mewintab" data-d="30" type="button">Month</button>
+        </div>
+        <div class="meRing" id="meRing"><div class="meRingTrack" id="meRingTrack"><div class="meRingPage"><canvas id="meRadar" width="900" height="900"></canvas></div><div class="meRingPage"><canvas id="meRadar2" width="900" height="900"></canvas></div></div></div>
+        <div class="panelfoot"><span class="mebalstat" id="meBalStat"></span><span class="mebalcta" id="meBalCta">tap for detail ›</span></div>
+      </div>
       <!-- Progress (logged history) -->
       <div class="panel metile" id="progPanel" data-tile="progress">
         <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 2 5-6"/></svg>Progress</span><span class="tilegrip" aria-label="Drag to reorder" title="Drag to reorder">⠿</span></div>
@@ -313,16 +323,6 @@
           <div class="progpage"><canvas id="progBars4" width="660" height="180"></canvas></div>
         </div></div>
         <div class="panelfoot stack"><div class="progcap" id="progCap"></div><div class="progverd" id="progVerdict" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div></div>
-      </div>
-      <!-- Muscle balance -->
-      <div class="panel tap metile" id="meBalance" data-tile="balance" role="button" tabindex="0" aria-label="Open muscle balance">
-        <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>Muscle balance</span><span class="tilegrip" aria-label="Drag to reorder" title="Drag to reorder">⠿</span></div>
-        <div class="mewintabs paneltabs" id="meWinSeg">
-          <button class="mewintab active" data-d="7" type="button">Week</button>
-          <button class="mewintab" data-d="30" type="button">Month</button>
-        </div>
-        <div class="meRing" id="meRing"><div class="meRingTrack" id="meRingTrack"><div class="meRingPage"><canvas id="meRadar" width="900" height="900"></canvas></div><div class="meRingPage"><canvas id="meRadar2" width="900" height="900"></canvas></div></div></div>
-        <div class="panelfoot"><span class="mebalstat" id="meBalStat"></span><span class="mebalcta" id="meBalCta">tap for detail ›</span></div>
       </div>
     </div>
 
