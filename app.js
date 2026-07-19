@@ -2596,7 +2596,7 @@ function openRingsDetail(){ renderRingsDetail(); openSheet("Rings"); }
 function renderRingsDetail(){
   const box=$("ringsBody"); if(!box) return;
   const cut=Date.now()-7*86400000; let setsWk=0; const musWk=new Set();
-  Object.keys(hist).forEach(n=>{ const gs=muscleFor(n); (hist[n]||[]).forEach(e=>{ if(e.d>=cut){ setsWk+=(e.n||0)*effortOf(e); gs.forEach(g=>{ if(MGROUPS.indexOf(g)>=0) musWk.add(g); }); } }); });
+  Object.keys(hist).forEach(n=>{ const gs=muscleFor(n); (hist[n]||[]).forEach(e=>{ if(e.d>=cut){ setsWk+=(e.n!=null?e.n:1)*effortOf(e); gs.forEach(g=>{ if(MGROUPS.indexOf(g)>=0) musWk.add(g); }); } }); });
   const f7=sessionCredit(7), sessTarget=Math.max(2,Math.min(5,planSessionsPerWeek(activePlan())||3)), setsTarget=Math.max(20,sessTarget*18);
   let h="";
   h+=ringRow("#ff6b3d","Sessions",f7,sessTarget,"Session-equivalents this week — a short session counts in proportion to the work done, so a couple of micro sessions add up to a full one. Aim for "+sessTarget+" to match your plan.",null,true);
@@ -2968,7 +2968,7 @@ function renderOverview(){
   let ovRings=null;
   if(Object.keys(hist).length || cardioList().length){
     const cut=Date.now()-7*86400000; let setsWk=0; const musWk=new Set();
-    Object.keys(hist).forEach(n=>{ const gs=muscleFor(n); (hist[n]||[]).forEach(e=>{ if(e.d>=cut){ setsWk+=(e.n||0)*effortOf(e); gs.forEach(g=>{ if(MGROUPS.indexOf(g)>=0) musWk.add(g); }); } }); });
+    Object.keys(hist).forEach(n=>{ const gs=muscleFor(n); (hist[n]||[]).forEach(e=>{ if(e.d>=cut){ setsWk+=(e.n!=null?e.n:1)*effortOf(e); gs.forEach(g=>{ if(MGROUPS.indexOf(g)>=0) musWk.add(g); }); } }); });
     const sessTarget=Math.max(2,Math.min(5,planSessionsPerWeek(activePlan())||3)), setsTarget=Math.max(20,sessTarget*18);
     ovRings=[ {label:"Sessions", val:f7, target:sessTarget, color:"#ff6b3d"},
               {label:"Hard sets", val:setsWk, target:setsTarget, color:"#4dabf7"},
@@ -3212,7 +3212,7 @@ function progWeeklyData(metric){
     return out;
   }
   // volume (kg) or sets
-  Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ const i=idx(e.d); if(i>=0) out[i]+= metric==="sets" ? ((e.n||0)*effortOf(e)) : (e.v||0); }));
+  Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ const i=idx(e.d); if(i>=0) out[i]+= metric==="sets" ? ((e.n!=null?e.n:1)*effortOf(e)) : (e.v||0); }));
   return out;
 }
 const PROG_LABELS={ volume:"Weekly volume", sets:"Weekly hard sets", sessions:"Sessions per week", weight:"Avg body weight", prs:"New PRs per week" };
@@ -7933,7 +7933,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v118";
+const APP_VER="v119";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
