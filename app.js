@@ -3120,6 +3120,7 @@ function renderDash(){
   renderBaseActivity();
   renderGrowthForecast();
   renderStrengthLedger();
+  renderExerciseProgress();
   renderGrowth();          // per-muscle current status, now folded into the forecast tile
   applyTileOrder();
   const po=$("progObj");   // objective-adherence score, moved onto the Progress tile
@@ -5533,6 +5534,51 @@ function drawExChart(data){
   ctx.fillStyle="#636366"; ctx.textAlign="right"; ctx.fillText(unit,W-20,26); ctx.textAlign="left";
 }
 
+// ===== exercise progress — across-exercises overview + per-exercise drilldown (detail reuses openChart) =====
+// One row per exercise with enough history: estimated-1RM trend over the log (top reps/secs for bodyweight
+// or timed moves), a sparkline, and a % change vs the start. The detail chart is the existing openChart sheet.
+function exerciseProgress(){
+  const out=[];
+  Object.keys(hist).forEach(name=>{
+    const es=(hist[name]||[]).slice().sort((a,b)=>a.d-b.d);
+    if(es.length<3) return;                                   // need a little history to call a trend
+    const loaded=es.some(e=>(parseFloat(e.w)||0)>0);          // weighted lift → e1RM; else bodyweight/timed → reps/secs
+    const pts=[]; es.forEach(e=>{ const v=loaded?e1rm(e.w,e.r):(parseInt(e.r)||0); if(v>0) pts.push({d:e.d, v}); });
+    if(pts.length<3) return;
+    if((pts[pts.length-1].d - pts[0].d) < 12*86400000) return;   // need ~2 weeks of separation for a trend
+    const series=pts.map(p=>p.v), k=Math.min(3, Math.floor(series.length/2));
+    const base=Math.max(...series.slice(0,k)), recent=Math.max(...series.slice(-k));
+    if(!(base>0)) return;
+    const pct=(recent/base-1)*100, state = pct>=2 ? "grow" : pct<=-2 ? "shrink" : "hold";
+    out.push({ name, series, pct, state, last:pts[pts.length-1].d, g:muscleFor(name)[0]||"Other" });
+  });
+  return out.sort((a,b)=> b.last-a.last);                     // most recently trained first
+}
+function sparkline(series, col){
+  const n=series.length; if(n<2) return "";
+  const mn=Math.min(...series), mx=Math.max(...series), sp=(mx-mn)||1, W=64, H=20;
+  const pts=series.map((v,i)=>(i/(n-1)*W).toFixed(1)+","+(H-((v-mn)/sp)*H).toFixed(1)).join(" ");
+  return '<svg class="spark" viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" preserveAspectRatio="none" aria-hidden="true">'
+    +'<polyline points="'+pts+'" fill="none" stroke="'+col+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+}
+function renderExerciseProgress(){
+  const card=$("exProgCard"); if(!card) return;
+  const rows=exerciseProgress();
+  if(!rows.length){ card.style.display="none"; return; }
+  card.style.display="";
+  const nG=rows.filter(r=>r.state==="grow").length, nH=rows.filter(r=>r.state==="hold").length, nS=rows.filter(r=>r.state==="shrink").length;
+  const parts=[]; if(nG) parts.push(nG+" progressing"); if(nH) parts.push(nH+" holding"); if(nS) parts.push(nS+" easing");
+  $("exProgSum").textContent = rows.length+" tracked lift"+(rows.length>1?"s":"")+(parts.length?" · "+parts.join(" · "):"");
+  const arrow={grow:"↑",hold:"→",shrink:"↓"};
+  $("exProgList").innerHTML = rows.map(r=>{ const col=MCOLOR[r.g]||"#888", s=(r.pct>=0?"+":"")+r.pct.toFixed(1)+"%";
+    return '<button type="button" class="exprow" data-ex="'+esc(r.name)+'">'
+      +'<span class="exdot" style="background:'+col+'"></span>'
+      +'<span class="exnm">'+esc(r.name)+'</span>'
+      +sparkline(r.series, col)
+      +'<span class="extr '+r.state+'">'+arrow[r.state]+' '+s+'</span></button>'; }).join("");
+}
+if($("exProgList")) $("exProgList").addEventListener("click", e=>{ const b=e.target.closest(".exprow"); if(b) openChart(b.dataset.ex); });
+
 // ================= other training (external + activities) =================
 const MUSCLE_TARGETS={
   Push:["Chest","Front Delts","Side Delts","Triceps"], Pull:["Back","Rear Delts","Biceps"],
@@ -6332,7 +6378,7 @@ async function saveTileOrder(){
   function setEdit(on){ c.classList.toggle("editing", on); if(eb) eb.textContent=on?"Done":"Edit"; if(rb) rb.style.display=on?"":"none"; if(!on) saveTileOrder(); }
   if(eb) eb.onclick=()=> setEdit(!c.classList.contains("editing"));
   if(rb) rb.onclick=()=>{ settings.meTileOrder=null; settings.meTileHidden=[]; sset("settings",settings);
-    ["forecast","ledger","balance","progress"].forEach(t=>{ const el=c.querySelector('.metile[data-tile="'+t+'"]'); if(el) c.appendChild(el); });
+    ["forecast","ledger","balance","progress","exercises"].forEach(t=>{ const el=c.querySelector('.metile[data-tile="'+t+'"]'); if(el) c.appendChild(el); });
     applyTileVisibility(); toast&&toast("Tiles reset"); };
   // drag-to-reorder (edit mode): the whole tile lifts and follows the finger, a dashed placeholder shows
   // where it will drop, so it's obvious what's grabbed and where it's going.
@@ -7997,7 +8043,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v121";
+const APP_VER="v122";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
