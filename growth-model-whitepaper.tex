@@ -43,17 +43,19 @@
 
 \title{Yalla: Estimating Muscle Growth, Maintenance, and Decline from Training Logs}
 \author{Oliver Frings}
-\date{Version 2.1 (v121) \quad 17 July 2026}
+\date{Version 2.3 (v123) \quad 19 July 2026}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-\noindent Yalla estimates, per muscle and for the body overall, whether recent training is enough to grow, hold, or slowly lose muscle size. The estimate reads \emph{training stimulus} from logged sets, loads, and reps; the app never sees the body itself. Two axes drive it: a \emph{dose} axis (effort-weighted weekly sets against volume landmarks) and a \emph{trend} axis (progressive overload measured as the better of a set trend and a load trend). Set effort is captured with a three-level control whose default is estimated from the load--rep relationship against the lifter's own best set. This document defines every quantity, the equations that combine them, the decision rules that produce a state, and the evidence each parameter rests on. It also states the model's assumptions, its validation status, and where it is deliberately conservative. The specification corresponds to the functions \texttt{growthStatus()}, \texttt{inferEffort()}, and \texttt{planForecast()} in \texttt{app.js}.
+\noindent Yalla estimates, per muscle and for the body overall, whether recent training is enough to grow, hold, or slowly lose muscle size. The estimate reads \emph{training stimulus} from logged sets, loads, and reps; the app never sees the body itself. Two axes drive it: a \emph{dose} axis (effort-weighted weekly sets against volume landmarks) and a \emph{trend} axis (progressive overload measured as the better of a set trend and a load trend). Set effort is captured with a three-level control whose default is estimated from the load--rep relationship against the lifter's own best set. This document defines every quantity, the equations that combine them, the decision rules that produce a state, and the evidence each parameter rests on. It also states the model's assumptions, its validation status, and where it is deliberately conservative. A second, statistical layer --- the prediction ledger (Section~\ref{sec:ledger}) --- closes the loop on the strength axis: the model writes down a probabilistic strength forecast per exercise \emph{before} the outcome exists, grades it when the weeks have passed, and re-parameterizes itself per user from the errors. The specification corresponds to the functions \texttt{growthStatus()}, \texttt{inferEffort()}, \texttt{planForecast()}, and the \texttt{lg*} ledger functions in \texttt{app.js}.
 \end{abstract}
 
 \section{Introduction}
-Most training apps record what was lifted; few say what it means for muscle. Yalla estimates, per muscle and for the body overall, whether recent training is enough to grow, maintain, or slowly lose size, using only the sets, loads, and reps a user logs. This document specifies that model: the quantities it computes, the equations that combine them, the decision rules that produce a per-muscle verdict, and the evidence behind each parameter. The goal is an auditable feedback signal whose parameters trace to the resistance-training literature. Sections~\ref{sec:overview}--\ref{sec:plan} define the model, Section~\ref{sec:basis} lists the evidence with a grade for each source, and Section~\ref{sec:verification} describes the checks that accompany the model in the absence of a body-composition study.
+Most training apps record what was lifted; few say what it means for muscle. Yalla estimates, per muscle and for the body overall, whether recent training is enough to grow, maintain, or slowly lose size, using only the sets, loads, and reps a user logs. This document specifies that model: the quantities it computes, the equations that combine them, the decision rules that produce a per-muscle verdict, and the evidence behind each parameter. The goal is an auditable feedback signal whose parameters trace to the resistance-training literature.
+
+Sections~\ref{sec:overview}--\ref{sec:forecasts} define the training-stimulus model --- a mechanistic classifier whose parameters come from the literature and are fitted to nothing --- in three layers: measurement (attribution and effort, Sections~\ref{sec:overview}--\ref{sec:effort}), classification (dose, trend, and state, Section~\ref{sec:signal}), and forecasts (Section~\ref{sec:forecasts}). Section~\ref{sec:ledger} closes the loop the other way: the prediction ledger, a statistical layer that forecasts each lift's strength change, records the forecast before the outcome exists, grades it, and learns per-user parameters from the errors --- Section~\ref{sec:whatis} states precisely what is measured and what is estimated there. The closing sections collect the evidence with a grade per source (Section~\ref{sec:basis}), the verification suites (Section~\ref{sec:verification}), and the assumptions and limitations.
 
 \section{Background and related work}
 The model synthesises several strands of resistance-training research.
@@ -103,7 +105,7 @@ S_{g,k}=\sum_{e\,\in\,\text{week }k} n_e\,\eps(f_e)\,\alpha(x_e,g),
 \end{equation}
 where the sum runs over all entries $e$ logged in week $k$, and $n_e$, $f_e$, and $x_e$ are the entry's set count, effort code, and exercise. In plain terms, the week's training for a muscle is counted set by set, with easy sets discounted and helper-muscle work counted at half. This same effort-weighted, fractional count feeds the weekly-sets chart, the balance radar, and the ``hard sets'' ring, so every surface in the app reads consistently.
 
-\section{Effort inference}
+\section{Effort inference}\label{sec:effort}
 Proximity to failure cannot be recovered from load and reps alone: the same $100\,\text{kg}\times 8$ can be an all-out set or an easy one. So effort is a self-report. To keep friction to one optional tap, its default is estimated from the numbers and shown pre-selected; the lifter overrides only when the estimate is wrong.
 
 \subsection{Estimated one-rep max (anchor)}
@@ -144,7 +146,10 @@ K=\frac{w_2 r_2 - w_1 r_1}{w_1 - w_2},
 \end{equation}
 where $(w_1,r_1)$ and $(w_2,r_2)$ are the loads and reps of the two Max sets. Intuitively, two all-out sets at different weights trace the lifter's personal trade-off between load and reps, and $K$ is the steepness of that trade-off. Valid within-exercise pairs are pooled across the whole log, the median is taken and clamped to $[20,40]$, and $K=30$ is used until enough failure data exists. This grounds the effort estimate in the lifter's own data.
 
-\section{Volume landmarks}
+\section{The growth signal: dose, trend, and state}\label{sec:signal}
+With the measurement layer in place --- effective weekly sets \eqref{eq:S} built from attribution, effort weighting, and the inferred effort defaults --- this section defines the classifier: the landmarks that calibrate the dose axis, the windows and ratios that form the trend axis, and the decision rules that combine both into a per-muscle state and an overall verdict.
+
+\subsection{Volume landmarks}
 Four thresholds, in effective sets per muscle per week, define the dose axis. They follow the $\MEV/\MAV$ framework and the dose--response meta-analyses.
 \begin{center}
 \begin{tabular}{@{}llp{7.6cm}@{}}
@@ -167,7 +172,7 @@ The four landmarks discretise a continuous relationship~\cite{sch17,drr}. We mod
 \end{equation}
 where $s$ is the muscle's effective weekly set count and the scale $s_0$ is fixed by requiring $\rho(\text{target})=0.8$ at the practical target of 10 sets. The curve encodes diminishing returns: the first few weekly sets buy the most stimulus, each added set buys less, and past twenty there is almost nothing left to buy. The landmarks are read off this single curve: $\rho(\MV)\approx0.28$, $\rho(\MEV)\approx0.62$, $\rho(\text{target})\approx0.80$, and $\rho(\MAV)\approx0.96$. So MEV is the $\approx0.6$ knee, target the $0.8$ point, and MAV the $\approx0.95$ near-plateau. This replaces four independent thresholds with one meta-analytic function; the growth signal also reports $\rho(D_g)$ as a per-muscle share of the attainable growth stimulus.
 
-\section{Temporal windows}
+\subsection{Temporal windows}
 Both axes compare a recent window against an earlier one, each a three-week mean over the 10-week series. For any weekly series $X_g$, the window means $\recent(X_g)$ and $\earlier(X_g)$ are:
 \begin{equation}\label{eq:windows}
 \recent(X_g)=\frac{1}{3}\sum_{k=7}^{9} X_{g,k},
@@ -176,7 +181,6 @@ Both axes compare a recent window against an earlier one, each a three-week mean
 \end{equation}
 where $X_{g,k}$ is the series value for muscle $g$ in week $k$, with week indices running $k=0,\dots,9$ and $k=9$ the current week. The comparison simply asks how the last three weeks stack up against the three before them. The three-week mean smooths single missed or heavy sessions. The recent window is weeks 8--10 (the last three), the earlier window is weeks 5--7; the oldest three weeks provide history for charts but do not enter the comparison. Because the window is recent, the signal responds within about three weeks of a genuine change in training.
 
-\section{The two axes}
 \subsection{Dose}
 The current dose $D_g$ for muscle $g$ is the recent mean of effective weekly sets:
 \begin{equation}\label{eq:dose}
@@ -199,7 +203,7 @@ with an absent ratio contributing $0$ to the maximum, and $\tau_g$ itself absent
 
 An earlier version used tonnage, $V=w\,r\,n$, as the sole trend signal. Tonnage rewards total kilograms moved, so lighter high-rep work inflates it while heavier low-rep work deflates it; it is a poor proxy for stimulus, and \eqref{eq:tau} replaces it.
 
-\section{Per-muscle state}
+\subsection{Per-muscle state}
 The state $\sigma_g$ is a function of the dose $D_g$ and the trend $\tau_g$, evaluated top to bottom (first matching rule wins):
 \begin{enumerate}[label=\arabic*.,leftmargin=*]
 \item \textbf{Under-stimulated} if $D_g < \MV$ (below the maintenance floor of 2).
@@ -212,7 +216,7 @@ The asymmetry is intentional: a muscle grows only with both an adequate dose and
 \subsection{Borderline states}\label{sec:borderline}
 The inputs carry known noise: effort-weighted sets to about $\pm 1$ set, and each trend ratio to about $\pm 0.06$. When a muscle's dose or trend sits within that range of a decision boundary, it is flagged \emph{borderline} and shown with a tilde to mark the verdict as provisional. The sensitivity analysis (Section~\ref{sec:verification}) shows the growth-trend boundary is where this matters most.
 
-\section{Overall verdict}\label{sec:overall}
+\subsection{Overall verdict}\label{sec:overall}
 Let $n_{\text{grow}}$, $n_{\text{hold}}$, $n_{\text{shrink}}$ count trained muscles in each state, and $m$ be the number of trained muscles. Let $\tau_{\text{all}}$ be the recent-over-earlier ratio of whole-body weekly volume. The headline is:
 \begin{enumerate}[label=\arabic*.,leftmargin=*]
 \item \textbf{Need more data} if fewer than 3 weeks show any training, or $m=0$.
@@ -222,22 +226,25 @@ Let $n_{\text{grow}}$, $n_{\text{hold}}$, $n_{\text{shrink}}$ count trained musc
 \end{enumerate}
 The ``at risk'' headline requires under-stimulated muscles to both outnumber growing ones and reach a third of those trained, so a few neglected small muscles do not flip the whole read. It resolves to ``at risk'' chiefly when most of recent training is genuinely sparse.
 
-\section{Plan forecast}\label{sec:plan}
+\section{Forecasts}\label{sec:forecasts}
+The signal of Section~\ref{sec:signal} reads history. Two forward-looking companions complete the mechanistic model: the plan forecast checks a plan's prescribed dose against the growth window before any of it is logged, and the Monte Carlo projection turns the same mechanisms into a probabilistic muscle-gain trajectory.
+
+\subsection{Plan forecast}\label{sec:plan}
 Separately from the history-based signal, the plan forecast projects a plan's \emph{prescribed} weekly sets before any of it is logged. Prescribed sets per rotation are scaled to a weekly rate $\hat{s}_g$ by how often the plan is run, capped so an ambitious frequency on a short rotation cannot over-promise:
 \begin{equation}\label{eq:plan}
 \hat{s}_g = s_g \cdot \min\!\left(1.2,\ \frac{p}{W}\right),
 \end{equation}
 where $s_g$ is prescribed sets per rotation for muscle $g$ (primary plus half of secondary, as in \eqref{eq:alpha}), $p$ is planned sessions per week, and $W$ is the number of distinct rotation workouts. In words: cycling through the rotation more often than once a week delivers proportionally more weekly sets, and the cap keeps an ambitious schedule from projecting more weekly work than anyone sustains. Each trained muscle is then sorted into under-dosed ($<\MV$), growth window ($\MEV$ to 20), past-productive ($>20$), or maintenance, and the counts drive a plain-language outlook. The forecast promises no centimetres or kilograms; it reports the dose against the growth window and what to change.
 
-\section{Simulations}\label{sec:sims}
-The figures that follow project muscle gain under different training regimes from the Monte Carlo forecast defined next. A seeded script (\texttt{research/simulate.mjs}) generates them and reproduces every value on re-run.
-
-\subsection{Monte Carlo forecast}\label{sec:mc}
+\subsection{Monte Carlo growth projection}\label{sec:mc}
 A point prediction of muscle gain would overstate what the model knows, so the in-app forecast is probabilistic. Each of 500 runs accumulates a weekly fractional gain $\Delta_t$
 \begin{equation}\label{eq:mcgain}
 \Delta_t = b \cdot m \cdot a \cdot \rho(D) \cdot \eta \cdot o \cdot e^{-t/32},
 \end{equation}
-where $t$ counts weeks, $b$ is a training-age base rate~\cite{damas}, $m$ is the inter-individual response multiplier, drawn lognormal to span the range Hubal et~al.~\cite{hubal} observed (cross-sectional-area (CSA) change from about $-2\%$ to $+59\%$), $a$ is an age factor that attenuates hypertrophy past about 30~\cite{peterson}, $\rho(D)$ is the dose--response of \eqref{eq:doseresp}~\cite{sch17,drr} evaluated at the scenario's effective weekly dose $D$, $\eta$ scales with proximity to failure~\cite{failureprox}, $o$ is near 1 while progressing and drops without added load~\cite{plotkin}, and the factor $e^{-t/32}$ tapers the weekly rate toward the lifter's ceiling with a 32-week time constant. In words: each week adds a small slice of growth --- bigger with a larger dose, harder sets, and continued progression; how big varies a lot between people; and every slice shrinks as the lifter nears their ceiling. Sex is a separate lever set near neutral: relative hypertrophy is comparable between sexes~\cite{roberts}, so it bears on absolute mass while the percentage gain here stays about the same for either. Below maintenance the increment turns negative (atrophy~\cite{mujika}), so a starved scenario trends down and the axis extends below zero. Most terms are well constrained by the literature; $b$ carries a wide prior, and $m$ dominates the spread, so the width of the band is the honest output.
+where $t$ counts weeks, $b$ is a training-age base rate~\cite{damas}, $m$ is the inter-individual response multiplier, drawn lognormal to span the range Hubal et~al.~\cite{hubal} observed (cross-sectional-area (CSA) change from about $-2\%$ to $+59\%$), $a$ is an age factor that attenuates hypertrophy past about 30~\cite{peterson}, $\rho(D)$ is the dose--response of \eqref{eq:doseresp}~\cite{sch17,drr} evaluated at the scenario's effective weekly dose $D$, $\eta$ scales with proximity to failure~\cite{failureprox}, $o$ is near 1 while progressing and drops without added load~\cite{plotkin}, and the factor $e^{-t/32}$ tapers the weekly rate toward the lifter's ceiling with a 32-week time constant. In words: each week adds a small slice of growth --- bigger with a larger dose, harder sets, and continued progression; how big varies a lot between people; and every slice shrinks as the lifter nears their ceiling. Sex is a separate lever set near neutral: relative hypertrophy is comparable between sexes~\cite{roberts}, so it bears on absolute mass while the percentage gain here stays about the same for either. Below maintenance the increment turns negative (atrophy~\cite{mujika}), so a starved scenario trends down and the axis extends below zero. Most terms are well constrained by the literature; $b$ carries a wide prior, and $m$ dominates the spread, so the width of the band is the honest output. The multiplier $m$ is where the strength ledger feeds back in: once it has learned a lifter's strength response, $m$ is drawn from the bridge conditional \eqref{eq:bridge} rather than the population prior (Section~\ref{sec:bridge}), so a projection that starts population-generic personalises as strength data accrues.
+
+\subsection{Simulated regimes and sensitivity}\label{sec:sims}
+The figures that follow project muscle gain under different training regimes from the Monte Carlo forecast just defined. A seeded script (\texttt{research/simulate.mjs}) generates them and reproduces every value on re-run.
 
 At a novice base rate, an adequate plan trained with progressive overload gains most over 24 weeks; the same volume with no added load reaches about half that, an irregular schedule ($\sim$55\% of sessions) less again, and training below maintenance loses tissue. More weekly volume across the three standard plans gives more gain, with diminishing returns and heavily overlapping bands (Fig.~\ref{fig:regimes}).
 
@@ -298,6 +305,63 @@ On the same progressing plan, a novice gains most and an advanced lifter least a
 \end{figure}
 
 \FloatBarrier
+\section{The prediction ledger and self-calibration}\label{sec:ledger}
+Everything up to here is a mechanistic model: its parameters come from the literature and none is fitted to an outcome. This section adds the missing loop. The app cannot observe muscle size, but it can observe \emph{strength} --- the estimated one-rep max $\varphi$ of \eqref{eq:epley} is computed on every logged set --- so strength is where prediction can meet observation. The protocol is fixed ex ante in \texttt{CALIBRATION-PLAN.md} (which names this layer Part~II, as does the code); this section summarises it.
+
+\subsection{What is measured and what is estimated}\label{sec:whatis}
+This layer is easy to misread as ``a model of each lift's one-rep max'', so the division of labour is stated up front.
+
+\emph{The one-rep max is a measurement, not a model output.} $\varphi(w,r)$ is a deterministic transformation of a logged set --- a way to put $100\,\text{kg}\times 8$ and $110\,\text{kg}\times 4$ on one scale. The only calibrated quantity inside it is the rep denominator $K$ (Section~\ref{sec:kcal}). No latent strength state is estimated, and no trajectory is fitted through the one-rep-max series: the weekly peak $P_{x,k}$ defined next is simply the best measured value of the week.
+
+\emph{What the model estimates is a rate.} The forecast target $Y_{x,k}$ \eqref{eq:endpoint} is the four-week log-\emph{change} of a lift's weekly peak --- how fast strength is moving, not where it stands. The forecast mean \eqref{eq:ledgermu} is a fixed mechanistic function of the training inputs (dose, effort, overload --- all frozen from the mechanistic model) multiplied by essentially one learned number per lifter: the response multiplier $m_u$, plus small per-muscle deviations around it. A statistician would recognise a regression in which everything except the scale is a known offset; only the scale is learned.
+
+\emph{Learning is sequential, not batch.} Each graded forecast updates the posterior for $m_u$ in closed form \eqref{eq:ledgerupdate} --- a Kalman filter with a static state. Nothing is refitted over the history; the ledger record carries everything the update needs.
+
+\emph{The ledger itself is not a model.} It is the evaluation protocol --- the same discipline as weather-forecast verification: state the predictive distribution before the outcome exists, then score it with proper scoring rules and coverage checks (Section~\ref{sec:ledgerval}).
+
+\emph{Why this shape.} A lift yields at most one usable observation per week, noisy and gapped --- far too little to identify a per-exercise dynamic model without it mostly reproducing its own assumptions. Borrowing the structure from the literature and learning only ``how strongly does this lifter respond'' is the largest parameter set the data honestly supports; per-muscle and per-exercise effects are added only with shrinkage, only as data accumulates.
+
+\subsection{The observable}
+Time is bucketed into absolute calendar weeks (week $k$ means the same seven days no matter when the computation runs). For exercise $x$, the weekly peak $P_{x,k}$ is the best estimated one-rep max the lifter reached in week $k$. The outcome of a forecast made at week $k$ with horizon $H=4$ weeks is the realised log-gain
+\begin{equation}\label{eq:endpoint}
+Y_{x,k}=\log\frac{\max\left(P_{x,k+H-1},\,P_{x,k+H}\right)}{\max\left(P_{x,k-1},\,P_{x,k}\right)},
+\end{equation}
+where the numerator is the best weekly peak over the two \emph{final} weeks of the horizon and the denominator the best over the two weeks up to and including the forecast week. In words: where the lift ended up against where it stood, each read from a two-week window so one bad day does not decide either end. The two windows must be the same length: the maximum of four noisy weeks is systematically higher than the maximum of two, and an asymmetric definition would bias every score upward.
+
+\subsection{The forecast}
+At most once per exercise per week --- when a workout is saved --- the model emits a forecast of $Y_{x,k}$ as a normal distribution with mean
+\begin{equation}\label{eq:ledgermu}
+\mu_{x,k}=H\, r_0\, m_u\, \rho_S(D_g)\, \eta\, o(\tau_g),
+\end{equation}
+where $H$ is the horizon (4 weeks), $r_0$ the population base rate of weekly log-strength gain at full stimulus ($0.0075$, i.e.\ about $0.75\%$ per week), $m_u$ the lifter's personal response multiplier (the learned quantity, prior centred on 1), $\rho_S(D_g)$ the \emph{strength} dose--response at the primary muscle's recent effective weekly dose $D_g$, $\eta$ the mean effort factor \eqref{eq:eps} of the recent sets, and $o(\tau_g)$ an overload factor that is 1 while the trend $\tau_g$ \eqref{eq:tau} shows progression, $0.5$ when flat, and $0.15$ after a sharp drop. The dose--response here is \emph{not} the hypertrophy curve \eqref{eq:doseresp}: strength saturates with volume faster than size (Pelland et~al.~\cite{drr} report ``considerably more pronounced diminishing returns'' for strength), so the ledger uses its own $\rho_S(s)=1-e^{-s/s_{0,S}}$ with $s_{0,S}=\text{target}_S/\ln 5\approx3.11$ at a strength practical target of $\text{target}_S=5$ effective sets/wk (versus 10 for hypertrophy). Thus $\rho_S(5)=0.8$ where $\rho(5)\approx0.55$: the same volume reads as ``most of the available strength benefit'' but only ``more than half'' the size benefit. The effort factor $\eta$ is kept identical to Part~I --- strength is somewhat less failure-sensitive than hypertrophy, but that difference sits below the resolution of the three coarse effort bands, and strength's load-dependence already enters through the e1RM outcome and $o(\tau_g)$. The forecast's standard deviation combines the posterior uncertainty about $m_u$, a residual term, and the measurement noise of the weekly peak (estimated per exercise from median-detrended week-to-week variation). In words: the predicted gain is the base rate, scaled by who you are, how much you train the muscle, how hard the sets are, and whether the load is still moving; the band around it says how sure the model is entitled to be. The multiplier $m_u$ is the learned counterpart of the response multiplier the Monte Carlo forecast draws at random (Section~\ref{sec:mc}): what the growth projection samples from the population distribution because it cannot know the individual, the ledger estimates for the individual from their own graded forecasts.
+
+\subsection{The ledger}
+Each forecast is appended to a ledger with its inputs and the parameter posterior \emph{frozen} at emission. Scoring, when week $k{+}H$ completes, writes only the outcome block: the realised $Y$, the probability integral transform (PIT --- where the outcome landed in the forecast distribution), the continuous ranked probability score (CRPS --- a proper scoring rule that rewards being both right and appropriately confident~\cite{gneiting}), and whether the central 80\% interval covered the outcome. Predictions are never edited after the fact; records that cannot be scored (the lifter stopped logging that exercise) are labelled unscorable and kept, because silently dropping them would flatter the statistics. Backfilled ``predictions'' over pre-ledger history are labelled retrodictions and never feed calibration.
+
+\subsection{Re-parameterization}
+Let $\theta_u=\log m_u$ with prior $\theta_u\sim\mathcal{N}(0,\,0.35^2)$, wide enough to span the inter-individual range of Hubal et~al.~\cite{hubal}. Each scored forecast updates the posterior by a conjugate normal step, linearised at the current posterior mean:
+\begin{equation}\label{eq:ledgerupdate}
+\theta_{\text{obs}}=\hat\theta+\frac{y-\mu}{\mu},\qquad
+p_{\text{obs}}=\frac{c\,\mu^{2}}{\sigma^{2}_{\text{tot}}},\qquad
+\hat\theta \leftarrow \frac{p_0\,\hat\theta+p_{\text{obs}}\,\theta_{\text{obs}}}{p_0+p_{\text{obs}}},
+\end{equation}
+where $y$ is the realised log-gain \eqref{eq:endpoint}, $\mu$ the forecast mean at the current estimate $\hat\theta$, $\sigma^{2}_{\text{tot}}$ the non-parameter part of the forecast variance, $p_0$ the prior (incoming) precision, and $p_{\text{obs}}$ the observation's precision. The factor $c=1/(H{+}2)$ is an effective-information correction: forecasts are emitted weekly but their four-week outcomes overlap, so consecutive scores are far from independent --- $1/H$ of the correction follows from the overlap itself, the remainder from residual dependence, calibrated in simulation. In words: each graded forecast nudges the personal multiplier toward whatever ratio of ``happened over predicted'' it showed, with a weight that honestly reflects how little new information one overlapping week carries. A weak training week moves it barely at all ($\mu$ small $\Rightarrow$ precision small); a posterior clamp at $[\times0.2,\times3]$ keeps data errors from claiming impossible physiology. A second, tighter stage learns per-muscle deviations around the personal multiplier once a muscle has enough scored records.
+
+\subsection{From strength back to size: the bridge}\label{sec:bridge}
+The ledger learns a lifter's \emph{strength} response; the Monte Carlo projects \emph{muscle size} and, on its own, draws the individual response multiplier at random because it cannot see the person. The bridge lets the learned strength response inform that draw. Write $\theta_S=\log m_u$ (learned, posterior $\mathcal N(\hat\theta_S, v_S)$) and $\theta_H=\log(\text{indiv})$ (the hypertrophy multiplier the projection needs). Treat them as bivariate normal with correlation $\rho_{sh}$; conditioning $\theta_H$ on the strength posterior and integrating over it gives, again normally,
+\begin{equation}\label{eq:bridge}
+\theta_H \mid \text{data} \sim \mathcal N\!\left(\beta\,\hat\theta_S,\; \sigma_H^2(1-\rho_{sh}^2)+\beta^2 v_S\right),\qquad \beta=\rho_{sh}\,\frac{\sigma_H}{\sigma_S},
+\end{equation}
+and the Monte Carlo draws $\text{indiv}=e^{\theta_H}$ from this instead of from $\mathcal N(0,\sigma_H^2)$. The correlation is set deliberately low, $\rho_{sh}=0.3$, because strength is a \emph{biased, weak} proxy for size: the individual-level correlation between strength change and size change is small (Ahtiainen et~al.~\cite{ahtiainen}, $r\approx0.16$; Balshaw et~al.~\cite{balshaw} find hypertrophy explains ${\sim}19\%$ of strength-gain variance, behind neural drive at ${\sim}31\%$), and early strength gain is largely neural and skill-based. At $\rho_{sh}=0.3$ the bridge \emph{shifts} the muscle-gain centre by $\beta\hat\theta_S$ (a strong strength responder nudges the size forecast up ${\sim}18\%$) but the band $\sigma_H\sqrt{1-\rho_{sh}^2}$ barely narrows: strength informs the size forecast without pretending to pin it. At $\rho_{sh}=0$ the draw reverts exactly to the unconditional one. The bridge activates only after ten scored forecasts (the same gate as the card), so it never personalises on no data. This is the pragmatic connection; the principled successor --- a per-muscle latent factor with a fast exercise-specific skill term and a slow shared-capacity term that loads on both strength and size --- is noted for future work (\texttt{CALIBRATION-PLAN.md} §12).
+
+\subsection{Validation before belief}\label{sec:ledgerval}
+Three reproducible checks accompany the ledger (\texttt{research/ledger.test.mjs}): known-answer tests of the ledger mechanics; \emph{simulation-based calibration} --- users drawn from the prior, the full loop run on their synthetic logs, then verifying that interval coverage matches the nominal 80\%, that the truth is uniformly distributed under the reported posterior (final z-scores: mean $0.18$, sd $1.07$ against targets 0 and 1), and that recovery reaches the ceiling the posterior width permits; and numeric parity between the app implementation and the reference module. A walk-forward backtest (\texttt{research/ledger-backtest.mjs}) replays any exported history with an expanding window --- no future data can leak into a forecast --- and reports coverage, CRPS, and skill against two fixed baselines: ``no change'' and ``personal drift'' (the lifter's own trailing mean gain). The model earns its keep only if it beats the second. The forecast card in the app shows numbers only after ten scored forecasts; until then it says it is calibrating.
+
+The bridge \eqref{eq:bridge} is checked the same way: synthetic lifters are generated with a known $(\theta_S,\theta_H)$ pair at correlation $\rho_{sh}$, the ledger learns $\theta_S$ from their logs, and the conditioned size forecast is scored against the true $\theta_H$. At $\rho_{sh}=0$ it reproduces the unconditional forecast exactly; at a strong coupling it clearly reduces error; at the production $\rho_{sh}=0.3$ the conditioned centre tracks the truth (small but positive) and the interval stays at or above nominal coverage --- i.e.\ the bridge is never overconfident.
+
+\subsection{Which exercises drive strength}
+With outcomes and exposures defined, a second question opens: which exercises contribute most? Self-progression is uninformative here --- practising a lift raises its own $\varphi$ through skill alone --- so the estimand is \emph{transfer}: the association between one weekly effective set of exercise $x$ and the $H$-week log-gain of the \emph{other} lifts sharing $x$'s muscle, within person, with the lift's own practice, the pre-window dose state, the trend, and time held fixed. Per-exercise coefficients are shrunk toward zero (partial pooling as the multiplicity control), uncertainty comes from a moving-block bootstrap that respects the weekly serial correlation, and the output language stays associational: this is an observational design with known limits, not a randomised trial. The analysis ships as a research script (\texttt{research/effectiveness.mjs}) with a known-truth synthetic self-check; pooled estimation across consenting users is designed but deferred.
+
 \section{Scientific basis}\label{sec:basis}
 Each parameter and mechanism traces to a specific source. Effect sizes are context-dependent; the model uses the literature to set its structure and thresholds, and promises no outcomes.
 Grades follow the GRADE approach (Grading of Recommendations, Assessment, Development and Evaluation) to rating the underlying evidence: High (meta-analyses of randomised controlled trials, RCTs), Moderate (individual RCTs or focused reviews), Low (practitioner framework). A Low grade flags a parameter that rests on weaker evidence and is the first candidate for revision (Table~\ref{tab:basis}).
@@ -320,22 +384,26 @@ Monte Carlo forecast: training-age base rate & Damas et~al.~\cite{damas}; hypert
 Monte Carlo forecast: inter-individual response spread & Hubal et~al.~\cite{hubal} (n=585); 12-wk CSA change ${\approx}\,{-}2\%$ to $+59\%$. & High\\
 Forecast age factor & Peterson et~al.~\cite{peterson}; lean-mass gains attenuate with age. & Moderate\\
 Forecast sex lever ($\approx$ neutral for \%\ gain) & Roberts et~al.~\cite{roberts}; relative hypertrophy comparable between sexes. & High\\
+\midrule
+Ledger prior spread of $m_u$ & Hubal et~al.~\cite{hubal}; inter-individual strength-response range sets the prior width \eqref{eq:ledgerupdate}. & High\\
+Ledger base rate $r_0$ & Prior centred near $0.75\%$/wk, consistent with the strength arm of Pelland et~al.~\cite{drr}; the posterior learns the product $r_0 m_u$ per user. & Prior\\
+Ledger scoring (CRPS, PIT, coverage) & Gneiting \& Raftery~\cite{gneiting}, proper scoring rules; protocol in \texttt{CALIBRATION-PLAN.md}. & Method\\
 \bottomrule
 \end{tabular}
 \caption{Evidence basis for each model parameter, with GRADE-style ratings.}\label{tab:basis}
 \end{table}
 
 \section{Verification}\label{sec:verification}
-No body-composition study validates the model (see the limitations that follow). Three reproducible checks accompany it (the \texttt{research/} folder in the repository), each raising rigor without new measurement.
+No body-composition study validates the model (see the limitations that follow). Three reproducible checks accompany the training-stimulus signal (the \texttt{research/} folder in the repository), each raising rigor without new measurement; the prediction ledger carries its own verification suite (Section~\ref{sec:ledgerval}), including simulation-based calibration and a walk-forward backtest.
 \begin{itemize}[leftmargin=*]
 \item \textbf{Known-answer tests.} Canonical scenarios --- a returning lifter, a deload, easy versus hard sets, a hard stop --- paired with domain-expected verdicts, so miscalibration or later drift is caught in code.
 \item \textbf{Sensitivity analysis.} Perturbing each threshold by $\pm 10\%$ over a synthetic population shows the growth-trend cutoff is the most load-bearing parameter (about a quarter of muscles change state), while the maintenance floor and sharp-drop cutoff are nearly cosmetic. This is why the borderline band sits on the trend boundary.
-\item \textbf{Predictive-coherence backtest.} On a training log, muscles labelled growing should precede larger subsequent gains in estimated 1RM than those labelled holding or under-stimulated. Strength change is only a proxy for hypertrophy; a body-composition study remains the standard these checks cannot replace.
+\item \textbf{Predictive-coherence backtest.} On a training log, muscles labelled growing should precede larger subsequent gains in estimated 1RM than those labelled holding or under-stimulated. This one-off check matured into the prediction ledger (Section~\ref{sec:ledger}), where the same idea runs continuously. Strength change is only a proxy for hypertrophy; a body-composition study remains the standard these checks cannot replace.
 \end{itemize}
 
 \section{Assumptions and limitations}
 \begin{itemize}[leftmargin=*]
-\item \textbf{Validation status.} This is a mechanistic model, grounded in the literature and internally consistent. It has no validation against direct body-composition measurements (dual-energy X-ray absorptiometry, ultrasound, or magnetic resonance imaging): its thresholds are derived from published dose--response findings, none are fitted to an outcome dataset, and it claims no predictive-accuracy interval. The checks in Section~\ref{sec:verification} cover internal consistency and coherence; external accuracy stays out of scope.
+\item \textbf{Validation status.} The training-stimulus model is mechanistic, grounded in the literature and internally consistent. It has no validation against direct body-composition measurements (dual-energy X-ray absorptiometry, ultrasound, or magnetic resonance imaging): its thresholds are derived from published dose--response findings, none are fitted to an outcome dataset, and it claims no predictive-accuracy interval. The prediction ledger (Section~\ref{sec:ledger}) fits per-user parameters to \emph{strength} outcomes under a pre-registered protocol and reports its own calibration; strength remains a pro
 \item \textbf{A stimulus estimate.} Every output estimates the training stimulus from logs. The app cannot see the body; no measurement of muscle mass is implied.
 \item \textbf{Effort is self-reported.} Reps in reserve is not recoverable from load and reps alone; \eqref{eq:rir} sets only a default. Day-to-day max-rep variability ($\pm 1$--3 reps) sits at the resolution of the effort bands, so the estimate is noisy near failure and the manual override remains the ground truth.
 \item \textbf{Top-set inference.} History stores each exercise's top set and its set count, without the reps of every set, so within-session rep drop-off is not yet used as an effort cue.
@@ -350,6 +418,9 @@ No body-composition study validates the model (see the limitations that follow).
 \bibitem{bickel} Bickel CS, Cross JM, Bamman MM. Exercise dosing to retain resistance-training adaptations in young and older adults. \emph{Med Sci Sports Exerc}. 2011;43(7):1177--1187. doi:10.1249/MSS.0b013e318207c15d
 \bibitem{damas} Damas F, Phillips SM, Libardi CA, et al. Resistance training-induced changes in integrated myofibrillar protein synthesis are related to hypertrophy only after attenuation of muscle damage. \emph{J Physiol}. 2016;594(18):5209--5222. doi:10.1113/JP272472
 \bibitem{epley} Epley B. Poundage chart. \emph{Boyd Epley Workout}. Lincoln, NE: Body Enterprises; 1985.
+\bibitem{gneiting} Gneiting T, Raftery AE. Strictly proper scoring rules, prediction, and estimation. \emph{J Am Stat Assoc}. 2007;102(477):359--378. doi:10.1198/016214506000001437
+\bibitem{ahtiainen} Ahtiainen JP, Walker S, Peltonen H, et al. Heterogeneity in resistance training-induced muscle strength and mass responses in men and women of different ages. \emph{Age (Dordr)}. 2016;38(1):10. doi:10.1007/s11357-015-9870-1
+\bibitem{balshaw} Balshaw TG, Massey GJ, Maden-Wilkinson TM, et al. Changes in agonist neural drive, hypertrophy and pre-training strength all contribute to the individual strength gains after resistance training. \emph{Eur J Appl Physiol}. 2017;117(4):631--640. doi:10.1007/s00421-017-3560-x
 \bibitem{hubal} Hubal MJ, Gordish-Dressman H, Thompson PD, et al. Variability in muscle size and strength gain after unilateral resistance training. \emph{Med Sci Sports Exerc}. 2005;37(6):964--972. doi:10.1249/01.mss.0000170469.90461.5f
 \bibitem{rpvol} Israetel M, Hoffmann J, Smith CW. Training volume landmarks for muscle growth (MEV/MAV/MRV). \emph{Renaissance Periodization}; 2017. \url{https://rpstrength.com/blogs/articles/training-volume-landmarks-muscle-growth}
 \bibitem{mujika} Mujika I, Padilla S. Detraining: loss of training-induced physiological and performance adaptations. Part I --- short-term insufficient training stimulus. \emph{Sports Med}. 2000;30(2):79--87. doi:10.2165/00007256-200030020-00002
@@ -379,16 +450,31 @@ $A_x$ & Anchor: best prior $\varphi$ over $\mathrm{hist}(x)$, the prior logged e
 $\rir$ & Estimated reps in reserve of a set \eqref{eq:rir}\\
 $L_{g,k}$ & Weekly peak $\varphi$ on primary exercises for $g$\\
 $D_g$ & Recent dose: recent mean of $S_g$ \eqref{eq:dose}\\
-$\rho(s),\ s_0$ & Dose--response stimulus fraction and its scale \eqref{eq:doseresp}\\
+$\rho(s),\ s_0$ & Hypertrophy dose--response stimulus fraction and its scale \eqref{eq:doseresp}\\
+$\rho_S(s),\ s_{0,S}$ & Strength dose--response and its scale ($s_{0,S}\approx3.11$; earlier plateau) \eqref{eq:ledgermu}\\
 $T^{S},\ T^{L},\ \tau_g$ & Set trend, load trend, combined trend \eqref{eq:trends}--\eqref{eq:tau}\\
 $\sigma_g$ & Per-muscle state (growing / holding / under-stimulated)\\
 $\MV,\MEV,\text{target},\MAV$ & Landmarks 2, 6, 10, 20 effective sets/muscle/week\\
+\midrule
+\multicolumn{2}{@{}l}{\emph{Prediction ledger (Section~\ref{sec:ledger})}}\\
+$P_{x,k}$ & Weekly peak: best measured $\varphi$ for exercise $x$ in absolute week $k$\\
+$H$ & Forecast horizon, 4 weeks\\
+$Y_{x,k}$ & Realised 4-week log-gain, symmetric 2-week endpoint windows \eqref{eq:endpoint}\\
+$r_0$ & Population base rate of weekly log-strength gain at full stimulus\\
+$m_u,\ \theta_u$ & Personal response multiplier and its log, the learned parameter\\
+$\mu_{x,k}$ & Forecast mean \eqref{eq:ledgermu}: mechanistic offset $\times\ m_u$\\
+$o(\tau_g)$ & Overload factor: 1 progressing / 0.5 flat / 0.15 after a sharp drop\\
+$c$ & Effective-information correction $1/(H{+}2)$ in \eqref{eq:ledgerupdate}\\
+$\sigma^{2}_{\text{tot}}$ & Non-parameter forecast variance: residual + $2\times$ peak measurement noise\\
+$\theta_S,\theta_H$ & Strength / hypertrophy log response-multipliers; bridged by \eqref{eq:bridge}\\
+$\rho_{sh},\ \beta$ & Strength--size response correlation ($0.3$) and bridge slope $\rho_{sh}\sigma_H/\sigma_S$ \eqref{eq:bridge}\\
+$\sigma_S,\sigma_H$ & Log-scale spreads of the strength / hypertrophy multipliers (0.35 / 0.55)\\
 \bottomrule
 \end{tabular}
 \end{center}
 
 \section{Parameter values}
-Every numeric constant in the model, its value, and where it enters. These are the values used in production (v121); the sensitivity analysis (Section~\ref{sec:verification}) quantifies how much each one matters.
+Every numeric constant in the model, its value, and where it enters. These are the values used in production (v122); the sensitivity analysis (Section~\ref{sec:verification}) quantifies how much each one matters.
 \begin{center}
 \small
 \begin{tabular}{@{}p{5.2cm}p{4.7cm}p{4.3cm}@{}}
@@ -414,12 +500,30 @@ Overall ``at risk'' & $n_{\text{shrink}} > n_{\text{grow}}$ and $n_{\text{shrink
 Overall ``growing'' & $n_{\text{grow}} \geq \max(1,\,\mathrm{round}(0.4m))$, $\tau_{\text{all}}$ absent or ${\geq}0.95$ & Section~\ref{sec:overall}\\
 ``Need more data'' & fewer than 3 active weeks & Section~\ref{sec:overall}\\
 Plan frequency cap & $\min(1.2,\ p/W)$ & \eqref{eq:plan}\\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Prediction ledger (Section~\ref{sec:ledger}; protocol and changelog in \texttt{CALIBRATION-PLAN.md})}}\\
+Horizon $H$ & 4 weeks & \eqref{eq:endpoint}\\
+Base rate $r_0$ & 0.0075 /wk (${\approx}0.75\%$) & \eqref{eq:ledgermu}\\
+Strength dose--response $s_{0,S}$ & $\text{target}_S/\ln 5\approx3.11$ ($\text{target}_S{=}5$) & $\rho_S$ \eqref{eq:ledgermu}\\
+Prior on $\theta_u=\log m_u$ & $\mathcal{N}(0,\,0.35^2)$ & \eqref{eq:ledgerupdate}\\
+Posterior clamp on $m_u$ & $[\times0.2,\ \times3]$ & \eqref{eq:ledgerupdate}\\
+Effective-information $c$ & $1/(H{+}2)=1/6$ & \eqref{eq:ledgerupdate}\\
+Per-muscle deviation prior & $\mathcal{N}(0,\,0.15^2)$, applied from 6 scored records & second update stage\\
+Overload factor $o$ & 1 / 0.5 / 0.15 (progressing / flat / sharp drop) & \eqref{eq:ledgermu}\\
+Residual variance $\sigma^2_u$ & starts $0.025^2$, re-estimated every 8 scored, floor $0.005^2$ & forecast sd\\
+Peak measurement sd & median-detrended MAD of weekly log-diffs$/\sqrt{2}$; default 0.02, floor 0.005 & forecast sd\\
+Emission gate & ${\geq}3$ prior loaded weeks; trained this week; baseline exists & ledger protocol\\
+Scoring gate & ${\geq}1$ loaded entry in weeks $k{+}H{-}1..k{+}H$ & \eqref{eq:endpoint}\\
+Forecast numbers shown from & 10 scored forecasts & app card\\
+Bridge correlation $\rho_{sh}$ & 0.3 (conservative; range 0.15--0.5) & \eqref{eq:bridge}\\
+Bridge spreads $\sigma_S,\sigma_H$ & 0.35 / 0.55 (log scale) & \eqref{eq:bridge}\\
+Bridge activation gate & ${\geq}10$ scored forecasts and $v_S<$ prior & Section~\ref{sec:bridge}\\
 \bottomrule
 \end{tabular}
 \end{center}
 
 \vspace{6pt}
 \noindent\rule{\linewidth}{0.4pt}\\[2pt]
-\noindent\footnotesize Yalla training-stimulus model, v121. Estimates a training stimulus from logs; not medical or diagnostic advice, and not a measurement of muscle mass.
+\noindent\footnotesize Yalla training-stimulus model, v123. Estimates a training stimulus from logs; not medical or diagnostic advice, and not a measurement of muscle mass.
 
 \end{document}
