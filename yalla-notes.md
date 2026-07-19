@@ -174,6 +174,35 @@ Exercises are grouped under `#exlist` in **both** modes, so one delegated listen
 
 ---
 
+## 9b. Part II — prediction ledger & self-calibration (v116)
+
+- Protocol fixed in `CALIBRATION-PLAN.md`; reference implementation `research/ledger-core.mjs`;
+  compact mirror in app.js (the `lg*` functions + `LG` constants). Parity between the two is
+  enforced numerically by `research/ledger.test.mjs` — change both together or that test fails.
+- New synced stores: `predledger` (append-only forecast records) and `calib` (per-user posterior).
+  Both are in `CLOUD_KEYS`, so they ride the existing sync/backup/restore paths.
+- Flow: `ledgerTick(emit)` — score matured forecasts → update posterior → (on workout save) emit
+  this week's forecasts. Called with `emit=true` from the workout save button, `emit=false` at init.
+- UI: `slCard` tile ("Strength forecast — on the record") on the Me page; shows numbers only after
+  10 scored forecasts (before that it says "calibrating").
+- Research CLIs: `ledger-backtest.mjs` (walk-forward metrics on an exported history) and
+  `effectiveness.mjs` (which exercises transfer to the muscle's other lifts).
+
+## 9c. Strength/hypertrophy de-conflation + bridge (v117, plan §12)
+
+- **De-conflation:** the ledger predicts *strength* but reused the *hypertrophy* dose-response.
+  Now uses its own `doseStimulusStrength` / `lgDoseStr` (`s0_S=5/ln5≈3.11`, plateaus by ~5 sets vs
+  10 for hypertrophy — Pelland 2026). The Monte Carlo keeps the hypertrophy `doseStimulus`.
+- **Bridge:** `growthForecast()` draws the hypertrophy multiplier `indiv` from the strength posterior
+  via the bivariate-normal conditional (`bridgeThetaH` in ledger-core), gated on ≥10 scored forecasts.
+  ρ_sh=0.3 (deliberately low — strength is a weak, neural-biased proxy). Sub-text shows "personalised
+  from your strength data" when active; per-muscle bars use the bridged median so they stay consistent
+  with the whole-body line.
+- The SBC/backtest generators and `effectiveness.mjs` dose control were switched to the strength curve
+  (they model strength outcomes). Bridge has its own recovery/calibration tests in `ledger.test.mjs`.
+
+---
+
 ## 10. Possible next steps / TODO ideas
 
 - Optionally fold the `wkMeta` line + session timer into one compact strip.

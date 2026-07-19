@@ -820,7 +820,7 @@ const SUPA = {
   // VAPID *public* key (safe to embed). The matching private key goes in Supabase secrets — see PUSH-SETUP.md
   vapidPublic: "BI6G-Tfh8TMp9wK5N4vFc1w_z9zkGNUekzNo31HM8J9zofn25ZVp7f3bVqd_m2LhwIl89Azb7FjSNjdDGiBYUG4"
 };
-const CLOUD_KEYS = ["plans","lastsets","bodyweight","history","extlog","settings"]; // draft stays device-only
+const CLOUD_KEYS = ["plans","lastsets","bodyweight","history","extlog","settings","predledger","calib"]; // draft stays device-only
 let sb=null, cloudUser=null, _syncMeta={}, _pushTimers={};
 // True once the friends-only hardening migration (supabase/schema-hardening.sql) is live —
 // detected by probing the `follows` table. Until then the activity table is world-readable, so
@@ -1014,6 +1014,7 @@ async function reloadFromStore(){
   settings = Object.assign(settings, (await sget("settings"))||{});
   const sp=await sget("plans"); if(sp) plans=sp;
   last=(await sget("lastsets"))||{}; bw=(await sget("bodyweight"))||[]; hist=(await sget("history"))||{}; extlog=(await sget("extlog"))||[];
+  ledger=(await sget("predledger"))||[]; calib=(await sget("calib"))||lgFreshCalib();
   if(!plans.length) plans=DEFAULT_PLANS.map(p=>JSON.parse(JSON.stringify(p)));
   if(!plans.find(p=>p.id===settings.activePlanId)) settings.activePlanId=plans[0].id;
   applyTheme(); renderAll();
@@ -2152,6 +2153,7 @@ async function loadComments(r, panel, cspan){
   };
 }
 let plans=[], last={}, bw=[], hist={}, extlog=[];
+let ledger=[], calib=null;   // Part II prediction ledger + per-user calibration state (CALIBRATION-PLAN.md)
 let draft={};   // in-progress entries per workout, kept until the workout is saved: { sig: { t, s:{ exname:[{w,r}] } } }
 let swaps={}, swapIdx=null;
 let freeMode=false;
@@ -2350,6 +2352,8 @@ async function init(){
   hist  = (await sget("history")) || {};
   extlog= (await sget("extlog")) || [];
   draft = (await sget("draft")) || {};
+  ledger= (await sget("predledger")) || []; calib=(await sget("calib")) || lgFreshCalib();
+  ledgerTick(false);   // score any forecasts whose horizon completed while the app was closed (no emission)
   if(settings.achUnlocked==null) settings.achUnlocked=unlockedIds();
   if(!settings.planStartAt) settings.planStartAt=Date.now();   // start the "freshen" clock for the active plan
   if(!settings.bodyDefaultsCleared){                            // clear the old shipped body defaults (68/75/male) so untouched profiles read empty
@@ -3095,6 +3099,7 @@ function renderDash(){
   renderCalendar();
   renderBaseActivity();
   renderGrowthForecast();
+  renderStrengthLedger();
   renderGrowth();          // per-muscle current status, now folded into the forecast tile
   applyTileOrder();
   const po=$("progObj");   // objective-adherence score, moved onto the Progress tile
@@ -3779,6 +3784,7 @@ $("saveBtn").onclick=async()=>{
   await sset("lastsets",last);
   await sset("history",hist);
   _repDenom=null;   // new Max sets may shift the self-calibrated effort denominator
+  await ledgerTick(true);   // score matured forecasts, update the posterior, emit this week's predictions
   const mins=Math.round(tmrElapsed()/60);
   if(mins>0){ settings.timeTotal=(settings.timeTotal||0)+mins; }
   session.mins=mins; session.beaten=beaten; session.sub=logged+" exercise"+(logged>1?"s":"");
@@ -6282,8 +6288,157 @@ function saveTileOrder(){
     grip.addEventListener("pointercancel", end);
   });
   const rst=$("tileReset"); if(rst) rst.onclick=()=>{ settings.meTileOrder=null; sset("settings",settings);
-    ["forecast","progress","balance"].forEach(t=>{ const el=c.querySelector('.metile[data-tile="'+t+'"]'); if(el) c.appendChild(el); }); toast&&toast("Tiles reset to default order"); };
+    ["forecast","ledger","progress","balance"].forEach(t=>{ const el=c.querySelector('.metile[data-tile="'+t+'"]'); if(el) c.appendChild(el); }); toast&&toast("Tiles reset to default order"); };
 })();
+// ===== Part II: prediction ledger — predict → observe → re-parameterize =====
+// Mirrors research/ledger-core.mjs (the reference implementation; keep the two in sync). The protocol
+// is fixed ex ante in CALIBRATION-PLAN.md: at most one forecast per exercise per epoch week, emitted
+// BEFORE the outcome exists with the posterior then in force frozen into the record; scoring writes
+// only the outcome block and never touches a prediction; the per-user response multiplier is updated
+// from scored errors by a conjugate Normal–Normal step on the log scale, relinearized at the posterior
+// mean. Retrodictions (retro:true) never feed calibration. Outcomes are scored with the Epley K frozen
+// at emission so a later K recalibration can't move the goalposts of an existing prediction.
+const LG={WK:7*86400000, H:4, R0:0.0075, V:1, THV:0.1225, MUSV:0.0225, SIG2U:0.000625, SIG2F:0.000025,
+  SIGOBS:0.02, MINW:3, MINOUT:1, MUSN:6, REEST:8, Z80:1.2815515655446004, CLAMP:[Math.log(0.2),Math.log(3)],
+  PSC:1/6,        // effective-info per record: 1/H from overlapping outcome windows, /1.5 more for residual dependence (SBC-calibrated)
+  TAUS:5/Math.log(5),                 // strength dose-response scale (plan §12a): 80% attained by ~5 sets/wk, not 10 (≈3.107)
+  BRHO:0.3, BSIGH:0.55, BSIGS:0.35, BMIN:10};   // strength→hypertrophy bridge (plan §12b): correlation, log-sd of each multiplier, activation gate
+const lgWeek=d=>Math.floor(d/LG.WK);
+// Strength dose-response (plan §12a): strength saturates with volume faster than hypertrophy
+// (Pelland 2026), so the ledger uses its own curve rather than the hypertrophy doseStimulus().
+const lgDoseStr=s=> s>0 ? 1-Math.exp(-s/LG.TAUS) : 0;
+// Strength→hypertrophy bridge (plan §12b): the conditional distribution of the hypertrophy log-multiplier
+// θ_H given the learned strength posterior θ_S~N(m,v), integrating over it. Mirrors bridgeThetaH in
+// research/ledger-core.mjs. β=ρ·σ_H/σ_S; at ρ=0 it returns the unconditional draw N(0,σ_H).
+const lgBridgeThetaH=(m,v)=>{ const b=LG.BRHO*LG.BSIGH/LG.BSIGS;
+  return { m:b*m, sd:Math.sqrt(LG.BSIGH*LG.BSIGH*(1-LG.BRHO*LG.BRHO) + b*b*v) }; };
+function lgFreshCalib(){ return {v:1, th:{m:0,v:LG.THV}, mus:{}, sig2u:LG.SIG2U, nsc:0, ss:0, so2s:0, mv2s:0}; }
+function lgNormCdf(z){ const t=1/(1+0.3275911*Math.abs(z)/Math.SQRT2);
+  const e=1-t*(0.254829592+t*(-0.284496736+t*(1.421413741+t*(-1.453152027+t*1.061405429))))*Math.exp(-z*z/2);
+  return z>=0 ? 0.5*(1+e) : 0.5*(1-e); }
+function lgCrps(y,mu,sd){ if(!(sd>0)) return Math.abs(y-mu); const z=(y-mu)/sd;
+  return sd*( z*(2*lgNormCdf(z)-1) + 2*Math.exp(-z*z/2)/Math.sqrt(2*Math.PI) - 1/Math.sqrt(Math.PI) ); }
+// Weekly per-exercise peaks/entries and per-muscle effective sets & peaks, on ABSOLUTE epoch weeks
+// (fixed buckets — "the outcome of week k" must not depend on when it is computed).
+function lgWeekly(K){ const byEx={}, musSets={}, musPeak={};
+  Object.keys(hist).forEach(name=>{ const gs=muscleFor(name);
+    const ex=byEx[name]={peak:{}, n:{}, effs:{}, g:gs[0]||null};
+    (hist[name]||[]).forEach(e=>{ const k=lgWeek(e.d), eff=effortOf(e), ns=e.n!=null?+e.n:1;
+      gs.forEach((g,gi)=>{ const m=musSets[g]=musSets[g]||{}; m[k]=(m[k]||0)+ns*eff*(gi===0?1:0.5); });
+      const w=parseFloat(e.w)||0, r=parseInt(e.r)||0;
+      if(w>0&&r>0){ const p=w*(1+r/K);
+        if(p>(ex.peak[k]||0)) ex.peak[k]=p; ex.n[k]=(ex.n[k]||0)+1; (ex.effs[k]=ex.effs[k]||[]).push(eff);
+        if(gs[0]){ const mp=musPeak[gs[0]]=musPeak[gs[0]]||{}; if(p>(mp[k]||0)) mp[k]=p; } } }); });
+  return {byEx,musSets,musPeak}; }
+const lgWinMean=(m,a,b)=>{ let s=0; for(let k=a;k<=b;k++) s+=m[k]||0; return s/(b-a+1); };
+const lgWinMeanPos=(m,a,b)=>{ let s=0,n=0; for(let k=a;k<=b;k++){ const v=m[k]||0; if(v>0){ s+=v; n++; } } return n?s/n:null; };
+const lgWinMax =(m,a,b)=>{ let x=0; for(let k=a;k<=b;k++){ const v=m[k]||0; if(v>x) x=v; } return x; };
+// Recent dose & overload trend for a muscle at as-of week k (v2.1's 3-week windows on absolute weeks).
+// Dose means keep untrained weeks as zeros (the dose really was zero); the load trend averages trained
+// weeks only — zeros in a PEAK series read "didn't train" as "got weaker" and bias the calibration.
+function lgMuscleState(wk,g,k){ const S=wk.musSets[g]||{}, P=wk.musPeak[g]||{};
+  const D=lgWinMean(S,k-2,k), es=lgWinMean(S,k-5,k-3), el=lgWinMeanPos(P,k-5,k-3), rl=lgWinMeanPos(P,k-2,k);
+  const tS=es>0?D/es:null, tL=(el!=null&&rl!=null)?rl/el:null;
+  const trend=(tS==null&&tL==null)?null:Math.max(tS!=null?tS:0, tL!=null?tL:0);
+  return {D,trend}; }
+const lgOverload=t=> (t==null||t>=1) ? 1 : (t>=0.75 ? 0.5 : 0.15);
+// Robust measurement sd of an exercise's weekly log-peak: successive diffs, median-detrended, MAD→sd, /√2.
+function lgObsSigma(ex){ const ks=Object.keys(ex.peak).map(Number).sort((a,b)=>a-b); const d=[];
+  for(let i=1;i<ks.length;i++) d.push(Math.log(ex.peak[ks[i]]/ex.peak[ks[i-1]]));
+  if(d.length<4) return LG.SIGOBS;
+  const med=a=>{ const s=[...a].sort((x,y)=>x-y); return s[Math.floor(s.length/2)]; };
+  const m0=med(d); return Math.max(0.005, 1.4826*med(d.map(x=>Math.abs(x-m0)))/Math.SQRT2); }
+// Emit forecasts for every exercise trained in the as-of week (gates per plan §6); freezes inputs + posterior.
+function lgEmit(now){ const K=effortRepDenom(), k=lgWeek(now), wk=lgWeekly(K), out=[];
+  const have=new Set(ledger.map(r=>r.x+"|"+r.k));
+  Object.keys(wk.byEx).forEach(x=>{ const ex=wk.byEx[x];
+    if(!ex.g || have.has(x+"|"+k) || !(ex.n[k]>0)) return;
+    let prior=0; Object.keys(ex.n).forEach(w=>{ if(+w<=k) prior++; }); if(prior<LG.MINW) return;
+    const base=lgWinMax(ex.peak,k-1,k); if(!(base>0)) return;
+    const st=lgMuscleState(wk,ex.g,k);
+    const effs=[].concat(ex.effs[k-2]||[], ex.effs[k-1]||[], ex.effs[k]||[]);
+    const eta=effs.length? effs.reduce((a,b)=>a+b,0)/effs.length : 1;
+    const rho=lgDoseStr(st.D), o=lgOverload(st.trend), mu0=LG.H*LG.R0*rho*eta*o;   // strength dose-response (plan §12a)
+    const mus=calib.mus[ex.g], musM=(mus&&mus.n>=LG.MUSN)?mus.m:0, musV=(mus&&mus.n>=LG.MUSN)?mus.v:LG.MUSV;
+    const th=calib.th.m+musM, thv=calib.th.v+musV, mu=mu0*Math.exp(th), so2=Math.pow(lgObsSigma(ex),2);
+    let sd=Math.sqrt(mu*mu*thv + calib.sig2u + 2*so2); if(st.trend==null) sd*=1.25;
+    out.push({ id:x+"|"+k, v:LG.V, t:now, k, x, g:ex.g, h:LG.H, mu, sd,
+      in:{ D:st.D, rho, eff:eta, trend:st.trend, o, base, mu0, so2, K, thm:th, thv },
+      retro:false, st:"pending" }); });
+  return out; }
+// Score matured records (outcome window complete). Writes ONLY the out block; predictions stay frozen.
+// Outcome is endpoint-to-endpoint with SYMMETRIC 2-week windows (best peak of weeks k+H-1..k+H vs the
+// 2-week baseline) — asymmetric max windows carry an order-statistics bias that skews calibration.
+function lgScore(now){ const wNow=lgWeek(now), scored=[];
+  ledger.forEach(rec=>{ if(rec.st!=="pending" || wNow<=rec.k+rec.h) return;
+    const K=(rec.in&&rec.in.K)||30; let nOut=0, ahead=0;
+    (hist[rec.x]||[]).forEach(e=>{ const w=lgWeek(e.d); if(w<rec.k+rec.h-1||w>rec.k+rec.h) return;
+      const wt=parseFloat(e.w)||0, r=parseInt(e.r)||0; if(!(wt>0&&r>0)) return;
+      nOut++; const p=wt*(1+r/K); if(p>ahead) ahead=p; });
+    if(nOut<LG.MINOUT || !(ahead>0)){ rec.st="unscorable"; rec.out={scoredAt:now}; return; }
+    const y=Math.log(ahead/rec.in.base), z=(y-rec.mu)/rec.sd;
+    rec.st="scored"; rec.out={ y, pit:lgNormCdf(z), crps:lgCrps(y,rec.mu,rec.sd), hit80:Math.abs(z)<=LG.Z80?1:0, scoredAt:now };
+    scored.push(rec); });
+  return scored; }
+// Conjugate posterior update from one scored record (plan §5) — relinearized at the current mean.
+function lgUpdate(rec){ if(rec.retro || rec.st!=="scored") return;
+  const mu0=rec.in.mu0, so2=rec.in.so2, y=rec.out.y; if(!(mu0>0)) return;
+  const s2=calib.sig2u+2*so2;
+  const muU=mu0*Math.exp(calib.th.m), thObs=calib.th.m+(y-muU)/muU, prec=LG.PSC*muU*muU/s2;
+  const p0=1/calib.th.v, p1=p0+prec;
+  calib.th.m=Math.min(LG.CLAMP[1], Math.max(LG.CLAMP[0], (p0*calib.th.m+prec*thObs)/p1)); calib.th.v=1/p1;
+  const mus=calib.mus[rec.g]=calib.mus[rec.g]||{m:0,v:LG.MUSV,n:0};
+  const muG=mu0*Math.exp(calib.th.m+mus.m), dObs=mus.m+(y-muG)/muG, gp=LG.PSC*muG*muG/s2, q0=1/mus.v, q1=q0+gp;
+  mus.m=(q0*mus.m+gp*dObs)/q1; mus.v=1/q1; mus.n++;
+  calib.nsc++; calib.ss+=Math.pow(y-rec.mu,2); calib.so2s+=2*so2; calib.mv2s+=rec.mu*rec.mu*rec.in.thv;
+  if(calib.nsc%LG.REEST===0) calib.sig2u=Math.max(LG.SIG2F, (calib.ss-calib.so2s-calib.mv2s)/calib.nsc); }
+// Aggregate metrics over non-retro scored records (plan §8): coverage, CRPS, skill vs fixed baselines.
+function lgMetrics(){ const recs=ledger.filter(r=>!r.retro&&r.st==="scored").sort((a,b)=>a.k-b.k);
+  const n=recs.length, uns=ledger.filter(r=>!r.retro&&r.st==="unscorable").length;
+  if(!n) return {n:0, unscorable:uns};
+  let hits=0, crps=0, b0=0, b1=0, sdS=0; const trail=[];
+  recs.forEach(r=>{ hits+=r.out.hit80; crps+=r.out.crps; sdS+=r.sd;
+    b0+=lgCrps(r.out.y,0,r.sd);
+    const drift=trail.length? trail.reduce((a,b)=>a+b,0)/trail.length : 0;
+    b1+=lgCrps(r.out.y,drift,r.sd); trail.push(r.out.y); });
+  return { n, unscorable:uns, coverage80:hits/n, meanCRPS:crps/n, sharpness:sdS/n,
+    skillVsNoChange:1-crps/b0, skillVsDrift:1-crps/b1 }; }
+// The tick: score what matured → update the posterior → (on workout save) emit this week's forecasts.
+async function ledgerTick(emit){
+  if(!calib) calib=lgFreshCalib();
+  const now=Date.now(); let dirty=false;
+  const scored=lgScore(now); if(scored.length){ scored.forEach(lgUpdate); dirty=true; }
+  if(emit){ const recs=lgEmit(now); if(recs.length){ ledger.push(...recs); dirty=true; } }
+  if(dirty){ await sset("predledger",ledger); await sset("calib",calib); }
+  return dirty; }
+// Me-page card: pending forecasts + calibration status. Numbers are shown only once ≥10 forecasts
+// are scored (plan §11.4); before that the card says it is calibrating, not pretending.
+function renderStrengthLedger(){
+  const card=$("slCard"); if(!card) return;
+  if(!ledger.length){ card.style.display="none"; return; }
+  card.style.display="";
+  const m=lgMetrics(), pct=v=>((Math.exp(v)-1)*100), s1=v=>(v>=0?"+":"")+v.toFixed(1)+"%";
+  const latest=Math.max(...ledger.map(r=>r.k));
+  const open=ledger.filter(r=>r.st==="pending"&&r.k>=latest-1).sort((a,b)=>b.mu-a.mu).slice(0,4);
+  let h="";
+  if(open.length){
+    h+='<div class="fchd2">Next '+LG.H+' weeks — strength forecast</div>';
+    h+=open.map(r=>{ const due=new Date((r.k+r.h+1)*LG.WK);
+      return '<div class="slrow"><b>'+esc(r.x)+'</b> '+s1(pct(r.mu))
+        +' <span class="slband">(80%: '+s1(pct(r.mu-LG.Z80*r.sd))+' … '+s1(pct(r.mu+LG.Z80*r.sd))
+        +')</span> <span class="slband">by '+due.toLocaleDateString(undefined,{month:"short",day:"numeric"})+'</span></div>'; }).join("");
+  }
+  if(m.n>=10){
+    const lo=Math.exp(calib.th.m-1.96*Math.sqrt(calib.th.v)), hi=Math.exp(calib.th.m+1.96*Math.sqrt(calib.th.v));
+    h+='<p class="fcnote">Calibrated on '+m.n+' scored forecasts — 80% intervals hit '+Math.round(100*m.coverage80)
+      +'% · skill vs personal drift '+s1(100*m.skillVsDrift)
+      +' · your response multiplier ×'+Math.exp(calib.th.m).toFixed(2)+' (95%: ×'+lo.toFixed(2)+'–×'+hi.toFixed(2)+')'
+      +(m.unscorable? ' · '+m.unscorable+' unscorable':'')+'</p>';
+  } else {
+    h+='<p class="fcnote">Calibrating — '+m.n+' of 10 forecasts scored so far. Each prediction is written down before the outcome exists, then graded against what you actually lift; your personal parameters update from the errors.</p>';
+  }
+  $("slBody").innerHTML=h;
+}
 // ===== Monte Carlo growth forecast =====
 // A probabilistic projection of muscle gain over 16 weeks, so the output is a distribution, not a false
 // point estimate. Each of K runs draws literature-backed parameters and accumulates a weekly fractional gain
@@ -6330,7 +6485,13 @@ function growthForecast(){
   // seeded PRNG so the bands are stable across re-renders; paired draws for a fair plan-vs-pace comparison
   let s=987654321>>>0; const u=()=>((s=(s*1103515245+12345)&0x7fffffff)/0x7fffffff);
   const nrm=(m,sd)=>{ const a=Math.max(1e-9,u()); return m+sd*Math.sqrt(-2*Math.log(a))*Math.cos(2*Math.PI*u()); };
-  const draws=[]; for(let k=0;k<K;k++) draws.push({ indiv:Math.exp(nrm(0,0.55)) });
+  // Strength → hypertrophy bridge (plan §12b): once the ledger has learned this lifter's strength
+  // response (≥10 scored forecasts, posterior tighter than the prior), condition the hypertrophy
+  // multiplier on it. ρ is low on purpose — strength is a weak, neural-biased proxy for size — so this
+  // shifts the muscle forecast modestly and barely narrows the band. Otherwise draw unconditionally.
+  const bridged = !!(calib && calib.nsc>=LG.BMIN && calib.th && calib.th.v < LG.THV);
+  const thH = bridged ? lgBridgeThetaH(calib.th.m, calib.th.v) : { m:0, sd:LG.BSIGH };
+  const draws=[]; for(let k=0;k<K;k++) draws.push({ indiv:Math.exp(nrm(thH.m, thH.sd)) });
   const q=(arr,p)=>{ const a=arr.slice().sort((x,y)=>x-y); return a[Math.floor(p*(a.length-1))]; };
   // One weekly increment per muscle: hypertrophy above maintenance, atrophy below it (starved → negative).
   const inc=(d,rho,indiv,ov,aF,eff,bR,t)=> d>=WEEKLY_SET_MAINT
@@ -6362,19 +6523,21 @@ function growthForecast(){
     {label:"age ±15y",     lo:w16(bands(planDose,{...baseOpts,ageF:ageFor(a0+15)})),hi:w16(bands(planDose,{...baseOpts,ageF:ageFor(Math.max(18,a0-15))}))},
     {label:"experience",   lo:w16(bands(planDose,{...baseOpts,baseRate:0.28})),     hi:w16(bands(planDose,{...baseOpts,baseRate:0.9}))},
   ];
-  // per-muscle projected gain — the median run (individual=1) of the SAME per-muscle model the chart averages,
-  // so a muscle's bar and the whole-body line are guaranteed consistent.
+  // per-muscle projected gain — the median run of the SAME per-muscle model the chart averages, so a
+  // muscle's bar and the whole-body line stay consistent. The median individual is exp(thH.m): 1 without
+  // the bridge, or the strength-personalised centre once the bridge is active (lognormal median).
+  const medIndiv=Math.exp(thH.m);
   const permusc=(doseMap, ovOf)=> muscles.map(g=>{
     const d=doseMap[g], rho=doseStimulus(d), ov=ovOf(g); let C=0;
-    for(let t=1;t<=AHEAD;t++) C+=inc(d,rho,1,ov,ageF,effort,baseRate,t);
+    for(let t=1;t<=AHEAD;t++) C+=inc(d,rho,medIndiv,ov,ageF,effort,baseRate,t);
     return { g, gain:C };
   }).sort((a,b)=>b.gain-a.gain);
   const perMuscle = { plan:permusc(planDose,full), pace:permusc(paceDose,paceOv) };
-  return { plan, pace, ahead:AHEAD, n:muscles.length, base:w16(plan), sens, perMuscle };
+  return { plan, pace, ahead:AHEAD, n:muscles.length, base:w16(plan), sens, perMuscle, bridged };
 }
 function drawForecast(f){
   const c=$("fcChart"); if(!c||!f) return;
-  const sub=$("fcSub"); if(sub) sub.textContent="projected muscle gain over the next "+f.ahead+" weeks · "+f.n+" muscles";
+  const sub=$("fcSub"); if(sub) sub.textContent="projected muscle gain over the next "+f.ahead+" weeks · "+f.n+" muscles"+(f.bridged?" · personalised from your strength data":"");
   const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const cs=getComputedStyle(document.documentElement);
   const l3=(cs.getPropertyValue('--l3')||'#888').trim();
@@ -7202,6 +7365,7 @@ async function applyRestore(obj){
     for(const k of CLOUD_KEYS){ if(data[k]!=null) await sset(k,data[k]); }
     settings=Object.assign({}, (await sget("settings"))||{});
     plans=(await sget("plans"))||[]; last=(await sget("lastsets"))||{}; bw=(await sget("bodyweight"))||[]; hist=(await sget("history"))||{}; extlog=(await sget("extlog"))||[];
+    ledger=(await sget("predledger"))||[]; calib=(await sget("calib"))||lgFreshCalib();
     if(!plans.length) plans=DEFAULT_PLANS.map(p=>JSON.parse(JSON.stringify(p)));
     if(!plans.find(p=>p.id===settings.activePlanId)) settings.activePlanId=plans[0].id;
     curWk=0; freeMode=false; swaps={}; draft={}; await sset("draft", draft);
@@ -7760,7 +7924,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v115";
+const APP_VER="v117";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
