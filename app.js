@@ -2158,14 +2158,14 @@ let draft={};   // in-progress entries per workout, kept until the workout is sa
 let swaps={}, swapIdx=null;
 let freeMode=false;
 let timer={ elapsed:0, startedAt:null, running:false, iv:null };
-let rest={ elapsed:0, target:90, startedAt:null, alerted:false, iv:null };
+let rest={ elapsed:0, target:180, startedAt:null, alerted:false, iv:null };
 function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) set.push(n); };
   add(e.n); (e.alts||[]).forEach(add); (ALTS[e.n]||[]).forEach(add);   // suggested picks first
   const primary=muscleFor(e.n)[0];
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi] || (rot[xi]!=null && !rotKeep.has(xi) ? rot[xi] : e.n); }
-let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, age:null, exp:null, sponLen:null, meTileOrder:null, theme:"auto", restSec:90, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{}, baseActivity:null };
+let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, age:null, exp:null, sponLen:null, meTileOrder:null, meTileHidden:null, theme:"auto", restSec:180, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{}, baseActivity:null };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -2225,9 +2225,9 @@ function updateTimerStick(){
   const active = timer.running || timer.elapsed>0 || (rb && rb.classList.contains("show"));
   w.classList.toggle("stick", !!active);
 }
-function tmrStart(){ if(timer.running) return; timer.startedAt=Date.now(); timer.running=true; timer.iv=setInterval(tmrRender,1000); tmrRender(); }
-function tmrPause(){ if(!timer.running) return; timer.elapsed=tmrElapsed(); timer.running=false; timer.startedAt=null; if(timer.iv){clearInterval(timer.iv);timer.iv=null;} tmrRender(); }
-function tmrReset(){ timer.elapsed=0; timer.running=false; timer.startedAt=null; if(timer.iv){clearInterval(timer.iv);timer.iv=null;} tmrRender(); }
+function tmrStart(){ if(timer.running) return; timer.startedAt=Date.now(); timer.running=true; timer.iv=setInterval(tmrRender,1000); tmrRender(); acquireWake(); }
+function tmrPause(){ if(!timer.running) return; timer.elapsed=tmrElapsed(); timer.running=false; timer.startedAt=null; if(timer.iv){clearInterval(timer.iv);timer.iv=null;} tmrRender(); if(!(rest.iv&&rest.startedAt)) releaseWake(); }
+function tmrReset(){ timer.elapsed=0; timer.running=false; timer.startedAt=null; if(timer.iv){clearInterval(timer.iv);timer.iv=null;} tmrRender(); if(!(rest.iv&&rest.startedAt)) releaseWake(); }
 $("tmrToggle").onclick=()=> timer.running ? tmrPause() : tmrStart();
 $("tmrReset").onclick=tmrReset;
 tmrRender();
@@ -2238,14 +2238,22 @@ function beep(){ try{ _ac=_ac||new (window.AudioContext||window.webkitAudioConte
   o.frequency.value=880; const t=_ac.currentTime; g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.18,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.4);
   o.start(t); o.stop(t+0.42); }catch(e){} }
 function ensureNotifyPerm(){ try{ if(window.Notification && Notification.permission==="default") Notification.requestPermission(); }catch(e){} }
+// Screen Wake Lock — keep the display awake while a set/rest is running so the timer stays visible without
+// the phone sleeping. (A true lock-screen live countdown like Hevy's needs a native app / iOS Live Activity;
+// a PWA can't render one. This is the feasible half: don't let the screen sleep mid-workout.)
+let _wakeLock=null;
+async function acquireWake(){ try{ if("wakeLock" in navigator && !_wakeLock){ _wakeLock=await navigator.wakeLock.request("screen"); _wakeLock.addEventListener("release",()=>{ _wakeLock=null; }); } }catch(e){} }
+function releaseWake(){ try{ if(_wakeLock){ _wakeLock.release(); _wakeLock=null; } }catch(e){} }
+// the OS drops a wake lock when the tab backgrounds; re-acquire on return if a timer is still active
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && (timer.running || (rest.iv && rest.startedAt))) acquireWake(); });
 function restRender(){ const t=rest.elapsed; $("restTime").textContent=tmrFmt(t);
   $("restProg").style.width=(rest.target?Math.max(0,Math.min(100,(t/rest.target)*100)):0)+"%"; }
 // counts UP from 0; called fresh every time a set is finished so rest never carries over between sets
-function restStart(sec){ rest.target=Math.max(5, sec||settings.restSec||90); rest.elapsed=0; rest.startedAt=Date.now(); rest.alerted=false; ensureNotifyPerm();
-  $("restBar").classList.add("show"); $("restBar").classList.remove("done"); restRender(); updateTimerStick();
+function restStart(sec){ rest.target=Math.max(5, sec||settings.restSec||180); rest.elapsed=0; rest.startedAt=Date.now(); rest.alerted=false; ensureNotifyPerm();
+  $("restBar").classList.add("show"); $("restBar").classList.remove("done"); restRender(); updateTimerStick(); acquireWake();
   if(rest.iv) clearInterval(rest.iv);
   rest.iv=setInterval(()=>{ rest.elapsed=Math.max(0,Math.round((Date.now()-rest.startedAt)/1000)); restRender(); if(!rest.alerted && rest.elapsed>=rest.target) restReached(); }, 250); }
-function restStop(){ if(rest.iv){ clearInterval(rest.iv); rest.iv=null; } rest.startedAt=null; $("restBar").classList.remove("show","done"); updateTimerStick(); }
+function restStop(){ if(rest.iv){ clearInterval(rest.iv); rest.iv=null; } rest.startedAt=null; $("restBar").classList.remove("show","done"); updateTimerStick(); if(!timer.running) releaseWake(); }
 function restReached(){ rest.alerted=true;
   if(navigator.vibrate) try{ navigator.vibrate([0,220,120,220]); }catch(e){}
   try{ if(window.Notification && Notification.permission==="granted") new Notification("Rest done 💪", {body:"Time for your next set.", tag:"yalla-rest", renotify:true}); }catch(e){}
@@ -2255,9 +2263,12 @@ function restAdjust(d){ if(!$("restBar").classList.contains("show")) return; res
 // set the rest target to an exact value (also the saved default for next time)
 function restSetTarget(sec){ rest.target=Math.max(5,Math.min(1800,Math.round(sec))); settings.restSec=rest.target; sset("settings",settings);
   if(rest.elapsed<rest.target){ rest.alerted=false; $("restBar").classList.remove("done"); } restRender(); }
+// Parse a rest duration. With a colon it's mm:ss. Without one — the case a numeric keypad forces, since
+// it has no colon — digits are read microwave-style (last two = seconds, the rest = minutes): "300" → 3:00,
+// "130" → 1:30, "90" → 1:30, "45" → 0:45. This fixes "type 300 for 3:00 and it jumps to 5:00" (300 s).
 function parseRest(v){ v=String(v).trim(); if(!v) return 0;
   if(v.indexOf(":")>=0){ const p=v.split(":"); return (parseInt(p[0])||0)*60+(parseInt(p[1])||0); }
-  return parseInt(v)||0; }
+  const d=parseInt(v.replace(/\D/g,""))||0; return Math.floor(d/100)*60 + (d%100); }
 // tap the time → type an exact rest (mm:ss or seconds). The live counter is paused on the swapped-in input.
 let _restEditing=false;
 function restEdit(){ if(_restEditing || !$("restBar").classList.contains("show")) return; _restEditing=true;
@@ -2276,8 +2287,11 @@ $("restPlus").onclick=()=>restAdjust(15);
 $("restTime").onclick=restEdit;
 $("exlist").addEventListener("change", e=>{ if(!e.target.classList||(!e.target.classList.contains("w")&&!e.target.classList.contains("r"))) return;
   const row=e.target.closest(".setrow"); if(!row) return;
+  const g=row.closest(".group"), name=g&&g.dataset.ex;
   const wv=row.querySelector(".w").value.trim(), rv=row.querySelector(".r").value.trim();
-  if(rv!=="" && (wv!=="" || row.classList.contains("timed"))) restStart(); captureDraft(); });
+  // a set is "done" once reps are in and either a weight is entered, it's a timed hold, or it's a
+  // bodyweight move (no weight needed) — the bodyweight case is why rest sometimes didn't start.
+  if(rv!=="" && (wv!=="" || row.classList.contains("timed") || (name&&isBW(name)))) restStart(); captureDraft(); });
 // ---- per-set hold timer for isometric moves: tap the button to start a count-up, tap again to log the seconds ----
 let hold={ row:null, startedAt:0, iv:null };
 function holdStop(write){
@@ -2356,6 +2370,7 @@ async function init(){
   ledgerTick(false);   // score any forecasts whose horizon completed while the app was closed (no emission)
   if(settings.achUnlocked==null) settings.achUnlocked=unlockedIds();
   if(!settings.planStartAt) settings.planStartAt=Date.now();   // start the "freshen" clock for the active plan
+  if(!settings.rest3){ if(settings.restSec===90) settings.restSec=180; settings.rest3=true; await sset("settings",settings); }   // default rest moved 90s→3min (one-time bump of the old default)
   if(!settings.bodyDefaultsCleared){                            // clear the old shipped body defaults (68/75/male) so untouched profiles read empty
     if(settings.goalStart===68) settings.goalStart=null;
     if(settings.goalTarget===75) settings.goalTarget=null;
@@ -3691,7 +3706,9 @@ function renderWorkout(){
       ${metaLine}${meta.show?meta.cue:''}</div>`;
     let rows="";
     for(let i=0;i<e.s;i++){ rows+=buildSetRow(i+1, prev[i], name); }
-    g.innerHTML=head+rows+effortBar(name)+'<div class="freeadd"><a class="demo addset">'+ICON.plus+'add set</a></div>'; list.appendChild(g);
+    // effort bar is the LAST child so it always sits below every set row; new/copied rows insert before
+    // .freeadd (above the effort bar), keeping the toggle in one consistent place (was landing mid-list).
+    g.innerHTML=head+rows+'<div class="freeadd"><a class="demo addset">'+ICON.plus+'add set</a></div>'+effortBar(name); list.appendChild(g);
     wireEffortBar(g);
     g.querySelector(".addset").onclick=()=>{ const n=g.querySelectorAll(".setrow").length+1;
       const tmp=document.createElement("div"); tmp.innerHTML=freeSetRow(n, null, name);
@@ -3868,9 +3885,9 @@ function placeGoalBlock(){
   if($("goalStart")) $("goalStart").value = settings.goalStart!=null ? settings.goalStart : "";
   if($("goalTarget")) $("goalTarget").value = settings.goalTarget!=null ? settings.goalTarget : "";
 }
-$("openSettings").onclick=()=>{ renderDash(); renderAccount(); if($("setRestDefault")) $("setRestDefault").value=tmrFmt(settings.restSec||90); renderTipSeg(); renderTipModeSeg(); renderTravel(); openSheet("Settings"); };
+$("openSettings").onclick=()=>{ renderDash(); renderAccount(); if($("setRestDefault")) $("setRestDefault").value=tmrFmt(settings.restSec||180); renderTipSeg(); renderTipModeSeg(); renderTravel(); openSheet("Settings"); };
 $("settingsClose").onclick=()=>closeSheet("Settings");
-if($("setRestDefault")) $("setRestDefault").onchange=e=>{ const sec=parseRest(e.target.value); if(sec){ settings.restSec=Math.max(5,Math.min(1800,Math.round(sec))); sset("settings",settings); } e.target.value=tmrFmt(settings.restSec||90); };
+if($("setRestDefault")) $("setRestDefault").onchange=e=>{ const sec=parseRest(e.target.value); if(sec){ settings.restSec=Math.max(5,Math.min(1800,Math.round(sec))); sset("settings",settings); } e.target.value=tmrFmt(settings.restSec||180); };
 $("scrimSettings").onclick=()=>closeSheet("Settings");
 // Friends sheet (the people) — opened from the Overview presence rail or Settings → Friends
 function openFriends(){ renderFriends(); openSheet("Friends"); if(cloudReady() && dbHardened) coach("dmFriend","Tap a friend to open their profile · long-press to message them."); }
@@ -4353,7 +4370,7 @@ function weeklyEquiv(totals, windowDays){
   const wks = windowDays ? windowDays/7 : histSpanWeeks();
   const out={}; Object.keys(totals).forEach(g=> out[g]=totals[g]/wks); return out;
 }
-$("meBalance").onclick=()=>{ if(_meSwiped){ _meSwiped=false; return; } openMuscles(); };   // a swipe must not open the sheet
+$("meBalance").onclick=()=>{ if(_meSwiped){ _meSwiped=false; return; } if($("meTiles")&&$("meTiles").classList.contains("editing")) return; openMuscles(); };   // a swipe must not open the sheet; nor a tap while editing the layout
 // hero window switch (Week / Month): tappable underline tabs + an iOS-style paged swipe of the gauge.
 let _meSwiped=false, meCache={};
 function meTrackTo(win, animate){ const tr=$("meRingTrack"); if(!tr) return;
@@ -4918,7 +4935,7 @@ function buildFreeGroup(name){
     +'<span class="lnks"><a class="lnkic swapfree" title="Swap exercise">'+ICON.swap+'</a><a class="lnkic info" data-ex="'+esc(name)+'" title="Info & demo">'+ICON.info+'</a></span>'
     +'<button class="freedel" title="Remove">×</button></div>'
     +metaLine+(meta.show?meta.cue:'')+'</div>'
-    +rows+effortBar(name)+'<div class="freeadd"><a class="demo addset">'+ICON.plus+'add set</a></div>';
+    +rows+'<div class="freeadd"><a class="demo addset">'+ICON.plus+'add set</a></div>'+effortBar(name);
   wireEffortBar(g);
   g.querySelector(".swapfree").onclick=e=>{ e.preventDefault(); openSwapFree(name); };
   g.querySelector(".freedel").onclick=()=>{ confirmAsk("Remove "+name+"?", "Remove", ()=>{ const sec=g.closest(".secgrp"); g.remove(); if(sec && !sec.querySelector(".group")) sec.remove(); captureDraft(); }); };
@@ -5089,6 +5106,7 @@ $("exlist").addEventListener("click", e=>{ const v=e.target.closest(".vol"); if(
     const nw=next.querySelector(".w"), nr=next.querySelector(".r");
     if(nw) nw.value=wv; if(nr) nr.value=rv;
     if(!timer.running && timer.elapsed===0) tmrStart();
+    restStart();   // copying a completed set means that set is done — start the rest clock
     updateSetVol(next, name); captureDraft();
   }
   if(navigator.vibrate) try{ navigator.vibrate(15); }catch(e){} });
@@ -6262,7 +6280,18 @@ let fcMuscleMode="pace", _fcF=null;   // per-muscle graph scenario: "pace" (defa
     if(_fcF) drawForecastMuscles(_fcF, fcMuscleMode);
   });
 })();
-// ===== reorderable Me tiles (drag the grip; order persists per user) =====
+// ===== customisable Me tiles — reorder (drag in edit mode) and show/hide, persisted per user =====
+const TILE_ICON = { eye:'<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeoff:'<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.4 10.4 0 0 1 12 19C5.5 19 2 12 2 12a18.5 18.5 0 0 1 5.1-5.9M9.9 4.2A10.9 10.9 0 0 1 12 4c6.5 0 10 7 10 7a18.6 18.6 0 0 1-2.2 3.2M1 1l22 22M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>' };
+const tileHidden=()=> settings.meTileHidden||[];
+// Apply user visibility: a hidden tile gets .tile-off (CSS hides it, or dims it while editing so it can be
+// re-enabled). A class — not inline display — so it never fights the forecast/ledger tiles' own data-driven show/hide.
+function applyTileVisibility(){
+  const c=$("meTiles"); if(!c) return; const hid=new Set(tileHidden());
+  c.querySelectorAll(".metile").forEach(el=>{ const off=hid.has(el.dataset.tile);
+    el.classList.toggle("tile-off", off);
+    const b=el.querySelector(".tilehide"); if(b){ b.innerHTML=off?TILE_ICON.eyeoff:TILE_ICON.eye; b.title=off?"Show tile":"Hide tile"; } });
+}
 function applyTileOrder(){
   const c=$("meTiles"); if(!c) return;
   const tiles=[...c.querySelectorAll(".metile")].map(el=>el.dataset.tile);
@@ -6272,6 +6301,7 @@ function applyTileOrder(){
   // stale saved order from stranding a new tile at the front — the previous bug that scrambled the layout.
   const order=[...saved.filter(t=>tiles.includes(t)), ...tiles.filter(t=>!saved.includes(t))];
   order.forEach(t=>{ const el=c.querySelector('.metile[data-tile="'+t+'"]'); if(el) c.appendChild(el); });
+  applyTileVisibility();
 }
 async function saveTileOrder(){
   const c=$("meTiles"); if(!c) return;
@@ -6280,24 +6310,51 @@ async function saveTileOrder(){
 }
 (function initTileReorder(){
   const c=$("meTiles"); if(!c) return;
-  let drag=null;
-  c.querySelectorAll(".tilegrip").forEach(grip=>{
-    grip.addEventListener("click", e=>e.stopPropagation());   // don't trigger the tile's own tap (muscle balance)
-    grip.addEventListener("pointerdown", e=>{ e.preventDefault(); e.stopPropagation();
-      drag=grip.closest(".metile"); if(!drag) return;
-      drag.classList.add("dragging"); try{ grip.setPointerCapture(e.pointerId); }catch(_){}
-    });
-    grip.addEventListener("pointermove", e=>{ if(!drag) return; e.preventDefault();
-      const sibs=[...c.querySelectorAll(".metile:not(.dragging)")]; let placed=false;
-      for(const s of sibs){ const r=s.getBoundingClientRect(); if(e.clientY < r.top + r.height/2){ c.insertBefore(drag,s); placed=true; break; } }
-      if(!placed) c.appendChild(drag);
-    });
-    const end=e=>{ if(!drag) return; drag.classList.remove("dragging"); drag=null; try{ grip.releasePointerCapture(e.pointerId); }catch(_){} saveTileOrder(); };
-    grip.addEventListener("pointerup", end);
-    grip.addEventListener("pointercancel", end);
+  // one show/hide button per tile, dropped into its header (revealed only in edit mode)
+  c.querySelectorAll(".metile").forEach(el=>{ const hd=el.querySelector(".panelhd");
+    if(hd && !hd.querySelector(".tilehide")){
+      const b=document.createElement("button"); b.type="button"; b.className="tilehide"; b.setAttribute("aria-label","Show or hide this tile");
+      hd.appendChild(b);
+      b.addEventListener("pointerdown", e=>e.stopPropagation());   // don't start a drag from the toggle
+      b.addEventListener("click", e=>{ e.stopPropagation(); e.preventDefault();
+        const id=el.dataset.tile, s=new Set(tileHidden()); if(s.has(id)) s.delete(id); else s.add(id);
+        settings.meTileHidden=[...s]; sset("settings",settings); applyTileVisibility(); haptic(8); });
+    } });
+  // edit-mode toggle: reveals grips + hide buttons and turns on drag-to-reorder
+  const eb=$("tileEdit"), rb=$("tileReset");
+  function setEdit(on){ c.classList.toggle("editing", on); if(eb) eb.textContent=on?"Done":"Edit"; if(rb) rb.style.display=on?"":"none"; if(!on) saveTileOrder(); }
+  if(eb) eb.onclick=()=> setEdit(!c.classList.contains("editing"));
+  if(rb) rb.onclick=()=>{ settings.meTileOrder=null; settings.meTileHidden=[]; sset("settings",settings);
+    ["forecast","ledger","balance","progress"].forEach(t=>{ const el=c.querySelector('.metile[data-tile="'+t+'"]'); if(el) c.appendChild(el); });
+    applyTileVisibility(); toast&&toast("Tiles reset"); };
+  // drag-to-reorder (edit mode): the whole tile lifts and follows the finger, a dashed placeholder shows
+  // where it will drop, so it's obvious what's grabbed and where it's going.
+  let drag=null, ph=null, dy=0;
+  c.addEventListener("pointerdown", e=>{
+    if(!c.classList.contains("editing")) return;
+    const el=e.target.closest(".metile"); if(!el || el.classList.contains("tile-off") || e.target.closest(".tilehide")) return;
+    e.preventDefault(); drag=el;
+    const r=el.getBoundingClientRect(); dy=e.clientY-r.top;
+    ph=document.createElement("div"); ph.className="tileph"; ph.style.height=r.height+"px";
+    el.parentNode.insertBefore(ph, el);
+    el.style.width=r.width+"px"; el.style.left=r.left+"px"; el.style.top=r.top+"px"; el.classList.add("dragging");
+    try{ el.setPointerCapture(e.pointerId); }catch(_){}
+    haptic(12);
   });
-  const rst=$("tileReset"); if(rst) rst.onclick=()=>{ settings.meTileOrder=null; sset("settings",settings);
-    ["forecast","ledger","balance","progress"].forEach(t=>{ const el=c.querySelector('.metile[data-tile="'+t+'"]'); if(el) c.appendChild(el); }); toast&&toast("Tiles reset to default order"); };
+  c.addEventListener("pointermove", e=>{ if(!drag) return; e.preventDefault();
+    drag.style.top=(e.clientY-dy)+"px";
+    const sibs=[...c.querySelectorAll(".metile:not(.dragging)")]; let placed=false;
+    for(const s of sibs){ const r=s.getBoundingClientRect(); if(e.clientY < r.top+r.height/2){ if(ph.nextSibling!==s) c.insertBefore(ph,s); placed=true; break; } }
+    if(!placed) c.appendChild(ph);
+  });
+  const end=e=>{ if(!drag) return;
+    c.insertBefore(drag, ph); ph.remove(); ph=null;
+    drag.classList.remove("dragging"); drag.style.width=drag.style.left=drag.style.top="";
+    try{ drag.releasePointerCapture(e.pointerId); }catch(_){}
+    drag=null; saveTileOrder(); haptic(8);
+  };
+  c.addEventListener("pointerup", end);
+  c.addEventListener("pointercancel", end);
 })();
 // ===== Part II: prediction ledger — predict → observe → re-parameterize =====
 // Mirrors research/ledger-core.mjs (the reference implementation; keep the two in sync). The protocol
@@ -7933,7 +7990,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v119";
+const APP_VER="v120";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH

@@ -257,7 +257,7 @@
       <div class="stat"><div class="n" id="stSince">0</div><div class="k">Since deload</div></div>
       <div class="stat"><div class="n" id="stBeat">0</div><div class="k">Beat last</div></div>
     </div>
-    <div class="mezone rowzone">Your training<button class="tilereset" id="tileReset" type="button">reset order</button></div>
+    <div class="mezone rowzone">Your training<span class="tilebtns"><button class="tilereset" id="tileReset" type="button" style="display:none;">reset</button><button class="tileedit" id="tileEdit" type="button">Edit</button></span></div>
     <div class="metiles" id="meTiles">
       <!-- Growth forecast (default first) — projection continuing from the logged history -->
       <div class="panel metile" id="fcCard" data-tile="forecast" style="display:none;">
@@ -478,7 +478,7 @@
         <div class="ed-label">Rest timer</div>
         <div class="merow">
           <label for="setRestDefault">Default rest between sets</label>
-          <div class="meinput"><input id="setRestDefault" type="text" inputmode="numeric" placeholder="1:30" style="width:90px;text-align:right;"><span class="unit">mm:ss</span></div>
+          <div class="meinput"><input id="setRestDefault" type="text" inputmode="numeric" placeholder="3:00" style="width:90px;text-align:right;"><span class="unit">mm:ss</span></div>
         </div>
 
         <div class="ed-label">Coach tips</div>

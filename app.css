@@ -1061,12 +1061,24 @@
   .pmcap{ font-size:12px; color:var(--l3); line-height:1.45; margin:9px 0 0; }
   /* reorderable Me tiles */
   .mezone.rowzone{ display:flex; align-items:baseline; justify-content:space-between; }
-  .tilereset{ background:none; border:none; cursor:pointer; color:var(--accent); font-size:11px; font-weight:700; text-transform:none; letter-spacing:0; padding:0; }
+  .tilebtns{ display:inline-flex; gap:14px; align-items:baseline; }
+  .tilereset,.tileedit{ background:none; border:none; cursor:pointer; color:var(--accent); font-size:11px; font-weight:700; text-transform:none; letter-spacing:0; padding:0; }
   .metile.panel{ position:relative; }
   .panelhd{ align-items:center; }
-  .tilegrip{ margin-left:auto; align-self:flex-start; color:var(--l3); font-size:17px; line-height:1; padding:2px 4px; cursor:grab; touch-action:none; -webkit-tap-highlight-color:transparent; user-select:none; }
-  .tilegrip:active{ cursor:grabbing; }
-  .metile.dragging{ opacity:.9; box-shadow:0 10px 26px rgba(0,0,0,.20); transform:scale(1.01); }
+  /* grip + hide toggle live in the header but only appear in edit mode */
+  .tilegrip{ display:none; margin-left:auto; align-self:center; color:var(--l3); font-size:17px; line-height:1; padding:2px 4px; cursor:grab; touch-action:none; -webkit-tap-highlight-color:transparent; user-select:none; }
+  .tilehide{ display:none; align-items:center; justify-content:center; background:none; border:none; color:var(--l3); padding:2px 4px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .editing .tilegrip{ display:inline-flex; }
+  .editing .tilehide{ display:inline-flex; }
+  /* edit-mode chrome: make every tile read as a movable card, and stop touch-scroll while dragging */
+  .editing .metile{ touch-action:none; outline:1.5px dashed var(--line); outline-offset:-2px; }
+  .editing .metile.tap{ cursor:grab; }
+  /* !important so a user-hidden tile stays hidden even over the forecast/ledger tiles' inline display */
+  .metile.tile-off{ display:none !important; }
+  .editing .metile.tile-off{ display:block !important; opacity:.4; outline-style:dotted; }
+  /* the lifted tile follows the finger (fixed), the placeholder shows the drop slot */
+  .metile.dragging{ position:fixed; z-index:200; margin:0; opacity:.97; box-shadow:0 18px 44px rgba(0,0,0,.30); transform:scale(1.03); }
+  .tileph{ border:2px dashed var(--accent); border-radius:16px; background:var(--accent-soft); opacity:.55; margin:0 0 18px; box-sizing:border-box; }
   /* objective-adherence line moved onto the Progress tile */
   .progobj{ font-size:13px; font-weight:600; color:var(--l2); margin:2px 0 8px; }
   .progobj.good{ color:#2b8a3e; } .progobj.under{ color:#c92a2a; }
