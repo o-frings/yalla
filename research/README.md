@@ -33,6 +33,37 @@ Reproducible checks for Yalla's training-stimulus model (documented in
   same seed reproduces every number and chart.
   Run: `node research/simulate.mjs`
 
+## Part II — predict → observe → re-parameterize (CALIBRATION-PLAN.md)
+
+- **`ledger-core.mjs`** — reference implementation of the prediction ledger and the
+  per-user Bayesian calibration: forecast emission (frozen inputs + posterior),
+  symmetric-endpoint scoring (CRPS, PIT, interval hits), conjugate posterior updates
+  with the effective-information correction, aggregate metrics, and a leakage-free
+  walk-forward runner. Also the strength-specific dose-response `doseStimulusStrength`
+  (strength saturates with volume faster than hypertrophy — plan §12a) and the
+  strength→hypertrophy `bridgeThetaH` (feeds the learned strength multiplier into the
+  Monte Carlo muscle forecast via a conservative bivariate-normal conditional — §12b).
+  Mirrored compactly in `../app.js` (parity is enforced by test).
+
+- **`ledger.test.mjs`** — the Part II verification suite: known-answer tests for the
+  ledger mechanics (immutability, retro exclusion, K-freeze, gates, week edges, CRPS
+  vs numeric integral), simulation-based calibration (users drawn from the prior;
+  coverage, posterior-rank uniformity, recovery vs the attainable ceiling, skill vs
+  the drift baseline), and numeric parity between app.js and the reference core.
+  Run: `node research/ledger.test.mjs`
+
+- **`ledger-backtest.mjs`** — walk-forward backtest on a real exported history
+  (expanding window, no leakage): coverage, CRPS, skill vs "no change" and
+  "personal drift" baselines, and the fitted response multiplier.
+  Run: `node research/ledger-backtest.mjs [path-to-exported-history.json]`
+
+- **`effectiveness.mjs`** — which exercises contribute most to strength gains:
+  within-person TRANSFER analysis (does volume on X precede gains on the muscle's
+  other lifts?), ridge-shrunk with block-bootstrap CIs; self-progression is excluded
+  by design (exercise-specific skill). With no argument it runs a known-truth
+  synthetic self-check.
+  Run: `node research/effectiveness.mjs [path-to-exported-history.json]`
+
 These raise rigor without new measurement (grounded thresholds, honest uncertainty,
 falsifiable internal checks). Direct validation still requires longitudinal
 body-composition data; see the white paper's "Assumptions and limitations".
