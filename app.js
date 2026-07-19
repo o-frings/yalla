@@ -2880,6 +2880,11 @@ function buildTips(){
 function srcLi(k){ const u=SRC_DOI[k];
   return u ? '<li><a class="srclink" href="'+u+'" target="_blank" rel="noopener">'+PROG_SRC[k]+' <span class="srcarrow">↗</span></a></li>'
            : '<li>'+PROG_SRC[k]+'</li>'; }
+// Canonical reference to the model white paper. Every surface that describes a modelled mechanism
+// (dose–response, growth signal, plan forecast, Monte Carlo projection, the strength ledger/bridge)
+// links to it, so any model claim in the UI is traceable to the spec + evidence.
+const WP_HREF = "growth-model-whitepaper.pdf";
+const WP_LINK = '<a class="srclink" href="'+WP_HREF+'" target="_blank" rel="noopener">The method &amp; evidence (PDF) <span class="srcarrow">↗</span></a>';
 
 // ===== Learn / coach library — browse every piece of advice from evidence.json, grouped & searchable =====
 let libCat="all", libQuery="";
@@ -4727,6 +4732,7 @@ function renderMuscles(){
                  : "Switch to <b>Sets</b> to compare against weekly volume targets."));
   $("musMethod").innerHTML += " The rose rolls the three delt heads into <b>Shoulders</b> and the back regions into <b>Back</b> — tap either wedge to split it into its individual muscles (the bars below always list them in full).";
   if(isLog) $("musMethod").innerHTML += " The <b>growth signal</b> above reads each muscle's recent weekly sets against a growth dose (~"+WEEKLY_SET_MIN+"–"+WEEKLY_SET_TARGET+") and a maintenance floor (~"+WEEKLY_SET_MAINT+"), then checks whether its weekly volume is trending up, flat or down — growth needs both an adequate dose and progressive overload; below maintenance, muscle is slowly lost. It estimates the training stimulus, not measured size.";
+  $("musMethod").innerHTML += " " + WP_LINK;
   let keys = useTarget ? ["sch17","drr","rpvol","vigotsky","mps"] : ["sch17","drr","vigotsky"];
   if(isLog) keys = keys.concat(["sch10","plotkin","bickel","mujika"]);   // growth-signal evidence
   $("musSrcList").innerHTML = keys.map(srcLi).join('');
@@ -6259,6 +6265,7 @@ function planOutlookHTML(plan){
       +'<p class="pmcap">By muscle, from the plan’s weekly sets · ↑ growth dose · → maintenance · ↓ under-dosed · ≈ past the productive range.</p>';
   }
   h+='</div>';
+  h+='<p class="fcnote" style="margin-top:8px;">'+WP_LINK+'</p>';   // plan forecast = white paper §plan forecast
   if(r.src&&r.src.length) h+='<details class="hsrc" style="margin-top:8px;"><summary>Sources</summary><ul>'+r.src.map(srcLi).join('')+'</ul></details>';
   return h;
 }
@@ -7990,7 +7997,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v120";
+const APP_VER="v121";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
