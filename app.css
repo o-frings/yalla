@@ -624,6 +624,7 @@
   .exprogsum{ font-size:14px; color:var(--l2); font-weight:600; margin:2px 0 6px; }
   .exprogsub{ font-weight:500; color:var(--l3); font-size:12px; }
   #exProgChart{ display:block; width:100%; height:auto; margin:2px 0 2px; }
+  #slML, #slPA{ display:block; width:100%; height:auto; margin:2px 0 2px; }
   .exprow{ display:flex; align-items:center; gap:10px; width:100%; background:none; border:none; padding:9px 0; border-bottom:.5px solid var(--sep); cursor:pointer; text-align:left; -webkit-tap-highlight-color:transparent; }
   .exprow:last-of-type{ border-bottom:none; }
   .exprow:active{ opacity:.6; }

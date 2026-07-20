@@ -6593,6 +6593,44 @@ async function ledgerTick(emit){
   return dirty; }
 // Me-page card: pending forecasts + calibration status. Numbers are shown only once ≥10 forecasts
 // are scored (plan §11.4); before that the card says it is calibrating, not pretending.
+// "The adjusted model, learning": the response multiplier the model actually used for each forecast
+// (exp of the frozen posterior mean), averaged per emission week with its 95% band — watch it converge.
+function drawLedgerMultiplier(recs){
+  const c=$("slML"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  const byWk={}; recs.forEach(r=>{ if(r.retro||!r.in||r.in.thm==null) return; (byWk[r.k]=byWk[r.k]||[]).push(r); });
+  const wks=Object.keys(byWk).map(Number).sort((a,b)=>a-b);
+  if(wks.length<2){ return; }
+  const pts=wks.map(k=>{ const a=byWk[k]; const m=a.reduce((s,r)=>s+r.in.thm,0)/a.length, v=a.reduce((s,r)=>s+r.in.thv,0)/a.length;
+    return { mult:Math.exp(m), lo:Math.exp(m-1.96*Math.sqrt(v)), hi:Math.exp(m+1.96*Math.sqrt(v)) }; });
+  const l3=(getComputedStyle(document.documentElement).getPropertyValue('--l3')||'#888').trim(), ac=accentHex();
+  const padL=30, padR=12, padT=10, padB=20, n=pts.length;
+  let lo=Math.min(1,...pts.map(p=>p.lo)), hi=Math.max(1,...pts.map(p=>p.hi)); const sp=Math.max(0.3,hi-lo); lo-=sp*0.1; hi+=sp*0.1;
+  const x=i=> padL+(n<2?0:(i/(n-1))*(W-padL-padR)), y=v=> padT+(1-(v-lo)/(hi-lo))*(H-padT-padB);
+  ctx.strokeStyle=hexAlpha(l3,.5); ctx.setLineDash([4,4]); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(padL,y(1)); ctx.lineTo(W-padR,y(1)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle=l3; ctx.font="11px -apple-system,sans-serif"; ctx.textAlign="right"; ctx.fillText("×1",padL-3,y(1)+4);
+  // 95% band
+  ctx.beginPath(); pts.forEach((p,i)=>{ const xx=x(i),yy=y(p.hi); i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy); });
+  for(let i=n-1;i>=0;i--){ ctx.lineTo(x(i),y(pts[i].lo)); } ctx.closePath(); ctx.fillStyle=hexAlpha(ac,.14); ctx.fill();
+  // multiplier line
+  ctx.strokeStyle=ac; ctx.lineWidth=2.5; ctx.lineJoin="round"; ctx.beginPath(); pts.forEach((p,i)=>{ const xx=x(i),yy=y(p.mult); i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy); }); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x(n-1),y(pts[n-1].mult),4,0,7); ctx.fillStyle=ac; ctx.fill();
+}
+// "The forecast, graded": each scored prediction as (predicted %, actual %); the diagonal is a perfect call,
+// dots on it = accurate. Green if the outcome landed inside the forecast's 80% band.
+function drawLedgerPredActual(scored){
+  const c=$("slPA"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  if(scored.length<1) return;
+  const pr=scored.map(r=>(Math.exp(r.mu)-1)*100), ac2=scored.map(r=>(Math.exp(r.out.y)-1)*100);
+  const l3=(getComputedStyle(document.documentElement).getPropertyValue('--l3')||'#888').trim(), ac=accentHex();
+  const pad=26; let lim=Math.max(3,...pr.map(Math.abs),...ac2.map(Math.abs))*1.1;
+  const x=v=> pad+((v+lim)/(2*lim))*(W-pad*2), y=v=> (H-pad)-((v+lim)/(2*lim))*(H-pad*2);
+  // zero axes + y=x diagonal
+  ctx.strokeStyle=hexAlpha(l3,.35); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x(0),pad); ctx.lineTo(x(0),H-pad); ctx.moveTo(pad,y(0)); ctx.lineTo(W-pad,y(0)); ctx.stroke();
+  ctx.strokeStyle=hexAlpha(l3,.6); ctx.setLineDash([5,4]); ctx.beginPath(); ctx.moveTo(x(-lim),y(-lim)); ctx.lineTo(x(lim),y(lim)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle=l3; ctx.font="11px -apple-system,sans-serif"; ctx.textAlign="center"; ctx.fillText("predicted →",W/2,H-6); ctx.save(); ctx.translate(9,H/2); ctx.rotate(-Math.PI/2); ctx.fillText("actual →",0,0); ctx.restore();
+  scored.forEach((r,i)=>{ const hit=r.out.hit80; ctx.beginPath(); ctx.arc(x(pr[i]),y(ac2[i]),4,0,7);
+    ctx.fillStyle=hit?ac:hexAlpha(l3,.55); ctx.fill(); });
+}
 function renderStrengthLedger(){
   const card=$("slCard"); if(!card) return;
   if(!ledger.length){ card.style.display="none"; return; }
@@ -6618,6 +6656,24 @@ function renderStrengthLedger(){
     h+='<p class="fcnote">Calibrating — '+m.n+' of 10 forecasts scored so far. Each prediction is written down before the outcome exists, then graded against what you actually lift; your personal parameters update from the errors.</p>';
   }
   $("slBody").innerHTML=h;
+  // "How it's tracking" — plots of the adjusted model (learning curve) and the forecast (predicted vs actual).
+  const scored=ledger.filter(r=>!r.retro && r.st==="scored").sort((a,b)=>a.k-b.k);
+  const emitted=ledger.filter(r=>!r.retro && r.in && r.in.thm!=null);
+  const track=$("slTrack");
+  if(track){
+    if(emitted.length>=3 || scored.length>=1){
+      track.style.display="";
+      drawLedgerMultiplier(emitted);
+      const cur=Math.exp(calib.th.m);
+      $("slMLcap").textContent = "The multiplier scales the literature base rate to you: ×"+cur.toFixed(2)+" now"
+        +(cur>1.05?" — you respond faster than average.":cur<0.95?" — you respond slower than average.":" — about average.")
+        +" The band narrows as more forecasts are graded.";
+      drawLedgerPredActual(scored);
+      $("slPAcap").textContent = scored.length
+        ? scored.length+" graded — dots on the dashed line were spot on; green landed inside the 80% band ("+Math.round(100*(m.coverage80||0))+"% did)."
+        : "Predictions will plot here against what you actually lift, once the first 4-week window completes.";
+    } else track.style.display="none";
+  }
 }
 // ===== Monte Carlo growth forecast =====
 // A probabilistic projection of muscle gain over 16 weeks, so the output is a distribution, not a false
@@ -8104,7 +8160,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v123";
+const APP_VER="v124";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
