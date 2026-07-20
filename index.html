@@ -307,7 +307,7 @@
       </div>
       <!-- Progress (logged history) -->
       <div class="panel metile" id="progPanel" data-tile="progress">
-        <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 2 5-6"/></svg>Progress</span><span class="tilegrip" aria-label="Drag to reorder" title="Drag to reorder">⠿</span></div>
+        <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 2 5-6"/></svg>Training volume</span><span class="tilegrip" aria-label="Drag to reorder" title="Drag to reorder">⠿</span></div>
         <div class="progobj" id="progObj"></div>
         <div class="mewintabs paneltabs" id="progMetric">
           <button class="mewintab active" data-pm="volume" type="button">Volume</button>
@@ -325,14 +325,15 @@
         </div></div>
         <div class="panelfoot stack"><div class="progcap" id="progCap"></div><div class="progverd" id="progVerdict" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div></div>
       </div>
-      <!-- Exercise progress — across-exercises summary; per-exercise detail collapsed by default -->
+      <!-- Strength progress — headline overall-strength trend; per-exercise detail collapsed by default -->
       <div class="panel metile" id="exProgCard" data-tile="exercises" style="display:none;">
-        <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5"/><path d="M4 15l4-4 4 3 8-8"/></svg>Exercise progress</span><span class="tilegrip" aria-label="Drag to reorder" title="Drag to reorder">⠿</span></div>
+        <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5"/><path d="M4 15l4-4 4 3 8-8"/></svg>Strength progress</span><span class="tilegrip" aria-label="Drag to reorder" title="Drag to reorder">⠿</span></div>
         <div class="exprogsum" id="exProgSum"></div>
+        <canvas id="exProgChart" width="660" height="150"></canvas>
         <details class="fcdetails">
           <summary>By exercise</summary>
           <div id="exProgList"></div>
-          <p class="fcnote">Estimated 1RM (weight × reps) per exercise over your logged history — tap a lift for its full chart. Bodyweight and timed moves track top reps or seconds. <a class="srclink" href="growth-model-whitepaper.pdf" target="_blank" rel="noopener">The method &amp; evidence (PDF) ↗</a></p>
+          <p class="fcnote">The line is your overall strength: each lift indexed to its own start (=100), averaged across lifts, so different loads combine into one trend. Estimated 1RM (weight × reps); bodyweight and timed moves track top reps or seconds. Tap a lift for its full chart. <a class="srclink" href="growth-model-whitepaper.pdf" target="_blank" rel="noopener">The method &amp; evidence (PDF) ↗</a></p>
         </details>
       </div>
     </div>

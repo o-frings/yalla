@@ -5534,9 +5534,61 @@ function drawExChart(data){
   ctx.fillStyle="#636366"; ctx.textAlign="right"; ctx.fillText(unit,W-20,26); ctx.textAlign="left";
 }
 
-// ===== exercise progress — across-exercises overview + per-exercise drilldown (detail reuses openChart) =====
-// One row per exercise with enough history: estimated-1RM trend over the log (top reps/secs for bodyweight
-// or timed moves), a sparkline, and a % change vs the start. The detail chart is the existing openChart sheet.
+// ===== strength progress — headline overall-strength trend + per-exercise drilldown (detail reuses openChart) =====
+// Overall strength index: each lift's estimated-1RM (top reps/secs for bodyweight/timed) is indexed to its own
+// baseline (=100) and averaged across lifts per week, carried forward between sessions — so lifts on different
+// loads combine into one at-a-glance trend line. Capped to the last ~26 weeks.
+function strengthIndex(){
+  const WKMS=7*86400000; const perEx={}; let minWk=Infinity, maxWk=-Infinity;
+  Object.keys(hist).forEach(name=>{
+    const loaded=(hist[name]||[]).some(e=>(parseFloat(e.w)||0)>0);
+    const m=new Map();
+    (hist[name]||[]).forEach(e=>{ const v=loaded?e1rm(e.w,e.r):(parseInt(e.r)||0);
+      if(v>0){ const wk=Math.floor(e.d/WKMS); if(v>(m.get(wk)||0)) m.set(wk,v); if(wk<minWk)minWk=wk; if(wk>maxWk)maxWk=wk; } });
+    if(m.size>=2) perEx[name]=m;                                // ≥2 points to contribute a trend
+  });
+  const names=Object.keys(perEx);
+  if(!names.length || !isFinite(minWk) || maxWk===minWk) return null;
+  const startWk=Math.max(minWk, maxWk-25);
+  const base={}, last={}, firstWk={};
+  names.forEach(n=>{ const m=perEx[n], keys=[...m.keys()].sort((a,b)=>a-b);
+    firstWk[n]=Math.max(keys[0], startWk);
+    let b=0; for(let w=minWk;w<=firstWk[n];w++) if(m.has(w)) b=m.get(w);   // carry the baseline to the window/entry
+    if(b<=0) b=m.get(keys[0]);
+    base[n]=b; last[n]=b; });
+  const out=[];
+  for(let w=startWk; w<=maxWk; w++){ let sum=0, cnt=0;
+    names.forEach(n=>{ const m=perEx[n]; if(m.has(w)) last[n]=m.get(w);
+      if(w>=firstWk[n] && base[n]>0){ sum+=last[n]/base[n]*100; cnt++; } });
+    if(cnt) out.push({ wk:w, idx:sum/cnt, n:cnt }); }
+  return out.length>=2 ? { series:out, weeks:maxWk-startWk+1, lifts:names.length } : null;
+}
+function drawStrengthIndex(si){
+  const c=$("exProgChart"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  const s=si.series, vals=s.map(p=>p.idx), n=s.length;
+  const l3=(getComputedStyle(document.documentElement).getPropertyValue('--l3')||'#888').trim();
+  const ac=accentHex(), padL=34, padR=14, padT=12, padB=24;
+  let lo=Math.min(100,...vals), hi=Math.max(100,...vals); const sp=Math.max(2,hi-lo); lo-=sp*0.12; hi+=sp*0.12;
+  const x=i=> padL + (n<2?0:(i/(n-1))*(W-padL-padR));
+  const y=v=> padT + (1-(v-lo)/(hi-lo))*(H-padT-padB);
+  // baseline at 100 (each lift's start)
+  ctx.strokeStyle=hexAlpha(l3,.5); ctx.setLineDash([4,4]); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(padL,y(100)); ctx.lineTo(W-padR,y(100)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle=l3; ctx.font="12px -apple-system,sans-serif"; ctx.textAlign="right"; ctx.fillText("100",padL-4,y(100)+4);
+  // linear trend line
+  const xs=s.map((_,i)=>i), sx=xs.reduce((a,b)=>a+b,0), sy=vals.reduce((a,b)=>a+b,0),
+        sxy=xs.reduce((a,xx,i)=>a+xx*vals[i],0), sxx=xs.reduce((a,xx)=>a+xx*xx,0), den=n*sxx-sx*sx;
+  if(den){ const m=(n*sxy-sx*sy)/den, b0=(sy-m*sx)/n;
+    ctx.strokeStyle=hexAlpha(ac,.35); ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x(0),y(b0)); ctx.lineTo(x(n-1),y(b0+m*(n-1))); ctx.stroke(); }
+  // index line + fill
+  const grad=ctx.createLinearGradient(0,padT,0,H-padB); grad.addColorStop(0,hexAlpha(ac,.28)); grad.addColorStop(1,hexAlpha(ac,0));
+  ctx.beginPath(); s.forEach((p,i)=>{ const px=x(i),py=y(p.idx); i?ctx.lineTo(px,py):ctx.moveTo(px,py); });
+  ctx.lineTo(x(n-1),H-padB); ctx.lineTo(x(0),H-padB); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
+  ctx.strokeStyle=ac; ctx.lineWidth=3; ctx.lineJoin="round"; ctx.beginPath();
+  s.forEach((p,i)=>{ const px=x(i),py=y(p.idx); i?ctx.lineTo(px,py):ctx.moveTo(px,py); }); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x(n-1),y(vals[n-1]),4.5,0,7); ctx.fillStyle=ac; ctx.fill();
+  ctx.fillStyle=l3; ctx.font="600 13px -apple-system,sans-serif"; ctx.textAlign="left"; ctx.fillText(si.weeks+"w ago",padL,H-6); ctx.textAlign="right"; ctx.fillText("now",W-padR,H-6);
+}
+// per-exercise rows for the collapsed detail — % change vs start, sparkline, tap → full chart.
 function exerciseProgress(){
   const out=[];
   Object.keys(hist).forEach(name=>{
@@ -5563,12 +5615,15 @@ function sparkline(series, col){
 }
 function renderExerciseProgress(){
   const card=$("exProgCard"); if(!card) return;
-  const rows=exerciseProgress();
-  if(!rows.length){ card.style.display="none"; return; }
+  const rows=exerciseProgress(), si=strengthIndex();
+  if(!rows.length && !si){ card.style.display="none"; return; }
   card.style.display="";
-  const nG=rows.filter(r=>r.state==="grow").length, nH=rows.filter(r=>r.state==="hold").length, nS=rows.filter(r=>r.state==="shrink").length;
-  const parts=[]; if(nG) parts.push(nG+" progressing"); if(nH) parts.push(nH+" holding"); if(nS) parts.push(nS+" easing");
-  $("exProgSum").textContent = rows.length+" tracked lift"+(rows.length>1?"s":"")+(parts.length?" · "+parts.join(" · "):"");
+  // headline: overall strength trend at a glance (index baselined at 100 → last idx − 100 = avg % change)
+  const sum=$("exProgSum"), chart=$("exProgChart");
+  if(si){ const pct=si.series[si.series.length-1].idx-100, up=pct>=1, dn=pct<=-1, ar=up?"↑":dn?"↓":"→", cls=up?"grow":dn?"shrink":"hold";
+    sum.className="exprogsum"; sum.innerHTML='Overall strength <span class="extr '+cls+'">'+ar+' '+(pct>=0?"+":"")+pct.toFixed(1)+'%</span> <span class="exprogsub">avg across '+si.lifts+' lift'+(si.lifts>1?"s":"")+' · last '+si.weeks+'w</span>';
+    if(chart){ chart.style.display=""; drawStrengthIndex(si); }
+  } else { sum.textContent=""; if(chart) chart.style.display="none"; }
   const arrow={grow:"↑",hold:"→",shrink:"↓"};
   $("exProgList").innerHTML = rows.map(r=>{ const col=MCOLOR[r.g]||"#888", s=(r.pct>=0?"+":"")+r.pct.toFixed(1)+"%";
     return '<button type="button" class="exprow" data-ex="'+esc(r.name)+'">'
@@ -6345,14 +6400,20 @@ function applyTileVisibility(){
     el.classList.toggle("tile-off", off);
     const b=el.querySelector(".tilehide"); if(b){ b.innerHTML=off?TILE_ICON.eyeoff:TILE_ICON.eye; b.title=off?"Show tile":"Hide tile"; } });
 }
+const TILE_DEFAULT = ["forecast","ledger","balance","exercises","progress"];
 function applyTileOrder(){
   const c=$("meTiles"); if(!c) return;
-  const tiles=[...c.querySelectorAll(".metile")].map(el=>el.dataset.tile);
-  const saved=settings.meTileOrder||[];
-  // Deterministic full order: saved order (for tiles that still exist) first, then any tiles missing
-  // from it (newly added, e.g. the ledger tile) appended in their default DOM order. This keeps a
-  // stale saved order from stranding a new tile at the front — the previous bug that scrambled the layout.
-  const order=[...saved.filter(t=>tiles.includes(t)), ...tiles.filter(t=>!saved.includes(t))];
+  const present=new Set([...c.querySelectorAll(".metile")].map(el=>el.dataset.tile));
+  const order=(settings.meTileOrder||[]).filter(t=>present.has(t));
+  // Insert any present tile missing from the saved order at its DEFAULT slot (next to its default
+  // neighbour) rather than blindly at the end — so a newly added/reprioritised tile lands where it
+  // belongs even for a user who already has a saved order. Truly-unknown tiles fall through to the end.
+  TILE_DEFAULT.forEach((t,i)=>{ if(present.has(t) && !order.includes(t)){
+    let pos=order.length;
+    for(let j=i-1;j>=0;j--){ const p=order.indexOf(TILE_DEFAULT[j]); if(p>=0){ pos=p+1; break; } }
+    order.splice(pos,0,t);
+  }});
+  present.forEach(t=>{ if(!order.includes(t)) order.push(t); });
   order.forEach(t=>{ const el=c.querySelector('.metile[data-tile="'+t+'"]'); if(el) c.appendChild(el); });
   applyTileVisibility();
 }
@@ -6378,7 +6439,7 @@ async function saveTileOrder(){
   function setEdit(on){ c.classList.toggle("editing", on); if(eb) eb.textContent=on?"Done":"Edit"; if(rb) rb.style.display=on?"":"none"; if(!on) saveTileOrder(); }
   if(eb) eb.onclick=()=> setEdit(!c.classList.contains("editing"));
   if(rb) rb.onclick=()=>{ settings.meTileOrder=null; settings.meTileHidden=[]; sset("settings",settings);
-    ["forecast","ledger","balance","progress","exercises"].forEach(t=>{ const el=c.querySelector('.metile[data-tile="'+t+'"]'); if(el) c.appendChild(el); });
+    TILE_DEFAULT.forEach(t=>{ const el=c.querySelector('.metile[data-tile="'+t+'"]'); if(el) c.appendChild(el); });
     applyTileVisibility(); toast&&toast("Tiles reset"); };
   // drag-to-reorder (edit mode): the whole tile lifts and follows the finger, a dashed placeholder shows
   // where it will drop, so it's obvious what's grabbed and where it's going.
@@ -8043,7 +8104,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v122";
+const APP_VER="v123";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
