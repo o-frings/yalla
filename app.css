@@ -989,6 +989,11 @@
   .sheethdr{ display:flex; align-items:center; justify-content:space-between; padding:12px 16px 8px; flex:0 0 auto; }
   .sheethdr .t{ font-size:20px; font-weight:650; letter-spacing:-.5px; }
  .sheetbody{ flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:8px 16px calc(28px + env(safe-area-inset-bottom)); }
+  /* in-app PDF viewer: near-full-height sheet with the PDF filling it + a small fallback link */
+  .pdfsheet{ height:94vh; }
+  .pdfsheet .pdfbody{ padding:0; display:flex; flex-direction:column; }
+  #pdfFrame{ flex:1 1 auto; width:100%; border:0; background:var(--card); }
+  .pdffallback{ flex:0 0 auto; text-align:center; padding:10px 16px calc(14px + env(safe-area-inset-bottom)); margin:0; }
 
   .planrow{ display:flex; align-items:center; gap:12px; padding:16px 16px; background:var(--row); border-radius:var(--r-md); margin-bottom:8px;
     border:.5px solid var(--line); transition:transform .14s cubic-bezier(.34,1.4,.6,1); }

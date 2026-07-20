@@ -893,6 +893,17 @@
   </div>
 </div>
 
+<!-- WHITE-PAPER PDF VIEWER — in-app so it has a Done button (a standalone PWA has no back button) -->
+<div class="scrim" id="scrimPDF"></div>
+<div class="sheet pdfsheet" id="sheetPDF">
+  <div class="grabber"></div>
+  <div class="sheethdr"><span class="t">The method &amp; evidence</span><button class="btn plain sm" id="pdfClose">Done</button></div>
+  <div class="sheetbody pdfbody">
+    <iframe id="pdfFrame" title="Yalla white paper"></iframe>
+    <p class="fcnote pdffallback">If it doesn't show above, <a class="srclink" href="growth-model-whitepaper.pdf" target="_blank" rel="noopener">open the PDF in your browser ↗</a>.</p>
+  </div>
+</div>
+
 <!-- SWAP SHEET -->
 <div class="scrim" id="scrimSwap"></div>
 <div class="sheet" id="sheetSwap">
