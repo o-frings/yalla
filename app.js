@@ -5561,32 +5561,59 @@ function strengthIndex(){
     names.forEach(n=>{ const m=perEx[n]; if(m.has(w)) last[n]=m.get(w);
       if(w>=firstWk[n] && base[n]>0){ sum+=last[n]/base[n]*100; cnt++; } });
     if(cnt) out.push({ wk:w, idx:sum/cnt, n:cnt }); }
-  return out.length>=2 ? { series:out, weeks:maxWk-startWk+1, lifts:names.length } : null;
+  if(out.length<2) return null;
+  // Forecast continuation: reuse the prediction ledger's latest pending per-exercise forecast (same mu/sd
+  // the "Strength forecast" card shows), as an equal-weight growth factor on the current index — so the two
+  // figures stay consistent. Untrained / unforecast lifts project flat (exp(0)=1). Band = 80% (LG.Z80).
+  const fc={}; if(typeof ledger!=="undefined") ledger.forEach(r=>{ if(!r.retro && names.includes(r.x) && (!fc[r.x]||r.k>fc[r.x].k)) fc[r.x]=r; });
+  let gm=0,gl=0,gh=0,hasF=false; names.forEach(n=>{ const r=fc[n]; const has=r&&r.st==="pending";
+    const mu=has?r.mu:0, sd=has?r.sd:0; if(has) hasF=true;
+    gm+=Math.exp(mu); gl+=Math.exp(mu-LG.Z80*sd); gh+=Math.exp(mu+LG.Z80*sd); });
+  const lastIdx=out[out.length-1].idx, k=names.length;
+  const forecast = hasF ? { weeks:LG.H, mid:lastIdx*gm/k, lo:lastIdx*gl/k, hi:lastIdx*gh/k, pct:(gm/k-1)*100 } : null;
+  return { series:out, weeks:maxWk-startWk+1, lifts:names.length, forecast };
 }
 function drawStrengthIndex(si){
   const c=$("exProgChart"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
-  const s=si.series, vals=s.map(p=>p.idx), n=s.length;
+  const s=si.series, vals=s.map(p=>p.idx), n=s.length, f=si.forecast;
   const l3=(getComputedStyle(document.documentElement).getPropertyValue('--l3')||'#888').trim();
   const ac=accentHex(), padL=34, padR=14, padT=12, padB=24;
-  let lo=Math.min(100,...vals), hi=Math.max(100,...vals); const sp=Math.max(2,hi-lo); lo-=sp*0.12; hi+=sp*0.12;
-  const x=i=> padL + (n<2?0:(i/(n-1))*(W-padL-padR));
+  // y-domain includes the forecast band so the continuation fits
+  let lo=Math.min(100,...vals), hi=Math.max(100,...vals);
+  if(f){ lo=Math.min(lo,f.lo); hi=Math.max(hi,f.hi); }
+  const sp=Math.max(2,hi-lo); lo-=sp*0.12; hi+=sp*0.12;
+  // history spans weeks 0..n-1; forecast adds H week-slots on the right, so reserve that fraction
+  const fw = f ? f.weeks : 0, span = (n-1) + fw;
+  const x=u=> padL + (span<=0?0:(u/span)*(W-padL-padR));   // u in week-slots from the left edge
+  const xNow=x(n-1);
   const y=v=> padT + (1-(v-lo)/(hi-lo))*(H-padT-padB);
   // baseline at 100 (each lift's start)
   ctx.strokeStyle=hexAlpha(l3,.5); ctx.setLineDash([4,4]); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(padL,y(100)); ctx.lineTo(W-padR,y(100)); ctx.stroke(); ctx.setLineDash([]);
   ctx.fillStyle=l3; ctx.font="12px -apple-system,sans-serif"; ctx.textAlign="right"; ctx.fillText("100",padL-4,y(100)+4);
-  // linear trend line
+  // linear trend line over the history
   const xs=s.map((_,i)=>i), sx=xs.reduce((a,b)=>a+b,0), sy=vals.reduce((a,b)=>a+b,0),
         sxy=xs.reduce((a,xx,i)=>a+xx*vals[i],0), sxx=xs.reduce((a,xx)=>a+xx*xx,0), den=n*sxx-sx*sx;
   if(den){ const m=(n*sxy-sx*sy)/den, b0=(sy-m*sx)/n;
     ctx.strokeStyle=hexAlpha(ac,.35); ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x(0),y(b0)); ctx.lineTo(x(n-1),y(b0+m*(n-1))); ctx.stroke(); }
-  // index line + fill
+  // history index line + fill
   const grad=ctx.createLinearGradient(0,padT,0,H-padB); grad.addColorStop(0,hexAlpha(ac,.28)); grad.addColorStop(1,hexAlpha(ac,0));
   ctx.beginPath(); s.forEach((p,i)=>{ const px=x(i),py=y(p.idx); i?ctx.lineTo(px,py):ctx.moveTo(px,py); });
-  ctx.lineTo(x(n-1),H-padB); ctx.lineTo(x(0),H-padB); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
+  ctx.lineTo(xNow,H-padB); ctx.lineTo(x(0),H-padB); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
   ctx.strokeStyle=ac; ctx.lineWidth=3; ctx.lineJoin="round"; ctx.beginPath();
   s.forEach((p,i)=>{ const px=x(i),py=y(p.idx); i?ctx.lineTo(px,py):ctx.moveTo(px,py); }); ctx.stroke();
-  ctx.beginPath(); ctx.arc(x(n-1),y(vals[n-1]),4.5,0,7); ctx.fillStyle=ac; ctx.fill();
-  ctx.fillStyle=l3; ctx.font="600 13px -apple-system,sans-serif"; ctx.textAlign="left"; ctx.fillText(si.weeks+"w ago",padL,H-6); ctx.textAlign="right"; ctx.fillText("now",W-padR,H-6);
+  // forecast continuation: 80% band fanning from "now" to +H weeks + dashed median line
+  if(f){ const xEnd=x(span), yNow=y(vals[n-1]);
+    ctx.beginPath(); ctx.moveTo(xNow,yNow); ctx.lineTo(xEnd,y(f.hi)); ctx.lineTo(xEnd,y(f.lo)); ctx.closePath();
+    ctx.fillStyle=hexAlpha(ac,.16); ctx.fill();
+    ctx.strokeStyle=ac; ctx.lineWidth=2.5; ctx.setLineDash([5,4]); ctx.beginPath(); ctx.moveTo(xNow,yNow); ctx.lineTo(xEnd,y(f.mid)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(xEnd,y(f.mid),4,0,7); ctx.fillStyle=ac; ctx.fill();
+    // faint "now" divider
+    ctx.strokeStyle=hexAlpha(l3,.4); ctx.lineWidth=1; ctx.setLineDash([2,3]); ctx.beginPath(); ctx.moveTo(xNow,padT); ctx.lineTo(xNow,H-padB); ctx.stroke(); ctx.setLineDash([]);
+  }
+  ctx.beginPath(); ctx.arc(xNow,y(vals[n-1]),4.5,0,7); ctx.fillStyle=ac; ctx.fill();
+  ctx.fillStyle=l3; ctx.font="600 13px -apple-system,sans-serif"; ctx.textAlign="left"; ctx.fillText(si.weeks+"w ago",padL,H-6);
+  ctx.textAlign="right"; ctx.fillText(f?"+"+f.weeks+"w":"now", W-padR, H-6);
+  if(f){ ctx.textAlign="center"; ctx.fillStyle=hexAlpha(l3,.9); ctx.fillText("now", xNow, H-6); }
 }
 // per-exercise rows for the collapsed detail — % change vs start, sparkline, tap → full chart.
 function exerciseProgress(){
@@ -5621,7 +5648,11 @@ function renderExerciseProgress(){
   // headline: overall strength trend at a glance (index baselined at 100 → last idx − 100 = avg % change)
   const sum=$("exProgSum"), chart=$("exProgChart");
   if(si){ const pct=si.series[si.series.length-1].idx-100, up=pct>=1, dn=pct<=-1, ar=up?"↑":dn?"↓":"→", cls=up?"grow":dn?"shrink":"hold";
-    sum.className="exprogsum"; sum.innerHTML='Overall strength <span class="extr '+cls+'">'+ar+' '+(pct>=0?"+":"")+pct.toFixed(1)+'%</span> <span class="exprogsub">avg across '+si.lifts+' lift'+(si.lifts>1?"s":"")+' · last '+si.weeks+'w</span>';
+    const cd=v=>v>=1?"grow":v<=-1?"shrink":"hold", cad=v=>v>=1?"↑":v<=-1?"↓":"→";
+    let head='Overall strength <span class="extr '+cls+'">'+ar+' '+(pct>=0?"+":"")+pct.toFixed(1)+'%</span>';
+    if(si.forecast) head+=' <span class="exprogsub">· forecast <span class="extr '+cd(si.forecast.pct)+'">'+cad(si.forecast.pct)+' '+(si.forecast.pct>=0?"+":"")+si.forecast.pct.toFixed(1)+'% next '+si.forecast.weeks+'w</span></span>';
+    else head+=' <span class="exprogsub">avg across '+si.lifts+' lift'+(si.lifts>1?"s":"")+' · last '+si.weeks+'w</span>';
+    sum.className="exprogsum"; sum.innerHTML=head;
     if(chart){ chart.style.display=""; drawStrengthIndex(si); }
   } else { sum.textContent=""; if(chart) chart.style.display="none"; }
   const arrow={grow:"↑",hold:"→",shrink:"↓"};
@@ -8160,7 +8191,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v124";
+const APP_VER="v125";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
