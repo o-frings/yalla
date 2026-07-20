@@ -274,8 +274,8 @@ const MUSCLES = {
   "Back Extension":["Lower Back","Glutes","Hamstrings"],"Seated Leg Curl":["Hamstrings"],"Lying Leg Curl":["Hamstrings"],"Leg Curl":["Hamstrings"],
   "Nordic Curl":["Hamstrings"],"Swiss-Ball Curl":["Hamstrings"],"Hip Thrust":["Glutes","Hamstrings"],
   "Single-Leg Hip Thrust":["Glutes","Hamstrings"],"Glute Bridge":["Glutes","Hamstrings"],"Single-Leg Glute Bridge":["Glutes","Hamstrings"],
-  "Hip Thrust Machine":["Glutes","Hamstrings"],"Cable Pull-Through":["Glutes","Hamstrings"],"Hip Abduction":["Glutes"],
-  "Banded Side Steps":["Glutes"],"Cable Abduction":["Glutes"],"Side-Lying Leg Raise":["Glutes"],
+  "Hip Thrust Machine":["Glutes","Hamstrings"],"Cable Pull-Through":["Glutes","Hamstrings"],"Hip Abduction":["Glute Med"],
+  "Banded Side Steps":["Glute Med"],"Cable Abduction":["Glute Med"],"Side-Lying Leg Raise":["Glute Med"],
   "Standing Calf Raise":["Calves"],"Seated Calf Raise":["Calves"],"Leg-Press Calf Raise":["Calves"],"Single-Leg Calf Raise":["Calves"],
   "Calf Raises":["Calves"],"Hanging Leg Raise":["Core"],"Lying Leg Raise":["Core"],"Captain's Chair Raise":["Core"],
   "Reverse Crunch":["Core"],"Cable Crunch":["Core"],"Ab-Machine Crunch":["Core"],"Decline Crunch":["Core"],"Weighted Decline Crunch":["Core"],
@@ -290,7 +290,7 @@ const MUSCLES = {
   "Hip Adduction":["Adductors"],"Cable Adduction (inner)":["Adductors"],"Cossack Squat":["Adductors","Quads","Glutes"],"Copenhagen Plank":["Adductors","Core"],
 };
 const MCOLOR={ Chest:"#ff6b6b", Back:"#4dabf7", Shoulders:"#f59f00", Biceps:"#9775fa", Triceps:"#ff8787",
-  Quads:"#20c997", Hamstrings:"#51cf66", Glutes:"#f783ac", Calves:"#74c0fc", Core:"#ffd43b", Other:"#adb5bd",
+  Quads:"#20c997", Hamstrings:"#51cf66", Glutes:"#f783ac", "Glute Med":"#e64980", Calves:"#74c0fc", Core:"#ffd43b", Other:"#adb5bd",
   "Front Delts":"#f59f00", "Side Delts":"#ffa94d", "Rear Delts":"#e8590c", Neck:"#15aabf",
   // detailed back split + new auxiliary groups (Back kept above as a legacy alias for old data / cardio chips)
   Lats:"#4dabf7", "Upper Back":"#3b8fd9", "Lower Back":"#1f6fb2", Forearms:"#b197fc", Adductors:"#38d9a9" };
@@ -305,7 +305,9 @@ function muscleFor(name){
   if(/bench|chest|\bpec\b|push.?up|\bdip\b|fly/.test(n)) return ["Chest","Triceps"];
   if(/calf|calves/.test(n)) return ["Calves"];
   if(/leg curl|hamstring|nordic/.test(n)) return ["Hamstrings"];
-  if(/deadlift|\brdl\b|romanian|good morning|hip thrust|glute|bridge|hinge|abduction/.test(n)) return ["Glutes","Hamstrings"];
+  // hip abduction / lateral-hip work → upper (side) glutes = gluteus medius, distinct from the main glute max
+  if(/abduction|clamshell|monster walk|lateral band walk|banded side step|side.?lying leg|glute med|hip abductor|fire.?hydrant/.test(n)) return ["Glute Med"];
+  if(/deadlift|\brdl\b|romanian|good morning|hip thrust|glute|bridge|hinge/.test(n)) return ["Glutes","Hamstrings"];
   if(/squat|leg press|lunge|step.?up|leg extension|\bquad/.test(n)) return ["Quads","Glutes"];
   if(/curl/.test(n)) return ["Biceps"];
   if(/tricep|pushdown|skull|close.?grip/.test(n)) return ["Triceps"];
@@ -1957,7 +1959,7 @@ function expandLegacyMtot(tot){
 // (muscle-balance + planner) let you tap a rolled-up wedge to expand it into its detailed heads.
 const SUBGROUPS={ Shoulders:["Front Delts","Side Delts","Rear Delts"], Back:["Lats","Upper Back","Lower Back"] };
 const AGG={}; Object.keys(SUBGROUPS).forEach(p=> SUBGROUPS[p].forEach(s=> AGG[s]=p));   // sub-group → parent
-const DISPLAY_GROUPS=["Chest","Back","Shoulders","Biceps","Triceps","Forearms","Quads","Adductors","Hamstrings","Glutes","Calves","Core","Neck"];
+const DISPLAY_GROUPS=["Chest","Back","Shoulders","Biceps","Triceps","Forearms","Quads","Adductors","Hamstrings","Glutes","Glute Med","Calves","Core","Neck"];
 // the spoke list for a chart: parents stay collapsed unless their name is in `expanded`, then they split
 function roseGroups(expanded){ const out=[];
   DISPLAY_GROUPS.forEach(g=>{ if(SUBGROUPS[g] && expanded && expanded.has(g)) Array.prototype.push.apply(out, SUBGROUPS[g]); else out.push(g); });
@@ -2636,13 +2638,22 @@ function ringRow(color,label,val,target,desc,unit,dec){
     +'<p class="rrdesc">'+desc+'</p></div>';
 }
 function openRingsDetail(){ renderRingsDetail(); openSheet("Rings"); }
+// Weekly ring targets from the GROWTH model + your objective (not the active plan's prescribed days):
+// aim for a per-muscle weekly dose across the major groups, scaled by goal, so the rings measure "enough
+// to grow toward your objective" rather than "did you run the plan". Sessions follow from the volume.
+function growthRingTargets(){
+  const perMuscle = ({ muscle:WEEKLY_SET_TARGET, strength:8, fatloss:8, fitness:7 })[settings.objective] || 8;
+  const majors = GAUGE_GROUPS.length;                       // the major muscle groups a rounded week should cover
+  const sets = Math.round(majors * perMuscle * 0.6);        // whole-body hard sets ≈ per-muscle dose across majors, deflated for shared compound work
+  return { sess: Math.max(2, Math.min(6, Math.ceil(sets/15))), sets, muscles: 12 };
+}
 function renderRingsDetail(){
   const box=$("ringsBody"); if(!box) return;
   const cut=Date.now()-7*86400000; let setsWk=0; const musWk=new Set();
   Object.keys(hist).forEach(n=>{ const gs=muscleFor(n); (hist[n]||[]).forEach(e=>{ if(e.d>=cut){ setsWk+=(e.n!=null?e.n:1)*effortOf(e); gs.forEach(g=>{ if(MGROUPS.indexOf(g)>=0) musWk.add(g); }); } }); });
-  const f7=sessionCredit(7), sessTarget=Math.max(2,Math.min(5,planSessionsPerWeek(activePlan())||3)), setsTarget=Math.max(20,sessTarget*18);
+  const f7=sessionCredit(7), _gt=growthRingTargets(), sessTarget=_gt.sess, setsTarget=_gt.sets;
   let h="";
-  h+=ringRow("#ff6b3d","Sessions",f7,sessTarget,"Session-equivalents this week — a short session counts in proportion to the work done, so a couple of micro sessions add up to a full one. Aim for "+sessTarget+" to match your plan.",null,true);
+  h+=ringRow("#ff6b3d","Sessions",f7,sessTarget,"Session-equivalents this week — a short session counts in proportion to the work done, so a couple of micro sessions add up to a full one. Aim for "+sessTarget+" to spread enough weekly volume for your goal.",null,true);
   h+=ringRow("#4dabf7","Hard sets",setsWk,setsTarget,"Working sets across every muscle this week — quality sets taken near failure are what drive growth.");
   h+=ringRow("#51cf66","Muscles",musWk.size,12,"Distinct muscle groups you've trained this week. Spreading the work keeps you balanced and injury-resistant.");
   // trained vs not-trained breakdown (the heart of the muscles ring)
@@ -2843,8 +2854,11 @@ function renderSpon(){
   });
   box.querySelectorAll(".spswap").forEach(b=> b.onclick=()=>sponSwap(+b.dataset.xi));
   const sh=$("sponShuf"); if(sh) sh.onclick=()=>{
-    const d=_sponDays[_sponSel];
-    _sponDays[_sponSel]=buildSponDay(d.tpl, _sponPr, d.shuffle+1);         // fresh picks for the whole day
+    // rotate every exercise to its next alternative — cycles endlessly and wraps back to the first option
+    // (no "end"): each lift steps through its own alternatives, so tapping repeatedly runs in circles.
+    const day=_sponDays[_sponSel]; let moved=false;
+    day.ex.forEach(e=>{ if(e.alts && e.alts.length>1){ e.n=e.alts[(e.alts.indexOf(e.n)+1)%e.alts.length]; moved=true; } });
+    if(!moved){ const d=_sponDays[_sponSel]; _sponDays[_sponSel]=buildSponDay(d.tpl,_sponPr,d.shuffle+1); }  // no alternates → fall back to a fresh draw
     renderSpon();
   };
   $("sponStart").onclick=sponStart;
@@ -3017,7 +3031,7 @@ function renderOverview(){
   if(Object.keys(hist).length || cardioList().length){
     const cut=Date.now()-7*86400000; let setsWk=0; const musWk=new Set();
     Object.keys(hist).forEach(n=>{ const gs=muscleFor(n); (hist[n]||[]).forEach(e=>{ if(e.d>=cut){ setsWk+=(e.n!=null?e.n:1)*effortOf(e); gs.forEach(g=>{ if(MGROUPS.indexOf(g)>=0) musWk.add(g); }); } }); });
-    const sessTarget=Math.max(2,Math.min(5,planSessionsPerWeek(activePlan())||3)), setsTarget=Math.max(20,sessTarget*18);
+    const _gt=growthRingTargets(), sessTarget=_gt.sess, setsTarget=_gt.sets;
     ovRings=[ {label:"Sessions", val:f7, target:sessTarget, color:"#ff6b3d"},
               {label:"Hard sets", val:setsWk, target:setsTarget, color:"#4dabf7"},
               {label:"Muscles", val:musWk.size, target:12, color:"#51cf66"} ];
@@ -4358,14 +4372,14 @@ $("importBtn").onclick=async()=>{
 };
 
 // ================= muscle volume =================
-const MGROUPS=["Chest","Lats","Upper Back","Lower Back","Front Delts","Side Delts","Rear Delts","Biceps","Triceps","Forearms","Quads","Adductors","Hamstrings","Glutes","Calves","Core","Neck"];
+const MGROUPS=["Chest","Lats","Upper Back","Lower Back","Front Delts","Side Delts","Rear Delts","Biceps","Triceps","Forearms","Quads","Adductors","Hamstrings","Glutes","Glute Med","Calves","Core","Neck"];
 // NO_TARGET muscles show a wedge when trained but carry NO weekly-volume target: never flagged as
 // under-trained or chased by the plan builder / growth signal. Neck (posture moves), plus the smaller
 // detail groups — Lower Back (gets ample work from compounds), Forearms and Adductors (grip/inner-thigh
 // accessories most people don't program directly). They're still visible on the radar and emphasizable
 // in the builder; they're just not part of the "are you under-training this?" model.
-const NO_TARGET=new Set(["Neck","Lower Back","Forearms","Adductors"]);
-const MSHORT={Chest:"Chest",Back:"Back",Shoulders:"Delts",Biceps:"Biceps",Triceps:"Triceps",Quads:"Quads",Hamstrings:"Hams",Glutes:"Glutes",Calves:"Calves",Core:"Core","Front Delts":"F·Delt","Side Delts":"S·Delt","Rear Delts":"R·Delt",Neck:"Neck",Lats:"Lats","Upper Back":"U·Back","Lower Back":"L·Back",Forearms:"Forearm",Adductors:"Adduct"};
+const NO_TARGET=new Set(["Neck","Lower Back","Forearms","Adductors","Glute Med"]);
+const MSHORT={Chest:"Chest",Back:"Back",Shoulders:"Delts",Biceps:"Biceps",Triceps:"Triceps",Quads:"Quads",Hamstrings:"Hams",Glutes:"Glute Max","Glute Med":"Glute Med",Calves:"Calves",Core:"Core","Front Delts":"F·Delt","Side Delts":"S·Delt","Rear Delts":"R·Delt",Neck:"Neck",Lats:"Lats","Upper Back":"U·Back","Lower Back":"L·Back",Forearms:"Forearm",Adductors:"Adduct"};
 let musWindow=7, musMetric="sets", musSrc="log", musVolMode="total", musScale="abs";
 let meWindow=7;   // Me-page hero gauge window: 7 (this week) or 30 (this month)
 // Evidence-based weekly volume targets (fractional sets per muscle per week).
@@ -6996,7 +7010,7 @@ const BACK_M=["Lats","Upper Back"];
 // auxiliary detail groups (NO_TARGET). They never get auto-programmed regardless of emphasis (they're not
 // in any split or day domain, and the coverage pass skips NO_TARGET), so "Balanced" can show them equal to
 // everything else — a balanced intent reads as a uniform wheel rather than punishing lower back / forearms.
-const AUX_EMPH=["Lower Back","Forearms","Adductors","Neck"];
+const AUX_EMPH=["Lower Back","Forearms","Adductors","Neck","Glute Med"];
 function baseEmphasis(){ const e={}; BUILD_GROUPS.forEach(m=>e[m]=0.5); return e; }
 let build={ exp:"intermediate", obj:"muscle", focus:["balanced"], bias:"balanced", time:60, freq:4, split:"auto", injuries:[], access:"gym", supersets:"on", vary:"on", kb:"off",
   emphasis:baseEmphasis() };
@@ -8220,7 +8234,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v131";
+const APP_VER="v132";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
