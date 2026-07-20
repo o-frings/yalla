@@ -2204,15 +2204,25 @@ document.addEventListener("click",(e)=>{ const h=e.target.closest&&e.target.clos
 // has no back/close chrome, so it looked like it "couldn't be closed". Intercept same-origin .pdf links
 // (the white paper); external study links (http…) keep opening normally. Skip the fallback link inside
 // the viewer itself so it can still escape to the browser.
+const WP_PAGES=17;   // white-paper page count (regenerate wp/page-NN.jpg + bump this when the paper changes)
+function openWhitepaper(){
+  const box=$("pdfPages");
+  if(box && !box.dataset.loaded){
+    let h="";
+    for(let i=1;i<=WP_PAGES;i++){ const n=(i<10?"0":"")+i; h+='<img class="pdfpg" loading="lazy" src="wp/page-'+n+'.jpg" alt="Page '+i+'">'; }
+    h+='<p class="fcnote pdffallback">Prefer the file? <a class="srclink" href="growth-model-whitepaper.pdf" target="_blank" rel="noopener">open the PDF ↗</a></p>';
+    box.innerHTML=h; box.dataset.loaded="1";
+  }
+  if(box) box.scrollTop=0;
+  openSheet("PDF");
+}
 document.addEventListener("click",(e)=>{
   const a=e.target.closest&&e.target.closest('a[href$=".pdf"]'); if(!a) return;
-  if(a.closest(".pdffallback")) return;                       // the escape-hatch link opens externally
-  e.preventDefault();
-  const fr=$("pdfFrame"); if(fr) fr.src=a.getAttribute("href");
-  openSheet("PDF");
+  if(a.closest(".pdffallback")) return;                       // the escape-hatch link opens the real file externally
+  e.preventDefault(); openWhitepaper();
 });
-if($("pdfClose")) $("pdfClose").onclick=()=>{ closeSheet("PDF"); const fr=$("pdfFrame"); if(fr) fr.removeAttribute("src"); };
-if($("scrimPDF")) $("scrimPDF").onclick=()=>{ closeSheet("PDF"); const fr=$("pdfFrame"); if(fr) fr.removeAttribute("src"); };
+if($("pdfClose")) $("pdfClose").onclick=()=>closeSheet("PDF");
+if($("scrimPDF")) $("scrimPDF").onclick=()=>closeSheet("PDF");
 if($("gymNew")) $("gymNew").onclick=()=>{ const inp=$("gymCodeInput"); if(inp){ inp.value=randGymCode(); inp.focus(); } };
 if($("gymGo")) $("gymGo").onclick=()=>{ const inp=$("gymCodeInput"); gymCheckIn(inp?inp.value:""); };
 if($("gymCodeInput")) $("gymCodeInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); gymCheckIn(e.target.value); } });
@@ -8210,7 +8220,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v130";
+const APP_VER="v131";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
