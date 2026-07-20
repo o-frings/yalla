@@ -266,24 +266,28 @@
         <canvas id="fcChart" width="760" height="300"></canvas>
         <div class="fclegend" id="fcLegend"></div>
         <p class="fcconn">Continues your recent logged trend — “current pace” follows it, “this plan” assumes progressive overload.</p>
-        <details class="fcdetails">
-          <summary>By muscle &amp; what moves it</summary>
-          <div class="fchd2">Projected 16-week gain by muscle</div>
-          <div class="mewintabs paneltabs" id="fcMuscleSeg" style="margin-top:2px;">
-            <button class="mewintab" data-fm="plan" type="button">This plan</button>
-            <button class="mewintab active" data-fm="pace" type="button">Current pace</button>
+        <div class="fcfold">
+          <button type="button" class="fcfoldhd">By muscle &amp; what moves it</button>
+          <div class="fcfoldbody">
+            <div class="fchd2">Projected 16-week gain by muscle</div>
+            <div class="mewintabs paneltabs" id="fcMuscleSeg" style="margin-top:2px;">
+              <button class="mewintab" data-fm="plan" type="button">This plan</button>
+              <button class="mewintab active" data-fm="pace" type="button">Current pace</button>
+            </div>
+            <canvas id="fcMuscles" width="760" height="230"></canvas>
+            <p class="fcnote" id="fcLagCap"></p>
+            <div class="fchd2">What would move this most</div>
+            <canvas id="fcTornado" width="760" height="190"></canvas>
+            <p class="fcnote" id="fcSensCap"></p>
           </div>
-          <canvas id="fcMuscles" width="760" height="230"></canvas>
-          <p class="fcnote" id="fcLagCap"></p>
-          <div class="fchd2">What would move this most</div>
-          <canvas id="fcTornado" width="760" height="190"></canvas>
-          <p class="fcnote" id="fcSensCap"></p>
-        </details>
-        <details class="fcdetails">
-          <summary>How it's estimated</summary>
-          <p class="fcnote">500-run Monte Carlo with literature-backed parameters — dose, effort, progressive overload, your age, sex and experience, and how differently people respond. The band is the 10–90% range, wide mostly because individual response varies a lot; it can dip below zero if training falls under maintenance. Set your age, sex and experience under Profile to personalise it. An estimate with real uncertainty, not a promise.</p>
-          <p class="fcnote"><a class="srclink" href="growth-model-whitepaper.pdf" target="_blank" rel="noopener">The method &amp; evidence (PDF) ↗</a></p>
-        </details>
+        </div>
+        <div class="fcfold">
+          <button type="button" class="fcfoldhd">How it's estimated</button>
+          <div class="fcfoldbody">
+            <p class="fcnote">500-run Monte Carlo with literature-backed parameters — dose, effort, progressive overload, your age, sex and experience, and how differently people respond. The band is the 10–90% range, wide mostly because individual response varies a lot; it can dip below zero if training falls under maintenance. Set your age, sex and experience under Profile to personalise it. An estimate with real uncertainty, not a promise.</p>
+            <p class="fcnote"><a class="srclink" href="growth-model-whitepaper.pdf" target="_blank" rel="noopener">The method &amp; evidence (PDF) ↗</a></p>
+          </div>
+        </div>
       </div>
       <!-- Strength: history + forecast + per-exercise detail + calibration tracking, all in one tile (Part II) -->
       <div class="panel metile" id="slCard" data-tile="ledger" style="display:none;">
@@ -291,25 +295,31 @@
         <div class="exprogsum" id="exProgSum"></div>
         <canvas id="exProgChart" width="660" height="150"></canvas>
         <p class="fcnote" id="slCal"></p>
-        <details class="fcdetails">
-          <summary>By exercise</summary>
-          <div id="exProgList"></div>
-          <p class="fcnote">The solid line is your overall strength: each lift indexed to its own start (=100), averaged across lifts, so different loads combine into one trend. The dashed continuation is the model's 4-week forecast (80% band). Estimated 1RM (weight × reps); bodyweight and timed moves track top reps or seconds. Tap a lift for its full chart.</p>
-        </details>
-        <details class="fcdetails" id="slTrack" style="display:none;">
-          <summary>How it's tracking</summary>
-          <div class="fchd2">Your response multiplier, as it learns</div>
-          <canvas id="slML" width="660" height="130"></canvas>
-          <p class="fcnote" id="slMLcap"></p>
-          <div class="fchd2">Forecast vs. what actually happened</div>
-          <canvas id="slPA" width="660" height="150"></canvas>
-          <p class="fcnote" id="slPAcap"></p>
-        </details>
-        <details class="fcdetails">
-          <summary>How this works</summary>
-          <p class="fcnote">Each lift's estimated 1RM is tracked over time; the tile shows your overall strength (lifts indexed to their start and averaged) with a 4-week forecast. Each forecast is written down before the outcome exists, then graded against what you actually lift, and your personal response parameters update from the errors — so it sharpens the longer you log. Strength is the yardstick: the app can see strength, not muscle size.</p>
-          <p class="fcnote"><a class="srclink" href="growth-model-whitepaper.pdf" target="_blank" rel="noopener">The method &amp; evidence (PDF) ↗</a></p>
-        </details>
+        <div class="fcfold">
+          <button type="button" class="fcfoldhd">By exercise</button>
+          <div class="fcfoldbody">
+            <div id="exProgList"></div>
+            <p class="fcnote">The solid line is your overall strength: each lift indexed to its own start (=100), averaged across lifts, so different loads combine into one trend. The dashed continuation is the model's 4-week forecast (80% band). Estimated 1RM (weight × reps); bodyweight and timed moves track top reps or seconds. Tap a lift for its full chart.</p>
+          </div>
+        </div>
+        <div class="fcfold" id="slTrack" style="display:none;">
+          <button type="button" class="fcfoldhd">How it's tracking</button>
+          <div class="fcfoldbody">
+            <div class="fchd2">Your response multiplier, as it learns</div>
+            <canvas id="slML" width="660" height="130"></canvas>
+            <p class="fcnote" id="slMLcap"></p>
+            <div class="fchd2">Forecast vs. what actually happened</div>
+            <canvas id="slPA" width="660" height="150"></canvas>
+            <p class="fcnote" id="slPAcap"></p>
+          </div>
+        </div>
+        <div class="fcfold">
+          <button type="button" class="fcfoldhd">How this works</button>
+          <div class="fcfoldbody">
+            <p class="fcnote">Each lift's estimated 1RM is tracked over time; the tile shows your overall strength (lifts indexed to their start and averaged) with a 4-week forecast. Each forecast is written down before the outcome exists, then graded against what you actually lift, and your personal response parameters update from the errors — so it sharpens the longer you log. Strength is the yardstick: the app can see strength, not muscle size.</p>
+            <p class="fcnote"><a class="srclink" href="growth-model-whitepaper.pdf" target="_blank" rel="noopener">The method &amp; evidence (PDF) ↗</a></p>
+          </div>
+        </div>
       </div>
       <!-- Muscle balance (default: above the Progress logs) -->
       <div class="panel tap metile" id="meBalance" data-tile="balance" role="button" tabindex="0" aria-label="Open muscle balance">

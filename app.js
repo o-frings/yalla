@@ -2195,17 +2195,11 @@ if($("gymMenuItem")) $("gymMenuItem").onclick=()=>{ closeSocialMenu(); gymOpenPa
 if($("gymPanelX")) $("gymPanelX").onclick=()=>{ const p=$("gymPanel"); if(p) p.hidden=true; };
 if($("livePanelX")) $("livePanelX").onclick=()=>{ const p=$("livePanel"); if(p) p.hidden=true; };
 document.addEventListener("click",(e)=>{ const w=$("socialWrap"), m=$("socialMenu"); if(w&&m&&!m.hidden&&!w.contains(e.target)) m.hidden=true; });
-// Drive .fcdetails open/close explicitly. Some iOS/PWA webviews drop the native <details> toggle after the
-// first open (opens, then won't close), and whether preventDefault cancels the native toggle is inconsistent.
-// So we compute the intended state from the state at tap time, then FORCE it on the next frame — overriding
-// whatever the native toggle did or didn't do. Deterministic open AND close regardless of webview quirks.
-document.addEventListener("click",(e)=>{
-  const s=e.target.closest&&e.target.closest("summary"); if(!s) return;
-  const d=s.parentElement; if(!d || d.tagName!=="DETAILS" || !d.classList.contains("fcdetails")) return;
-  e.preventDefault();
-  const willOpen=!d.hasAttribute("open");
-  requestAnimationFrame(()=>{ if(willOpen) d.setAttribute("open",""); else d.removeAttribute("open"); });
-});
+// Foldable model/detail sections. These used to be native <details>, but some iOS/PWA webviews wouldn't
+// collapse them after opening; they're now plain buttons + a .fcfold wrapper whose open/closed state is a
+// class we toggle here — no native <details> semantics, so open AND close always work.
+document.addEventListener("click",(e)=>{ const h=e.target.closest&&e.target.closest(".fcfoldhd"); if(!h) return;
+  const f=h.parentElement; if(f&&f.classList.contains("fcfold")) f.classList.toggle("open"); });
 if($("gymNew")) $("gymNew").onclick=()=>{ const inp=$("gymCodeInput"); if(inp){ inp.value=randGymCode(); inp.focus(); } };
 if($("gymGo")) $("gymGo").onclick=()=>{ const inp=$("gymCodeInput"); gymCheckIn(inp?inp.value:""); };
 if($("gymCodeInput")) $("gymCodeInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); gymCheckIn(e.target.value); } });
@@ -3018,6 +3012,18 @@ function renderOverview(){
       +'<div style="flex:1; min-width:0;"><div class="rglgwrap">'+legend+'</div>'+deltaLine+'</div>'
       +'</div></div>';
   }
+  // --- strength outcome: is the work paying off? a compact trend + forecast, taps through to the full tile ---
+  const ovSI=strengthIndex();
+  if(ovSI){ const p=ovSI.series[ovSI.series.length-1].idx-100;
+    const s1=v=>(v>=0?"+":"")+v.toFixed(1)+"%", cl=v=>v>=1?"grow":v<=-1?"shrink":"hold", av=v=>v>=1?"↑":v<=-1?"↓":"→";
+    const fpart = ovSI.forecast ? ' <span class="ovmeta" style="display:inline;">· forecast</span> <span class="extr '+cl(ovSI.forecast.pct)+'">'+av(ovSI.forecast.pct)+' '+s1(ovSI.forecast.pct)+'</span>' : '';
+    h+='<div class="ed-label">Strength <span class="subhint">— tap for detail ›</span></div>';
+    h+='<div class="group ovtap ovstrength" id="ovStrength"><div class="pad" style="display:flex; align-items:center; gap:14px;">'
+      +sparkline(ovSI.series.map(pt=>pt.idx), accentHex())
+      +'<div style="flex:1; min-width:0;">Overall <span class="extr '+cl(p)+'">'+av(p)+' '+s1(p)+'</span>'+fpart
+      +'<div class="ovmeta">across '+ovSI.lifts+' lift'+(ovSI.lifts>1?"s":"")+' · last '+ovSI.weeks+'w</div></div>'
+      +'<span class="ovchev">›</span></div></div>';
+  }
   // --- Discover --- a swipeable deck of tips / not-yet-used features
   const dt=discoverTips();
   if(dt.length){
@@ -3083,12 +3089,14 @@ function renderOverview(){
     dw.addEventListener("scroll", ()=>{ let best=0, bd=1e9; cards.forEach((c,i)=>{ const d=Math.abs(c.offsetLeft-dw.scrollLeft); if(d<bd){bd=d;best=i;} });
       dots.querySelectorAll(".discdot").forEach((el,i)=> el.classList.toggle("on", i===best)); }, {passive:true}); }
   host.querySelectorAll(".ovtodo .ovtap").forEach(li=> li.onclick=()=>ovAct(li.dataset.act));
+  { const os=$("ovStrength"); if(os) os.onclick=()=>ovAct("strength"); }
   if(settings.objective && !document.querySelector("#onboardWrap.show")) coach("swipe","Swipe left or right to move between your three pages — Overview, Workout and Me.");
 }
 // route a Needs-attention item to where the user acts on it
 function ovAct(act){
   const goto=(id,focus)=>{ showTab("me"); setTimeout(()=>{ const el=$(id); if(el){ el.scrollIntoView({behavior:"smooth",block:"center"}); if(focus) el.focus(); } },80); };
   if(act==="weight") goto("bwInput", true);
+  else if(act==="strength") goto("slCard");
   else if(act==="balance") openMuscles();
   else if(act==="account") goAccount();
   else if(act==="objective") goto("objChips");
@@ -8189,7 +8197,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v128";
+const APP_VER="v129";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH

@@ -637,11 +637,13 @@
   .exfc.grow{ color:#2b8a3e; } .exfc.hold{ color:var(--l3); } .exfc.shrink{ color:#c92a2a; }
   .fcconn{ font-size:12px; color:var(--l2); line-height:1.45; margin:8px 0 2px; }
   /* collapsed-by-default secondary detail inside the forecast card */
-  .fcdetails{ margin-top:10px; border-top:.5px solid var(--sep); padding-top:8px; }
-  .fcdetails summary{ cursor:pointer; list-style:none; font-size:15px; font-weight:600; color:var(--ink); -webkit-tap-highlight-color:transparent; }
-  .fcdetails summary::-webkit-details-marker{ display:none; }
-  .fcdetails summary::after{ content:" ›"; color:var(--l3); }
-  .fcdetails[open] summary::after{ content:" ⌄"; }
+  /* foldable detail sections (manual disclosure — no native <details>, which some webviews wouldn't close) */
+  .fcfold{ margin-top:10px; border-top:.5px solid var(--sep); padding-top:8px; }
+  .fcfoldhd{ display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; background:none; border:none; padding:4px 0; margin:0; font-size:15px; font-weight:600; color:var(--ink); text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .fcfoldhd::after{ content:"›"; color:var(--l3); font-size:17px; line-height:1; transition:transform .2s; }
+  .fcfold.open .fcfoldhd::after{ transform:rotate(90deg); }
+  .fcfoldbody{ display:none; }
+  .fcfold.open .fcfoldbody{ display:block; }
   .insight{ border:.5px solid var(--line); border-left-width:3px; border-radius:12px; padding:16px 16px; background:var(--card); margin:0 0 18px; }
   .insight .ititle{ font-size:15px; font-weight:700; letter-spacing:-.2px; }
   .insight .itext{ font-size:15px; color:var(--l2); line-height:1.5; margin-top:8px; }
