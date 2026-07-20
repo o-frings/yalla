@@ -285,10 +285,17 @@
           <p class="fcnote"><a class="srclink" href="growth-model-whitepaper.pdf" target="_blank" rel="noopener">The method &amp; evidence (PDF) ↗</a></p>
         </details>
       </div>
-      <!-- Strength forecast ledger (Part II) — predictions written down before the outcome, then graded -->
+      <!-- Strength: history + forecast + per-exercise detail + calibration tracking, all in one tile (Part II) -->
       <div class="panel metile" id="slCard" data-tile="ledger" style="display:none;">
-        <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>Strength forecast — on the record</span><span class="tilegrip" aria-label="Drag to reorder" title="Drag to reorder">⠿</span></div>
-        <div id="slBody"></div>
+        <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5"/><path d="M4 15l4-4 4 3 8-8"/></svg>Strength progress</span><span class="tilegrip" aria-label="Drag to reorder" title="Drag to reorder">⠿</span></div>
+        <div class="exprogsum" id="exProgSum"></div>
+        <canvas id="exProgChart" width="660" height="150"></canvas>
+        <p class="fcnote" id="slCal"></p>
+        <details class="fcdetails">
+          <summary>By exercise</summary>
+          <div id="exProgList"></div>
+          <p class="fcnote">The solid line is your overall strength: each lift indexed to its own start (=100), averaged across lifts, so different loads combine into one trend. The dashed continuation is the model's 4-week forecast (80% band). Estimated 1RM (weight × reps); bodyweight and timed moves track top reps or seconds. Tap a lift for its full chart.</p>
+        </details>
         <details class="fcdetails" id="slTrack" style="display:none;">
           <summary>How it's tracking</summary>
           <div class="fchd2">Your response multiplier, as it learns</div>
@@ -300,7 +307,7 @@
         </details>
         <details class="fcdetails">
           <summary>How this works</summary>
-          <p class="fcnote">Each week the model predicts your strength change per exercise over the next 4 weeks and writes it down before the outcome exists. When the weeks have passed, the prediction is graded against what you actually lifted, and your personal response parameters update from the errors — so the forecasts get sharper the longer you log. Estimated 1RM is the yardstick: the app can see strength, not muscle size.</p>
+          <p class="fcnote">Each lift's estimated 1RM is tracked over time; the tile shows your overall strength (lifts indexed to their start and averaged) with a 4-week forecast. Each forecast is written down before the outcome exists, then graded against what you actually lift, and your personal response parameters update from the errors — so it sharpens the longer you log. Strength is the yardstick: the app can see strength, not muscle size.</p>
           <p class="fcnote"><a class="srclink" href="growth-model-whitepaper.pdf" target="_blank" rel="noopener">The method &amp; evidence (PDF) ↗</a></p>
         </details>
       </div>
@@ -333,17 +340,6 @@
           <div class="progpage"><canvas id="progBars4" width="660" height="180"></canvas></div>
         </div></div>
         <div class="panelfoot stack"><div class="progcap" id="progCap"></div><div class="progverd" id="progVerdict" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div></div>
-      </div>
-      <!-- Strength progress — headline overall-strength trend; per-exercise detail collapsed by default -->
-      <div class="panel metile" id="exProgCard" data-tile="exercises" style="display:none;">
-        <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5"/><path d="M4 15l4-4 4 3 8-8"/></svg>Strength progress</span><span class="tilegrip" aria-label="Drag to reorder" title="Drag to reorder">⠿</span></div>
-        <div class="exprogsum" id="exProgSum"></div>
-        <canvas id="exProgChart" width="660" height="150"></canvas>
-        <details class="fcdetails">
-          <summary>By exercise</summary>
-          <div id="exProgList"></div>
-          <p class="fcnote">The solid line is your overall strength: each lift indexed to its own start (=100), averaged across lifts, so different loads combine into one trend. The dashed continuation is the model's forecast for the next 4 weeks (80% band) — the same per-exercise predictions as the “Strength forecast” tile, combined. Estimated 1RM (weight × reps); bodyweight and timed moves track top reps or seconds. Tap a lift for its full chart. <a class="srclink" href="growth-model-whitepaper.pdf" target="_blank" rel="noopener">The method &amp; evidence (PDF) ↗</a></p>
-        </details>
       </div>
     </div>
 

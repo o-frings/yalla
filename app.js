@@ -3119,8 +3119,7 @@ function renderDash(){
   renderCalendar();
   renderBaseActivity();
   renderGrowthForecast();
-  renderStrengthLedger();
-  renderExerciseProgress();
+  renderStrength();
   renderGrowth();          // per-muscle current status, now folded into the forecast tile
   applyTileOrder();
   const po=$("progObj");   // objective-adherence score, moved onto the Progress tile
@@ -5615,8 +5614,10 @@ function drawStrengthIndex(si){
   ctx.textAlign="right"; ctx.fillText(f?"+"+f.weeks+"w":"now", W-padR, H-6);
   if(f){ ctx.textAlign="center"; ctx.fillStyle=hexAlpha(l3,.9); ctx.fillText("now", xNow, H-6); }
 }
-// per-exercise rows for the collapsed detail — % change vs start, sparkline, tap → full chart.
+// per-exercise rows for the collapsed detail — history %change vs start, that lift's 4-week forecast (from
+// the ledger, so it matches the aggregate line), a sparkline; tap → full chart.
 function exerciseProgress(){
+  const fc={}; if(typeof ledger!=="undefined") ledger.forEach(r=>{ if(!r.retro && (!fc[r.x]||r.k>fc[r.x].k)) fc[r.x]=r; });
   const out=[];
   Object.keys(hist).forEach(name=>{
     const es=(hist[name]||[]).slice().sort((a,b)=>a.d-b.d);
@@ -5629,7 +5630,8 @@ function exerciseProgress(){
     const base=Math.max(...series.slice(0,k)), recent=Math.max(...series.slice(-k));
     if(!(base>0)) return;
     const pct=(recent/base-1)*100, state = pct>=2 ? "grow" : pct<=-2 ? "shrink" : "hold";
-    out.push({ name, series, pct, state, last:pts[pts.length-1].d, g:muscleFor(name)[0]||"Other" });
+    const fr=fc[name], fpct=(fr&&fr.st==="pending") ? (Math.exp(fr.mu)-1)*100 : null;
+    out.push({ name, series, pct, state, fpct, last:pts[pts.length-1].d, g:muscleFor(name)[0]||"Other" });
   });
   return out.sort((a,b)=> b.last-a.last);                     // most recently trained first
 }
@@ -5639,29 +5641,6 @@ function sparkline(series, col){
   const pts=series.map((v,i)=>(i/(n-1)*W).toFixed(1)+","+(H-((v-mn)/sp)*H).toFixed(1)).join(" ");
   return '<svg class="spark" viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" preserveAspectRatio="none" aria-hidden="true">'
     +'<polyline points="'+pts+'" fill="none" stroke="'+col+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>';
-}
-function renderExerciseProgress(){
-  const card=$("exProgCard"); if(!card) return;
-  const rows=exerciseProgress(), si=strengthIndex();
-  if(!rows.length && !si){ card.style.display="none"; return; }
-  card.style.display="";
-  // headline: overall strength trend at a glance (index baselined at 100 → last idx − 100 = avg % change)
-  const sum=$("exProgSum"), chart=$("exProgChart");
-  if(si){ const pct=si.series[si.series.length-1].idx-100, up=pct>=1, dn=pct<=-1, ar=up?"↑":dn?"↓":"→", cls=up?"grow":dn?"shrink":"hold";
-    const cd=v=>v>=1?"grow":v<=-1?"shrink":"hold", cad=v=>v>=1?"↑":v<=-1?"↓":"→";
-    let head='Overall strength <span class="extr '+cls+'">'+ar+' '+(pct>=0?"+":"")+pct.toFixed(1)+'%</span>';
-    if(si.forecast) head+=' <span class="exprogsub">· forecast <span class="extr '+cd(si.forecast.pct)+'">'+cad(si.forecast.pct)+' '+(si.forecast.pct>=0?"+":"")+si.forecast.pct.toFixed(1)+'% next '+si.forecast.weeks+'w</span></span>';
-    else head+=' <span class="exprogsub">avg across '+si.lifts+' lift'+(si.lifts>1?"s":"")+' · last '+si.weeks+'w</span>';
-    sum.className="exprogsum"; sum.innerHTML=head;
-    if(chart){ chart.style.display=""; drawStrengthIndex(si); }
-  } else { sum.textContent=""; if(chart) chart.style.display="none"; }
-  const arrow={grow:"↑",hold:"→",shrink:"↓"};
-  $("exProgList").innerHTML = rows.map(r=>{ const col=MCOLOR[r.g]||"#888", s=(r.pct>=0?"+":"")+r.pct.toFixed(1)+"%";
-    return '<button type="button" class="exprow" data-ex="'+esc(r.name)+'">'
-      +'<span class="exdot" style="background:'+col+'"></span>'
-      +'<span class="exnm">'+esc(r.name)+'</span>'
-      +sparkline(r.series, col)
-      +'<span class="extr '+r.state+'">'+arrow[r.state]+' '+s+'</span></button>'; }).join("");
 }
 if($("exProgList")) $("exProgList").addEventListener("click", e=>{ const b=e.target.closest(".exprow"); if(b) openChart(b.dataset.ex); });
 
@@ -6431,7 +6410,7 @@ function applyTileVisibility(){
     el.classList.toggle("tile-off", off);
     const b=el.querySelector(".tilehide"); if(b){ b.innerHTML=off?TILE_ICON.eyeoff:TILE_ICON.eye; b.title=off?"Show tile":"Hide tile"; } });
 }
-const TILE_DEFAULT = ["forecast","ledger","balance","exercises","progress"];
+const TILE_DEFAULT = ["forecast","ledger","balance","progress"];
 function applyTileOrder(){
   const c=$("meTiles"); if(!c) return;
   const present=new Set([...c.querySelectorAll(".metile")].map(el=>el.dataset.tile));
@@ -6662,32 +6641,40 @@ function drawLedgerPredActual(scored){
   scored.forEach((r,i)=>{ const hit=r.out.hit80; ctx.beginPath(); ctx.arc(x(pr[i]),y(ac2[i]),4,0,7);
     ctx.fillStyle=hit?ac:hexAlpha(l3,.55); ctx.fill(); });
 }
-function renderStrengthLedger(){
+// One merged strength tile: overall-strength trend + 4-week forecast (headline + chart), a calibration line,
+// a per-exercise breakdown (history + each lift's forecast), and the calibration-tracking plots.
+function renderStrength(){
   const card=$("slCard"); if(!card) return;
-  if(!ledger.length){ card.style.display="none"; return; }
+  const si=strengthIndex(), rows=exerciseProgress(), hasLedger=ledger.length>0;
+  if(!si && !rows.length && !hasLedger){ card.style.display="none"; return; }
   card.style.display="";
-  const m=lgMetrics(), pct=v=>((Math.exp(v)-1)*100), s1=v=>(v>=0?"+":"")+v.toFixed(1)+"%";
-  const latest=Math.max(...ledger.map(r=>r.k));
-  const open=ledger.filter(r=>r.st==="pending"&&r.k>=latest-1).sort((a,b)=>b.mu-a.mu).slice(0,4);
-  let h="";
-  if(open.length){
-    h+='<div class="fchd2">Next '+LG.H+' weeks — strength forecast</div>';
-    h+=open.map(r=>{ const due=new Date((r.k+r.h+1)*LG.WK);
-      return '<div class="slrow"><b>'+esc(r.x)+'</b> '+s1(pct(r.mu))
-        +' <span class="slband">(80%: '+s1(pct(r.mu-LG.Z80*r.sd))+' … '+s1(pct(r.mu+LG.Z80*r.sd))
-        +')</span> <span class="slband">by '+due.toLocaleDateString(undefined,{month:"short",day:"numeric"})+'</span></div>'; }).join("");
+  const s1=v=>(v>=0?"+":"")+v.toFixed(1)+"%", cls=v=>v>=1?"grow":v<=-1?"shrink":"hold", ar=v=>v>=1?"↑":v<=-1?"↓":"→";
+  // headline + chart: overall strength (indexed, averaged) with the forecast continuation
+  const sum=$("exProgSum"), chart=$("exProgChart");
+  if(si){ const pct=si.series[si.series.length-1].idx-100;
+    let head='Overall strength <span class="extr '+cls(pct)+'">'+ar(pct)+' '+s1(pct)+'</span>';
+    if(si.forecast) head+=' <span class="exprogsub">· forecast <span class="extr '+cls(si.forecast.pct)+'">'+ar(si.forecast.pct)+' '+s1(si.forecast.pct)+' next '+si.forecast.weeks+'w</span></span>';
+    else head+=' <span class="exprogsub">avg across '+si.lifts+' lift'+(si.lifts>1?"s":"")+' · last '+si.weeks+'w</span>';
+    sum.style.display=""; sum.innerHTML=head; if(chart){ chart.style.display=""; drawStrengthIndex(si); }
+  } else { sum.style.display="none"; if(chart) chart.style.display="none"; }
+  // calibration one-liner
+  const m=lgMetrics(), cal=$("slCal");
+  if(cal){
+    if(m.n>=10){ const mu=Math.exp(calib.th.m), lo=Math.exp(calib.th.m-1.96*Math.sqrt(calib.th.v)), hi=Math.exp(calib.th.m+1.96*Math.sqrt(calib.th.v));
+      cal.style.display=""; cal.textContent="Calibrated on "+m.n+" scored forecasts — 80% intervals hit "+Math.round(100*m.coverage80)+"% · skill vs drift "+s1(100*m.skillVsDrift)+" · your response ×"+mu.toFixed(2)+" (95%: ×"+lo.toFixed(2)+"–×"+hi.toFixed(2)+")"+(m.unscorable?" · "+m.unscorable+" unscorable":"");
+    } else if(hasLedger){ cal.style.display=""; cal.textContent="Calibrating — "+m.n+" of 10 forecasts scored. Each prediction is recorded before the outcome exists, then graded against what you actually lift."; }
+    else cal.style.display="none";
   }
-  if(m.n>=10){
-    const lo=Math.exp(calib.th.m-1.96*Math.sqrt(calib.th.v)), hi=Math.exp(calib.th.m+1.96*Math.sqrt(calib.th.v));
-    h+='<p class="fcnote">Calibrated on '+m.n+' scored forecasts — 80% intervals hit '+Math.round(100*m.coverage80)
-      +'% · skill vs personal drift '+s1(100*m.skillVsDrift)
-      +' · your response multiplier ×'+Math.exp(calib.th.m).toFixed(2)+' (95%: ×'+lo.toFixed(2)+'–×'+hi.toFixed(2)+')'
-      +(m.unscorable? ' · '+m.unscorable+' unscorable':'')+'</p>';
-  } else {
-    h+='<p class="fcnote">Calibrating — '+m.n+' of 10 forecasts scored so far. Each prediction is written down before the outcome exists, then graded against what you actually lift; your personal parameters update from the errors.</p>';
-  }
-  $("slBody").innerHTML=h;
-  // "How it's tracking" — plots of the adjusted model (learning curve) and the forecast (predicted vs actual).
+  // by-exercise: history %change + each lift's 4-week forecast, tap → full chart
+  const arrow={grow:"↑",hold:"→",shrink:"↓"};
+  $("exProgList").innerHTML = rows.map(r=>{ const col=MCOLOR[r.g]||"#888";
+    const fc = r.fpct!=null ? ' <span class="exfc '+cls(r.fpct)+'">4w '+ar(r.fpct)+' '+s1(r.fpct)+'</span>' : '';
+    return '<button type="button" class="exprow" data-ex="'+esc(r.name)+'">'
+      +'<span class="exdot" style="background:'+col+'"></span>'
+      +'<span class="exnm">'+esc(r.name)+'</span>'
+      +sparkline(r.series, col)
+      +'<span class="extr '+r.state+'">'+arrow[r.state]+' '+s1(r.pct)+'</span>'+fc+'</button>'; }).join("");
+  // "How it's tracking" — the adjusted model (learning curve) + the forecast graded (predicted vs actual).
   const scored=ledger.filter(r=>!r.retro && r.st==="scored").sort((a,b)=>a.k-b.k);
   const emitted=ledger.filter(r=>!r.retro && r.in && r.in.thm!=null);
   const track=$("slTrack");
@@ -8191,7 +8178,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v125";
+const APP_VER="v126";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
