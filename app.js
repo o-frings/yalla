@@ -2703,9 +2703,9 @@ function startHomeWorkout(){
 const SPON_DAYS=[
   { id:"push",  name:"Push",       g:["chest","shoulders","sidedelts","triceps"] },
   { id:"pull",  name:"Pull",       g:["lats","upperback","reardelts","biceps"] },
-  { id:"legs",  name:"Legs",       g:["quads","hamstrings","glutes","calves"] },
+  { id:"legs",  name:"Legs",       g:["quads","hamstrings","glutes","glute med","adductors","calves"] },
   { id:"upper", name:"Upper body", g:["chest","lats","upperback","shoulders","sidedelts","triceps","biceps"] },
-  { id:"lower", name:"Lower body", g:["quads","hamstrings","glutes","calves","adductors","core"] },
+  { id:"lower", name:"Lower body", g:["quads","hamstrings","glutes","glute med","adductors","calves","core"] },
   { id:"full",  name:"Full body",  g:["chest","lats","quads","hamstrings","shoulders","core"] },
 ];
 const SPON_N={ push:4, pull:4, legs:4, upper:6, lower:6, full:5 };   // base counts ≈ a standard ~45-min session
@@ -6934,12 +6934,13 @@ function drawForecastMuscles(f, which){
 
 // ================= automatic plan builder =================
 const BUILD_POOL={
-  chest:["Barbell Bench Press","Incline Barbell Press","Incline DB Press","Machine Chest Press","Weighted Dip","Dumbbell Bench Press","Cable Fly","Pec Deck","Machine Chest Fly","Push-Ups","Decline Push-Ups","Diamond Push-Ups","Incline Push-Ups","Kettlebell Floor Press"],
+  chest:["Barbell Bench Press","Incline Barbell Press","Incline DB Press","Machine Chest Press","Weighted Dip","Dumbbell Bench Press","Cable Fly","Incline Dumbbell Fly","Low-to-High Cable Fly","Dumbbell Fly","Cable Crossover","Pec Deck","Machine Chest Fly","Push-Ups","Decline Push-Ups","Diamond Push-Ups","Incline Push-Ups","Kettlebell Floor Press"],
   lats:["Weighted Pull-Up","Pull-Up","Lat Pulldown","Chin-Up","Straight-Arm Pulldown","Dumbbell Pullover","One-Arm DB Row"],
   upperback:["Chest-Supported Row","Bent-Over Row","Seated Row","One-Arm DB Row","T-Bar Row","Meadows Row","Face Pulls","Inverted / Backpack Row","Kettlebell Row"],
   lowerback:["Back Extension","Good Morning","Rack Pull","Superman","Romanian Deadlift"],
   forearms:["Wrist Curl","Reverse Wrist Curl","Hammer Curl","Reverse Curl","Farmer's Carry","Dead Hang"],
   adductors:["Hip Adduction","Cable Adduction (inner)","Cossack Squat","Copenhagen Plank"],
+  "glute med":["Hip Abduction","Cable Abduction","Banded Side Steps","Side-Lying Leg Raise"],
   shoulders:["Overhead Press","Seated DB Press","Machine Shoulder Press","Arnold Press","Pike Push-Ups","Kettlebell Overhead Press","Kettlebell Push Press","Kettlebell Clean & Press"],
   sidedelts:["Lateral Raise","Cable Lateral Raise","Dumbbell Lateral Raise","Machine Lateral Raise","Upright Row","Kettlebell High Pull"],
   reardelts:["Rear Delt Fly","Face Pulls","Reverse Pec Deck","Cable Rear Delt Fly","Bent-Over Lateral Raise","Band Pull-Aparts","Prone Y-Raise"],
@@ -7073,7 +7074,7 @@ const FOCUS_LABEL={ balanced:"balanced", upper:"upper body", lower:"lower body",
 function focusGroups(focus){ return ({ upper:["chest","upperback","lats","shoulders"], lower:["quads","hamstrings","glutes"],
   glutes:["glutes","hamstrings"], arms:["biceps","triceps"], chest:["chest"], back:["upperback","lats"], balanced:[] }[focus])||[]; }
 function buildSplit(freq, exp){
-  const P=["chest","shoulders","sidedelts","triceps"], U=["chest","upperback","lats","shoulders","sidedelts","reardelts","biceps","triceps"], L=["quads","hamstrings","glutes","calves"], PL=["upperback","lats","reardelts","biceps"];
+  const P=["chest","shoulders","sidedelts","triceps"], U=["chest","upperback","lats","shoulders","sidedelts","reardelts","biceps","triceps"], L=["quads","hamstrings","glutes","glute med","adductors","calves"], PL=["upperback","lats","reardelts","biceps"];
   if(freq<=2) return [{name:"Full Body A",g:["quads","chest","upperback","shoulders","core"]},{name:"Full Body B",g:["hamstrings","lats","chest","glutes","sidedelts","core"]}];
   if(freq===3){ if(exp==="beginner") return [{name:"Full Body A",g:["quads","chest","upperback","core"]},{name:"Full Body B",g:["hamstrings","shoulders","lats","glutes"]},{name:"Full Body C",g:["quads","chest","upperback","biceps","triceps"]}];
     return [{name:"Push",g:P},{name:"Pull",g:PL},{name:"Legs",g:L}]; }
@@ -7227,7 +7228,8 @@ function familyKey(name){
   if(/wrist curl/.test(n)) return "wristcurl";
   if(/adduction|adductor|cossack|copenhagen/.test(n)) return "adductor";
   if(/curl/.test(n)) return "curl";
-  if(/(fly|pec deck)/.test(n)) return "chestfly";
+  if(/(fly|flye|pec deck|crossover)/.test(n)) return "chestfly";
+  if(/abduction|banded side step|clamshell|monster walk|lateral band walk|side.?lying leg|hip abductor|fire.?hydrant/.test(n)) return "abduction";
   if(/superman|back extension|hyperextension/.test(n)) return "backext";
   if(/(crunch|leg raise|plank|hollow|sit-up|ab wheel|dead bug|bicycle|russian twist|mountain climber|bird dog|hold)/.test(n)) return "core";
   return n.replace(/[^a-z]/g,'');
@@ -7292,20 +7294,25 @@ function pickWorkoutWeighted(groups, n, injuries, level, W, offset, exp, obj, bi
     if(donor){ target[donor]--; target[g]=1; }
   }});
   const idx={}; usable.forEach(g=> idx[g]= Math.min(offset, Math.max(0,avail[g].length-1)) );
-  const used=new Set(), usedFam=new Set(), chosen=[], compDone=new Set(), left=Object.assign({},target), gcount={}; usable.forEach(g=>gcount[g]=0); let progress=true;
+  const used=new Set(), usedFam=new Set(), compPrimary=new Set(), chosen=[], compDone=new Set(), left=Object.assign({},target), gcount={}; usable.forEach(g=>gcount[g]=0); let progress=true;
   // For a compound muscle, anchor it with a real compound (first pick), then prefer an isolation for any extra
   // slot — so e.g. a chest day becomes bench (compound) + a fly (isolation), not two presses. Sequential idx
   // scan is kept so the offset still rotates which exercises a repeated-signature day draws.
+  // Also refuse a SECOND compound whose primary muscle already has one (across groups too): stops "two squats"
+  // — Back Squat then Leg Press / a quad-primary Bulgarian — so the day spreads across different muscles.
   const take=(g)=>{ const arr=avail[g]; const roleAware=COMPOUND_GROUPS.indexOf(g)>=0, wantIso=roleAware && gcount[g]>0;
     let i=idx[g], pick=-1, fallback=-1;
     for(; i<arr.length; i++){ const nm=arr[i]; if(used.has(nm)||usedFam.has(familyKey(nm))) continue;
       if(fallback<0) fallback=i;
+      const iso=roleFor(nm)==="isolation";
+      if(!iso && compPrimary.has(muscleFor(nm)[0])) continue;    // that muscle already has a compound → seek variety
       if(!roleAware){ pick=i; break; }
-      if(wantIso===(roleFor(nm)==="isolation")){ pick=i; break; } }
+      if(wantIso===iso){ pick=i; break; } }
     if(pick<0) pick=fallback;
     if(pick<0){ idx[g]=arr.length; return false; }
     idx[g]=pick+1;
     const nm=arr[pick]; used.add(nm); usedFam.add(familyKey(nm)); gcount[g]++;
+    if(roleFor(nm)==="compound") compPrimary.add(muscleFor(nm)[0]);
     const isComp=roleAware && roleFor(nm)==="compound" && !compDone.has(g); if(isComp) compDone.add(g);
     chosen.push({n:nm, comp:isComp}); return true; };
   while(chosen.length<n && progress){ progress=false;
@@ -8234,7 +8241,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v132";
+const APP_VER="v133";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
