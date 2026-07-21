@@ -224,6 +224,11 @@
  .largeTitle{ font-size:29px; font-weight:700; letter-spacing:-1px; padding: calc(env(safe-area-inset-top) + 12px) 0 16px; }
   .largeTitle .ltmain{ display:flex; align-items:center; gap:12px; }
   .largeTitle .ltmain .titleBtn{ flex:1; min-width:0; line-height:1.08; }
+  /* Workout is a working screen — the training leads, not the program name. Demote the plan title to a
+     quiet label (still tappable to open Plans) and tighten the header so the first set sits higher. */
+  #largeTitle{ font-size:20px; letter-spacing:-.4px; padding: calc(env(safe-area-inset-top) + 12px) 0 8px; }
+  #largeTitle .titleBtn{ font-weight:650; color:var(--l2); }
+  #largeTitle small{ font-size:13px; margin-top:3px; }
   .largeTitle .ltmain .iconbtn{ flex:0 0 auto; align-self:flex-start; margin-top:2px; }
   .largeTitle small{ display:block; font-size:15px; font-weight:500; color:var(--l2); letter-spacing:0; margin-top:8px; }
   /* Overview header → Friends destination: a tappable people chip with a request badge */
