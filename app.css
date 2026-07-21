@@ -236,6 +236,12 @@
   .startrow{ display:flex; gap:10px; margin:0 0 16px; }
   .startrow .btn{ flex:1; display:flex; align-items:center; justify-content:center; gap:8px; font-size:15px; font-weight:650; padding-left:10px; padding-right:10px; min-width:0; }
   .startrow .btn svg{ width:18px; height:18px; flex:0 0 auto; }
+  /* Set up → Train: once a session is underway, the setup chrome recedes and training fills the screen.
+     Keep #largeTitle for its safe-area top inset, just empty it. */
+  body.training #largeTitle{ padding-bottom:0; }
+  body.training #largeTitle .ltmain{ display:none; }
+  body.training #pageWorkout .startrow,
+  body.training #pageWorkout #seg{ display:none; }
   .largeTitle .ltmain .iconbtn{ flex:0 0 auto; align-self:flex-start; margin-top:2px; }
   .largeTitle small{ display:block; font-size:15px; font-weight:500; color:var(--l2); letter-spacing:0; margin-top:8px; }
   /* Overview header → Friends destination: a tappable people chip with a request badge */

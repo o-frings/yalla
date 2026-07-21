@@ -2250,7 +2250,12 @@ function tmrRender(){
   $("tmrLbl").textContent = timer.running ? "running" : (timer.elapsed>0?"paused":"Start session timer");
   $("tmrReset").style.visibility = (timer.elapsed>0||timer.running) ? "visible" : "hidden";
   updateTimerStick();
+  updateTrainingState();
 }
+// A session is "underway" once the clock is running or paused mid-workout. In that state the Workout
+// screen drops its setup chrome (start buttons, day toggle, header icons) so training fills the screen.
+function sessionUnderway(){ return timer.running || timer.elapsed>0; }
+function updateTrainingState(){ document.body.classList.toggle("training", sessionUnderway()); }
 // Pin the session + rest timers to the top while a workout's underway (active timer OR a running
 // rest). .stick enables position:sticky; an IntersectionObserver adds .stuck (the backdrop) only once
 // the bar actually reaches the top, so nothing changes visually until you scroll.
@@ -2326,7 +2331,7 @@ $("exlist").addEventListener("change", e=>{ if(!e.target.classList||(!e.target.c
   const wv=row.querySelector(".w").value.trim(), rv=row.querySelector(".r").value.trim();
   // a set is "done" once reps are in and either a weight is entered, it's a timed hold, or it's a
   // bodyweight move (no weight needed) — the bodyweight case is why rest sometimes didn't start.
-  if(rv!=="" && (wv!=="" || row.classList.contains("timed") || (name&&isBW(name)))) restStart(); captureDraft();
+  if(rv!=="" && (wv!=="" || row.classList.contains("timed") || (name&&isBW(name)))){ if(!timer.running && timer.elapsed===0) tmrStart(); restStart(); } captureDraft();
   refreshSetFocus(g); });
 // Visual focus only: fade the sets you've completed so the one you're on leads the eye. Same "done"
 // rule as the rest-timer trigger; never changes what's logged.
@@ -8418,7 +8423,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v155";
+const APP_VER="v156";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
