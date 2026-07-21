@@ -2905,7 +2905,7 @@ function sponSwap(xi){
   e.n=e.alts[(e.alts.indexOf(e.n)+1)%e.alts.length]; renderSpon();
 }
 function sponStart(){
-  const day=_sponDays[_sponSel], s={}; day.ex.forEach(e=> s[e.n]=[]);
+  const day=_sponDays[_sponSel], s={}; day.ex.forEach(e=> s[e.n]=Array.from({length:objSets(e.n)},()=>({w:"",r:""})));
   draft["free"]={ t:Date.now(), s, spon:1, name:day.name }; sset("draft", draft);
   freeMode=true; swaps={}; closeSheet("Spon"); renderSeg(); renderFree(); showTab("workout");
   toast(day.name+" session ready — picked from your recent training. Let's go!");
@@ -5050,7 +5050,7 @@ function loadSurprise(){
   const opts=(_sponDays||[]).filter(d=>d.ex && d.ex.length);
   if(!opts.length){ toast("Log a session or two first — then I can surprise you."); settings.surprise=false; sset("settings",settings); freeMode=false; renderSeg(); renderWorkout(); return; }
   const pick=opts[Math.floor(Math.random()*opts.length)]; _sponSel=_sponDays.indexOf(pick);
-  const s={}; pick.ex.forEach(e=> s[e.n]=[]);
+  const s={}; pick.ex.forEach(e=> s[e.n]=Array.from({length:objSets(e.n)},()=>({w:"",r:""})));
   draft["free"]={ t:Date.now(), s, spon:1, name:pick.name, tpl:pick.tpl, shuffle:pick.shuffle||0 }; sset("draft", draft);
   freeMode=true; swaps={}; renderSeg(); renderFree();
 }
@@ -5059,7 +5059,7 @@ function relenSurprise(){
   const fd=draft["free"]; if(!fd || fd.tpl==null){ loadSurprise(); return; }
   _sponLen=settings.sponLen||"standard"; _sponPr=_sponPr||(typeof sponPriorities==="function"?sponPriorities():null);
   const day=buildSponDay(fd.tpl, _sponPr, fd.shuffle||0), s={};
-  day.ex.forEach(e=> s[e.n]=[]);
+  day.ex.forEach(e=> s[e.n]=Array.from({length:objSets(e.n)},()=>({w:"",r:""})));
   draft["free"]={ t:Date.now(), s, spon:1, name:day.name, tpl:fd.tpl, shuffle:fd.shuffle||0 }; sset("draft", draft);
   freeMode=true; renderSeg(); renderFree();
 }
@@ -5074,7 +5074,11 @@ function renderStartMode(){
   const act=$("startAction"); if(!act) return;
   const refresh='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v4h-4"/></svg>';
   const swap='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>';
-  const sh=$("headerShuf"); if(sh) sh.style.display = on ? "" : "none";
+  // one header-icon slot carries the mode's action: shuffle (Surprise) or change plan (Plan)
+  const sh=$("headerShuf");
+  if(sh){ sh.style.display=""; sh.innerHTML = on ? refresh : swap;
+    sh.setAttribute("aria-label", on ? "New surprise" : "Change plan");
+    sh.onclick = on ? surpriseShuffle : (()=>{ renderPlanList(); openSheet("Plans"); }); }
   if(on){
     const fd=draft["free"]||{}, nm=fd.name||"Surprise session", nEx=fd.s?Object.keys(fd.s).length:0, L=settings.sponLen||"standard";
     // the session IS the title (fills the top-left); its shape is the subtitle
@@ -5086,8 +5090,7 @@ function renderStartMode(){
   } else {
     if($("ltName")) $("ltName").textContent="Workout";
     if($("planSub")) $("planSub").textContent = (typeof planMeta==="function") ? planMeta(activePlan()) : "";
-    act.innerHTML='<button class="planlink" id="choosePlanBtn" type="button">Change plan ›</button>';
-    $("choosePlanBtn").onclick=()=>{ renderPlanList(); openSheet("Plans"); };
+    act.innerHTML="";   // change-plan lives in the header icon now; day tabs below carry the day choice
   }
 }
 document.querySelectorAll("#wkMode .s").forEach(t=> t.onclick=()=>{
@@ -8522,7 +8525,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v165";
+const APP_VER="v166";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
