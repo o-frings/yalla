@@ -3042,7 +3042,7 @@ function renderOverview(){
   // --- Spontaneous session — a data-picked day for whenever you just want to train now ---
   if(!did && !due){
     h+='<div class="ed-label" style="margin-top:18px;">Feeling spontaneous?</div>';
-    h+='<div class="group ovtap ovspon"><div class="pad ovstartpad"><div class="ovstarttext"><div class="ovbig">Suggest a session</div><div class="ovmeta">a day picked from your recent training &amp; goals</div></div><span class="ovchev ovgo">›</span></div></div>';
+    h+='<div class="group ovtap ovspon"><div class="pad ovstartpad"><div class="ovstarttext"><div class="ovbig">Suggest a session</div><div class="ovmeta">Picked from your recent training.</div></div><span class="ovchev ovgo">›</span></div></div>';
   }
   // --- Spotlight — the single most notable thing right now, with a real graph; celebrate a win or flag a gap ---
   const spot=spotlight();
@@ -3169,7 +3169,7 @@ function renderDash(){
   const po=$("progObj");   // objective-adherence score, moved onto the Progress tile
   if(po){ if(!Object.keys(hist).length){ po.textContent="No sessions yet"; po.className="lh"; }
     else { const os=meObjectiveScore(7); po.className="lh "+(os.pct>=85?"good":os.pct<50?"under":"");
-      po.textContent=os.objLabel+" · "+os.pct+"% "+(os.pct>=85?"on track":os.pct<50?"behind":"on your way"); } }
+      po.textContent=(os.pct>=85?"On track":os.pct<50?"Behind pace":"On your way")+" for "+os.objLabel.toLowerCase()+" — "+os.pct+"% of this week's target."; } }
   renderCardioCard();
   renderMeDiscover();
   renderAchievements();
@@ -4870,7 +4870,7 @@ function renderMuscles(){
     else if(!Object.keys(hist).length){ lead.className="lh"; lead.textContent="No sessions yet"; }
     else { const det=expandLegacyMtot(view), under=GAUGE_GROUPS.filter(g=>gaugeVal(det,g)<WEEKLY_SET_MIN).length, tot=GAUGE_GROUPS.length;
       lead.className="lh "+(under?"":"good");
-      lead.textContent = under ? ((tot-under)+" of "+tot+" muscles on target") : ("All "+tot+" major muscles on target 💪"); }
+      lead.textContent = under ? ("You're hitting "+(tot-under)+" of "+tot+" muscle groups this week.") : ("You're hitting all "+tot+" major muscle groups this week 💪"); }
   }
   drawRadar(view, "musRadar", useTarget ? WEEKLY_SET_TARGET : null, false, relative);
   const groups=Object.keys(view).filter(g=>view[g]>0).sort((a,b)=>view[b]-view[a]);
@@ -6858,9 +6858,12 @@ function renderStrength(){
   // DETAIL sheet: headline + chart: overall strength (indexed, averaged) with the forecast continuation
   const sum=$("exProgSum"), chart=$("exProgChart");
   if(si){ const pct=si.series[si.series.length-1].idx-100;
-    let head='Overall strength <span class="extr '+cls(pct)+'">'+ar(pct)+' '+s1(pct)+'</span>';
-    if(si.forecast) head+=' <span class="exprogsub">· forecast <span class="extr '+cls(si.forecast.pct)+'">'+ar(si.forecast.pct)+' '+s1(si.forecast.pct)+' next '+si.forecast.weeks+'w</span></span>';
-    else head+=' <span class="exprogsub">avg across '+si.lifts+' lift'+(si.lifts>1?"s":"")+' · last '+si.weeks+'w</span>';
+    const verb = pct>=1 ? "You're getting stronger" : pct<=-1 ? "Your strength has dipped" : "Your strength is holding steady";
+    let head = Math.abs(pct)>=1
+      ? verb+' — <span class="extr '+cls(pct)+'">'+s1(pct)+'</span> overall over the last '+si.weeks+' weeks'
+      : verb+' over the last '+si.weeks+' weeks';
+    if(si.forecast) head+=' <span class="exprogsub">Forecast: <span class="extr '+cls(si.forecast.pct)+'">'+ar(si.forecast.pct)+' '+s1(si.forecast.pct)+'</span> over the next '+si.forecast.weeks+' weeks.</span>';
+    else head+=' <span class="exprogsub">Averaged across '+si.lifts+' lift'+(si.lifts>1?"s":"")+', each indexed to its own start.</span>';
     sum.style.display=""; sum.innerHTML=head; if(chart){ chart.style.display=""; drawStrengthIndex(si); }
   } else { sum.style.display="none"; if(chart) chart.style.display="none"; }
   // calibration one-liner
@@ -8400,7 +8403,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v147";
+const APP_VER="v148";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
