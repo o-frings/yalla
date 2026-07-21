@@ -200,7 +200,9 @@
   .gymnew{ flex:0 0 auto; width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; border-radius:12px; border:.5px solid var(--line); background:var(--card); color:var(--accent); cursor:pointer; }
   .gymnew svg{ width:18px; height:18px; }
   .gymnew:active{ transform:scale(.92); }
-  .titleBtn .tchev{ width:22px; height:22px; color:var(--l3); vertical-align:-3px; margin-left:4px; }
+  /* the plan name reads as a quiet title, not a picker: no dropdown chevron. Tapping it still opens
+     Plans — switching programs is a rare, deliberate act that doesn't need a permanent invitation. */
+  .titleBtn .tchev{ display:none; }
   /* compact training-mode toggle in the title (replaces the full-width Strength/Cardio segment) */
   .modebtn{ flex:0 0 auto; align-self:center; display:inline-flex; align-items:center; gap:6px; background:var(--accent-soft); color:var(--accent); border:none; font-family:inherit; font-size:13px; font-weight:600; padding:6px 11px; border-radius:16px; cursor:pointer; line-height:1; transition:transform .12s; }
   .modebtn:active{ transform:scale(.95); }
