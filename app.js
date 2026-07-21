@@ -2579,7 +2579,7 @@ function renderAll(){ renderNav(); renderDash(); renderSeg(); renderWorkout(); }
 
 // ================= dashboard =================
 function renderNav(){
-  $("ltName").textContent = activePlan().name;
+  $("ltName").textContent = freeMode ? "Free workout" : ((activePlan().workouts[curWk]||{}).name || "Workout");
   $("planSub").textContent = planMeta(activePlan());
   $("bwGoalTxt").textContent = settings.goalTarget!=null ? settings.goalTarget+" kg" : "—";
 }
@@ -3713,7 +3713,7 @@ function renderWorkout(){
   // swap or "keep" re-render doesn't reshuffle the variety or wipe the user's pins.
   const rsig=p.id+"#"+curWk+"#"+((settings.slotDone&&settings.slotDone[p.id+"|"+w.name])||0);
   if(rsig!==_rotSig){ _rotSig=rsig; applyRotation(); }
-  $("planSub").textContent = planMeta(p);
+  $("ltName").textContent = w.name; $("planSub").textContent = planMeta(p);
   renderInjuryBanner();
   const injRes=resolveInjuryNames(w); let shown=0;
   w.ex.forEach((e,xi)=>{
@@ -3915,7 +3915,7 @@ function celebrate(big){
 // ================= plans sheet =================
 function openSheet(s){ $("scrim"+s).classList.add("show"); $("sheet"+s).classList.add("show"); }
 function closeSheet(s){ $("scrim"+s).classList.remove("show"); $("sheet"+s).classList.remove("show"); }
-$("openPlans").onclick=()=>{ renderPlanList(); openSheet("Plans"); };
+if($("planPick")) $("planPick").onclick=()=>{ renderPlanList(); openSheet("Plans"); };
 $("closePlans").onclick=()=>closeSheet("Plans");
 $("scrimPlans").onclick=()=>closeSheet("Plans");
 // move the "set-once" groups (body details, appearance, account, data) off Me into the Settings sheet
@@ -5151,7 +5151,7 @@ function buildFreeGroup(name){
 }
 function renderFree(){
   if(typeof renderTravelBanner==="function") renderTravelBanner();
-  $("planSub").textContent="Free workout — choose your exercises";
+  $("ltName").textContent="Free workout"; $("planSub").textContent="Free workout — choose your exercises";
   const list=$("exlist"); list.innerHTML="";
   const hint=document.createElement("p"); hint.className="freehint";
   hint.textContent="A one-off session. Add any exercises you like — grouped by muscle, logged to history just like a plan workout.";
@@ -8418,7 +8418,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v153";
+const APP_VER="v154";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH

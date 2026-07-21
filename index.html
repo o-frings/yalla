@@ -58,7 +58,7 @@
 <div class="page" id="pageWorkout" data-tab="workout">
 <div class="largeTitle" id="largeTitle">
   <div class="ltmain">
-    <span class="titleBtn" id="openPlans"><span id="ltName">Yalla</span><svg class="tchev" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+    <span class="wktitle"><span id="ltName">Workout</span></span>
     <!-- travel mode quick-access — one tap to tag sessions when you're away from your usual gym -->
     <button class="modebtn travelbtn" id="travelQuick" type="button" aria-label="Travel mode">
       <svg class="mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l5.2 4.2-2 4-2-1-1 1 3 2 2 3 1-1-1-2 4-2 4.2 5.2a.5.5 0 0 0 .8-.4z"/></svg>
@@ -85,8 +85,11 @@
 
 <div id="strengthWrap">
 <!-- WORKOUT -->
-<!-- Two equal ways to start: get a data-picked session, or follow the plan (the day tabs below). -->
-<button class="btn tinted wide sponhero" id="sponHero" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>Suggest a session</button>
+<!-- Two ways to start: a data-picked session (leads), or switch the program you're on. -->
+<div class="startrow">
+  <button class="btn sponhero" id="sponHero" type="button"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4l1.7 5.4a3 3 0 0 0 1.9 1.9l5.4 1.7-5.4 1.7a3 3 0 0 0-1.9 1.9L12 20.4l-1.7-5.4a3 3 0 0 0-1.9-1.9L3 12.8l5.4-1.7a3 3 0 0 0 1.9-1.9z"/></svg>Suggest a session</button>
+  <button class="btn tinted planpick" id="planPick" type="button" aria-label="Choose a plan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>Choose a plan</button>
+</div>
 <div class="seg" id="seg"></div>
 <!-- session timer + rest ("pause") timer: pinned to the top of the page once a workout's underway.
      Train together + Share live now live as compact icons on the right of this bar (see .tmrsocial);
