@@ -1159,6 +1159,8 @@
   .ovspot.watch{ box-shadow:inset 3px 0 0 #e8890c; }
   .ovspot.info{ box-shadow:inset 3px 0 0 var(--accent); }
   .ovspot.info .spotk{ color:var(--accent); }
+  .ovspot{ animation:rise .44s cubic-bezier(.2,.8,.2,1) both; }
+  @media (prefers-reduced-motion: reduce){ .ovspot{ animation:none; } }
   .spothd{ display:flex; align-items:center; gap:7px; margin-bottom:6px; }
   .spotico{ font-size:17px; line-height:1; }
   .spotk{ font-size:11px; font-weight:750; letter-spacing:.6px; text-transform:uppercase; color:var(--l3); }

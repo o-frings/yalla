@@ -3048,6 +3048,9 @@ function renderOverview(){
     h+='<div class="group"><div class="pad"><div class="ovk">Deload week</div><div class="ovbig">Take it lighter</div><p class="ovp" style="margin-top:8px;">You’ve trained hard for a while. One easier week (~40% less) lets your body catch up — you’ll come back stronger.</p></div></div>';
   } else if(did){
     h+='<div class="group"><div class="pad"><div class="ovk">Today</div><div class="ovbig">Done for today 💪</div><p class="ovp" style="margin-top:8px;">You’ve logged a session. Rest and refuel — showing up consistently is what builds it.</p></div></div>';
+  } else if(settings.surprise){
+    // one adaptive start — reflects the mode chosen on the Workout tab (here: Surprise)
+    h+='<div class="group ovtap ovstart"><div class="pad ovstartpad"><div class="ovstarttext"><div class="ovk">Surprise session</div><div class="ovbig">A session, picked for you</div><div class="ovmeta">Tap to see today’s surprise</div></div><span class="ovchev ovgo">›</span></div></div>';
   } else if(w){
     h+='<div class="group ovtap ovstart"><div class="pad ovstartpad"><div class="ovstarttext"><div class="ovk">Next session</div><div class="ovbig">'+esc(w.name)+'</div><div class="ovmeta">≈'+workoutMinutes(w)+' min · '+w.ex.length+' exercise'+(w.ex.length===1?'':'s')+'</div></div><span class="ovchev ovgo">›</span></div></div>';
   } else {
@@ -3057,11 +3060,6 @@ function renderOverview(){
   const f7=sessionCredit(7);
   const motiv = f7>=4?"Strong week — you’re putting in the work." : f7>=2?"Good momentum — keep it rolling." : f7>=1?"You’ve started — one more session lifts the whole week." : "Fresh week. The first session is the hardest — let’s go.";
   h+='<p class="ovp" style="margin:12px 0 0;">'+motiv+'</p>';
-  // --- Spontaneous session — a data-picked day for whenever you just want to train now ---
-  if(!did && !due){
-    h+='<div class="ed-label" style="margin-top:18px;">Feeling spontaneous?</div>';
-    h+='<div class="group ovtap ovspon"><div class="pad ovstartpad"><div class="ovstarttext"><div class="ovbig">Suggest a session</div><div class="ovmeta">Picked from your recent training.</div></div><span class="ovchev ovgo">›</span></div></div>';
-  }
   // --- Spotlight — the single most notable thing right now, with a real graph; celebrate a win or flag a gap ---
   const spot=spotlight();
   if(spot){
@@ -4792,16 +4790,23 @@ function drawSummarySpark(id, series){
 function spotColor(kind){ return kind==="win" ? "#2b8a3e" : kind==="watch" ? "#e8890c" : accentHex(); }
 // weekly bars, latest highlighted, dashed mean baseline
 function drawSpotChart(id, series, kind){
-  const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height;
   series=(series||[]).filter(v=>v!=null); if(series.length<2) return;
   const col=spotColor(kind), n=series.length, mn=Math.min(...series,0), mx=Math.max(...series), sp=(mx-mn)||1;
-  const padX=10, top=12, bot=14, gap=(W-padX*2)/n, bw=Math.min(36, gap*0.6);
-  const y=v=> (H-bot)-((v-mn)/sp)*(H-top-bot);
+  const padX=10, top=12, bot=14, gap=(W-padX*2)/n, bw=Math.min(36, gap*0.6), baseY=H-bot;
+  const y=v=> baseY-((v-mn)/sp)*(H-top-bot);
   const mean=series.reduce((a,b)=>a+b,0)/n;
-  ctx.strokeStyle=hexAlpha(col,.30); ctx.lineWidth=1.5; ctx.setLineDash([5,6]);
-  ctx.beginPath(); ctx.moveTo(padX,y(mean)); ctx.lineTo(W-padX,y(mean)); ctx.stroke(); ctx.setLineDash([]);
-  series.forEach((v,i)=>{ const x=padX+gap*i+(gap-bw)/2, yy=y(v);
-    ctx.fillStyle = i===n-1 ? col : hexAlpha(col,.34); ctx.fillRect(x, yy, bw, Math.max(2,(H-bot)-yy)); });
+  const reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const start=Date.now(), dur=reduce?0:540;
+  (function frame(){
+    const p=dur?Math.min(1,(Date.now()-start)/dur):1, e=1-Math.pow(1-p,3);   // bars grow in from the baseline
+    ctx.clearRect(0,0,W,H);
+    ctx.globalAlpha=e; ctx.strokeStyle=hexAlpha(col,.30); ctx.lineWidth=1.5; ctx.setLineDash([5,6]);
+    ctx.beginPath(); ctx.moveTo(padX,y(mean)); ctx.lineTo(W-padX,y(mean)); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
+    series.forEach((v,i)=>{ const x=padX+gap*i+(gap-bw)/2, full=y(v), yy=baseY-(baseY-full)*e;
+      ctx.fillStyle = i===n-1 ? col : hexAlpha(col,.34); ctx.fillRect(x, yy, bw, Math.max(2,baseY-yy)); });
+    if(p<1) requestAnimationFrame(frame);
+  })();
 }
 // horizontal bars of the under-dosed muscles vs the weekly target (dashed line = target)
 function drawSpotBalance(id, unders){
@@ -8536,7 +8541,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v171";
+const APP_VER="v172";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
