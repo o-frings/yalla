@@ -3936,8 +3936,8 @@ let _figFns={};
 function animateFig(id){
   const fn=_figFns[id], c=$(id); if(!fn||!c||!c.offsetParent) return;
   if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches){ fn(1); return; }
-  const start=Date.now(), dur=660;
-  (function frame(){ const p=Math.min(1,(Date.now()-start)/dur), e=1-Math.pow(1-p,3); fn(e); if(p<1) requestAnimationFrame(frame); })();
+  const start=Date.now(), dur=1000;
+  (function frame(){ const p=Math.min(1,(Date.now()-start)/dur), e=1-Math.pow(1-p,4); fn(e); if(p<1) requestAnimationFrame(frame); })();
 }
 function openSheet(s){ $("scrim"+s).classList.add("show"); const sh=$("sheet"+s); if(sh) sh.classList.add("show");
   if(sh && sh.classList.contains("detailsheet")) setTimeout(()=>{ sh.querySelectorAll(".sheetbody canvas").forEach(cv=>{ if(cv.id) animateFig(cv.id); }); }, 170);
@@ -4578,7 +4578,6 @@ document.querySelectorAll("#musVolMode .s").forEach(s=> s.onclick=()=>{ musVolMo
 document.querySelectorAll("#musScale .s").forEach(s=> s.onclick=()=>{ musScale=s.dataset.sc; renderMuscles(); });
 const MUS_TIP="This radar shows your logged weekly sets per muscle against the ~10-set growth target — a dent means that muscle is under-dosed. Each plan's own balance lives with the plan.";
 function openMuscles(){ if(!plans.some(p=>p.id===musSrc)) musSrc="log"; renderMuscles(); openSheet("Mus"); coach("muscles",MUS_TIP); }
-function openMusclesFor(id){ if(plans.some(p=>p.id===id)){ musSrc=id; renderMuscles(); openSheet("Mus"); coach("muscles",MUS_TIP); } }  // plan-level entry
 function fmtKg(v){ return v>=1000 ? round1(v/1000)+"t" : Math.round(v)+"kg"; }
 // target: if given, a spoke reaching the outer ring means that muscle hit `target` sets/week
 // (so the chart reads "am I training each muscle enough?"); if omitted, spokes scale to the largest
@@ -4797,9 +4796,9 @@ function drawSpotChart(id, series, kind){
   const y=v=> baseY-((v-mn)/sp)*(H-top-bot);
   const mean=series.reduce((a,b)=>a+b,0)/n;
   const reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const start=Date.now(), dur=reduce?0:540;
+  const start=Date.now(), dur=reduce?0:760;
   (function frame(){
-    const p=dur?Math.min(1,(Date.now()-start)/dur):1, e=1-Math.pow(1-p,3);   // bars grow in from the baseline
+    const p=dur?Math.min(1,(Date.now()-start)/dur):1, e=1-Math.pow(1-p,4);   // bars grow in from the baseline
     ctx.clearRect(0,0,W,H);
     ctx.globalAlpha=e; ctx.strokeStyle=hexAlpha(col,.30); ctx.lineWidth=1.5; ctx.setLineDash([5,6]);
     ctx.beginPath(); ctx.moveTo(padX,y(mean)); ctx.lineTo(W-padX,y(mean)); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
@@ -8553,7 +8552,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v176";
+const APP_VER="v177";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH

@@ -432,6 +432,10 @@
   .ovchev{ color:var(--l3); font-weight:600; margin-left:8px; }
   .ovtodo li.ovtap .ovchev{ position:absolute; right:0; }
   .ovnudge{ background:var(--accent-soft); border:.5px solid transparent; box-shadow:0 0 0 1px var(--accent-soft) inset; }
+  /* friend activity arrives from the network after the home renders — ease it in instead of a hard pop */
+  @keyframes ovfriendin{ from{ opacity:0; transform:translateY(-6px); } to{ opacity:1; transform:none; } }
+  .ovfriend{ animation:ovfriendin .45s cubic-bezier(.2,.8,.2,1) both; }
+  @media (prefers-reduced-motion: reduce){ .ovfriend{ animation:none; } }
   /* overview snapshot — this-week strip */
   /* collapsible Me sections — keep the page sleek; expand on demand */
   .mefold{ border-top:.5px solid var(--line); }
