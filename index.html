@@ -885,22 +885,27 @@
   <div class="sheethdr"><span class="t">Training volume</span><button class="btn plain sm" id="volClose">Done</button></div>
   <div class="sheetbody">
     <div class="sheetlead"><div class="lh" id="progObj"></div></div>
-    <div class="mewintabs paneltabs" id="progMetric">
-      <button class="mewintab active" data-pm="prs" type="button">PRs</button>
-      <button class="mewintab" data-pm="sessions" type="button">Sessions</button>
-      <button class="mewintab" data-pm="volume" type="button">Volume</button>
-      <button class="mewintab" data-pm="sets" type="button">Sets</button>
-      <button class="mewintab" data-pm="weight" type="button">Weight</button>
-    </div>
-    <div class="progswipe" id="progSwipe"><div class="progtrack" id="progTrack">
-      <div class="progpage"><canvas id="progBars0" width="660" height="180"></canvas></div>
-      <div class="progpage"><canvas id="progBars1" width="660" height="180"></canvas></div>
-      <div class="progpage"><canvas id="progBars2" width="660" height="180"></canvas></div>
-      <div class="progpage"><canvas id="progBars3" width="660" height="180"></canvas></div>
-      <div class="progpage"><canvas id="progBars4" width="660" height="180"></canvas></div>
-    </div></div>
-    <div class="panelfoot stack"><div class="progcap" id="progCap"></div><div class="progverd" id="progVerdict" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div></div>
-    <div class="fcfold">
+    <div class="ed-label">New PRs</div>
+    <canvas id="progBars0" class="progchart" width="660" height="180"></canvas>
+    <div class="progcap" id="progCap0"></div>
+    <div class="progverd" id="progVerd0" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div>
+    <div class="ed-label">Sessions</div>
+    <canvas id="progBars1" class="progchart" width="660" height="180"></canvas>
+    <div class="progcap" id="progCap1"></div>
+    <div class="progverd" id="progVerd1" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div>
+    <div class="ed-label">Training volume</div>
+    <canvas id="progBars2" class="progchart" width="660" height="180"></canvas>
+    <div class="progcap" id="progCap2v"></div>
+    <div class="progverd" id="progVerd2" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div>
+    <div class="ed-label">Hard sets</div>
+    <canvas id="progBars3" class="progchart" width="660" height="180"></canvas>
+    <div class="progcap" id="progCap3"></div>
+    <div class="progverd" id="progVerd3" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div>
+    <div class="ed-label">Body weight</div>
+    <canvas id="progBars4" class="progchart" width="660" height="180"></canvas>
+    <div class="progcap" id="progCap4"></div>
+    <div class="progverd" id="progVerd4" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div>
+    <div class="fcfold" style="margin-top:20px;">
       <button type="button" class="fcfoldhd">How it's measured</button>
       <div class="fcfoldbody">
         <p class="fcnote"><b>PRs</b> — weeks you set an estimated-1RM record. <b>Sessions</b> — session-equivalents (a short session counts in proportion). <b>Volume</b> — effort-weighted work (weight × reps, bodyweight-aware). <b>Sets</b> — hard sets near failure. <b>Weight</b> — your bodyweight trend. All over the last 10 weeks. <a class="srclink" href="growth-model-whitepaper.pdf" target="_blank" rel="noopener">The method &amp; evidence (PDF) ↗</a></p>

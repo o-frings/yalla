@@ -3283,7 +3283,7 @@ const PROG_WEEKS=10;
 let progMetric="prs", progIdx=0, progMeta={};
 const PROG_METRICS=["prs","sessions","volume","sets","weight"];   // PRs first, then Sessions, then the rest
 // (re)draw all five metric pages and re-show the active page — name kept for existing callers
-function animateProgBars(){ drawAllProg(); applyProgMetric(progIdx, false); }
+function animateProgBars(){ drawAllProg(); fillProgSections(); }
 function progWeeklyData(metric){
   const wkMs=7*86400000, now=Date.now(), N=PROG_WEEKS, out=new Array(N).fill(0);
   const idx=d=>{ const k=Math.floor((now-d)/wkMs); return (k>=0 && k<N) ? (N-1-k) : -1; }; // N-1 = this week
@@ -3518,18 +3518,16 @@ function drawProgChart(metric, canvasId){
 }
 // pre-draw all five metric pages; show the active page's caption + verdict below
 function drawAllProg(){ PROG_METRICS.forEach((m,i)=> progMeta[m]=drawProgChart(m, "progBars"+i)); }
-function progTrackTo(idx, animate){ const tr=$("progTrack"); if(!tr) return;
-  tr.querySelectorAll(".progpage").forEach((p,i)=> p.classList.toggle("on", i===idx)); }
-function applyProgMetric(idx, animate){
-  idx=Math.max(0, Math.min(PROG_METRICS.length-1, idx));
-  progIdx=idx; progMetric=PROG_METRICS[idx];
-  document.querySelectorAll("#progMetric .mewintab").forEach(s=> s.classList.toggle("active", s.dataset.pm===progMetric));
-  progTrackTo(idx, animate);
-  const cap=$("progCap"), ve=$("progVerdict"), meta=progMeta[progMetric]||{capHTML:"",vData:null};
-  if(cap) cap.innerHTML=meta.capHTML;
-  if(ve){ if(meta.vData){ const v=progVerdict(progMetric, meta.vData); ve.style.display="flex"; ve.className="progverd v-"+v.lvl; ve.querySelector(".pvtxt").textContent=v.msg; } else ve.style.display="none"; }
+// all five metric charts are stacked vertically in the sheet; fill each one's caption + verdict
+const PROG_CAPID=["progCap0","progCap1","progCap2v","progCap3","progCap4"];
+function fillProgSections(){
+  PROG_METRICS.forEach((m,i)=>{
+    const meta=progMeta[m]||{capHTML:"",vData:null};
+    const cap=$(PROG_CAPID[i]); if(cap) cap.innerHTML=meta.capHTML;
+    const ve=$("progVerd"+i);
+    if(ve){ if(meta.vData){ const v=progVerdict(m, meta.vData); ve.style.display="flex"; ve.className="progverd v-"+v.lvl; ve.querySelector(".pvtxt").textContent=v.msg; } else ve.style.display="none"; }
+  });
 }
-document.querySelectorAll("#progMetric .mewintab").forEach(s=> s.onclick=()=> applyProgMetric(PROG_METRICS.indexOf(s.dataset.pm), true));
 $("bwBtn").onclick=async()=>{ const v=parseFloat($("bwInput").value);
   if(isNaN(v)||v<30||v>250){ toast("Enter a valid weight"); return; }
   bw.push({d:Date.now(),kg:v}); await sset("bodyweight",bw); $("bwInput").value=""; renderDash(); toast("Bodyweight logged — staying consistent."); };
@@ -4742,9 +4740,12 @@ function renderMeRadar(){
   drawRadar(meCache[7], "meMini", WEEKLY_SET_TARGET, true, false);   // the balance shape at a glance (no labels); full radar is the sheet
   const head=$("meBalHead"), st=$("meBalStat");
   if(!Object.keys(hist).length){ if(head) head.textContent="—"; if(st) st.textContent="No sessions yet — log a workout"; return; }
-  const det=expandLegacyMtot(meCache[7]||{}), under=GAUGE_GROUPS.filter(g=>gaugeVal(det,g)<WEEKLY_SET_MIN).length;
-  if(head){ head.innerHTML = under ? '<span class="down">'+under+' under</span>' : '<span class="up">On target</span>'; }
-  if(st) st.textContent = under ? (under+" muscle"+(under>1?"s":"")+" below target this week") : "Every major muscle hit its weekly target";
+  const det=expandLegacyMtot(meCache[7]||{}), underG=GAUGE_GROUPS.filter(g=>gaugeVal(det,g)<WEEKLY_SET_MIN);
+  const tot=GAUGE_GROUPS.length, under=underG.length, onT=tot-under;
+  if(head){ head.innerHTML = '<span class="up">'+onT+'/'+tot+'</span> <span class="u">on target</span>'; }
+  if(st) st.textContent = under
+    ? ("Nice work — "+onT+" on track. Next up: "+listWords(underG.slice(0,2).map(g=>MSHORT[g]||g))+(under>2?" +"+(under-2)+" more":""))
+    : "Every major muscle hit its weekly target 💪";
 }
 // Training-volume SUMMARY card: headline PR/trend + a mini sparkline of the default metric. Detail = Vol sheet.
 function renderTrainingVolume(){
@@ -4864,9 +4865,9 @@ function renderMuscles(){
   if(lead){
     if(!isLog){ lead.className="lh"; lead.textContent=(plans.find(p=>p.id===musSrc)||activePlan()).name; }
     else if(!Object.keys(hist).length){ lead.className="lh"; lead.textContent="No sessions yet"; }
-    else { const det=expandLegacyMtot(view), under=GAUGE_GROUPS.filter(g=>gaugeVal(det,g)<WEEKLY_SET_MIN).length;
-      lead.className="lh "+(under?"under":"good");
-      lead.textContent = under ? (under+" group"+(under>1?"s":"")+" under target") : "Every major muscle on target"; }
+    else { const det=expandLegacyMtot(view), under=GAUGE_GROUPS.filter(g=>gaugeVal(det,g)<WEEKLY_SET_MIN).length, tot=GAUGE_GROUPS.length;
+      lead.className="lh "+(under?"":"good");
+      lead.textContent = under ? ((tot-under)+" of "+tot+" muscles on target") : ("All "+tot+" major muscles on target 💪"); }
   }
   drawRadar(view, "musRadar", useTarget ? WEEKLY_SET_TARGET : null, false, relative);
   const groups=Object.keys(view).filter(g=>view[g]>0).sort((a,b)=>view[b]-view[a]);
@@ -8395,7 +8396,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v142";
+const APP_VER="v143";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
