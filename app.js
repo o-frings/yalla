@@ -3026,7 +3026,19 @@ function renderOverview(){
     h+='<div class="ed-label" style="margin-top:18px;">Feeling spontaneous?</div>';
     h+='<div class="group ovtap ovspon"><div class="pad ovstartpad"><div class="ovstarttext"><div class="ovbig">Suggest a session</div><div class="ovmeta">a day picked from your recent training &amp; goals</div></div><span class="ovchev ovgo">›</span></div></div>';
   }
-  // --- visual snapshot: three activity rings to fill this week + a "vs last month" delta ---
+  // --- the one trend that matters: are you getting stronger? (leads the home; taps to the Strength sheet) ---
+  const ovSI=strengthIndex();
+  if(ovSI){ const p=ovSI.series[ovSI.series.length-1].idx-100;
+    const s1=v=>(v>=0?"+":"")+v.toFixed(1)+"%", cl=v=>v>=1?"grow":v<=-1?"shrink":"hold", av=v=>v>=1?"↑":v<=-1?"↓":"→";
+    const fpart = ovSI.forecast ? ' <span class="ovmeta" style="display:inline;">· forecast</span> <span class="extr '+cl(ovSI.forecast.pct)+'">'+av(ovSI.forecast.pct)+' '+s1(ovSI.forecast.pct)+'</span>' : '';
+    h+='<div class="ed-label">Strength <span class="subhint">— tap for detail ›</span></div>';
+    h+='<div class="group ovtap ovstrength" id="ovStrength"><div class="pad" style="display:flex; align-items:center; gap:14px;">'
+      +sparkline(ovSI.series.map(pt=>pt.idx), accentHex())
+      +'<div style="flex:1; min-width:0;">Overall <span class="extr '+cl(p)+'">'+av(p)+' '+s1(p)+'</span>'+fpart
+      +'<div class="ovmeta">across '+ovSI.lifts+' lift'+(ovSI.lifts>1?"s":"")+' · last '+ovSI.weeks+'w</div></div>'
+      +'<span class="ovchev">›</span></div></div>';
+  }
+  // --- this week at a glance: three activity rings + a "vs last month" delta ---
   let ovRings=null;
   if(Object.keys(hist).length || cardioList().length){
     const cut=Date.now()-7*86400000; let setsWk=0; const musWk=new Set();
@@ -3048,18 +3060,6 @@ function renderOverview(){
       +'<canvas id="ovRingsC" width="320" height="320" style="width:118px; height:118px; flex:0 0 auto;"></canvas>'
       +'<div style="flex:1; min-width:0;"><div class="rglgwrap">'+legend+'</div>'+deltaLine+'</div>'
       +'</div></div>';
-  }
-  // --- strength outcome: is the work paying off? a compact trend + forecast, taps through to the full tile ---
-  const ovSI=strengthIndex();
-  if(ovSI){ const p=ovSI.series[ovSI.series.length-1].idx-100;
-    const s1=v=>(v>=0?"+":"")+v.toFixed(1)+"%", cl=v=>v>=1?"grow":v<=-1?"shrink":"hold", av=v=>v>=1?"↑":v<=-1?"↓":"→";
-    const fpart = ovSI.forecast ? ' <span class="ovmeta" style="display:inline;">· forecast</span> <span class="extr '+cl(ovSI.forecast.pct)+'">'+av(ovSI.forecast.pct)+' '+s1(ovSI.forecast.pct)+'</span>' : '';
-    h+='<div class="ed-label">Strength <span class="subhint">— tap for detail ›</span></div>';
-    h+='<div class="group ovtap ovstrength" id="ovStrength"><div class="pad" style="display:flex; align-items:center; gap:14px;">'
-      +sparkline(ovSI.series.map(pt=>pt.idx), accentHex())
-      +'<div style="flex:1; min-width:0;">Overall <span class="extr '+cl(p)+'">'+av(p)+' '+s1(p)+'</span>'+fpart
-      +'<div class="ovmeta">across '+ovSI.lifts+' lift'+(ovSI.lifts>1?"s":"")+' · last '+ovSI.weeks+'w</div></div>'
-      +'<span class="ovchev">›</span></div></div>';
   }
   // --- Discover --- a swipeable deck of tips / not-yet-used features
   const dt=discoverTips();
@@ -3133,7 +3133,7 @@ function renderOverview(){
 function ovAct(act){
   const goto=(id,focus)=>{ showTab("me"); setTimeout(()=>{ const el=$(id); if(el){ el.scrollIntoView({behavior:"smooth",block:"center"}); if(focus) el.focus(); } },80); };
   if(act==="weight") goto("bwInput", true);
-  else if(act==="strength") goto("slCard");
+  else if(act==="strength"){ showTab("me"); setTimeout(()=>openSheet("Strength"), 90); }
   else if(act==="balance") openMuscles();
   else if(act==="account") goAccount();
   else if(act==="objective") goto("objChips");
@@ -3174,9 +3174,10 @@ function renderDash(){
   renderCalc(now);
   renderCalendar();
   renderBaseActivity();
-  renderGrowthForecast();
-  renderStrength();
-  renderGrowth();          // per-muscle current status, now folded into the forecast tile
+  renderGrowthForecast();  // draws the muscle-size projection inside the Strength detail sheet; sets _fcF
+  renderStrength();        // strength summary card + strength detail sheet (reads _fcF for the size line)
+  renderTrainingVolume();  // volume summary card (detail = Vol sheet, drawn by animateProgBars)
+  renderGrowth();          // per-muscle current status (in the size-by-muscle fold)
   applyTileOrder();
   const po=$("progObj");   // objective-adherence score, moved onto the Progress tile
   if(po){ if(!Object.keys(hist).length){ po.textContent=""; po.className="progobj"; }
@@ -4439,7 +4440,15 @@ function weeklyEquiv(totals, windowDays){
   const wks = windowDays ? windowDays/7 : histSpanWeeks();
   const out={}; Object.keys(totals).forEach(g=> out[g]=totals[g]/wks); return out;
 }
-$("meBalance").onclick=()=>{ if(_meSwiped){ _meSwiped=false; return; } if($("meTiles")&&$("meTiles").classList.contains("editing")) return; openMuscles(); };   // a swipe must not open the sheet; nor a tap while editing the layout
+// summary cards → open their detail sheet on tap (ignored while editing the layout, so a drag doesn't open one)
+const _editing=()=> $("meTiles")&&$("meTiles").classList.contains("editing");
+$("meBalance").onclick=()=>{ if(_meSwiped){ _meSwiped=false; return; } if(_editing()) return; openMuscles(); };
+if($("slCard")) $("slCard").onclick=()=>{ if(_editing()) return; openSheet("Strength"); };
+if($("progPanel")) $("progPanel").onclick=()=>{ if(_editing()) return; openSheet("Vol"); };
+if($("strengthClose")) $("strengthClose").onclick=()=>closeSheet("Strength");
+if($("scrimStrength")) $("scrimStrength").onclick=()=>closeSheet("Strength");
+if($("volClose")) $("volClose").onclick=()=>closeSheet("Vol");
+if($("scrimVol")) $("scrimVol").onclick=()=>closeSheet("Vol");
 // hero window switch (Week / Month): tappable underline tabs + an iOS-style paged swipe of the gauge.
 let _meSwiped=false, meCache={};
 function meTrackTo(win, animate){ const tr=$("meRingTrack"); if(!tr) return;
@@ -4721,14 +4730,41 @@ function meObjectiveScore(days){
   const pct=Math.round(100*comps.reduce((a,c)=>a+c.w*c.v,0)/tw);
   return { pct:Math.max(0,Math.min(100,pct)), objLabel: OBJ_LABELS[settings.objective]||"Training" };
 }
+// Balance SUMMARY card: a small week gauge + a one-line verdict. Full per-muscle detail is the Mus sheet (tap).
 function renderMeRadar(){
-  if(!$("meRadar")) return;
-  // pre-draw BOTH pages so the swipe can reveal either window with no redraw; sets/week-normalised
+  const mini=$("meMini"); if(!mini) return;
   meCache = { 7: weeklyEquiv(muscleVolume(7, "sets", "total").totals, 7),
               30: weeklyEquiv(muscleVolume(30, "sets", "total").totals, 30) };
-  drawSuccessGauge("meRadar", meCache[7]);
-  drawSuccessGauge("meRadar2", meCache[30]);
-  applyMeWindow(meWindow, false);   // position the track + fill stat/cta for the active window
+  drawSuccessGauge("meMini", meCache[7]);
+  const head=$("meBalHead"), st=$("meBalStat");
+  if(!Object.keys(hist).length){ if(head) head.textContent="—"; if(st) st.textContent="No sessions yet — log a workout"; return; }
+  const det=expandLegacyMtot(meCache[7]||{}), under=GAUGE_GROUPS.filter(g=>gaugeVal(det,g)<WEEKLY_SET_MIN).length;
+  if(head){ head.innerHTML = under ? '<span class="down">'+under+' under</span>' : '<span class="up">On target</span>'; }
+  if(st) st.textContent = under ? (under+" muscle"+(under>1?"s":"")+" below target this week") : "Every major muscle hit its weekly target";
+}
+// Training-volume SUMMARY card: headline PR/trend + a mini sparkline of the default metric. Detail = Vol sheet.
+function renderTrainingVolume(){
+  const stat=$("progStat"), cap=$("progCap2"); if(!stat) return;
+  const prd=progWeeklyData("prs"), prTot=prd.reduce((a,b)=>a+b,0);
+  const vol=progWeeklyData("volume"), e=vol.slice(0,-3).filter(v=>v>0), r=vol.slice(-3).filter(v=>v>0);
+  const em=e.length?e.reduce((a,b)=>a+b,0)/e.length:0, rm=r.length?r.reduce((a,b)=>a+b,0)/r.length:0;
+  const dv = em>0 ? Math.round((rm-em)/em*100) : null;
+  stat.innerHTML = '<span>'+prTot+'</span> <span class="u">PRs · 10 wks</span>';
+  cap.textContent = dv!=null ? ("volume "+(dv>=0?"+":"")+dv+"% vs the prior weeks") : "sessions, volume, sets & bodyweight";
+  drawSummarySpark("progMini", vol.filter(v=>v>0));
+}
+// small filled sparkline for a summary card
+function drawSummarySpark(id, series){
+  const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  if(!series || series.length<2){ return; }
+  const ac=accentHex(), mn=Math.min(...series), mx=Math.max(...series), sp=(mx-mn)||1, n=series.length, pad=6;
+  const x=i=> pad+(i/(n-1))*(W-pad*2), y=v=> (H-pad)-((v-mn)/sp)*(H-pad*2);
+  const grad=ctx.createLinearGradient(0,0,0,H); grad.addColorStop(0,hexAlpha(ac,.28)); grad.addColorStop(1,hexAlpha(ac,0));
+  ctx.beginPath(); series.forEach((v,i)=>{ const px=x(i),py=y(v); i?ctx.lineTo(px,py):ctx.moveTo(px,py); });
+  ctx.lineTo(x(n-1),H-pad); ctx.lineTo(x(0),H-pad); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
+  ctx.strokeStyle=ac; ctx.lineWidth=2.5; ctx.lineJoin="round"; ctx.beginPath();
+  series.forEach((v,i)=>{ const px=x(i),py=y(v); i?ctx.lineTo(px,py):ctx.moveTo(px,py); }); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x(n-1),y(series[n-1]),3.5,0,7); ctx.fillStyle=ac; ctx.fill();
 }
 function renderMuscles(){
   buildSrc();
@@ -6462,13 +6498,12 @@ function planOutlookHTML(plan){
   if(r.src&&r.src.length) h+='<details class="hsrc" style="margin-top:8px;"><summary>Sources</summary><ul>'+r.src.map(srcLi).join('')+'</ul></details>';
   return h;
 }
-// Growth forecast card on the Me page (projection continuing from the logged history).
+// Muscle-size projection — now drawn inside the Strength detail sheet (see renderStrength). Sets _fcF so
+// the strength summary can show a size-outlook line and the By-muscle toggle can redraw.
 function renderGrowthForecast(){
-  const card=$("fcCard"); if(!card) return;
+  if(!$("fcChart")) return;
   const f=(typeof growthForecast==="function")?growthForecast():null;
-  if(!f){ card.style.display="none"; return; }
-  card.style.display="";
-  _fcF=f;
+  _fcF=f; if(!f) return;
   drawForecast(f); drawForecastMuscles(f, fcMuscleMode); drawForecastSens(f);
 }
 let fcMuscleMode="pace", _fcF=null;   // per-muscle graph scenario: "pace" (default) or "plan"
@@ -6492,7 +6527,7 @@ function applyTileVisibility(){
     el.classList.toggle("tile-off", off);
     const b=el.querySelector(".tilehide"); if(b){ b.innerHTML=off?TILE_ICON.eyeoff:TILE_ICON.eye; b.title=off?"Show tile":"Hide tile"; } });
 }
-const TILE_DEFAULT = ["forecast","ledger","balance","progress"];
+const TILE_DEFAULT = ["strength","balance","progress"];   // forecast merged into strength; data-tile ids match the summary cards
 function applyTileOrder(){
   const c=$("meTiles"); if(!c) return;
   const present=new Set([...c.querySelectorAll(".metile")].map(el=>el.dataset.tile));
@@ -6727,11 +6762,24 @@ function drawLedgerPredActual(scored){
 // a per-exercise breakdown (history + each lift's forecast), and the calibration-tracking plots.
 function renderStrength(){
   const card=$("slCard"); if(!card) return;
-  const si=strengthIndex(), rows=exerciseProgress(), hasLedger=ledger.length>0;
-  if(!si && !rows.length && !hasLedger){ card.style.display="none"; return; }
+  const si=strengthIndex(), rows=exerciseProgress(), hasLedger=ledger.length>0, f=_fcF;
+  if(!si && !rows.length && !hasLedger && !f){ card.style.display="none"; return; }
   card.style.display="";
   const s1=v=>(v>=0?"+":"")+v.toFixed(1)+"%", cls=v=>v>=1?"grow":v<=-1?"shrink":"hold", ar=v=>v>=1?"↑":v<=-1?"↓":"→";
-  // headline + chart: overall strength (indexed, averaged) with the forecast continuation
+  const up=v=>v>=1?"up":v<=-1?"down":"";
+  // SUMMARY card (Me tab): one glanceable line — overall strength, the 4-week forecast, and the size outlook
+  const stat=$("slStat"), capL=$("slCapLine");
+  if(si){ const pct=si.series[si.series.length-1].idx-100;
+    if(stat) stat.innerHTML='<span class="'+up(pct)+'">'+ar(pct)+' '+s1(pct)+'</span> <span class="u">strength</span>';
+    let cap = si.forecast ? ("forecast "+ar(si.forecast.pct)+" "+s1(si.forecast.pct)+" next "+si.forecast.weeks+"w") : ("avg across "+si.lifts+" lift"+(si.lifts>1?"s":""));
+    if(f && f.base!=null) cap += " · size "+(f.base>=0?"+":"")+f.base.toFixed(1)+"%/16w";
+    if(capL) capL.textContent=cap;
+    drawSummarySpark("slMini", si.series.map(p=>p.idx));
+  } else if(f && f.base!=null){
+    if(stat) stat.innerHTML='<span class="u">size outlook</span> <span class="'+up(f.base)+'">'+(f.base>=0?"+":"")+f.base.toFixed(1)+'%</span>';
+    if(capL) capL.textContent="projected muscle gain over 16 weeks";
+  } else { if(stat) stat.textContent="Log a few sessions"; if(capL) capL.textContent="your strength trend + forecast will appear here"; }
+  // DETAIL sheet: headline + chart: overall strength (indexed, averaged) with the forecast continuation
   const sum=$("exProgSum"), chart=$("exProgChart");
   if(si){ const pct=si.series[si.series.length-1].idx-100;
     let head='Overall strength <span class="extr '+cls(pct)+'">'+ar(pct)+' '+s1(pct)+'</span>';
@@ -8275,7 +8323,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v136";
+const APP_VER="v137";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH

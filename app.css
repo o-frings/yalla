@@ -1064,6 +1064,20 @@
   .gchip.bord{ border-style:dashed; }   /* borderline: within input-noise of a decision boundary */
   .gchip.over{ color:var(--l2); border-color:var(--line); background:var(--row); }  /* past the productive range */
   .gchip .gq{ font-weight:800; opacity:.6; margin-left:-1px; }
+  /* ===== calm-pass: summary card (one glanceable line) → opens a detail sheet on tap ===== */
+  .tsum{ display:flex; align-items:center; gap:14px; width:100%; padding:2px 0 2px; }
+  .tsum-mini{ flex:0 0 auto; width:78px; height:52px; }
+  .tsum-mini.radar{ width:60px; height:60px; }
+  .tsum-main{ flex:1 1 auto; min-width:0; }
+  .tsum-stat{ font-size:23px; font-weight:750; letter-spacing:-.6px; color:var(--ink); line-height:1.1; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .tsum-stat .u{ font-size:13px; font-weight:600; color:var(--l3); letter-spacing:0; }
+  .tsum-stat .up{ color:#2b8a3e; } .tsum-stat .down{ color:#c92a2a; }
+  .tsum-cap{ font-size:12.5px; color:var(--l3); margin-top:3px; line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tsum-chev{ flex:0 0 auto; color:var(--l3); font-size:22px; font-weight:400; margin-left:2px; }
+  .metile.tap:active .tsum-chev{ color:var(--accent); }
+  /* detail sheets that host the moved-in charts/folds */
+  .detailsheet{ height:92vh; }
+  .detailsheet .sheetbody .fchd2:first-child{ margin-top:2px; }
   /* spontaneous-session sheet */
   .sponpick{ display:flex; flex-direction:column; gap:8px; }
   .sponcard{ display:flex; flex-direction:column; gap:2px; text-align:left; width:100%; padding:12px 14px; border-radius:12px; border:.5px solid var(--line); background:var(--row); cursor:pointer; -webkit-tap-highlight-color:transparent; }
