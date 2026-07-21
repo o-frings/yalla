@@ -542,9 +542,10 @@
   .obopt span{ display:block; font-size:13px; color:var(--l2); margin-top:2px; }
   /* progress chart — a 5-page metric carousel (Volume/Sets/Sessions/Weight/PRs) the finger drags & snaps.
      Viewport stretches to the panel edges; each page re-insets the chart by 16px so charts keep a gutter. */
-  .progswipe{ margin:10px -16px 8px; overflow:hidden; touch-action:pan-y; -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; }
-  .progtrack{ display:flex; width:500%; will-change:transform; }
-  .progpage{ flex:0 0 20%; width:20%; box-sizing:border-box; padding:0 16px; }
+  .progswipe{ margin:12px 0 6px; overflow:hidden; }
+  .progtrack{ display:block; }
+  .progpage{ display:none; box-sizing:border-box; }
+  .progpage.on{ display:block; }
   .progpage canvas{ display:block; width:100%; height:auto; aspect-ratio:11/3; outline:none; -webkit-tap-highlight-color:transparent; }
   .progcap{ font-size:13px; color:var(--l2); margin:8px 0 2px; line-height:1.4; }
   .proglegend{ display:flex; flex-wrap:wrap; gap:5px 12px; margin-top:8px; }
@@ -609,7 +610,7 @@
   /* forward growth-stimulus forecast chart */
   /* growth-forecast internals (the card itself uses the shared .panel look) */
   .fcsub{ display:block; font-size:12px; font-weight:500; color:var(--l3); margin-top:2px; }
-  #fcChart, #fcMuscles, #fcTornado{ width:100%; height:auto; display:block; margin-top:8px; }
+  #fcChart, #fcMuscles, #fcTornado{ width:100%; height:auto; display:block; margin:12px 0 10px; }
   .fclegend{ display:flex; gap:14px; flex-wrap:wrap; margin-top:6px; font-size:12.5px; color:var(--l2); }
   .fclg{ display:inline-flex; align-items:center; gap:6px; }
   .fclg i{ width:11px; height:3px; border-radius:2px; display:inline-block; }
@@ -623,8 +624,8 @@
   /* strength-progress tile: headline trend + across-exercises rows (each taps through to the full chart) */
   .exprogsum{ font-size:14px; color:var(--l2); font-weight:600; margin:2px 0 6px; }
   .exprogsub{ font-weight:500; color:var(--l3); font-size:12px; }
-  #exProgChart{ display:block; width:100%; height:auto; margin:2px 0 2px; }
-  #slML, #slPA{ display:block; width:100%; height:auto; margin:2px 0 2px; }
+  #exProgChart{ display:block; width:100%; height:auto; margin:12px 0 10px; }
+  #slML, #slPA{ display:block; width:100%; height:auto; margin:12px 0 10px; }
   .exprow{ display:flex; align-items:center; gap:10px; width:100%; background:none; border:none; padding:9px 0; border-bottom:.5px solid var(--sep); cursor:pointer; text-align:left; -webkit-tap-highlight-color:transparent; }
   .exprow:last-of-type{ border-bottom:none; }
   .exprow:active{ opacity:.6; }
@@ -1100,8 +1101,14 @@
   .ovspot .ovchev{ position:absolute; top:14px; right:2px; }
   /* one toggle style across every detail sheet: the balance sheet's segmented controls
      render as the same underline tabs used by the Strength & Volume sheets */
-  .detailsheet .seg{ background:none; border:none; padding:0; margin:12px 0 6px; gap:20px; border-radius:0; overflow-x:auto; scrollbar-width:none; }
-  .detailsheet .seg::-webkit-scrollbar{ display:none; }
+  .detailsheet .seg{ background:none; border:none; padding:0; margin:12px 0 6px; gap:20px; border-radius:0; flex-wrap:wrap; overflow:visible; }
+  /* consistent figure rhythm across every detail sheet: same chart margins, same section spacing */
+  .detailsheet .sheetbody{ overflow-x:hidden; }
+  .detailsheet .sheetbody canvas{ margin:12px 0 10px; }
+  .detailsheet .ed-label{ margin:26px 0 10px; }
+  .detailsheet .fchd2{ margin:22px 0 6px; }
+  .detailsheet .fcnote{ margin:9px 0 0; }
+  .detailsheet .fcconn{ margin:10px 0 2px; }
   .detailsheet .seg .s{ flex:0 0 auto; padding:1px 0 6px; border-radius:0; font-size:13px; font-weight:600; color:var(--l3); background:none; box-shadow:none; position:relative; }
   .detailsheet .seg .s.active{ background:none; box-shadow:none; color:var(--ink); }
   .detailsheet .seg .s.active::after{ content:""; position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:2px; background:var(--accent); }
@@ -1165,7 +1172,7 @@
   .growth.hold{ border-left-color:#f59f00; } .growth .gdot.hold{ background:#f59f00; }
   .growth.shrink{ border-left-color:var(--red); } .growth .gdot.shrink{ background:var(--red); }
   .growth.more{ border-left-color:var(--line); } .growth .gdot.more{ background:var(--l3); }
-  #musRadar, #buildRadar{ width:100%; max-width:330px; height:auto; aspect-ratio:1/1; display:block; margin:16px auto 20px; }
+  #musRadar, #buildRadar{ width:100%; max-width:320px; height:auto; aspect-ratio:1/1; display:block; margin:16px auto 16px; }
   /* Unified card for the two homogenised panels (Muscle balance + Progress):
      title → underline tab bar → swipe carousel → footer. `.tap` adds the press affordance (balance only). */
   .panel{ display:block; box-sizing:border-box; width:100%; padding:16px 16px 14px; margin-bottom:18px; text-align:left;
