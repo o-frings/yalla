@@ -1971,7 +1971,7 @@ function roseTotals(tot, expanded){ const t=expandLegacyMtot(tot||{}), out={};
 // One typography scale for every canvas chart. Charts render at very different internal widths but all
 // display at roughly the same on-screen column width, so sizing the font as a fraction of the canvas
 // width makes the ON-SCREEN size the same across every graph (fontPx = k·W → displayed = k·W·(D/W) = k·D).
-const CHART_FONT={ tick:0.023, label:0.028, value:0.030, big:0.045 };
+const CHART_FONT={ tick:0.023, label:0.028, value:0.028, big:0.045 };
 function cfont(W, role, weight){ const px=Math.max(9, Math.round(W*(CHART_FONT[role]||CHART_FONT.label))); return (weight||"600")+" "+px+"px -apple-system,system-ui,sans-serif"; }
 function drawRose(x, cx, cy, R, G, tot, o){
   // tot is already display-prepared by roseTotals() (legacy keys expanded, heads rolled into Back/Shoulders).
@@ -4621,8 +4621,8 @@ function drawRadar(totals, canvasId, target, noLabels, relative, prog){
   G.forEach((g,i)=>{ const rr=R*radii[i]; if(rr<=0.5) return;
     const a=(-90+i*360/n)*Math.PI/180, col=MCOLOR[g]||accent;
     ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rr,a-half,a+half); ctx.closePath();
-    ctx.globalAlpha=.34; ctx.fillStyle=col; ctx.fill(); ctx.globalAlpha=1;
-    ctx.lineWidth=2; ctx.strokeStyle=col; ctx.stroke(); });
+    ctx.globalAlpha=.55; ctx.fillStyle=col; ctx.fill(); ctx.globalAlpha=1;
+    ctx.lineWidth=2.5; ctx.strokeStyle=col; ctx.stroke(); });
   if(target && !relative){ ctx.strokeStyle=accent; ctx.globalAlpha=.5; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; }
   else if(target && relative){ const tr=R*Math.min(1,target/max);   // where the ~target/wk line falls on the relative scale
     ctx.strokeStyle=accent; ctx.globalAlpha=.5; ctx.lineWidth=2; ctx.setLineDash([7,7]);
@@ -4849,7 +4849,7 @@ function drawSpotRings(id, rings){
     ctx.lineWidth=thick; ctx.lineCap="round";
     ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.strokeStyle=hexAlpha(rg.color,.18); ctx.stroke();
     if(pct>0){ const a0=-Math.PI/2; ctx.beginPath(); ctx.arc(cx,cy,R,a0,a0+Math.PI*2*pct); ctx.strokeStyle=rg.color; ctx.stroke(); }
-    ctx.fillStyle=rg.color; ctx.font=cfont(W,"value","700"); ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillStyle=rg.color; ctx.font=cfont(W,"value"); ctx.textAlign="center"; ctx.textBaseline="middle";
     ctx.fillText((rg.label==="Sessions"?round1(rg.val):Math.round(rg.val))+"", cx, cy);
     ctx.fillStyle=l3; ctx.font=cfont(W,"tick"); ctx.textBaseline="alphabetic"; ctx.fillText(rg.label, cx, H-8);
   });
@@ -7201,7 +7201,7 @@ function drawForecastSens(f, prog){
     ctx.fillStyle=hexAlpha(accent,.13); if(ctx.roundRect){ctx.beginPath();ctx.roundRect(trackX,cy-bh/2,trackW,bh,rr);ctx.fill();} else ctx.fillRect(trackX,cy-bh/2,trackW,bh);
     ctx.fillStyle=hexAlpha(accent,.9); if(bw>0.6){ if(ctx.roundRect){ctx.beginPath();ctx.roundRect(trackX,cy-bh/2,bw,bh,rr);ctx.fill();} else ctx.fillRect(trackX,cy-bh/2,bw,bh); }
     ctx.fillStyle=l3; ctx.textAlign="right"; ctx.font=cfont(W,"label"); ctx.fillText(r.label, padL-12, cy);
-    ctx.fillStyle=ink; ctx.textAlign="right"; ctx.font=cfont(W,"value","700"); ctx.fillText("±"+r.impact.toFixed(1)+"%", W-8, cy);
+    ctx.fillStyle=ink; ctx.textAlign="right"; ctx.font=cfont(W,"value"); ctx.fillText("±"+r.impact.toFixed(1)+"%", W-8, cy);
   });
   // actionable read-out: the biggest swing among the levers the lifter can actually change
   if(prog<1) return;
@@ -7235,7 +7235,7 @@ function drawForecastMuscles(f, which, prog){
     ctx.fillStyle=hexAlpha(col,.92);
     if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(bx, cy-bh/2, bw, bh, 5); ctx.fill(); } else ctx.fillRect(bx, cy-bh/2, bw, bh);
     ctx.fillStyle=l3; ctx.textAlign="right"; ctx.font=cfont(W,"label"); ctx.fillText(MSHORT[r.g]||r.g, padL-12, cy+7);
-    ctx.fillStyle=ink; ctx.font=cfont(W,"value","700"); ctx.textAlign="left";
+    ctx.fillStyle=ink; ctx.font=cfont(W,"value"); ctx.textAlign="left";
     const lab=(r.gain>=0?"+":"")+r.gain.toFixed(1)+"%";
     ctx.fillText(lab, (r.gain>=0 ? x+8 : zeroX+8), cy+6.5);   // negatives label right of the zero line, clear of names
   });
@@ -8557,7 +8557,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v179";
+const APP_VER="v180";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
