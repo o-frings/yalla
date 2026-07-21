@@ -256,7 +256,8 @@
   #startAction .btn svg{ width:18px; height:18px; flex:0 0 auto; }
   #sponLen2{ margin:2px 0 14px; }
   /* plan mode's secondary action, kept as light as surprise mode's controls */
-  .planlink{ background:none; border:none; font:inherit; font-size:14px; font-weight:600; color:var(--accent); padding:8px 2px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .planlink{ display:inline-flex; align-items:center; gap:7px; background:none; border:none; font:inherit; font-size:14px; font-weight:600; color:var(--accent); padding:10px 2px 4px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .planlink svg{ width:16px; height:16px; flex:0 0 auto; }
   .planlink:active{ opacity:.55; }
   /* the surprise session reads as a plain headline + one small shuffle — no box */
   .sesshead{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin:16px 2px 8px; }
