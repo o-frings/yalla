@@ -2906,7 +2906,7 @@ function sponSwap(xi){
 }
 function sponStart(){
   const day=_sponDays[_sponSel], s={}; day.ex.forEach(e=> s[e.n]=[]);
-  draft["free"]={ t:Date.now(), s }; sset("draft", draft);
+  draft["free"]={ t:Date.now(), s, spon:1, name:day.name }; sset("draft", draft);
   freeMode=true; swaps={}; closeSheet("Spon"); renderSeg(); renderFree(); showTab("workout");
   toast(day.name+" session ready — picked from your recent training. Let's go!");
 }
@@ -3836,7 +3836,9 @@ $("saveBtn").onclick=async()=>{
   const p=activePlan(); const w = freeMode ? null : p.workouts[curWk]; let logged=0, beaten=0;
   // travel tag: 1 = travel + full gym, 2 = travel + no gym, 3 = travel + partial gym, 0 = home (normal)
   const tvCode = settings.travelMode==="gym"?1 : settings.travelMode==="nogym"?2 : settings.travelMode==="partial"?3 : 0;
-  const session={ name: freeMode?"Free workout":(w?w.name:"Workout"), sub:"", totalVol:0, sets:0, beaten:0, top:null, mtot:{}, exercises:[], date:Date.now() };
+  const _fd=draft[savedSig];   // a suggested session keeps its own name in history/feed, not "Free workout"
+  const sessName = freeMode ? ((_fd && _fd.spon && _fd.name) ? _fd.name : "Free workout") : (w?w.name:"Workout");
+  const session={ name: sessName, sub:"", totalVol:0, sets:0, beaten:0, top:null, mtot:{}, exercises:[], date:Date.now() };
   document.querySelectorAll("#exlist .group").forEach(g=>{
     const name=g.dataset.ex, pt=topSet(last[name]), sets=[];
     const efbar=g.querySelector(".efbar"), ef = efbar ? (+efbar.dataset.ef) : 1;   // 0 easy · 1 hard (default) · 2 max
@@ -5166,10 +5168,14 @@ function buildFreeGroup(name){
 }
 function renderFree(){
   if(typeof renderTravelBanner==="function") renderTravelBanner();
-  $("ltName").textContent="Free workout"; $("planSub").textContent="Free workout — choose your exercises";
+  const _fd=draft["free"], spon=!!(_fd && _fd.spon);
+  if(spon){ $("ltName").textContent=_fd.name||"Suggested session"; $("planSub").textContent="Suggested session"; }
+  else { $("ltName").textContent="Free workout"; $("planSub").textContent="Free workout — choose your exercises"; }
   const list=$("exlist"); list.innerHTML="";
   const hint=document.createElement("p"); hint.className="freehint";
-  hint.textContent="A one-off session. Add any exercises you like — grouped by muscle, logged to history just like a plan workout.";
+  hint.textContent = spon
+    ? "Suggested session — picked from your recent training. Tweak anything, then log your sets."
+    : "A one-off session. Add any exercises you like — grouped by muscle, logged to history just like a plan workout.";
   list.appendChild(hint);
   const addBtn=document.createElement("button"); addBtn.className="btn tinted wide"; addBtn.id="addExBtn";
   addBtn.innerHTML=ICON.plus+"Add exercise"; addBtn.onclick=()=>openAdd("free"); list.appendChild(addBtn);
@@ -8433,7 +8439,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v157";
+const APP_VER="v158";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
