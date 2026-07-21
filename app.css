@@ -626,7 +626,7 @@
   .pad{ padding:20px; }
   .row{ display:flex; gap:10px; }
 
-  .bwnum{ font-size:34px; font-weight:600; letter-spacing:-.8px; line-height:1; }
+  .bwnum{ font-size:24px; font-weight:700; letter-spacing:-.5px; line-height:1; }
   .bwnum.empty{ color:var(--l3); }
   .bwnum small{ font-size:15px; font-weight:600; color:var(--l2); margin-left:4px; letter-spacing:0; }
   .bwgoal{ text-align:right; font-size:15px; color:var(--l2); line-height:1.55; }
@@ -655,7 +655,7 @@
   .stats{ display:flex; border-top:.5px solid var(--sep); }
   .stat{ flex:1; padding:16px 8px; text-align:center; border-right:.5px solid var(--sep); }
   .stat:last-child{ border-right:none; }
-  .stat .n{ font-size:24px; font-weight:600; letter-spacing:-.4px; }
+  .stat .n{ font-size:24px; font-weight:700; letter-spacing:-.4px; }
   .stat .n.due{ color:var(--red); }
   .stat .k{ font-size:12px; color:var(--l2); margin-top:4px; font-weight:500; }
   .achcap{ font-size:14px; color:var(--l2); margin:2px 0 12px; }
@@ -1077,7 +1077,7 @@
 
   .ed-label{ font-size:12px; color:var(--l3); font-weight:700; text-transform:uppercase; letter-spacing:.6px; margin:20px 0 8px; }
   /* Me-page zone header — stronger than .ed-label, with a hairline, to delineate the page's sections */
-  .mezone{ font-size:13px; font-weight:800; color:var(--l2); text-transform:uppercase; letter-spacing:.5px; margin:28px 2px 12px; padding-bottom:8px; border-bottom:.5px solid var(--line); }
+  .mezone{ font-size:12px; font-weight:700; color:var(--l3); text-transform:uppercase; letter-spacing:.6px; margin:26px 2px 12px; padding-bottom:8px; border-bottom:.5px solid var(--line); }
   .mezone:first-child{ margin-top:4px; }
   .ed-wk{ background:var(--row); border-radius:12px; padding:12px; margin-bottom:12px; }
   .ed-wk .wkhead{ display:flex; gap:8px; margin-bottom:8px; }
@@ -1136,7 +1136,7 @@
   .tsum-mini{ flex:0 0 auto; width:78px; height:52px; }
   .tsum-mini.radar{ width:60px; height:60px; }
   .tsum-main{ flex:1 1 auto; min-width:0; }
-  .tsum-stat{ font-size:23px; font-weight:750; letter-spacing:-.6px; color:var(--ink); line-height:1.1; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .tsum-stat{ font-size:24px; font-weight:700; letter-spacing:-.5px; color:var(--ink); line-height:1.1; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
   .tsum-stat .u{ font-size:13px; font-weight:600; color:var(--l3); letter-spacing:0; }
   .tsum-stat .up{ color:#2b8a3e; } .tsum-stat .down{ color:#c92a2a; }
   .tsum-cap{ font-size:12.5px; color:var(--l3); margin-top:3px; line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -1144,6 +1144,10 @@
   .metile.tap:active .tsum-chev{ color:var(--accent); }
   /* detail sheets that host the moved-in charts/folds */
   .detailsheet{ height:92vh; }
+  /* every figure animates in when its sheet opens (re-triggers on each open via .show) */
+  @keyframes figin{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:none; } }
+  .detailsheet.show .sheetbody canvas{ animation:figin .5s cubic-bezier(.2,.8,.2,1) both; }
+  @media (prefers-reduced-motion: reduce){ .detailsheet.show .sheetbody canvas{ animation:none; } }
   .detailsheet .sheetbody .fchd2:first-child{ margin-top:2px; }
   /* one shared lead for every detail sheet: big headline + caption + hairline, echoing the summary card */
   .sheetlead{ margin:2px 2px 16px; padding-bottom:14px; border-bottom:.5px solid var(--sep); }
@@ -1252,8 +1256,8 @@
   .panel.tap:active{ opacity:.7; }
   .panel:focus, .panel:focus-visible{ outline:none; }
   .panelhd{ display:flex; align-items:center; gap:8px; }
-  .panelt{ display:inline-flex; align-items:center; gap:7px; font-size:19px; font-weight:700; letter-spacing:-.3px; }
-  .panelt svg{ width:18px; height:18px; flex:0 0 auto; }
+  .panelt{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--l3); }
+  .panelt svg{ width:15px; height:15px; flex:0 0 auto; }
   /* underline tab bar — window/metric switch + swipe state indicator, left-aligned under the title */
   .mewintabs{ display:flex; flex-wrap:wrap; gap:18px; }
   .paneltabs{ margin:9px 0 2px; }
