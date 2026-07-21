@@ -1106,8 +1106,13 @@
   /* consistent figure rhythm across every detail sheet: same chart margins, same section spacing */
   .detailsheet .sheetbody{ overflow-x:hidden; }
   .detailsheet .sheetbody canvas{ margin:12px 0 10px; }
-  .detailsheet .ed-label{ margin:26px 0 10px; }
-  .detailsheet .fchd2{ margin:22px 0 6px; }
+  /* one title style for every heading in a detail sheet — sections, sub-headers and fold headers alike */
+  .detailsheet .ed-label,
+  .detailsheet .fchd2,
+  .detailsheet .fcfoldhd{ font-size:12px; font-weight:700; color:var(--l3); text-transform:uppercase; letter-spacing:.6px; }
+  .detailsheet .ed-label,
+  .detailsheet .fchd2{ margin:26px 0 10px; }
+  .detailsheet .fcfoldhd{ padding:6px 0; }
   .detailsheet .fcnote{ margin:9px 0 0; }
   .detailsheet .fcconn{ margin:10px 0 2px; }
   .detailsheet .seg .s{ flex:0 0 auto; padding:1px 0 6px; border-radius:0; font-size:13px; font-weight:600; color:var(--l3); background:none; box-shadow:none; position:relative; }
