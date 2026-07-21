@@ -228,9 +228,12 @@
      quiet label (still tappable to open Plans) and tighten the header so the first set sits higher. */
   /* the current session lives in the day toggle below, so the top needs no title: a slim bar of just
      the travel + mode controls, right-aligned. */
-  #largeTitle{ padding: calc(env(safe-area-inset-top) + 12px) 0 10px; }
-  #largeTitle .wktitle, #largeTitle small{ display:none; }
-  #largeTitle .ltmain{ gap:16px; justify-content:flex-end; }
+  /* the session is the title (fills the top-left); mins·moves the subtitle; controls sit on the right */
+  #largeTitle{ font-size:25px; letter-spacing:-.6px; padding: calc(env(safe-area-inset-top) + 14px) 0 14px; }
+  #largeTitle .wktitle{ display:block; font-weight:750; color:var(--ink); }
+  #largeTitle small{ display:block; font-size:13px; margin-top:4px; }
+  #largeTitle .ltmain{ gap:12px; align-items:center; }
+  .largeTitle .ltmain .wktitle{ flex:1; min-width:0; line-height:1.12; }
   #strengthWrap > #seg{ margin-top:2px; margin-bottom:22px; }
   /* Two ways to start the workout, as a pair: Suggest (primary) + Choose a plan (secondary) */
   .startrow{ display:flex; gap:10px; margin:0 0 16px; }
@@ -245,9 +248,9 @@
   body.training #pageWorkout #startAction,
   body.training #pageWorkout #seg{ display:none; }
   /* segmented Plan/Surprise switch — the one loud control at the top */
-  .wkseg{ margin:2px 0 14px; padding:4px; border-radius:13px; }
+  .wkseg{ margin:4px 0 18px; padding:4px; border-radius:13px; }
   .wkseg .s{ flex:1 0 0; padding:10px 0; font-size:15px; font-weight:650; letter-spacing:-.2px; border-radius:10px; }
-  #startAction{ margin:0; }
+  #startAction{ margin:0 0 6px; }
   #startAction .btn{ display:flex; align-items:center; justify-content:center; gap:8px; font-weight:650; margin:2px 0 14px; }
   #startAction .btn svg{ width:18px; height:18px; flex:0 0 auto; }
   #sponLen2{ margin:0 0 2px; }

@@ -5062,16 +5062,18 @@ function renderStartMode(){
   const act=$("startAction"); if(!act) return;
   const refresh='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v4h-4"/></svg>';
   const swap='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>';
+  const sh=$("headerShuf"); if(sh) sh.style.display = on ? "" : "none";
   if(on){
     const fd=draft["free"]||{}, nm=fd.name||"Surprise session", nEx=fd.s?Object.keys(fd.s).length:0, L=settings.sponLen||"standard";
-    const sub=(nEx?'~'+sponMins(nEx)+' min · '+nEx+' move'+(nEx>1?'s':''):'')+' · picked for you';
+    // the session IS the title (fills the top-left); its shape is the subtitle
+    if($("ltName")) $("ltName").textContent=nm;
+    if($("planSub")) $("planSub").textContent=(nEx?'~'+sponMins(nEx)+' min · '+nEx+' move'+(nEx>1?'s':''):'picked for you')+(nEx?' · picked for you':'');
     act.innerHTML='<div class="mewintabs paneltabs" id="sponLen2">'
-      +[["quick","Quick"],["standard","Standard"],["full","Full"]].map(([v,l])=>'<button class="mewintab'+(L===v?" active":"")+'" data-sl="'+v+'" type="button">'+l+'</button>').join('')+'</div>'
-      +'<div class="sesshead"><div style="min-width:0;"><div class="surpname">'+esc(nm)+'</div><div class="surpsub">'+esc(sub)+'</div></div>'
-      +'<button class="shuf" id="surpriseShuffle" type="button" aria-label="New surprise">'+refresh+'</button></div>';
+      +[["quick","Quick"],["standard","Standard"],["full","Full"]].map(([v,l])=>'<button class="mewintab'+(L===v?" active":"")+'" data-sl="'+v+'" type="button">'+l+'</button>').join('')+'</div>';
     act.querySelectorAll("#sponLen2 .mewintab").forEach(b=> b.onclick=()=>{ settings.sponLen=b.dataset.sl; sset("settings",settings); relenSurprise(); });
-    $("surpriseShuffle").onclick=surpriseShuffle;
   } else {
+    if($("ltName")) $("ltName").textContent="Workout";
+    if($("planSub")) $("planSub").textContent = (typeof planMeta==="function") ? planMeta(activePlan()) : "";
     act.innerHTML='<button class="btn tinted wide" id="choosePlanBtn" type="button">'+swap+'Choose a plan</button>';
     $("choosePlanBtn").onclick=()=>{ renderPlanList(); openSheet("Plans"); };
   }
@@ -5086,6 +5088,7 @@ document.querySelectorAll("#wkMode .s").forEach(t=> t.onclick=()=>{
   if(sessionUnderway()) confirmAsk("Switch mode? Your current sets will be discarded.", "Switch", apply, "danger");
   else apply();
 });
+if($("headerShuf")) $("headerShuf").onclick=surpriseShuffle;
 document.querySelectorAll("#travelSeg .s").forEach(s=>{
   s.onclick=async()=>{ if(s.dataset.tv===(settings.travelMode||"off")) return;   // no change → don't reset the clock
     travelAccrue();                       // bank the time spent in the context you're leaving
@@ -8500,7 +8503,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v162";
+const APP_VER="v163";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
