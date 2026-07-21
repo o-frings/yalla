@@ -336,11 +336,11 @@
         <div class="panelhd"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 2 5-6"/></svg>Training volume</span><span class="tilegrip" aria-label="Drag to reorder" title="Drag to reorder">⠿</span></div>
         <div class="progobj" id="progObj"></div>
         <div class="mewintabs paneltabs" id="progMetric">
-          <button class="mewintab active" data-pm="volume" type="button">Volume</button>
-          <button class="mewintab" data-pm="sets" type="button">Sets</button>
+          <button class="mewintab active" data-pm="prs" type="button">PRs</button>
           <button class="mewintab" data-pm="sessions" type="button">Sessions</button>
+          <button class="mewintab" data-pm="volume" type="button">Volume</button>
+          <button class="mewintab" data-pm="sets" type="button">Sets</button>
           <button class="mewintab" data-pm="weight" type="button">Weight</button>
-          <button class="mewintab" data-pm="prs" type="button">PRs</button>
         </div>
         <div class="progswipe" id="progSwipe"><div class="progtrack" id="progTrack">
           <div class="progpage"><canvas id="progBars0" width="660" height="180"></canvas></div>
@@ -350,6 +350,12 @@
           <div class="progpage"><canvas id="progBars4" width="660" height="180"></canvas></div>
         </div></div>
         <div class="panelfoot stack"><div class="progcap" id="progCap"></div><div class="progverd" id="progVerdict" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div></div>
+        <div class="fcfold">
+          <button type="button" class="fcfoldhd">How it's measured</button>
+          <div class="fcfoldbody">
+            <p class="fcnote"><b>PRs</b> — weeks you set an estimated-1RM record. <b>Sessions</b> — session-equivalents (a short session counts in proportion). <b>Volume</b> — effort-weighted work (weight × reps, bodyweight-aware). <b>Sets</b> — hard sets near failure. <b>Weight</b> — your bodyweight trend. All over the last 10 weeks. <a class="srclink" href="growth-model-whitepaper.pdf" target="_blank" rel="noopener">The method &amp; evidence (PDF) ↗</a></p>
+          </div>
+        </div>
       </div>
     </div>
 

@@ -205,6 +205,13 @@ Exercises are grouped under `#exlist` in **both** modes, so one delegated listen
 
 ## 10. Possible next steps / TODO ideas
 
+- **Cross-gym machine resistance (deferred — agreed to revisit).** Everything keys off the
+  exercise NAME, so "Leg Press" at gym A vs gym B shares one anchor / e1RM trend / PR / forecast,
+  though the same pin is a different real load — quietly corrupts the strength trend on gym switches.
+  Options: (1) per-machine naming (works today, zero code); (2) a "current gym" location tag that
+  segments MACHINE exercises' anchors + e1RM per location under one name (recommended); (3) relative
+  ordinal load modelling (overkill). Model is partly self-healing (rolling anchor, 2-week ledger
+  baseline). Preferred: option 2, segment under the hood rather than suffixing names.
 - Optionally fold the `wkMeta` line + session timer into one compact strip.
 - Per-exercise rest target (currently one global `settings.restSec`).
 - Edit/delete past history entries; a session history view.
