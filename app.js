@@ -5057,7 +5057,7 @@ function surpriseShuffle(){
 }
 function renderStartMode(){
   const on=!!settings.surprise;
-  document.querySelectorAll("#wkMode .mewintab").forEach(t=> t.classList.toggle("active",(t.dataset.wm==="surprise")===on));
+  document.querySelectorAll("#wkMode .s").forEach(t=> t.classList.toggle("active",(t.dataset.wm==="surprise")===on));
   const seg=$("seg"); if(seg) seg.style.display = on ? "none" : "";
   const act=$("startAction"); if(!act) return;
   const refresh='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v4h-4"/></svg>';
@@ -5075,7 +5075,7 @@ function renderStartMode(){
     $("choosePlanBtn").onclick=()=>{ renderPlanList(); openSheet("Plans"); };
   }
 }
-document.querySelectorAll("#wkMode .mewintab").forEach(t=> t.onclick=()=>{
+document.querySelectorAll("#wkMode .s").forEach(t=> t.onclick=()=>{
   const on = t.dataset.wm==="surprise";
   if(on===!!settings.surprise){ if(on) surpriseShuffle(); return; }   // re-tapping active Surprise → reshuffle
   const apply=()=>{ settings.surprise=on; sset("settings",settings);
@@ -8499,7 +8499,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v160";
+const APP_VER="v161";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH

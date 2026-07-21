@@ -244,7 +244,7 @@
   body.training #pageWorkout #wkMode,
   body.training #pageWorkout #startAction,
   body.training #pageWorkout #seg{ display:none; }
-  .wkmode{ margin:2px 0 12px; }
+  .wkseg{ margin:2px 0 14px; }
   #startAction{ margin:0 0 16px; }
   #startAction .btn{ display:flex; align-items:center; justify-content:center; gap:8px; font-weight:650; }
   #startAction .btn svg{ width:18px; height:18px; flex:0 0 auto; }

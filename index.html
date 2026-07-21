@@ -86,13 +86,13 @@
 <div id="strengthWrap">
 <!-- WORKOUT -->
 <!-- Two ways to start: a data-picked session (leads), or switch the program you're on. -->
-<!-- how you start: follow your plan, or let the app surprise you with a data-picked session -->
-<div class="mewintabs paneltabs wkmode" id="wkMode">
-  <button class="mewintab" data-wm="plan" type="button">Plan</button>
-  <button class="mewintab" data-wm="surprise" type="button">Surprise me</button>
+<!-- how you start: a segmented switch — let the app surprise you, or follow your plan -->
+<div class="seg wkseg" id="wkMode">
+  <div class="s" data-wm="surprise">Surprise me</div>
+  <div class="s" data-wm="plan">Plan</div>
 </div>
-<div id="startAction"></div>
 <div class="seg" id="seg"></div>
+<div id="startAction"></div>
 <!-- session timer + rest ("pause") timer: pinned to the top of the page once a workout's underway.
      Train together + Share live now live as compact icons on the right of this bar (see .tmrsocial);
      each opens its panel below. Shown only when signed in + the friends schema is live. -->
