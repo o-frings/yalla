@@ -3742,7 +3742,7 @@ function renderWorkout(){
     const mcol=MCOLOR[muscleFor(name)[0]]||"#888888";
     const mp=[];
     if(e.t) mp.push('<button type="button" class="tg tgedit" data-i="'+xi+'" title="Edit sets &amp; reps">'+esc(e.t)+' '+ICON.pencil+'</button>');
-    if(meta.lastText) mp.push('<span>'+meta.lastText+'</span>');
+    if(meta.lastText) mp.push('<button type="button" class="fillast" data-ex="'+esc(name)+'">↻ '+esc(meta.lastText)+'</button>');
     mp.push(scoreTag(name));
     const metaLine = '<div class="exmeta">'+mp.join('<span class="dot">·</span>')+'</div>';
     let head=`<div class="pad" style="padding-bottom:0">
@@ -3824,6 +3824,18 @@ function updateRepeatBtn(){ const btn=$("repeatBtn"); if(!btn) return;
   btn.style.display = any ? "" : "none";
 }
 $("repeatBtn").onclick=repeatLastWorkout;
+// fill ONE exercise from its own last session (tap the "↻ Last …" chip on that exercise)
+function fillExerciseLast(name){
+  const g=[...document.querySelectorAll("#exlist .group")].find(x=>x.dataset.ex===name);
+  const prev=name&&last[name];
+  if(!g||!prev||!prev.length){ toast("No previous numbers for "+name+" yet"); return; }
+  g.querySelectorAll(".setrow").forEach((r,i)=>{ if(r.classList.contains("warm")) return;
+    const dv=prev[Math.min(i,prev.length-1)]||{}, w=r.querySelector(".w"), rp=r.querySelector(".r");
+    if(w) w.value=(dv.w!=null?dv.w:""); if(rp) rp.value=(dv.r!=null?dv.r:""); if((w&&w.value)||(rp&&rp.value)) updateSetVol(r,name); });
+  refreshAutoEffort(g); if(typeof refreshSetFocus==="function") refreshSetFocus(g); captureDraft();
+  toast("Filled "+name+" from last time");
+}
+$("exlist").addEventListener("click", e=>{ const b=e.target.closest(".fillast"); if(!b) return; e.preventDefault(); fillExerciseLast(b.dataset.ex); });
 // abort: throw away the in-progress session (unsaved sets), reset the clocks, and return to Set up
 function abortSession(){
   const sig=draftSig();
@@ -5200,20 +5212,27 @@ function wireEffortBar(g){
 // Rep/set target for a free or suggested-session move, from the user's GOAL: strength → low reps & more
 // sets, hypertrophy → moderate, fat-loss/fitness → higher reps. Compound anchors get the lower bracket,
 // accessories the higher one. Drives both the displayed target and the progressive-overload cues.
+// suggested set count for a data-picked / free exercise (strength trains a touch heavier on sets)
+function objSets(name){ return settings.objective==="strength" ? 4 : 3; }
 function objTarget(name){
   const sch=(REPSCHEME[settings.objective]||REPSCHEME.muscle).balanced;
   const reps = roleFor(name)==="compound" ? sch.c : sch.a;
-  return (settings.objective==="strength"?4:3)+" × "+reps;
+  return objSets(name)+" × "+reps;
 }
 function buildFreeGroup(name){
   const prev=last[name]||[];
   const g=document.createElement("div"); g.className="group"; g.dataset.ex=name;
-  let rows=""; for(let i=0;i<3;i++) rows+=freeSetRow(i+1, prev[i], name);
+  const nSets=objSets(name);
+  let rows=""; for(let i=0;i<nSets;i++) rows+=freeSetRow(i+1, prev[i], name);
   // rep target from the user's objective so the range AND the progressive-overload cues (topped-the-range,
   // add-a-rep…) match the goal — a strength session nudges toward load, a hypertrophy one toward reps.
-  const meta=metaHTML(name, isTimed(name)?"":objTarget(name), "free"), eq=equipFor(name);
+  const tgt=isTimed(name)?"":objTarget(name);
+  const meta=metaHTML(name, tgt, "free"), eq=equipFor(name);
   const mcol=MCOLOR[muscleFor(name)[0]]||"#888888";
-  const mp=[]; if(meta.lastText) mp.push('<span>'+meta.lastText+'</span>'); mp.push(scoreTag(name));
+  const mp=[];
+  if(tgt) mp.push('<span class="tg">'+esc(tgt)+'</span>');
+  if(meta.lastText) mp.push('<button type="button" class="fillast" data-ex="'+esc(name)+'">↻ '+esc(meta.lastText)+'</button>');
+  mp.push(scoreTag(name));
   const metaLine='<div class="exmeta">'+mp.join('<span class="dot">·</span>')+'</div>';
   g.innerHTML='<div class="pad" style="padding-bottom:0">'
     +'<div class="exhead"><span class="eqic tinted" style="background:'+hexAlpha(mcol,.15)+';color:'+mcol+'" title="'+esc(eq.label)+'">'+EQUIP[eq.key]+'</span><span class="nm">'+esc(name)+'</span>'
@@ -8503,7 +8522,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v164";
+const APP_VER="v165";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
