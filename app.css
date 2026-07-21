@@ -1098,6 +1098,13 @@
   .spotcap{ font-size:13px; color:var(--l2); line-height:1.45; margin-top:6px; }
   #ovSpotC{ width:100%; height:auto; aspect-ratio:640/150; display:block; margin:12px 0 0; }
   .ovspot .ovchev{ position:absolute; top:14px; right:2px; }
+  /* one toggle style across every detail sheet: the balance sheet's segmented controls
+     render as the same underline tabs used by the Strength & Volume sheets */
+  .detailsheet .seg{ background:none; border:none; padding:0; margin:12px 0 6px; gap:20px; border-radius:0; overflow:visible; }
+  .detailsheet .seg .s{ flex:0 0 auto; padding:1px 0 6px; border-radius:0; font-size:13px; font-weight:600; color:var(--l3); background:none; box-shadow:none; position:relative; }
+  .detailsheet .seg .s.active{ background:none; box-shadow:none; color:var(--ink); }
+  .detailsheet .seg .s.active::after{ content:""; position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:2px; background:var(--accent); }
+  html.dark .detailsheet .seg .s.active{ border:none; box-shadow:none; }
   #musSrcList{ list-style:none; padding:2px 2px 4px; margin:0; }
   #musSrcList li{ font-size:12px; color:var(--l2); line-height:1.5; padding:8px 0; border-top:.5px solid var(--sep); }
   #musSrcList li:first-child{ border-top:none; }

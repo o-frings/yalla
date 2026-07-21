@@ -1968,10 +1968,15 @@ function roseGroups(expanded){ const out=[];
 function roseTotals(tot, expanded){ const t=expandLegacyMtot(tot||{}), out={};
   Object.keys(t).forEach(k=>{ const p=AGG[k]||k, keep=(SUBGROUPS[p] && expanded && expanded.has(p)); const key=keep?k:p; out[key]=(out[key]||0)+(t[k]||0); });
   return out; }
+// One typography scale for every canvas chart. Charts render at very different internal widths but all
+// display at roughly the same on-screen column width, so sizing the font as a fraction of the canvas
+// width makes the ON-SCREEN size the same across every graph (fontPx = k·W → displayed = k·W·(D/W) = k·D).
+const CHART_FONT={ tick:0.028, label:0.033, value:0.040, big:0.052 };
+function cfont(W, role, weight){ const px=Math.max(9, Math.round(W*(CHART_FONT[role]||CHART_FONT.label))); return (weight||"600")+" "+px+"px -apple-system,system-ui,sans-serif"; }
 function drawRose(x, cx, cy, R, G, tot, o){
   // tot is already display-prepared by roseTotals() (legacy keys expanded, heads rolled into Back/Shoulders).
   // Don't expandLegacyMtot here — it would re-split the rolled-up "Back"/"Shoulders" keys and blank those spokes.
-  o=o||{}; const n=G.length, frac=roseRadii(G,tot);
+  o=o||{}; const n=G.length, frac=o.radii||roseRadii(G,tot);
   x.strokeStyle=o.grid||"rgba(127,127,127,.30)"; x.lineWidth=o.gridW||1;
   (o.rings||[1]).forEach(f=>{ x.beginPath(); x.arc(cx,cy,R*f,0,Math.PI*2); x.stroke(); });
   const half=Math.PI/n - (o.gap!=null?o.gap:0.06)/2;
@@ -2681,7 +2686,7 @@ function drawOvSets(id){ const c=$(id); if(!c) return; const ctx=c.getContext("2
   data.forEach((v,i)=>{ i?ctx.lineTo(x(i),y(v)):ctx.moveTo(x(i),y(v)); }); ctx.stroke();
   data.forEach((v,i)=>{ ctx.beginPath(); ctx.arc(x(i),y(v), i===data.length-1?5:3, 0, 7); ctx.fillStyle=i===data.length-1?ac:hexAlpha(ac,.5); ctx.fill(); });
   const l3=(getComputedStyle(document.documentElement).getPropertyValue('--l3')||'#888').trim();
-  ctx.fillStyle=l3; ctx.font="600 17px -apple-system,sans-serif"; ctx.textAlign="left"; ctx.fillText("10w ago",pad,H-5); ctx.textAlign="right"; ctx.fillText("now",W-pad,H-5);
+  ctx.fillStyle=l3; ctx.font=cfont(W,"label"); ctx.textAlign="left"; ctx.fillText("10w ago",pad,H-5); ctx.textAlign="right"; ctx.fillText("now",W-pad,H-5);
 }
 function lastWorkoutTs(){ let m=0; Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ if(e.d>m) m=e.d; })); return m; }
 // most recent logged rotational / anti-rotation move (0 = never) — drives the weekly rotational nudge
@@ -3260,7 +3265,7 @@ function renderCalc(now){
 }
 function drawSpark(){
   const c=$("spark"), ctx=c.getContext("2d"), W=c.width,H=c.height; ctx.clearRect(0,0,W,H);
-  if(bw.length<2){ ctx.fillStyle="#636366"; ctx.font="12px -apple-system,sans-serif";
+  if(bw.length<2){ ctx.fillStyle="#636366"; ctx.font=cfont(W,"label");
     ctx.fillText("log weight a few times to see your trend",6,H/2+4); return; }
   const gt=parseFloat(settings.goalTarget), gs=parseFloat(settings.goalStart);
   const ks=bw.map(p=>p.kg), extra=[...ks]; if(!isNaN(gt)) extra.push(gt); if(!isNaN(gs)) extra.push(gs);
@@ -3461,8 +3466,8 @@ function drawProgChart(metric, canvasId){
   const ink=(getComputedStyle(document.documentElement).getPropertyValue('--ink')||'#000').trim();
   const N=PROG_WEEKS, pad=12, base=H-26, top=12;
   const cx=i=> pad + i*((W-pad*2)/(N-1));
-  const emptyMsg=()=>{ ctx.fillStyle=l3; ctx.font="13px -apple-system,sans-serif"; ctx.textAlign="center"; ctx.fillText("Log a few workouts to see this build up.", W/2, H/2); };
-  const xLabels=()=>{ ctx.fillStyle=l3; ctx.font="600 17px -apple-system,sans-serif"; ctx.textAlign="left"; ctx.fillText(PROG_WEEKS+"w ago", pad, H-6); ctx.textAlign="right"; ctx.fillText("now", W-pad, H-6); };
+  const emptyMsg=()=>{ ctx.fillStyle=l3; ctx.font=cfont(W,"label"); ctx.textAlign="center"; ctx.fillText("Log a few workouts to see this build up.", W/2, H/2); };
+  const xLabels=()=>{ ctx.fillStyle=l3; ctx.font=cfont(W,"label"); ctx.textAlign="left"; ctx.fillText(PROG_WEEKS+"w ago", pad, H-6); ctx.textAlign="right"; ctx.fillText("now", W-pad, H-6); };
   const baseline=()=>{ ctx.strokeStyle=hexAlpha(ac,.18); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad,base+0.5); ctx.lineTo(W-pad,base+0.5); ctx.stroke(); };
 
   // ---- volume / sets → one line per muscle (like the radar, but over time) ----
@@ -3829,7 +3834,7 @@ function renderSessionRose(){
   const gx=cv.getContext("2d"), W=cv.width, H=cv.height, R=Math.min(W,H)/2-62;   // leave room for edge labels
   gx.clearRect(0,0,W,H);
   drawRose(gx, W/2, H/2, R, G, agg, { color:g=>MCOLOR[g]||"#f08020", alpha:.72, rings:[0.5,1], grid:"rgba(127,127,127,.28)",
-    labels:true, labelFont:"600 11px -apple-system,system-ui,sans-serif", labelGap:10, labelColor:g=>MCOLOR[g]||"#888" });
+    labels:true, labelFont:cfont(W,"label"), labelGap:10, labelColor:g=>MCOLOR[g]||"#888" });
   const top=G.slice().sort((a,b)=>(agg[b]||0)-(agg[a]||0)).filter(g=>(agg[g]||0)>0).slice(0,3).map(g=>MSHORT[g]||g);
   const sub=$("sessRoseSub"); if(sub) sub.textContent=(st.doneSets||0)+" set"+(st.doneSets===1?"":"s")+" logged · mostly "+top.join(" · ");
 }
@@ -4600,30 +4605,28 @@ function drawRadar(totals, canvasId, target, noLabels, relative){
   const cs=getComputedStyle(document.documentElement);
   const accent=(cs.getPropertyValue("--accent")||"#0a84ff").trim();
   const lab=(cs.getPropertyValue("--l2")||"#888").trim();
-  const grid="rgba(128,128,128,.22)";
   const val=g=>radarVal(det, g, target);
   const max=Math.max(1, ...G.map(val));
   // Absolute (target) mode: the rim is a fixed per-muscle weekly goal, so short wedges read as gaps.
   // Relative mode: spokes scale to your most-trained muscle so the BALANCE SHAPE stays full-size at any
   // time window (a month no longer collapses toward the centre); the target then shows as a dashed ring.
   const norm = (target && !relative) ? (g=>Math.min(1,val(g)/target)) : (g=>val(g)/max);
-  ctx.strokeStyle=grid; ctx.lineWidth=1.5;
-  [0.5,1].forEach(f=>{ ctx.beginPath(); ctx.arc(cx,cy,R*f,0,Math.PI*2); ctx.stroke(); });
-  if(target && !relative){ ctx.strokeStyle=accent; ctx.globalAlpha=.45; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; }
-  else if(target && relative){ const tr=R*Math.min(1,target/max);   // where the ~target/wk line falls on the relative scale
-    ctx.strokeStyle=accent; ctx.globalAlpha=.5; ctx.lineWidth=2; ctx.setLineDash([7,7]);
-    ctx.beginPath(); ctx.arc(cx,cy,tr,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; }
-  const half=Math.PI/n - 0.05;
   // Auxiliary (NO_TARGET) muscles have no weekly goal, so against the target ring they'd read as
   // permanent gaps. Match the small roses: show an aux spoke/label only when it was actually trained.
   const showSpoke=g=> val(g)>0 || !NO_TARGET.has(g);
-  G.forEach((g,i)=>{ if(!showSpoke(g)) return; const rr=R*norm(g); if(rr<=0.5) return;
-    const a=(-90+i*360/n)*Math.PI/180, col=MCOLOR[g]||accent;
-    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rr,a-half,a+half); ctx.closePath();
-    ctx.fillStyle=col; ctx.globalAlpha=.30; ctx.fill(); ctx.globalAlpha=1; ctx.lineWidth=2; ctx.strokeStyle=col; ctx.stroke(); });
+  // Render the wedges with the shared rose renderer, so the balance radar matches the feed & planner roses.
+  const radii=G.map(g=> showSpoke(g) ? norm(g) : 0);
+  drawRose(ctx, cx, cy, R, G, roseTotals(totals||{}, musExpanded), {
+    radii, color:g=>MCOLOR[g]||accent, alpha:.8, stroke:"rgba(127,127,127,.18)", strokeW:1,
+    rings:[0.5,1], grid:"rgba(128,128,128,.22)", gridW:1.5 });
+  if(target && !relative){ ctx.strokeStyle=accent; ctx.globalAlpha=.5; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; }
+  else if(target && relative){ const tr=R*Math.min(1,target/max);   // where the ~target/wk line falls on the relative scale
+    ctx.strokeStyle=accent; ctx.globalAlpha=.5; ctx.lineWidth=2; ctx.setLineDash([7,7]);
+    ctx.beginPath(); ctx.arc(cx,cy,tr,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; }
   if(noLabels) return;
-  ctx.fillStyle=lab; ctx.font="600 29px -apple-system,sans-serif"; ctx.textBaseline="middle";
-  G.forEach((g,i)=>{ if(!showSpoke(g)) return; const a=(-90+i*360/n)*Math.PI/180, x=cx+(R+52)*Math.cos(a), y=cy+(R+52)*Math.sin(a), co=Math.cos(a);
+  ctx.fillStyle=lab; ctx.font=cfont(W,"label"); ctx.textBaseline="middle";
+  const gap=W*0.058;
+  G.forEach((g,i)=>{ if(!showSpoke(g)) return; const a=(-90+i*360/n)*Math.PI/180, x=cx+(R+gap)*Math.cos(a), y=cy+(R+gap)*Math.sin(a), co=Math.cos(a);
     ctx.textAlign = Math.abs(co)<0.3 ? "center" : (co>0?"left":"right");
     const isParent=SUBGROUPS[g] && !musExpanded.has(g);
     ctx.fillText((MSHORT[g]||g)+(isParent?" ›":""), x, y); });
@@ -4716,7 +4719,7 @@ function drawSuccessGauge(canvasId, wk){
     if(rr>1){ ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rr,a-half,a+half); ctx.closePath();   // success fill
       ctx.fillStyle=col; ctx.globalAlpha=succ>=1?fillHi:fillLo; ctx.fill(); ctx.globalAlpha=1; ctx.lineWidth=2.5; ctx.strokeStyle=col; ctx.stroke(); }
     const x=cx+(R+40)*Math.cos(a), y=cy+(R+40)*Math.sin(a), co=Math.cos(a);
-    ctx.font="600 31px -apple-system,sans-serif"; ctx.textBaseline="middle";
+    ctx.font=cfont(W,"label"); ctx.textBaseline="middle";
     ctx.textAlign = Math.abs(co)<0.3 ? "center" : (co>0?"left":"right");
     ctx.fillStyle=col; ctx.fillText(MSHORT[g]||g, x, y);
   });
@@ -4802,7 +4805,7 @@ function drawSpotBalance(id, unders){
   if(!rows.length) return;
   const lab=(getComputedStyle(document.documentElement).getPropertyValue("--l2")||"#888").trim();
   const x0=170, bw=W-x0-26, rh=H/rows.length;
-  ctx.textBaseline="middle"; ctx.font="600 22px -apple-system,sans-serif";
+  ctx.textBaseline="middle"; ctx.font=cfont(W,"label");
   rows.forEach((g,i)=>{ const y=i*rh+rh/2, v=wk[g]||0, frac=Math.max(0,Math.min(1,v/WEEKLY_SET_TARGET)), col=MCOLOR[g]||accentHex();
     ctx.fillStyle=lab; ctx.textAlign="right"; ctx.fillText(MSHORT[g]||g, x0-14, y);
     ctx.fillStyle=hexAlpha(col,.16); ctx.fillRect(x0, y-10, bw, 20);
@@ -5717,7 +5720,7 @@ function openChart(name){
 }
 function drawExChart(data){
   const c=$("exChart"), ctx=c.getContext("2d"), W=c.width, H=c.height, P=48; ctx.clearRect(0,0,W,H);
-  if(!data.length){ ctx.fillStyle="#636366"; ctx.font="26px -apple-system,sans-serif"; ctx.textAlign="center";
+  if(!data.length){ ctx.fillStyle="#636366"; ctx.font=cfont(W,"label"); ctx.textAlign="center";
     ctx.fillText("No history yet",W/2,H/2); ctx.textAlign="left"; return; }
   const hasW=data.some(d=>parseFloat(d.w)>0);
   const vals=data.map(d=> hasW?(parseFloat(d.w)||0):(parseFloat(d.r)||0));
@@ -5727,7 +5730,7 @@ function drawExChart(data){
   const n=data.length;
   const x=i=> n<2? W/2 : P+(i/(n-1))*(W-P-20);
   const y=v=> H-P-((v-mn)/(mx-mn))*(H-P-30);
-  ctx.lineWidth=1; ctx.font="20px -apple-system,sans-serif";
+  ctx.lineWidth=1; ctx.font=cfont(W,"tick");
   for(let g=0;g<=2;g++){ const v=mn+(mx-mn)*(g/2), yy=y(v);
     ctx.strokeStyle="rgba(84,84,88,.4)"; ctx.beginPath(); ctx.moveTo(P,yy); ctx.lineTo(W-20,yy); ctx.stroke();
     ctx.fillStyle="#98989e"; ctx.fillText(Math.round(v)+'', 8, yy+6); }
@@ -5796,7 +5799,7 @@ function drawStrengthIndex(si){
   const y=v=> padT + (1-(v-lo)/(hi-lo))*(H-padT-padB);
   // baseline at 100 (each lift's start)
   ctx.strokeStyle=hexAlpha(l3,.5); ctx.setLineDash([4,4]); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(padL,y(100)); ctx.lineTo(W-padR,y(100)); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle=l3; ctx.font="12px -apple-system,sans-serif"; ctx.textAlign="right"; ctx.fillText("100",padL-4,y(100)+4);
+  ctx.fillStyle=l3; ctx.font=cfont(W,"tick"); ctx.textAlign="right"; ctx.fillText("100",padL-4,y(100)+4);
   // linear trend line over the history
   const xs=s.map((_,i)=>i), sx=xs.reduce((a,b)=>a+b,0), sy=vals.reduce((a,b)=>a+b,0),
         sxy=xs.reduce((a,xx,i)=>a+xx*vals[i],0), sxx=xs.reduce((a,xx)=>a+xx*xx,0), den=n*sxx-sx*sx;
@@ -5818,7 +5821,7 @@ function drawStrengthIndex(si){
     ctx.strokeStyle=hexAlpha(l3,.4); ctx.lineWidth=1; ctx.setLineDash([2,3]); ctx.beginPath(); ctx.moveTo(xNow,padT); ctx.lineTo(xNow,H-padB); ctx.stroke(); ctx.setLineDash([]);
   }
   ctx.beginPath(); ctx.arc(xNow,y(vals[n-1]),4.5,0,7); ctx.fillStyle=ac; ctx.fill();
-  ctx.fillStyle=l3; ctx.font="600 13px -apple-system,sans-serif"; ctx.textAlign="left"; ctx.fillText(si.weeks+"w ago",padL,H-6);
+  ctx.fillStyle=l3; ctx.font=cfont(W,"label"); ctx.textAlign="left"; ctx.fillText(si.weeks+"w ago",padL,H-6);
   ctx.textAlign="right"; ctx.fillText(f?"+"+f.weeks+"w":"now", W-padR, H-6);
   if(f){ ctx.textAlign="center"; ctx.fillStyle=hexAlpha(l3,.9); ctx.fillText("now", xNow, H-6); }
 }
@@ -6364,14 +6367,14 @@ function drawCardioMins(id){ const c=$(id); if(!c) return; const ctx=c.getContex
   ctx.strokeStyle=hexAlpha("#9775fa",.45); ctx.setLineDash([4,4]); ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(pad,y(tgt)); ctx.lineTo(W-pad,y(tgt)); ctx.stroke(); ctx.setLineDash([]);
   data.forEach((v,i)=>{ const x=pad+i*gapX+(gapX-bw)/2, h=Math.max(0,base-y(v)); ctx.fillStyle = v>=tgt ? "#9775fa" : hexAlpha("#9775fa",.4);
     if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(x,y(v),bw,h,3); ctx.fill(); } else ctx.fillRect(x,y(v),bw,h); });
-  ctx.fillStyle=_axisColor(); ctx.font="600 15px -apple-system,sans-serif"; ctx.textAlign="left"; ctx.fillText("10w ago",pad,H-5); ctx.textAlign="right"; ctx.fillText("now",W-pad,H-5);
+  ctx.fillStyle=_axisColor(); ctx.font=cfont(W,"label"); ctx.textAlign="left"; ctx.fillText("10w ago",pad,H-5); ctx.textAlign="right"; ctx.fillText("now",W-pad,H-5);
 }
 function drawZoneStack(id){ const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const wk=cardioZoneWeekly(8), base=H-22, top=12, pad=10, n=wk.length, gapX=(W-pad*2)/n, bw=gapX*0.66;
   const tots=wk.map(o=>CZONES.reduce((s,z)=>s+o[z.z],0)), hi=Math.max(1,...tots);
   wk.forEach((o,i)=>{ let yb=base; const x=pad+i*gapX+(gapX-bw)/2;
     CZONES.forEach(z=>{ const v=o[z.z]; if(!v) return; const h=(v/hi)*(base-top); yb-=h; ctx.fillStyle=CZCOL[z.z]; ctx.fillRect(x,yb,bw,h); }); });
-  ctx.fillStyle=_axisColor(); ctx.font="600 15px -apple-system,sans-serif"; ctx.textAlign="left"; ctx.fillText("8w ago",pad,H-5); ctx.textAlign="right"; ctx.fillText("now",W-pad,H-5);
+  ctx.fillStyle=_axisColor(); ctx.font=cfont(W,"label"); ctx.textAlign="left"; ctx.fillText("8w ago",pad,H-5); ctx.textAlign="right"; ctx.fillText("now",W-pad,H-5);
 }
 function drawPaceTrend(id, activity){ const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const a=cardioPaceActivities().find(a=>a.name===activity); if(!a) return;
@@ -6381,7 +6384,7 @@ function drawPaceTrend(id, activity){ const c=$(id); if(!c) return; const ctx=c.
   ctx.strokeStyle=ac; ctx.lineWidth=3; ctx.lineJoin="round"; ctx.lineCap="round"; ctx.beginPath();
   pts.forEach((p,i)=>{ i?ctx.lineTo(x(i),y(p.pace)):ctx.moveTo(x(i),y(p.pace)); }); ctx.stroke();
   pts.forEach((p,i)=>{ ctx.beginPath(); ctx.arc(x(i),y(p.pace), i===pts.length-1?5:3,0,7); ctx.fillStyle=i===pts.length-1?ac:hexAlpha(ac,.5); ctx.fill(); });
-  ctx.fillStyle=_axisColor(); ctx.font="600 14px -apple-system,sans-serif"; ctx.textAlign="left"; ctx.fillText("faster ↑",pad,H-5); ctx.textAlign="right"; ctx.fillText("now",W-pad,H-5);
+  ctx.fillStyle=_axisColor(); ctx.font=cfont(W,"label"); ctx.textAlign="left"; ctx.fillText("faster ↑",pad,H-5); ctx.textAlign="right"; ctx.fillText("now",W-pad,H-5);
 }
 
 // ================= achievements (gamification) =================
@@ -6824,7 +6827,7 @@ function drawLedgerMultiplier(recs){
   let lo=Math.min(1,...pts.map(p=>p.lo)), hi=Math.max(1,...pts.map(p=>p.hi)); const sp=Math.max(0.3,hi-lo); lo-=sp*0.1; hi+=sp*0.1;
   const x=i=> padL+(n<2?0:(i/(n-1))*(W-padL-padR)), y=v=> padT+(1-(v-lo)/(hi-lo))*(H-padT-padB);
   ctx.strokeStyle=hexAlpha(l3,.5); ctx.setLineDash([4,4]); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(padL,y(1)); ctx.lineTo(W-padR,y(1)); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle=l3; ctx.font="11px -apple-system,sans-serif"; ctx.textAlign="right"; ctx.fillText("×1",padL-3,y(1)+4);
+  ctx.fillStyle=l3; ctx.font=cfont(W,"tick"); ctx.textAlign="right"; ctx.fillText("×1",padL-3,y(1)+4);
   // 95% band
   ctx.beginPath(); pts.forEach((p,i)=>{ const xx=x(i),yy=y(p.hi); i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy); });
   for(let i=n-1;i>=0;i--){ ctx.lineTo(x(i),y(pts[i].lo)); } ctx.closePath(); ctx.fillStyle=hexAlpha(ac,.14); ctx.fill();
@@ -6844,7 +6847,7 @@ function drawLedgerPredActual(scored){
   // zero axes + y=x diagonal
   ctx.strokeStyle=hexAlpha(l3,.35); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x(0),pad); ctx.lineTo(x(0),H-pad); ctx.moveTo(pad,y(0)); ctx.lineTo(W-pad,y(0)); ctx.stroke();
   ctx.strokeStyle=hexAlpha(l3,.6); ctx.setLineDash([5,4]); ctx.beginPath(); ctx.moveTo(x(-lim),y(-lim)); ctx.lineTo(x(lim),y(lim)); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle=l3; ctx.font="11px -apple-system,sans-serif"; ctx.textAlign="center"; ctx.fillText("predicted →",W/2,H-6); ctx.save(); ctx.translate(9,H/2); ctx.rotate(-Math.PI/2); ctx.fillText("actual →",0,0); ctx.restore();
+  ctx.fillStyle=l3; ctx.font=cfont(W,"tick"); ctx.textAlign="center"; ctx.fillText("predicted →",W/2,H-6); ctx.save(); ctx.translate(9,H/2); ctx.rotate(-Math.PI/2); ctx.fillText("actual →",0,0); ctx.restore();
   scored.forEach((r,i)=>{ const hit=r.out.hit80; ctx.beginPath(); ctx.arc(x(pr[i]),y(ac2[i]),4,0,7);
     ctx.fillStyle=hit?ac:hexAlpha(l3,.55); ctx.fill(); });
 }
@@ -7022,7 +7025,7 @@ function drawForecast(f){
   const ymax=Math.max(2, Math.ceil(hi*1.1/2)*2), ymin=Math.min(0, Math.floor(lo*1.1/2)*2);
   const X=w=> padL + (w/x1)*(W-padL-padR);
   const Y=v=> padT + (1-(v-ymin)/(ymax-ymin))*(H-padT-padB);
-  ctx.font="12px -apple-system,system-ui,sans-serif"; ctx.textAlign="right";
+  ctx.font=cfont(W,"tick"); ctx.textAlign="right";
   const ticks=5; for(let k=0;k<=ticks;k++){ const v=ymin+(ymax-ymin)*k/ticks, y=Y(v), zero=Math.abs(v)<1e-6;
     ctx.strokeStyle=hexAlpha(l3, zero?.5:.18); ctx.lineWidth=zero?1.2:1; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
     ctx.fillStyle=l3; ctx.fillText(v.toFixed(0)+"%", padL-6, y+4); }
@@ -7036,7 +7039,7 @@ function drawForecast(f){
   line(f.pace.p50, blue); line(f.plan.p50, accent);
   let yp=Y(f.plan.p50[x1]), yc=Y(f.pace.p50[x1]); if(Math.abs(yp-yc)<13){ const m=(yp+yc)/2; yp=m-7; yc=m+7; }
   const sgn=v=>(v>=0?"+":"")+v.toFixed(1)+"%";
-  ctx.font="600 12px -apple-system,system-ui,sans-serif"; ctx.textAlign="left";
+  ctx.font=cfont(W,"label"); ctx.textAlign="left";
   ctx.fillStyle=accent; ctx.fillText(sgn(f.plan.p50[x1]), X(x1)+5, yp+4);
   ctx.fillStyle=blue;   ctx.fillText(sgn(f.pace.p50[x1]), X(x1)+5, yc+4);
   const lg=$("fcLegend"); if(lg) lg.innerHTML='<span class="fclg"><i style="background:'+accent+'"></i>this plan</span><span class="fclg"><i style="background:'+blue+'"></i>current pace</span><span class="fclg"><i class="fcbandi"></i>10–90% range</span>';
@@ -7055,12 +7058,12 @@ function drawForecastSens(f){
   const X=v=> padL + (v-vmin)/span*(W-padL-padR);
   // baseline (plan median)
   ctx.strokeStyle=hexAlpha(l3,.5); ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(X(f.base),padT); ctx.lineTo(X(f.base),H-padB); ctx.stroke(); ctx.setLineDash([]);
-  ctx.font="11px -apple-system,system-ui,sans-serif"; ctx.fillStyle=l3; ctx.textAlign="center"; ctx.fillText("median "+f.base.toFixed(1)+"%", X(f.base), H-6);
+  ctx.font=cfont(W,"tick"); ctx.fillStyle=l3; ctx.textAlign="center"; ctx.fillText("median "+f.base.toFixed(1)+"%", X(f.base), H-6);
   rows.forEach((r,i)=>{ const cy=padT+i*rowH+rowH/2, x0=X(r.lo), x1=X(r.hi);
     ctx.fillStyle=hexAlpha(accent,.28); ctx.strokeStyle=accent; ctx.lineWidth=1;
     ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(x0, cy-7, Math.max(2,x1-x0), 14, 3); else ctx.rect(x0,cy-7,Math.max(2,x1-x0),14); ctx.fill(); ctx.stroke();
-    ctx.fillStyle=l3; ctx.textAlign="right"; ctx.font="11px -apple-system,system-ui,sans-serif"; ctx.fillText(r.label, padL-8, cy+4);
-    ctx.fillStyle=ink; ctx.textAlign="left"; ctx.font="10px -apple-system,system-ui,sans-serif"; ctx.fillText(r.hi.toFixed(1)+"%", x1+4, cy+3.5);
+    ctx.fillStyle=l3; ctx.textAlign="right"; ctx.font=cfont(W,"tick"); ctx.fillText(r.label, padL-8, cy+4);
+    ctx.fillStyle=ink; ctx.textAlign="left"; ctx.font=cfont(W,"tick"); ctx.fillText(r.hi.toFixed(1)+"%", x1+4, cy+3.5);
   });
   // actionable read-out: the biggest swing among the levers the lifter can actually change
   const ACT={ effort:"push a little closer to failure on your hard sets",
@@ -7090,8 +7093,8 @@ function drawForecastMuscles(f, which){
     const bx=Math.min(zeroX,x), bw=Math.max(2,Math.abs(x-zeroX)), bh=Math.min(22,rowH*0.5);
     ctx.fillStyle=hexAlpha(col,.92);
     if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(bx, cy-bh/2, bw, bh, 5); ctx.fill(); } else ctx.fillRect(bx, cy-bh/2, bw, bh);
-    ctx.fillStyle=l3; ctx.textAlign="right"; ctx.font="600 20px -apple-system,system-ui,sans-serif"; ctx.fillText(MSHORT[r.g]||r.g, padL-12, cy+7);
-    ctx.fillStyle=ink; ctx.font="700 18px -apple-system,system-ui,sans-serif"; ctx.textAlign="left";
+    ctx.fillStyle=l3; ctx.textAlign="right"; ctx.font=cfont(W,"label"); ctx.fillText(MSHORT[r.g]||r.g, padL-12, cy+7);
+    ctx.fillStyle=ink; ctx.font=cfont(W,"value","700"); ctx.textAlign="left";
     const lab=(r.gain>=0?"+":"")+r.gain.toFixed(1)+"%";
     ctx.fillText(lab, (r.gain>=0 ? x+8 : zeroX+8), cy+6.5);   // negatives label right of the zero line, clear of names
   });
@@ -7723,7 +7726,7 @@ function drawEmphasisRadar(){
     ctx.fillStyle=col; ctx.globalAlpha=.28; ctx.fill(); ctx.globalAlpha=1; ctx.lineWidth=2.5; ctx.strokeStyle=col; ctx.stroke(); });
   // grab handle at each wedge tip
   G.forEach((g,i)=>{ const [x,y]=pt(i,R*frac[i]); ctx.beginPath(); ctx.arc(x,y,14,0,Math.PI*2); ctx.fillStyle=MCOLOR[g]||accent; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle="#fff"; ctx.stroke(); });
-  ctx.fillStyle=lab; ctx.font="600 26px -apple-system,sans-serif"; ctx.textBaseline="middle";
+  ctx.fillStyle=lab; ctx.font=cfont(W,"label"); ctx.textBaseline="middle";
   G.forEach((g,i)=>{ const [x,y]=pt(i,R+50), co=Math.cos((-90+i*360/n)*Math.PI/180); ctx.textAlign=Math.abs(co)<0.3?"center":(co>0?"left":"right");
     const isParent=SUBGROUPS[g] && !buildExpanded.has(g); ctx.fillText((MSHORT[g]||g)+(isParent?" ›":""), x, y); });
 }
@@ -8413,7 +8416,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v138";
+const APP_VER="v139";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
