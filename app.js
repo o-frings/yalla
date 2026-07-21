@@ -2619,6 +2619,20 @@ function dismissTip(id, card){
   if(!left){ const lbl=wrap.previousElementSibling; if(lbl && lbl.classList.contains("ed-label")) lbl.remove(); if(dots) dots.remove(); wrap.remove(); }
   else if(dots){ dots.innerHTML=Array.from({length:left},(_,i)=>'<span class="discdot'+(i===0?" on":"")+'"></span>').join(""); }
 }
+// Discover deck now lives on the Me tab (a persistent container we repopulate, so dismiss-by-id + rebuild)
+function renderMeDiscover(){
+  const wrap=$("meDiscover"), zone=$("meDiscZone"), dotsEl=$("meDiscDots"); if(!wrap) return;
+  const dt=discoverTips();
+  if(!dt.length){ if(zone) zone.style.display="none"; wrap.style.display="none"; if(dotsEl) dotsEl.style.display="none"; return; }
+  if(zone) zone.style.display=""; wrap.style.display="";
+  wrap.innerHTML=dt.map(d=>'<div class="group ovnudge disccard"><div class="pad"><button class="discx" data-tip="'+d.id+'" aria-label="Dismiss">✕</button><div class="ovbig" style="font-size:18px; padding-right:20px;">'+esc(d.t)+'</div><p class="ovp" style="margin-top:8px;">'+esc(d.s)+'</p>'+(d.act?'<button class="btn wide ovdisc" data-act="'+d.act+'" data-tip="'+d.id+'" style="margin-top:16px;">'+esc(d.btn)+'</button>':'')+'</div></div>').join('');
+  if(dotsEl){ if(dt.length>1){ dotsEl.style.display=""; dotsEl.innerHTML=dt.map((_,i)=>'<span class="discdot'+(i===0?' on':'')+'"></span>').join(''); } else dotsEl.style.display="none"; }
+  wrap.querySelectorAll(".discx").forEach(x=> x.onclick=(ev)=>{ ev.stopPropagation(); dismissTip(x.dataset.tip); renderMeDiscover(); });
+  wrap.querySelectorAll(".ovdisc").forEach(b=> b.onclick=()=>{ if(b.dataset.tip){ settings.discRead=settings.discRead||{}; settings.discRead[b.dataset.tip]=1; sset("settings",settings); } ovAct(b.dataset.act); });
+  if(dt.length>1 && dotsEl){ const cards=wrap.querySelectorAll(".disccard");
+    wrap.onscroll=()=>{ let best=0, bd=1e9; cards.forEach((c,i)=>{ const d=Math.abs(c.offsetLeft-wrap.scrollLeft); if(d<bd){bd=d;best=i;} });
+      dotsEl.querySelectorAll(".discdot").forEach((el,i)=> el.classList.toggle("on", i===best)); }; }
+}
 // Apple-style activity rings — concentric arcs filling toward each weekly target
 function drawRings(id, rings){
   const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, cx=W/2, cy=W/2; ctx.clearRect(0,0,W,W);
@@ -3000,7 +3014,6 @@ function decideTip(){
 function renderOverview(){
   const host=$("ovBody"); if(!host) return;
   $("ovGreet").textContent=ovGreetWord()+((settings.displayName||settings.name)?", "+(settings.displayName||settings.name):"");
-  try{ $("ovDate").textContent=new Date().toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"}); }catch(e){}
   const due=(settings.sinceDeload||0)>=DELOAD_AT, p=activePlan(), w=p&&p.workouts[curWk], did=sessionToday();
   let h="";
   // --- Train-at-home nudge (2+ days since the last workout) ---
@@ -3042,48 +3055,8 @@ function renderOverview(){
       +'<canvas id="ovSpotC" width="640" height="150"></canvas>'
       +'<span class="ovchev">›</span></div></div>';
   }
-  // --- the one trend that matters: are you getting stronger? (leads the home; taps to the Strength sheet) ---
-  const ovSI=strengthIndex();
-  if(ovSI){ const p=ovSI.series[ovSI.series.length-1].idx-100;
-    const s1=v=>(v>=0?"+":"")+v.toFixed(1)+"%", cl=v=>v>=1?"grow":v<=-1?"shrink":"hold", av=v=>v>=1?"↑":v<=-1?"↓":"→";
-    const fpart = ovSI.forecast ? ' <span class="ovmeta" style="display:inline;">· forecast</span> <span class="extr '+cl(ovSI.forecast.pct)+'">'+av(ovSI.forecast.pct)+' '+s1(ovSI.forecast.pct)+'</span>' : '';
-    h+='<div class="ed-label">Strength <span class="subhint">— tap for detail ›</span></div>';
-    h+='<div class="group ovtap ovstrength" id="ovStrength"><div class="pad" style="display:flex; align-items:center; gap:14px;">'
-      +sparkline(ovSI.series.map(pt=>pt.idx), accentHex())
-      +'<div style="flex:1; min-width:0;">Overall <span class="extr '+cl(p)+'">'+av(p)+' '+s1(p)+'</span>'+fpart
-      +'<div class="ovmeta">across '+ovSI.lifts+' lift'+(ovSI.lifts>1?"s":"")+' · last '+ovSI.weeks+'w</div></div>'
-      +'<span class="ovchev">›</span></div></div>';
-  }
-  // --- this week at a glance: three activity rings + a "vs last month" delta ---
-  let ovRings=null;
-  if(Object.keys(hist).length || cardioList().length){
-    const cut=Date.now()-7*86400000; let setsWk=0; const musWk=new Set();
-    Object.keys(hist).forEach(n=>{ const gs=muscleFor(n); (hist[n]||[]).forEach(e=>{ if(e.d>=cut){ setsWk+=(e.n!=null?e.n:1)*effortOf(e); gs.forEach(g=>{ if(MGROUPS.indexOf(g)>=0) musWk.add(g); }); } }); });
-    const _gt=growthRingTargets(), sessTarget=_gt.sess, setsTarget=_gt.sets;
-    ovRings=[ {label:"Sessions", val:f7, target:sessTarget, color:"#ff6b3d"},
-              {label:"Hard sets", val:setsWk, target:setsTarget, color:"#4dabf7"},
-              {label:"Muscles", val:musWk.size, target:12, color:"#51cf66"} ];
-    const cTgt=cardioTargetMins(); if(cTgt>0) ovRings.push({label:"Cardio", val:cardioDoseWeek(7), target:cTgt, color:"#9775fa", unit:"min"});
-    if(ovRings.every(r=>r.val>=r.target)) shareRingsClosed(setsWk);   // all rings closed → auto-share (gated inside)
-    // month-over-month volume delta
-    const vol=(loDays,hiDays)=>{ const lo=Date.now()-loDays*86400000, hi=Date.now()-hiDays*86400000; let v=0; Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ if(e.d>=lo&&e.d<hi) v+=(e.v||0); })); return v; };
-    const cur=vol(28,0), prev=vol(56,28), delta = prev>0 ? Math.round((cur-prev)/prev*100) : null;
-    const legend=ovRings.map(r=>{ const rv = r.label==="Sessions" ? round1(r.val) : Math.round(r.val);
-      return '<span class="rglg"><i style="background:'+r.color+'"></i>'+r.label+' <b>'+rv+'</b>/'+r.target+(r.unit?' '+r.unit:'')+'</span>'; }).join('');
-    const deltaLine = delta!=null ? '<div class="ovdelta'+(delta>=0?' up':' down')+'">'+(delta>=0?'▲':'▼')+' Volume '+(delta>=0?'+':'')+delta+'% vs the month before</div>' : '';
-    h+='<div class="ed-label">This week <span class="subhint">— tap for detail ›</span></div>';
-    h+='<div class="group ovtap ovsnap"><div class="pad" style="display:flex; align-items:center; gap:16px;">'
-      +'<canvas id="ovRingsC" width="320" height="320" style="width:118px; height:118px; flex:0 0 auto;"></canvas>'
-      +'<div style="flex:1; min-width:0;"><div class="rglgwrap">'+legend+'</div>'+deltaLine+'</div>'
-      +'</div></div>';
-  }
-  // --- Discover --- a swipeable deck of tips / not-yet-used features
-  const dt=discoverTips();
-  if(dt.length){
-    h+='<div class="ed-label">Discover'+(dt.length>1?' <span class="subhint">— swipe ›</span>':'')+'</div>';
-    h+='<div class="discwrap" id="discWrap">'+dt.map(d=>'<div class="group ovnudge disccard"><div class="pad"><button class="discx" data-tip="'+d.id+'" aria-label="Dismiss">✕</button><div class="ovbig" style="font-size:18px; padding-right:20px;">'+esc(d.t)+'</div><p class="ovp" style="margin-top:8px;">'+esc(d.s)+'</p>'+(d.act?'<button class="btn wide ovdisc" data-act="'+d.act+'" data-tip="'+d.id+'" style="margin-top:16px;">'+esc(d.btn)+'</button>':'')+'</div></div>').join('')+'</div>';
-    if(dt.length>1) h+='<div class="discdots" id="discDots">'+dt.map((_,i)=>'<span class="discdot'+(i===0?' on':'')+'"></span>').join('')+'</div>';
-  }
+  // (the strength trend and weekly rings now surface through the single Spotlight card above;
+  //  Discover moved to the Me tab — the home stays to today's job + one signal + coaching.)
   // --- Coach tip --- an occasional research-backed pointer (shown ~every 3rd open; see decideTip).
   // Health tips are observational, so they're flagged "Linked in research"; training tips "Backed by research".
   if(currentTip){
@@ -3133,18 +3106,13 @@ function renderOverview(){
   const hb=host.querySelector(".ovhome"); if(hb) hb.onclick=startHomeWorkout;
   const sp=host.querySelector(".ovspon"); if(sp) sp.onclick=openSpontaneous;
   const ll=host.querySelector("#ovLibLink"); if(ll) ll.onclick=openLibrary;
-  if(ovRings && $("ovRingsC")){ drawRings("ovRingsC", ovRings);
-    const snap=host.querySelector(".ovsnap"); if(snap) snap.onclick=openRingsDetail; }
-  host.querySelectorAll(".discx").forEach(x=> x.onclick=(ev)=>{ ev.stopPropagation(); dismissTip(x.dataset.tip, x.closest(".disccard")); });
-  host.querySelectorAll(".ovdisc").forEach(b=> b.onclick=()=>{ if(b.dataset.tip){ settings.discRead=settings.discRead||{}; settings.discRead[b.dataset.tip]=1; sset("settings",settings); } ovAct(b.dataset.act); });
-  const dw=$("discWrap"), dots=$("discDots");
-  if(dw && dots){ const cards=dw.querySelectorAll(".disccard");
-    dw.addEventListener("scroll", ()=>{ let best=0, bd=1e9; cards.forEach((c,i)=>{ const d=Math.abs(c.offsetLeft-dw.scrollLeft); if(d<bd){bd=d;best=i;} });
-      dots.querySelectorAll(".discdot").forEach((el,i)=> el.classList.toggle("on", i===best)); }, {passive:true}); }
   host.querySelectorAll(".ovtodo .ovtap").forEach(li=> li.onclick=()=>ovAct(li.dataset.act));
-  { const os=$("ovStrength"); if(os) os.onclick=()=>ovAct("strength"); }
-  if(spot && $("ovSpot")){ if(spot.unders) drawSpotBalance("ovSpotC", spot.unders); else drawSpotChart("ovSpotC", spot.series, spot.kind);
-    $("ovSpot").onclick=()=>ovAct(spot.act); }
+  if(spot && $("ovSpot")){
+    if(spot.rings) drawSpotRings("ovSpotC", spot.rings);
+    else if(spot.unders) drawSpotBalance("ovSpotC", spot.unders);
+    else drawSpotChart("ovSpotC", spot.series, spot.kind);
+    $("ovSpot").onclick=()=> spot.rings ? openRingsDetail() : ovAct(spot.act);
+  }
   if(settings.objective && !document.querySelector("#onboardWrap.show")) coach("swipe","Swipe left or right to move between your three pages — Overview, Workout and Me.");
 }
 // route a Needs-attention item to where the user acts on it
@@ -3203,6 +3171,7 @@ function renderDash(){
     else { const os=meObjectiveScore(7); po.className="lh "+(os.pct>=85?"good":os.pct<50?"under":"");
       po.textContent=os.objLabel+" · "+os.pct+"% "+(os.pct>=85?"on track":os.pct<50?"behind":"on your way"); } }
   renderCardioCard();
+  renderMeDiscover();
   renderAchievements();
   renderInsight();
   renderObjective();
@@ -4801,6 +4770,33 @@ function drawSpotBalance(id, unders){
   ctx.strokeStyle=hexAlpha(accentHex(),.5); ctx.lineWidth=2; ctx.setLineDash([4,4]);
   ctx.beginPath(); ctx.moveTo(x0+bw, 6); ctx.lineTo(x0+bw, H-6); ctx.stroke(); ctx.setLineDash([]);
 }
+// the week's activity rings (session-credit, hard sets, muscles hit, optional cardio) vs growth-scaled targets
+function weekRings(){
+  if(!(Object.keys(hist).length || cardioList().length)) return null;
+  const cut=Date.now()-7*86400000; let setsWk=0; const musWk=new Set();
+  Object.keys(hist).forEach(n=>{ const gs=muscleFor(n); (hist[n]||[]).forEach(e=>{ if(e.d>=cut){ setsWk+=(e.n!=null?e.n:1)*effortOf(e); gs.forEach(g=>{ if(MGROUPS.indexOf(g)>=0) musWk.add(g); }); } }); });
+  const _gt=growthRingTargets();
+  const rings=[ {label:"Sessions", val:sessionCredit(7), target:_gt.sess, color:"#ff6b3d"},
+                {label:"Sets", val:setsWk, target:_gt.sets, color:"#4dabf7"},
+                {label:"Muscles", val:musWk.size, target:12, color:"#51cf66"} ];
+  const cTgt=cardioTargetMins(); if(cTgt>0) rings.push({label:"Cardio", val:cardioDoseWeek(7), target:cTgt, color:"#9775fa", unit:"min"});
+  if(rings.every(r=>r.val>=r.target)) shareRingsClosed(setsWk);   // all closed → auto-share (gated inside)
+  return rings;
+}
+// the week's rings drawn in a row (fits the wide spotlight canvas): progress arc + value + label under each
+function drawSpotRings(id, rings){
+  const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  const n=rings.length, slot=W/n, R=Math.min(slot*0.30, H*0.34), thick=Math.max(6,R*0.28), cy=H*0.42;
+  const l3=(getComputedStyle(document.documentElement).getPropertyValue('--l3')||'#888').trim();
+  rings.forEach((rg,i)=>{ const cx=slot*(i+0.5), pct=Math.max(0,Math.min(1, rg.target?rg.val/rg.target:0));
+    ctx.lineWidth=thick; ctx.lineCap="round";
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.strokeStyle=hexAlpha(rg.color,.18); ctx.stroke();
+    if(pct>0){ const a0=-Math.PI/2; ctx.beginPath(); ctx.arc(cx,cy,R,a0,a0+Math.PI*2*pct); ctx.strokeStyle=rg.color; ctx.stroke(); }
+    ctx.fillStyle=rg.color; ctx.font=cfont(W,"value","700"); ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText((rg.label==="Sessions"?round1(rg.val):Math.round(rg.val))+"", cx, cy);
+    ctx.fillStyle=l3; ctx.font=cfont(W,"tick"); ctx.textBaseline="alphabetic"; ctx.fillText(rg.label, cx, H-8);
+  });
+}
 function spotlight(){
   const c=[];
   const prs=(typeof progWeeklyData==="function")?progWeeklyData("prs"):[];
@@ -4832,6 +4828,13 @@ function spotlight(){
     c.push({ kind:"watch", score:1.8+under.length*0.3, ico:"🎯", tag:"Easy win",
       title:names.join(", ")+(under.length>3?" +"+(under.length-3):"")+" under target",
       detail:under.length+" muscle group"+(under.length>1?"s are":" is")+" below the weekly volume to grow. A couple of extra sets closes the gap.", unders:under, act:"balance" });
+  }
+  const rings=weekRings();
+  if(rings){ const closed=rings.filter(r=>r.val>=r.target).length, all=closed===rings.length, dow=(new Date().getDay()+6)%7;   // Mon=0 … Sun=6
+    if(all) c.push({ kind:"win", score:2.4, ico:"✅", tag:"Week done",
+      title:"You closed every ring this week", detail:"Sessions, sets and muscles all hit their target — a complete week. Enjoy it.", rings, act:"rings" });
+    else c.push({ kind:"watch", score:1.3+dow*0.18, ico:"◎", tag:"This week",
+      title:closed+" of "+rings.length+" rings closed", detail:"Close the rest before the week resets — tap to see what's left.", rings, act:"rings" });
   }
   if(!c.length) return null;
   c.sort((a,b)=>b.score-a.score);
@@ -8397,7 +8400,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v146";
+const APP_VER="v147";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
