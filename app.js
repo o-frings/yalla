@@ -3455,27 +3455,9 @@ function drawProgChart(metric, canvasId){
   const xLabels=()=>{ ctx.fillStyle=l3; ctx.font=cfont(W,"label"); ctx.textAlign="left"; ctx.fillText(PROG_WEEKS+"w ago", pad, H-6); ctx.textAlign="right"; ctx.fillText("now", W-pad, H-6); };
   const baseline=()=>{ ctx.strokeStyle=hexAlpha(ac,.18); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad,base+0.5); ctx.lineTo(W-pad,base+0.5); ctx.stroke(); };
 
-  // ---- volume / sets → one line per muscle (like the radar, but over time) ----
-  if(metric==="volume" || metric==="sets"){
-    const series=progMuscleWeekly(metric==="volume"?"vol":"sets");
-    const active=MGROUPS.filter(g=> series[g].some(v=>v>0));
-    if(!active.length){ emptyMsg(); return {capHTML:"", vData:null}; }
-    let hi=0; active.forEach(g=> series[g].forEach(v=>{ if(v>hi) hi=v; })); hi=hi||1;
-    const mapY=v=> base-(v/hi)*(base-top);
-    baseline();
-    ctx.lineJoin="round"; ctx.lineCap="round";
-    active.forEach(g=>{ const col=MCOLOR[g]||l3;
-      ctx.strokeStyle=col; ctx.globalAlpha=.9; ctx.lineWidth=3; ctx.beginPath();
-      series[g].forEach((v,i)=>{ const x=cx(i), y=mapY(v); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.stroke();
-      const li=N-1; ctx.globalAlpha=1; ctx.beginPath(); ctx.arc(cx(li), mapY(series[g][li]), 4.5, 0, Math.PI*2); ctx.fillStyle=col; ctx.fill();
-    });
-    ctx.globalAlpha=1; xLabels();
-    const capHTML=(metric==="volume"?"Weekly volume":"Weekly sets")+' by muscle · last '+PROG_WEEKS+' weeks'
-      +'<div class="proglegend">'+active.map(g=>'<span class="pglg"><i style="background:'+(MCOLOR[g]||"#888")+'"></i>'+MSHORT[g]+'</span>').join('')+'</div>';
-    return {capHTML, vData:progWeeklyData(metric)};
-  }
-
-  // ---- sessions / weight / PRs → a single trend line ----
+  // every metric draws the same way — one trend line — so the five figures tell one consistent story
+  // (per-muscle detail lives on the Muscle-balance sheet, not here)
+  // ---- single trend line ----
   const data=progWeeklyData(metric);
   if(!data.some(v=>v>0)){ emptyMsg(); return {capHTML:"", vData:null}; }
   let lo=0, hi=Math.max(...data);
@@ -8541,7 +8523,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v173";
+const APP_VER="v174";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
