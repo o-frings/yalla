@@ -2326,7 +2326,20 @@ $("exlist").addEventListener("change", e=>{ if(!e.target.classList||(!e.target.c
   const wv=row.querySelector(".w").value.trim(), rv=row.querySelector(".r").value.trim();
   // a set is "done" once reps are in and either a weight is entered, it's a timed hold, or it's a
   // bodyweight move (no weight needed) — the bodyweight case is why rest sometimes didn't start.
-  if(rv!=="" && (wv!=="" || row.classList.contains("timed") || (name&&isBW(name)))) restStart(); captureDraft(); });
+  if(rv!=="" && (wv!=="" || row.classList.contains("timed") || (name&&isBW(name)))) restStart(); captureDraft();
+  refreshSetFocus(g); });
+// Visual focus only: fade the sets you've completed so the one you're on leads the eye. Same "done"
+// rule as the rest-timer trigger; never changes what's logged.
+function setRowDone(row, name){
+  if(row.classList.contains("warm")) return false;
+  const w=row.querySelector(".w"), r=row.querySelector(".r");
+  const wv=w?w.value.trim():"", rv=r?r.value.trim():"";
+  return rv!=="" && (wv!=="" || row.classList.contains("timed") || (name&&isBW(name)));
+}
+function refreshSetFocus(g){
+  if(!g||!g.dataset) return; const name=g.dataset.ex;
+  g.querySelectorAll(".setrow").forEach(row=> row.classList.toggle("done", setRowDone(row, name)));
+}
 // ---- per-set hold timer for isometric moves: tap the button to start a count-up, tap again to log the seconds ----
 let hold={ row:null, startedAt:0, iv:null };
 function holdStop(write){
@@ -2335,7 +2348,7 @@ function holdStop(write){
   if(!row) return;
   const btn=row.querySelector(".holdbtn"); if(btn){ btn.classList.remove("running"); btn.innerHTML=ICON.play; }
   if(write){ const secs=Math.max(1,Math.round((Date.now()-started)/1000)); const rEl=row.querySelector(".r"); if(rEl) rEl.value=secs;
-    const g=row.closest(".group"); updateSetVol(row, g&&g.dataset.ex); captureDraft();
+    const g=row.closest(".group"); updateSetVol(row, g&&g.dataset.ex); captureDraft(); refreshSetFocus(g);
     restStart();   // the hold IS the set — start the rest clock once it ends
     if(navigator.vibrate) try{ navigator.vibrate([0,40,30,40]); }catch(e){} }
 }
@@ -3765,6 +3778,7 @@ function renderWorkout(){
   const addBtn=document.createElement("button"); addBtn.className="btn tinted wide"; addBtn.style.marginTop="2px";
   addBtn.innerHTML=ICON.plus+"Add exercise"; addBtn.onclick=()=>openAdd("plan"); list.appendChild(addBtn);
   applyDraft();
+  list.querySelectorAll(".group").forEach(refreshSetFocus);   // fade completed sets so the current one leads (visual only)
   updateRepeatBtn();
   updateLiveRow();
   updateGymRow();
@@ -8403,7 +8417,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v148";
+const APP_VER="v149";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH

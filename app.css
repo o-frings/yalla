@@ -565,6 +565,7 @@
   .progverd.v-reduce{ border-left-color:var(--red); } .progverd.v-reduce .pvdot{ background:var(--red); }
 
   .group{ background:var(--card); border:.5px solid var(--line); border-radius:var(--r-lg); overflow:hidden; margin-bottom:20px; box-shadow:var(--shadow), inset 0 .5px 0 var(--hi); }
+  #exlist .group{ margin-bottom:26px; }   /* a touch more breathing room between exercises on the workout screen */
   .pad{ padding:20px; }
   .row{ display:flex; gap:10px; }
 
@@ -898,6 +899,10 @@
   .setrow .eq{ color:var(--l3); flex:0 0 auto; font-weight:600; font-size:13px; }
   .setrow .vol{ font-size:18px; color:var(--l2); font-weight:700; min-width:56px; flex:0 0 auto; text-align:right; line-height:1; font-variant-numeric:tabular-nums; }
   .setrow.novol .eq, .setrow.novol .vol{ visibility:hidden; }   /* no number yet → hide the "= —" noise, keep column alignment */
+  /* focus: completed sets recede so the set you're on leads the eye (visual only; PRs stay bright) */
+  .setrow{ transition:opacity .25s ease; }
+  .setrow.done:not(.pr){ opacity:.42; }
+  .setrow.done:focus-within{ opacity:1; }   /* tapping a completed set to edit brings it back */
   .setrow .vol.live{ color:var(--ink); cursor:pointer; }
   .setrow .vol.live:active{ transform:scale(.9); opacity:.6; }
   /* previous-session volume doubles as a "tap to copy last time" target */
