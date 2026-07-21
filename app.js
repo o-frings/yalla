@@ -2085,7 +2085,7 @@ async function renderFeed(){
   // urgency: a friend who trained in the last day gets surfaced at the top of the overview
   const host=$("ovBody"); if(host){ const old=host.querySelector(".ovfriend"); if(old) old.remove();
     const fresh=rows.find(r=> r.user_id!==cloudUser.id && (Date.now()-Date.parse(r.created_at)) < 24*3600*1000);
-    if(fresh && settings.socialHome){ const who=names[fresh.user_id]||"A friend", s=fresh.summary||{};
+    if(fresh){ const who=names[fresh.user_id]||"A friend", s=fresh.summary||{};
       const c=document.createElement("div"); c.className="group ovnudge ovfriend";
       c.innerHTML='<div class="pad"><div class="ovk" style="color:var(--accent);">Friends</div><div class="ovbig" style="font-size:20px;">'+esc(who)+' just trained 🔥</div><p class="ovp" style="margin-top:8px;">'+esc(s.name||"A workout")+' · '+esc(agoStr(Date.parse(fresh.created_at)))+' — your move?</p></div>';
       host.insertBefore(c, host.firstChild);
@@ -3065,7 +3065,7 @@ function renderOverview(){
   // --- Spotlight — the single most notable thing right now, with a real graph; celebrate a win or flag a gap ---
   const spot=spotlight();
   if(spot){
-    h+='<div class="ed-label">'+(spot.kind==="win"?"Nice work":"In focus")+'</div>';
+    h+='<div class="ed-label">'+(spot.kind==="win"?"Nice work":spot.kind==="watch"?"In focus":"Your training")+'</div>';
     h+='<div class="group ovtap ovspot '+spot.kind+'" id="ovSpot"><div class="pad">'
       +'<div class="spothd"><span class="spotico">'+spot.ico+'</span><span class="spotk">'+esc(spot.tag)+'</span></div>'
       +'<div class="spotbig">'+esc(spot.title)+'</div>'
@@ -4027,6 +4027,7 @@ function showTab(name){
     if(settings.surprise && !sessionUnderway() && !(draft["free"]&&draft["free"].spon)) loadSurprise();
     coach("workout","Tap a set to log your weight × reps. The coach tracks each exercise across all your plans, so progress carries over.");
   } else if(name==="overview"){
+    _spotSeed=Math.random();   // fresh spotlight pick each time you land on the home
     renderOverview(); renderAccount();
   }
 }
@@ -4844,6 +4845,7 @@ function drawSpotRings(id, rings){
     ctx.fillStyle=l3; ctx.font=cfont(W,"tick"); ctx.textBaseline="alphabetic"; ctx.fillText(rg.label, cx, H-8);
   });
 }
+let _spotSeed=Math.random();   // re-rolled each time the Overview opens, so the spotlight varies per app-open
 function spotlight(){
   const c=[];
   const prs=(typeof progWeeklyData==="function")?progWeeklyData("prs"):[];
@@ -4883,10 +4885,19 @@ function spotlight(){
     else c.push({ kind:"watch", score:1.3+dow*0.18, ico:"◎", tag:"This week",
       title:closed+" of "+rings.length+" rings closed", detail:"Close the rest before the week resets — tap to see what's left.", rings, act:"rings" });
   }
+  // always-on trend graphs: keep a chart on the home even on a calm week, and give it variety to rotate through
+  if(si && si.series.length>=2){ const ser=si.series.map(s=>Math.round(s.idx)), p=si.series[si.series.length-1].idx-100;
+    c.push({ kind:"info", score:1.35, ico:"💪", tag:"Strength", title:"Strength over "+si.weeks+" weeks",
+      detail:"Each lift indexed to its own start, then averaged"+(Math.abs(p)>=1?" — "+(p>=0?"+":"")+p.toFixed(1)+"% so far.":"."), series:ser, act:"strength" }); }
+  if(vol.length>=3){ c.push({ kind:"info", score:1.25, ico:"📊", tag:"Volume", title:"Training volume",
+      detail:"Effort-weighted work each week across the last "+vol.length+" weeks.", series:vol, act:"vol" }); }
+  const sess=(typeof progWeeklyData==="function")?progWeeklyData("sessions"):[];
+  if(sess.filter(v=>v>0).length>=3){ c.push({ kind:"info", score:1.15, ico:"🗓️", tag:"Consistency", title:"Sessions per week",
+      detail:"How often you've trained across the last "+sess.length+" weeks.", series:sess, act:"vol" }); }
   if(!c.length) return null;
   c.sort((a,b)=>b.score-a.score);
-  const band=c.filter(x=>x.score>=c[0].score-1.0);
-  return band[Math.floor(Date.now()/86400000)%band.length];   // importance-led, rotates daily among the near-top
+  const band=c.filter(x=>x.score>=c[0].score-1.2);      // the near-top band…
+  return band[Math.floor((_spotSeed||0)*band.length)] || band[0];   // …rotated per app-open, so the home feels fresh each time
 }
 function renderMuscles(){
   const isLog=true;   // the balance sheet always reflects YOUR logged training; each plan's balance lives with that plan
@@ -8122,8 +8133,8 @@ const RAIL_USERS_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
 // ---- Overview presence rail: friends as faces, live ones ringed; tap to watch or open a profile ----
 async function renderPresenceRail(){
   const rail=$("presenceRail"); if(!rail) return;
-  const ovm=$("ovMessages"); if(ovm) ovm.style.display=(cloudReady() && dbHardened && settings.socialHome)?"":"none";   // deprioritised unless social is turned on
-  if(!(cloudReady() && dbHardened && settings.socialHome)){ rail.style.display="none"; rail.innerHTML=""; return; }
+  const ovm=$("ovMessages"); if(ovm) ovm.style.display=(cloudReady() && dbHardened)?"":"none";   // chat shortcut visible only when messaging is live
+  if(!(cloudReady() && dbHardened)){ rail.style.display="none"; rail.innerHTML=""; return; }
   let following=[], live={}, reqN=0;
   try{ const { data } = await sb.rpc("my_following"); following=(data||[]).filter(u=>u.status==="accepted"); recordAvatars(following); }catch(e){}
   try{ const { data } = await sb.from("live_sessions").select("user_id,updated_at").eq("active",true);
@@ -8525,7 +8536,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v170";
+const APP_VER="v171";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH

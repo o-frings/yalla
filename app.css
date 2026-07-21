@@ -422,10 +422,12 @@
   .ovtodo li.ovmore{ list-style:none; color:var(--l3); font-size:13px; margin-left:-20px; }
   .ovtap{ cursor:pointer; transition:opacity .12s; }
   .ovtap:active{ opacity:.55; }
-  /* compact "next session" card — the whole card navigates, so a chevron replaces the big button */
-  .ovstartpad{ display:flex; align-items:center; gap:12px; }
+  /* compact "next session" / "suggest a session" cards — the whole card navigates, so a chevron replaces the big button */
+  .ovstartpad{ display:flex; align-items:center; gap:12px; padding:13px 16px; }
+  .ovstart .ovbig, .ovspon .ovbig{ font-size:18px; margin-top:2px; }
+  .ovstart .ovmeta, .ovspon .ovmeta{ margin-top:3px; font-size:13px; }
   .ovstarttext{ flex:1; min-width:0; }
-  .ovgo{ flex:0 0 auto; font-size:28px; line-height:1; color:var(--l3); margin-left:0; }
+  .ovgo{ flex:0 0 auto; font-size:26px; line-height:1; color:var(--l3); margin-left:0; }
   .ovtodo li.ovtap{ padding-right:16px; position:relative; }
   .ovchev{ color:var(--l3); font-weight:600; margin-left:8px; }
   .ovtodo li.ovtap .ovchev{ position:absolute; right:0; }
@@ -1155,6 +1157,8 @@
   .ovspot .pad{ position:relative; }
   .ovspot.win{ box-shadow:inset 3px 0 0 #2b8a3e; }
   .ovspot.watch{ box-shadow:inset 3px 0 0 #e8890c; }
+  .ovspot.info{ box-shadow:inset 3px 0 0 var(--accent); }
+  .ovspot.info .spotk{ color:var(--accent); }
   .spothd{ display:flex; align-items:center; gap:7px; margin-bottom:6px; }
   .spotico{ font-size:17px; line-height:1; }
   .spotk{ font-size:11px; font-weight:750; letter-spacing:.6px; text-transform:uppercase; color:var(--l3); }
