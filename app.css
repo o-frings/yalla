@@ -619,8 +619,8 @@
   .progverd.v-reduce{ border-left-color:var(--red); } .progverd.v-reduce .pvdot{ background:var(--red); }
 
   .group{ background:var(--card); border:.5px solid var(--line); border-radius:var(--r-lg); overflow:hidden; margin-bottom:20px; box-shadow:var(--shadow), inset 0 .5px 0 var(--hi); }
-  /* one tile per exercise (a touch more breathing room between them on the workout screen) */
-  #exlist .group{ margin-bottom:14px; }
+  /* one tile per exercise — softer: rounder corners, a lighter edge, a gentle shadow */
+  #exlist .group{ margin-bottom:14px; border-radius:20px; border:.5px solid var(--sep); box-shadow:0 1px 2px rgba(0,0,0,.045), 0 12px 28px -18px rgba(0,0,0,.22); }
   .pad{ padding:20px; }
   .row{ display:flex; gap:10px; }
 
