@@ -3712,6 +3712,8 @@ function flushDraft(){ try{ captureDraft(); clearTimeout(_draftTimer); sset("dra
 window.addEventListener("pagehide", flushDraft);
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden") flushDraft(); });
 function renderWorkout(){
+  // Surprise mode: propose a random data-picked session instead of the plan day (once, unless one's already loaded)
+  if(settings.surprise && !freeMode && !sessionUnderway() && !(draft["free"]&&draft["free"].spon)){ loadSurprise(); return; }
   if(typeof renderTravelBanner==="function") renderTravelBanner();
   const p=activePlan(), w=p.workouts[curWk], list=$("exlist"); list.innerHTML="";
   // recompute the auto-rotation pick only when the slot (or its completion count) changes, so a manual
@@ -3784,6 +3786,7 @@ function renderWorkout(){
   addBtn.innerHTML=ICON.plus+"Add exercise"; addBtn.onclick=()=>openAdd("plan"); list.appendChild(addBtn);
   applyDraft();
   list.querySelectorAll(".group").forEach(refreshSetFocus);   // fade completed sets so the current one leads (visual only)
+  renderStartMode();
   updateRepeatBtn();
   updateLiveRow();
   updateGymRow();
@@ -4009,6 +4012,7 @@ function showTab(name){
     $("heightIn").value=settings.heightCm||""; $("bfIn").value=settings.bodyfatPct||""; $("nameIn").value=settings.name||""; if($("ageIn")) $("ageIn").value=settings.age||"";
     renderDash(); renderAccount(); animateProgBars();
   } else if(name==="workout"){
+    if(settings.surprise && !sessionUnderway() && !(draft["free"]&&draft["free"].spon)) loadSurprise();
     coach("workout","Tap a set to log your weight × reps. The coach tracks each exercise across all your plans, so progress carries over.");
   } else if(name==="overview"){
     renderOverview(); renderAccount();
@@ -5024,8 +5028,42 @@ function renderTravelBreakdown(){
 }
 function renderTravel(){ renderTravelSeg(); renderTravelFab(); renderTravelBreakdown(); }
 if($("travelQuick")) $("travelQuick").onclick=()=> openTravel();
-if($("sponHero")) $("sponHero").onclick=()=> openSpontaneous();
 if($("openTravelBtn")) $("openTravelBtn").onclick=()=> openTravel();
+// ===== Plan vs Surprise start mode =====
+// Surprise mode: the app proposes a random data-picked session (a bit of a surprise) instead of you
+// choosing a plan/day. It reuses the suggested-session machinery, just auto-picking rather than showing a picker.
+function loadSurprise(){
+  _sponDays = (typeof spontaneousDays==="function") ? spontaneousDays() : [];
+  const opts=(_sponDays||[]).filter(d=>d.ex && d.ex.length);
+  if(!opts.length){ toast("Log a session or two first — then I can surprise you."); settings.surprise=false; sset("settings",settings); freeMode=false; renderSeg(); renderWorkout(); return; }
+  const pick=opts[Math.floor(Math.random()*opts.length)]; _sponSel=_sponDays.indexOf(pick);
+  const s={}; pick.ex.forEach(e=> s[e.n]=[]);
+  draft["free"]={ t:Date.now(), s, spon:1, name:pick.name }; sset("draft", draft);
+  freeMode=true; swaps={}; renderSeg(); renderFree();
+}
+function surpriseShuffle(){
+  if(sessionUnderway()) confirmAsk("Start a new surprise? Your current sets will be discarded.", "New surprise", ()=>{ tmrReset(); restStop(); loadSurprise(); }, "danger");
+  else loadSurprise();
+}
+function renderStartMode(){
+  const on=!!settings.surprise;
+  document.querySelectorAll("#wkMode .mewintab").forEach(t=> t.classList.toggle("active",(t.dataset.wm==="surprise")===on));
+  const seg=$("seg"); if(seg) seg.style.display = on ? "none" : "";
+  const act=$("startAction"); if(!act) return;
+  const swap='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>';
+  if(on){ act.innerHTML='<button class="btn tinted wide" id="surpriseShuffle" type="button">'+swap+'New surprise</button>'; $("surpriseShuffle").onclick=surpriseShuffle; }
+  else { act.innerHTML='<button class="btn tinted wide" id="choosePlanBtn" type="button">'+swap+'Choose a plan</button>'; $("choosePlanBtn").onclick=()=>{ renderPlanList(); openSheet("Plans"); }; }
+}
+document.querySelectorAll("#wkMode .mewintab").forEach(t=> t.onclick=()=>{
+  const on = t.dataset.wm==="surprise";
+  if(on===!!settings.surprise){ if(on) surpriseShuffle(); return; }   // re-tapping active Surprise → reshuffle
+  const apply=()=>{ settings.surprise=on; sset("settings",settings);
+    if(on){ loadSurprise(); }
+    else { freeMode=false; if(draft["free"]&&draft["free"].spon){ delete draft["free"]; sset("draft",draft); } tmrReset(); restStop(); renderSeg(); renderWorkout(); }
+    renderStartMode(); };
+  if(sessionUnderway()) confirmAsk("Switch mode? Your current sets will be discarded.", "Switch", apply, "danger");
+  else apply();
+});
 document.querySelectorAll("#travelSeg .s").forEach(s=>{
   s.onclick=async()=>{ if(s.dataset.tv===(settings.travelMode||"off")) return;   // no change → don't reset the clock
     travelAccrue();                       // bank the time spent in the context you're leaving
@@ -5185,6 +5223,7 @@ function renderFree(){
     applyDraft();
   } else if(fd){ delete draft["free"]; sset("draft", draft); }
   list.querySelectorAll(".group").forEach(refreshSetFocus);   // same completed-set fade as plan sessions
+  renderStartMode();
   updateRepeatBtn();
   renderSessionRose();
 }
@@ -8439,7 +8478,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v158";
+const APP_VER="v159";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
