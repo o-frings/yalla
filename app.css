@@ -204,11 +204,12 @@
      Plans — switching programs is a rare, deliberate act that doesn't need a permanent invitation. */
   .titleBtn .tchev{ display:none; }
   /* compact training-mode toggle in the title (replaces the full-width Strength/Cardio segment) */
-  .modebtn{ flex:0 0 auto; align-self:center; display:inline-flex; align-items:center; gap:6px; background:var(--accent-soft); color:var(--accent); border:none; font-family:inherit; font-size:13px; font-weight:600; padding:6px 11px; border-radius:16px; cursor:pointer; line-height:1; transition:transform .12s; }
-  .modebtn:active{ transform:scale(.95); }
-  .modebtn .mic{ width:16px; height:16px; flex:0 0 auto; }
-  .modebtn.travelbtn{ padding:6px 9px; }                 /* icon-only travel quick-access */
-  .modebtn.travelbtn.on{ background:var(--accent); color:#fff; }
+  /* header controls: uniform, quiet icon buttons (no pill, no label) — one visual language */
+  .modebtn{ flex:0 0 auto; align-self:center; display:inline-flex; align-items:center; justify-content:center; gap:0; background:none; color:var(--l2); border:none; font-family:inherit; padding:4px; border-radius:10px; cursor:pointer; line-height:1; transition:transform .12s; -webkit-tap-highlight-color:transparent; }
+  .modebtn:active{ transform:scale(.9); }
+  .modebtn .mic{ width:22px; height:22px; flex:0 0 auto; }
+  #trainModeLbl{ display:none; }
+  .modebtn.travelbtn.on{ background:none; color:var(--accent); }
   .modebtn .mic-car{ display:none; }
   .modebtn.cardio .mic-str{ display:none; }
   .modebtn.cardio .mic-car{ display:inline; }
@@ -254,6 +255,9 @@
   #startAction .btn{ display:flex; align-items:center; justify-content:center; gap:8px; font-weight:650; margin:2px 0 14px; }
   #startAction .btn svg{ width:18px; height:18px; flex:0 0 auto; }
   #sponLen2{ margin:0 0 2px; }
+  /* plan mode's secondary action, kept as light as surprise mode's controls */
+  .planlink{ background:none; border:none; font:inherit; font-size:14px; font-weight:600; color:var(--accent); padding:8px 2px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .planlink:active{ opacity:.55; }
   /* the surprise session reads as a plain headline + one small shuffle — no box */
   .sesshead{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin:16px 2px 8px; }
   .surpname{ font-size:22px; font-weight:750; letter-spacing:-.5px; color:var(--ink); line-height:1.15; }
@@ -749,7 +753,8 @@
   .exhead .nm{ font-size:20px; font-weight:650; letter-spacing:-.3px; flex:1; min-width:0; }
   .exhead .eqic{ color:var(--l3); display:inline-flex; align-items:center; flex:0 0 auto; }
   .exhead .eqic svg{ width:20px; height:20px; }
-  .exhead .eqic.tinted{ width:40px; height:40px; border-radius:12px; justify-content:center; }
+  .exhead .eqic.tinted{ width:30px; height:30px; border-radius:9px; justify-content:center; font-size:15px; }
+  .exhead .eqic.tinted svg{ width:16px; height:16px; }
   .swapcheck{ color:var(--accent); font-weight:800; flex:0 0 auto; font-size:15px; }
   .exmeta{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:14px; color:var(--l2); font-weight:500; padding:0 0 12px; }
   .exmeta .tg{ font-weight:600; font-size:15px; }

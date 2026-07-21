@@ -5074,7 +5074,7 @@ function renderStartMode(){
   } else {
     if($("ltName")) $("ltName").textContent="Workout";
     if($("planSub")) $("planSub").textContent = (typeof planMeta==="function") ? planMeta(activePlan()) : "";
-    act.innerHTML='<button class="btn tinted wide" id="choosePlanBtn" type="button">'+swap+'Choose a plan</button>';
+    act.innerHTML='<button class="planlink" id="choosePlanBtn" type="button">Change plan ›</button>';
     $("choosePlanBtn").onclick=()=>{ renderPlanList(); openSheet("Plans"); };
   }
 }
@@ -8503,7 +8503,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v163";
+const APP_VER="v164";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
