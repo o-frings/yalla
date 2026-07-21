@@ -1144,10 +1144,6 @@
   .metile.tap:active .tsum-chev{ color:var(--accent); }
   /* detail sheets that host the moved-in charts/folds */
   .detailsheet{ height:92vh; }
-  /* every figure animates in when its sheet opens (re-triggers on each open via .show) */
-  @keyframes figin{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:none; } }
-  .detailsheet.show .sheetbody canvas{ animation:figin .5s cubic-bezier(.2,.8,.2,1) both; }
-  @media (prefers-reduced-motion: reduce){ .detailsheet.show .sheetbody canvas{ animation:none; } }
   .detailsheet .sheetbody .fchd2:first-child{ margin-top:2px; }
   /* one shared lead for every detail sheet: big headline + caption + hairline, echoing the summary card */
   .sheetlead{ margin:2px 2px 16px; padding-bottom:14px; border-bottom:.5px solid var(--sep); }
