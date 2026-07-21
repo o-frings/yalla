@@ -248,6 +248,19 @@
   #startAction{ margin:0 0 16px; }
   #startAction .btn{ display:flex; align-items:center; justify-content:center; gap:8px; font-weight:650; }
   #startAction .btn svg{ width:18px; height:18px; flex:0 0 auto; }
+  #sponLen2{ margin:0; }
+  .surphd{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin:12px 0 2px; }
+  .surpname{ font-size:15px; font-weight:700; letter-spacing:-.2px; color:var(--ink); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .surpshuf{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:10px; background:var(--row); border:none; color:var(--accent); cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .surpshuf:active{ opacity:.6; }
+  .surpshuf svg{ width:18px; height:18px; }
+  /* day tabs share the underline-tab language of the mode toggle (was a filled segmented control) */
+  #seg{ background:none; border:none; padding:0; gap:20px; border-radius:0; overflow-x:auto; scrollbar-width:none; }
+  #seg::-webkit-scrollbar{ display:none; }
+  #seg .s{ flex:0 0 auto; padding:1px 0 6px; border-radius:0; font-size:13px; font-weight:600; color:var(--l3); background:none; box-shadow:none; position:relative; }
+  #seg .s.active{ background:none; box-shadow:none; color:var(--ink); }
+  #seg .s.active::after{ content:""; position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:2px; background:var(--accent); }
+  html.dark #seg .s.active{ border:none; box-shadow:none; }
   /* discard the in-progress session — only offered once you're training */
   #abortBtn{ display:none; margin-top:8px; color:var(--red); font-weight:600; }
   body.training #abortBtn{ display:block; }
