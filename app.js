@@ -7303,7 +7303,14 @@ function cableRepBump(name, rr){ return (rr && equipFor(name).key==="cable") ? b
 function pickWorkoutWeighted(groups, n, injuries, level, W, offset, exp, obj, bias, pool){
   offset=offset||0; pool=pool||BUILD_POOL;
   const avail={}, usable=[];
-  groups.forEach(g=>{ const a=(pool[g]||[]).filter(x=>!injuryBlocks(x,injuries)&&allowsAt(x,level)&&suitsExp(x,exp)&&fitsGoal(x,obj,bias)); avail[g]=a; if(a.length) usable.push(g); });
+  // Favour the moves you actually train: bias each muscle's candidate order toward exercises you log often
+  // and recently, so suggestions learn from your habits. Ties keep the curated pool order; the shuffle
+  // offset still rotates through the rest for variety, and a brand-new user (no history) is unaffected.
+  const favScore=name=>{ const h=hist[name]; if(!h||!h.length) return 0; let last=0; h.forEach(e=>{ if(e.d>last) last=e.d; });
+    return h.length + ((Date.now()-last)/86400000 < 21 ? 2.5 : 0); };
+  groups.forEach(g=>{ const a=(pool[g]||[]).filter(x=>!injuryBlocks(x,injuries)&&allowsAt(x,level)&&suitsExp(x,exp)&&fitsGoal(x,obj,bias));
+    a.sort((x,y)=>favScore(y)-favScore(x));   // stable: favourites first, pool order within equal scores
+    avail[g]=a; if(a.length) usable.push(g); });
   if(!usable.length) return [];
   // Strength tilts slot allocation toward the big compound groups (chest/back/quads/hams/shoulders),
   // so the day is built around heavy lifts rather than isolation.
@@ -8268,7 +8275,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v134";
+const APP_VER="v135";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
