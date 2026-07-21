@@ -614,7 +614,7 @@
   .fclg{ display:inline-flex; align-items:center; gap:6px; }
   .fclg i{ width:11px; height:3px; border-radius:2px; display:inline-block; }
   .fclg .fcbandi{ height:10px; border-radius:2px; background:var(--l3); opacity:.28; }
-  .fchd2{ font-size:12.5px; font-weight:650; color:var(--l2); margin:2px 0 2px; }
+  .fchd2{ font-size:14.5px; font-weight:700; color:var(--l2); margin:10px 0 4px; }
   .fcnote{ font-size:12px; color:var(--l3); line-height:1.45; margin:8px 0 0; }
   /* strength-forecast ledger card rows */
   .slrow{ font-size:14px; color:var(--ink); padding:5px 0; border-bottom:.5px solid var(--sep); }
@@ -879,7 +879,10 @@
 
   .setrow{ display:flex; align-items:center; gap:12px; padding:16px 20px; border-top:.5px solid var(--sep); }
   .setrow:first-of-type{ border-top:none; }
-  .setrow .sn{ font-size:15px; color:var(--l3); font-weight:600; width:18px; flex:0 0 auto; text-align:center; }
+  .setrow .sn{ font-size:15px; color:var(--l3); font-weight:600; width:22px; flex:0 0 auto; text-align:center; cursor:pointer; -webkit-tap-highlight-color:transparent; border-radius:6px; padding:3px 0; }
+  .setrow.warm .sn{ color:var(--accent); font-size:12px; letter-spacing:.3px; }
+  .setrow.warm .w, .setrow.warm .r{ opacity:.7; }
+  .setrow.warm .vol{ color:var(--l3); font-style:italic; font-size:12px; }
   .setrow input{ text-align:center; padding:16px 4px; }
   .setrow .x{ color:var(--l3); flex:0 0 auto; font-weight:600; }
   /* hold timer for timed/isometric moves — tap to count up, tap to log the seconds into the row */

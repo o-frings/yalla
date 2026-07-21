@@ -3685,7 +3685,7 @@ function captureDraft(){
   const sig=draftSig(), map={}, efmap={}, efauto={};
   document.querySelectorAll("#exlist .group").forEach(g=>{
     const name=g.dataset.ex; if(!name) return; const arr=[];
-    g.querySelectorAll(".setrow").forEach(r=>{ const w=r.querySelector(".w"), rp=r.querySelector(".r"); arr.push({w:w?w.value:"", r:rp?rp.value:""}); });
+    g.querySelectorAll(".setrow").forEach(r=>{ const w=r.querySelector(".w"), rp=r.querySelector(".r"); arr.push({w:w?w.value:"", r:rp?rp.value:"", warm:r.classList.contains("warm")?1:0}); });
     map[name]=arr;
     const bar=g.querySelector(".efbar"); if(bar){ efmap[name]=+bar.dataset.ef; efauto[name]=bar.dataset.auto==="1"?1:0; }
   });
@@ -3707,11 +3707,12 @@ function applyDraft(){
     }
     let els=g.querySelectorAll(".setrow");
     for(let i=els.length-1;i>=arr.length;i--) els[i].remove();
-    g.querySelectorAll(".setrow").forEach((r,i)=>{ r.querySelector(".sn").textContent=i+1;
-      const dv=arr[i]||{}, w=r.querySelector(".w"), rp=r.querySelector(".r");
+    g.querySelectorAll(".setrow").forEach((r,i)=>{ const dv=arr[i]||{}, w=r.querySelector(".w"), rp=r.querySelector(".r");
+      r.classList.toggle("warm", !!dv.warm);
       if(w) w.value=dv.w||""; if(rp) rp.value=dv.r||"";
-      if((w&&w.value)||(rp&&rp.value)) updateSetVol(r, name);
+      if(dv.warm || (w&&w.value)||(rp&&rp.value)) updateSetVol(r, name);
     });
+    renumberSets(g);
     const bar=g.querySelector(".efbar");
     if(bar){
       const manual = d.efa && d.efa[name]===0;
@@ -3843,7 +3844,8 @@ $("saveBtn").onclick=async()=>{
   document.querySelectorAll("#exlist .group").forEach(g=>{
     const name=g.dataset.ex, pt=topSet(last[name]), sets=[];
     const efbar=g.querySelector(".efbar"), ef = efbar ? (+efbar.dataset.ef) : 1;   // 0 easy · 1 hard (default) · 2 max
-    g.querySelectorAll(".setrow").forEach(r=>{ const wv=r.querySelector(".w").value.trim(), rv=r.querySelector(".r").value.trim();
+    g.querySelectorAll(".setrow").forEach(r=>{ if(r.classList.contains("warm")) return;   // warm-ups don't count as working sets
+      const wv=r.querySelector(".w").value.trim(), rv=r.querySelector(".r").value.trim();
       if(rv!=="") sets.push({w:wv,r:rv}); });
     if(sets.length){ logged++; const nt=topSet(sets);
       // "beaten" by effective volume so timed holds (more seconds) and bodyweight moves (more reps) count too, not just added kg
@@ -4387,6 +4389,12 @@ let meWindow=7;   // Me-page hero gauge window: 7 (this week) or 30 (this month)
 // lower bound (MEV) below which most trainees under-stimulate growth. One baseline for all groups —
 // real per-muscle landmarks differ, but a single target keeps the read honest and legible.
 const WEEKLY_SET_TARGET=10, WEEKLY_SET_MIN=6;
+// Balance-radar-only per-muscle target factor: small muscles trained with many quick sets (calves, core,
+// forearms) tolerate/expect more weekly volume, so a flat 10-set target makes them fill their spoke too
+// easily and dominate the wheel. Scaling their target up balances the DISPLAY (the growth model's landmarks
+// are untouched — see white paper). Calves were the worst offender.
+const MUS_TGT_FACTOR={ Calves:1.5, Core:1.4, Forearms:1.4, "Side Delts":1.2, "Rear Delts":1.2, "Glute Med":1.2, Adductors:1.2 };
+const musTarget=g=> WEEKLY_SET_TARGET*(MUS_TGT_FACTOR[g]||1);
 // Maintenance volume (MV): muscle built by a program is held on very little — as little as ~1/3 of the
 // building volume in older adults and ~1/9 in young trained adults (Bickel 2011); below that, size slowly
 // declines over weeks of insufficient stimulus (Mujika 2000). We collect no age, so use one conservative
@@ -4678,7 +4686,7 @@ function drawSuccessGauge(canvasId, wk){
   const slotA=dark?.12:.18, fillHi=dark?.66:.85, fillLo=dark?.46:.66;
   ctx.strokeStyle="rgba(128,128,128,.25)"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();  // target rim
   GAUGE_GROUPS.forEach((g,i)=>{
-    const a=(-90+i*360/n)*Math.PI/180, col=MCOLOR[g]||lab, succ=Math.min(1,(val(g)||0)/WEEKLY_SET_TARGET);
+    const a=(-90+i*360/n)*Math.PI/180, col=MCOLOR[g]||lab, succ=Math.min(1,(val(g)||0)/musTarget(g));
     ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,a-half,a+half); ctx.closePath();        // empty slot → the target
     ctx.fillStyle=col; ctx.globalAlpha=slotA; ctx.fill(); ctx.globalAlpha=1;
     const rr=R*succ;
@@ -4903,7 +4911,7 @@ function buildSetRow(i, pv, name){
     ? '<button class="holdbtn" type="button" aria-label="Hold timer — tap to start, tap to stop">'+ICON.play+'</button>'
     : '<span class="x">×</span>';
   const fill = (pvVol&&(pw||pr)) ? ' fillable' : '';
-  return '<div class="setrow'+(timed?' timed':'')+(pvVol?'':' novol')+'" data-pvol="'+(pvVol||'')+'" data-pw="'+pw+'" data-pr="'+pr+'"><span class="sn">'+i+'</span>'
+  return '<div class="setrow'+(timed?' timed':'')+(pvVol?'':' novol')+'" data-pvol="'+(pvVol||'')+'" data-pw="'+pw+'" data-pr="'+pr+'"><span class="sn" title="Tap to mark warm-up">'+i+'</span>'
     +'<input class="w" type="text" inputmode="decimal" autocomplete="off" placeholder="'+wPh+'">'
     +sep
     +'<input class="r" type="number" inputmode="numeric" placeholder="'+rPh+'">'
@@ -4949,6 +4957,7 @@ function inferEffort(name, g){
   if(anchor<=0) return null;                                    // first time on this lift → no baseline → Hard
   let bw=0, br=0, be=0;                                         // this session's hardest set (highest e1RM among filled rows)
   (g?g.querySelectorAll(".setrow"):[]).forEach(row=>{
+    if(row.classList.contains("warm")) return;   // warm-ups aren't the working effort
     const w=parseFloat(row.querySelector(".w").value)||0, r=parseInt(row.querySelector(".r").value)||0;
     if(w>0&&r>0){ const x=w*(1+r/K); if(x>be){ be=x; bw=w; br=r; } } });
   if(be<=0) return null;                                        // nothing logged yet → keep the current default
@@ -4982,13 +4991,21 @@ function wireEffortBar(g){
     captureDraft();
   });
 }
+// Rep/set target for a free or suggested-session move, from the user's GOAL: strength → low reps & more
+// sets, hypertrophy → moderate, fat-loss/fitness → higher reps. Compound anchors get the lower bracket,
+// accessories the higher one. Drives both the displayed target and the progressive-overload cues.
+function objTarget(name){
+  const sch=(REPSCHEME[settings.objective]||REPSCHEME.muscle).balanced;
+  const reps = roleFor(name)==="compound" ? sch.c : sch.a;
+  return (settings.objective==="strength"?4:3)+" × "+reps;
+}
 function buildFreeGroup(name){
   const prev=last[name]||[];
   const g=document.createElement("div"); g.className="group"; g.dataset.ex=name;
   let rows=""; for(let i=0;i<3;i++) rows+=freeSetRow(i+1, prev[i], name);
-  // default hypertrophy rep target so the progressive-overload cues (layoff, topped-the-range…) fire
-  // in free sessions too — free mode has no plan target of its own. Timed holds keep the no-target path.
-  const meta=metaHTML(name, isTimed(name)?"":"3 × 8–12", "free"), eq=equipFor(name);
+  // rep target from the user's objective so the range AND the progressive-overload cues (topped-the-range,
+  // add-a-rep…) match the goal — a strength session nudges toward load, a hypertrophy one toward reps.
+  const meta=metaHTML(name, isTimed(name)?"":objTarget(name), "free"), eq=equipFor(name);
   const mcol=MCOLOR[muscleFor(name)[0]]||"#888888";
   const mp=[]; if(meta.lastText) mp.push('<span>'+meta.lastText+'</span>'); mp.push(scoreTag(name));
   const metaLine='<div class="exmeta">'+mp.join('<span class="dot">·</span>')+'</div>';
@@ -5143,6 +5160,14 @@ $("exlist").addEventListener("click", e=>{ const a=e.target.closest(".rem"); if(
   document.addEventListener("scroll", close, true);   // any scroll dismisses it
 })();
 $("exlist").addEventListener("click", e=>{ const a=e.target.closest(".setdel"); if(a){ e.preventDefault(); removeSetRow(a.closest(".setrow")); } });
+// tap the set number to toggle a WARM-UP set: it stays on screen (and in the draft) but is excluded from
+// working-set count, volume, PRs, effort, and the saved top set — warm-ups shouldn't skew your logged work.
+function renumberSets(g){ let n=0; g.querySelectorAll(".setrow").forEach(r=>{ const sn=r.querySelector(".sn"); if(!sn) return;
+  if(r.classList.contains("warm")) sn.textContent="W"; else { n++; sn.textContent=n; } }); }
+$("exlist").addEventListener("click", e=>{ const s=e.target.closest(".sn"); if(!s) return;
+  const r=s.closest(".setrow"), g=s.closest(".group"); if(!r||!g) return;
+  r.classList.toggle("warm"); renumberSets(g); updateSetVol(r, g.dataset.ex); refreshAutoEffort(g); captureDraft();
+  if(navigator.vibrate) try{ navigator.vibrate(10); }catch(_){} });
 // Tap a set's volume number:
 //  • an empty row showing a dotted previous-session value → fills last time's weight × reps (the "fillable" hint)
 //  • a row you've just logged → copies its weight × reps into the next set, adding a fresh set if there isn't one
@@ -5189,6 +5214,7 @@ $("exlist").addEventListener("input", e=>{ if(!e.target.classList||(!e.target.cl
   const r=e.target.closest(".setrow"), g=e.target.closest(".group"); if(r&&g){ updateSetVol(r, g.dataset.ex); refreshAutoEffort(g); } captureDraft(); });
 function updateSetVol(r, name){
   const wv=r.querySelector(".w").value.trim(), rv=r.querySelector(".r").value.trim(), vEl=r.querySelector(".vol");
+  if(r.classList.contains("warm")){ vEl.textContent="warm-up"; vEl.classList.remove("live","fillable"); r.classList.remove("novol"); setRowPR(r,false); return; }
   if(rv===""&&wv===""){ const pv=r.dataset.pvol; vEl.textContent=pv?fmtVol(+pv):""; vEl.classList.remove("live"); vEl.classList.toggle("fillable", !!pv && !!(r.dataset.pw||r.dataset.pr)); r.classList.toggle("novol", !pv); setRowPR(r,false); return; }
   const vol=setVol(name, wv, rv);
   // a row with reps entered is a logged set even with no weight (bodyweight / empty bar) — never gray it out
@@ -6913,22 +6939,23 @@ function drawForecastSens(f){
 function drawForecastMuscles(f, which){
   const c=$("fcMuscles"); if(!c||!f||!f.perMuscle) return;
   const rows=f.perMuscle[which||"plan"]||f.perMuscle.plan||[]; if(!rows.length) return;
+  c.height = Math.max(170, rows.length*40);          // roomy rows; the CSS keeps it full-width, so bigger bitmap rows = bigger on screen
   const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const cs=getComputedStyle(document.documentElement);
   const l3=(cs.getPropertyValue('--l3')||'#888').trim(), ink=(cs.getPropertyValue('--ink')||'#000').trim();
   let gmax=0.5, gmin=0; rows.forEach(r=>{ gmax=Math.max(gmax,r.gain); gmin=Math.min(gmin,r.gain); });
-  const padL=62, padR=52, padT=4, padB=4, span=Math.max(0.5, gmax-gmin);
+  const padL=124, padR=88, padT=8, padB=8, span=Math.max(0.5, gmax-gmin);
   const X=v=> padL + (v-gmin)/span*(W-padL-padR);
   const rowH=(H-padT-padB)/rows.length, zeroX=X(0);
-  ctx.strokeStyle=hexAlpha(l3,.4); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(zeroX,padT); ctx.lineTo(zeroX,H-padB); ctx.stroke();
+  ctx.strokeStyle=hexAlpha(l3,.35); ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(zeroX,padT); ctx.lineTo(zeroX,H-padB); ctx.stroke();
   rows.forEach((r,i)=>{ const cy=padT+i*rowH+rowH/2, x=X(r.gain), col=MCOLOR[r.g]||l3;
-    const bx=Math.min(zeroX,x), bw=Math.max(1.5,Math.abs(x-zeroX)), bh=Math.min(15,rowH*0.62);
-    ctx.fillStyle=hexAlpha(col,.9);
-    if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(bx, cy-bh/2, bw, bh, 3); ctx.fill(); } else ctx.fillRect(bx, cy-bh/2, bw, bh);
-    ctx.fillStyle=l3; ctx.textAlign="right"; ctx.font="11px -apple-system,system-ui,sans-serif"; ctx.fillText(MSHORT[r.g]||r.g, padL-8, cy+4);
-    ctx.fillStyle=ink; ctx.font="600 10px -apple-system,system-ui,sans-serif"; ctx.textAlign="left";
+    const bx=Math.min(zeroX,x), bw=Math.max(2,Math.abs(x-zeroX)), bh=Math.min(22,rowH*0.5);
+    ctx.fillStyle=hexAlpha(col,.92);
+    if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(bx, cy-bh/2, bw, bh, 5); ctx.fill(); } else ctx.fillRect(bx, cy-bh/2, bw, bh);
+    ctx.fillStyle=l3; ctx.textAlign="right"; ctx.font="600 20px -apple-system,system-ui,sans-serif"; ctx.fillText(MSHORT[r.g]||r.g, padL-12, cy+7);
+    ctx.fillStyle=ink; ctx.font="700 18px -apple-system,system-ui,sans-serif"; ctx.textAlign="left";
     const lab=(r.gain>=0?"+":"")+r.gain.toFixed(1)+"%";
-    ctx.fillText(lab, (r.gain>=0 ? x+5 : zeroX+5), cy+3.5);   // negatives label right of the zero line, clear of names
+    ctx.fillText(lab, (r.gain>=0 ? x+8 : zeroX+8), cy+6.5);   // negatives label right of the zero line, clear of names
   });
 }
 
@@ -8241,7 +8268,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v133";
+const APP_VER="v134";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
