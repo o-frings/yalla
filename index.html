@@ -857,14 +857,13 @@
         <p class="fcnote" id="slPAcap"></p>
       </div>
     </div>
-    <div class="fchd2" style="margin-top:16px;">Projected muscle size</div>
-    <div class="fcsub" id="fcSub"></div>
-    <canvas id="fcChart" width="760" height="300"></canvas>
-    <div class="fclegend" id="fcLegend"></div>
-    <p class="fcconn">Muscle size can't be measured, so this projects it from your logged training — “current pace” follows your recent trend, “this plan” assumes progressive overload. Strength (above) is the measured yardstick.</p>
     <div class="fcfold">
-      <button type="button" class="fcfoldhd">Size by muscle &amp; what moves it</button>
+      <button type="button" class="fcfoldhd">Projected muscle size</button>
       <div class="fcfoldbody">
+        <div class="fcsub" id="fcSub"></div>
+        <canvas id="fcChart" width="760" height="300"></canvas>
+        <div class="fclegend" id="fcLegend"></div>
+        <p class="fcconn">Muscle size can't be measured, so this projects it from your logged training — “current pace” follows your recent trend, “this plan” assumes progressive overload. Strength (above) is the measured yardstick.</p>
         <div class="fchd2">Projected 16-week gain by muscle</div>
         <div class="mewintabs paneltabs" id="fcMuscleSeg" style="margin-top:2px;">
           <button class="mewintab" data-fm="plan" type="button">This plan</button>
@@ -1041,30 +1040,34 @@
   <div class="sheethdr"><span class="t">Muscle balance</span><button class="btn plain sm" id="musClose">Done</button></div>
   <div class="sheetbody">
     <div class="sheetlead"><div class="lh" id="musLeadH"></div><div class="lc" id="musIntro">How balanced your training is — a full circle means even coverage, a dent means an undertrained group.</div></div>
-    <div class="seg" id="musSrc" style="margin-bottom:8px;"></div>
     <div class="seg appearance" id="musSeg">
       <div class="s" data-d="7">This week</div>
       <div class="s" data-d="30">30 days</div>
       <div class="s" data-d="0">All time</div>
     </div>
-    <div class="seg appearance" id="musMetric" style="margin-top:8px;">
+    <div class="seg appearance" id="musMetric" style="margin-top:4px;">
       <div class="s" data-m="sets">Sets</div>
       <div class="s" data-m="vol">Volume (kg)</div>
     </div>
-    <div class="seg appearance" id="musScale" style="margin-top:8px; display:none;">
-      <div class="s active" data-sc="abs">vs target</div>
-      <div class="s" data-sc="rel">Relative</div>
-    </div>
-    <div class="seg appearance" id="musVolMode" style="margin-top:8px; display:none;">
-      <div class="s active" data-vm="total">+ Bodyweight</div>
-      <div class="s" data-vm="lifted">Lifted only</div>
-    </div>
-    <p class="levelcap" id="musVolNote" style="display:none;">“Lifted only” counts the weight you load; “+ Bodyweight” adds an estimate of your own body load on calisthenics.</p>
     <canvas id="musRadar" width="900" height="900"></canvas>
     <div id="musSuggest"></div>
-    <div id="musBars"></div>
-    <div class="ed-label">By exercise</div>
-    <div id="musByEx"></div>
+    <div class="fcfold" style="margin-top:6px;">
+      <button type="button" class="fcfoldhd">Per-muscle &amp; by-exercise detail</button>
+      <div class="fcfoldbody">
+        <div class="seg appearance" id="musScale" style="display:none;">
+          <div class="s active" data-sc="abs">vs target</div>
+          <div class="s" data-sc="rel">Relative</div>
+        </div>
+        <div class="seg appearance" id="musVolMode" style="margin-top:4px; display:none;">
+          <div class="s active" data-vm="total">+ Bodyweight</div>
+          <div class="s" data-vm="lifted">Lifted only</div>
+        </div>
+        <p class="levelcap" id="musVolNote" style="display:none;">“Lifted only” counts the weight you load; “+ Bodyweight” adds an estimate of your own body load on calisthenics.</p>
+        <div id="musBars"></div>
+        <div class="ed-label">By exercise</div>
+        <div id="musByEx"></div>
+      </div>
+    </div>
     <div class="fcfold" id="musSrcBox" style="margin-top:16px;">
       <button type="button" class="fcfoldhd">How this is measured &amp; sources</button>
       <div class="fcfoldbody">

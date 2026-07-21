@@ -4174,19 +4174,33 @@ function renderPlanList(){
   plans.forEach(p=>{
     const active=p.id===settings.activePlanId;
     const sc=planScores(p);
+    const item=document.createElement("div"); item.className="planitem";
     const row=document.createElement("div"); row.className="planrow";
     row.innerHTML=`<div class="check">${active?'✓':''}</div>
       <div class="info"><div class="nm">${esc(p.name)}</div>
         <div class="meta">${esc(planMeta(p))}</div>
-        <div class="pscores"><span class="psc pscbtn" data-bal="1"><b>Balance</b> ${sc.balance}<small>/5</small> ›</span><span class="psc"><b>Hypertrophy</b> ${sc.hyp}<small>/5</small></span></div></div>
+        <div class="pscores"><span class="psc pscbtn" data-bal="1"><b>Balance</b> ${sc.balance}<small>/5</small> <span class="psccar">›</span></span><span class="psc"><b>Hypertrophy</b> ${sc.hyp}<small>/5</small></span></div></div>
       <button class="edit share">Share</button><button class="edit">Edit</button>`;
-    row.querySelector(".info").onclick=async(ev)=>{ if(ev.target.closest(".pscbtn")) return;   // let the Balance chip open the radar instead of switching
+    row.querySelector(".info").onclick=async(ev)=>{ if(ev.target.closest(".pscbtn")) return;   // Balance chip reveals the plan's rose instead of switching
       settings.activePlanId=p.id; settings.planStartAt=Date.now(); freeMode=false; swaps={}; const ni=nextRotateIndex(p); curWk=ni>=0?ni:0;
       await sset("settings",settings); renderAll(); closeSheet("Plans"); toast("Switched to "+p.name); };
-    row.querySelector(".pscbtn").onclick=(ev)=>{ ev.stopPropagation(); openMusclesFor(p.id); };
     row.querySelector(".share").onclick=()=>openShare(p);
     row.querySelector(".edit:not(.share)").onclick=()=>{ closeSheet("Plans"); openEditor(p); };
-    wrap.appendChild(row);
+    item.appendChild(row);
+    // plan balance lives with the plan: tap the Balance chip to reveal this plan's projected-balance rose
+    const bWrap=document.createElement("div"); bWrap.className="planbal"; bWrap.style.display="none";
+    const bc=document.createElement("canvas"); bc.id="planbal_"+p.id; bc.width=720; bc.height=720; bc.className="planbalc";
+    const bCap=document.createElement("p"); bCap.className="planbalcap";
+    bWrap.appendChild(bc); bWrap.appendChild(bCap); item.appendChild(bWrap);
+    row.querySelector(".pscbtn").onclick=(ev)=>{ ev.stopPropagation();
+      const car=row.querySelector(".psccar");
+      if(bWrap.style.display!=="none"){ bWrap.style.display="none"; if(car) car.style.transform=""; return; }
+      bWrap.style.display="block"; if(car) car.style.transform="rotate(90deg)";
+      const {totals}=planVolume(p);
+      drawRadar(totals, bc.id, null, false, false);   // the plan's balance SHAPE (labelled); a plan cycle has no weekly target
+      bCap.textContent="Balance "+sc.balance+"/5 — a fuller, rounder rose means more even coverage across muscles.";
+    };
+    wrap.appendChild(item);
   });
 }
 $("newPlan").onclick=()=>{ closeSheet("Plans"); openEditor(null); };
@@ -4571,16 +4585,9 @@ document.querySelectorAll("#musSeg .s").forEach(s=> s.onclick=()=>{ musWindow=+s
 document.querySelectorAll("#musMetric .s").forEach(s=> s.onclick=()=>{ musMetric=s.dataset.m; renderMuscles(); });
 document.querySelectorAll("#musVolMode .s").forEach(s=> s.onclick=()=>{ musVolMode=s.dataset.vm; renderMuscles(); });
 document.querySelectorAll("#musScale .s").forEach(s=> s.onclick=()=>{ musScale=s.dataset.sc; renderMuscles(); });
-const MUS_TIP="This radar shows weekly sets per muscle against the ~10-set growth target. Switch the source to compare your logs and each plan.";
+const MUS_TIP="This radar shows your logged weekly sets per muscle against the ~10-set growth target — a dent means that muscle is under-dosed. Each plan's own balance lives with the plan.";
 function openMuscles(){ if(!plans.some(p=>p.id===musSrc)) musSrc="log"; renderMuscles(); openSheet("Mus"); coach("muscles",MUS_TIP); }
 function openMusclesFor(id){ if(plans.some(p=>p.id===id)){ musSrc=id; renderMuscles(); openSheet("Mus"); coach("muscles",MUS_TIP); } }  // plan-level entry
-function buildSrc(){
-  const wrap=$("musSrc"); wrap.innerHTML="";
-  const mk=(val,label)=>{ const s=document.createElement("div"); s.className="s"+(musSrc===val?" active":"");
-    s.textContent=label; s.dataset.src=val; s.onclick=()=>{ musSrc=val; renderMuscles(); }; wrap.appendChild(s); };
-  mk("log","Logged");
-  plans.forEach(p=> mk(p.id, p.name));
-}
 function fmtKg(v){ return v>=1000 ? round1(v/1000)+"t" : Math.round(v)+"kg"; }
 // target: if given, a spoke reaching the outer ring means that muscle hit `target` sets/week
 // (so the chart reads "am I training each muscle enough?"); if omitted, spokes scale to the largest
@@ -4851,20 +4858,12 @@ function spotlight(){
   return band[Math.floor(Date.now()/86400000)%band.length];   // importance-led, rotates daily among the near-top
 }
 function renderMuscles(){
-  buildSrc();
-  const isLog = musSrc==="log";
-  $("musSeg").style.display = isLog ? "" : "none";
-  $("musMetric").style.display = isLog ? "" : "none";
+  const isLog=true;   // the balance sheet always reflects YOUR logged training; each plan's balance lives with that plan
   let totals, byEx;
-  if(isLog){
-    document.querySelectorAll("#musSeg .s").forEach(s=> s.classList.toggle("active", +s.dataset.d===musWindow));
-    document.querySelectorAll("#musMetric .s").forEach(s=> s.classList.toggle("active", s.dataset.m===musMetric));
-    document.querySelectorAll("#musVolMode .s").forEach(s=> s.classList.toggle("active", s.dataset.vm===musVolMode));
-    ({totals, byEx}=muscleVolume(musWindow||null, musMetric, musVolMode));
-  } else {
-    const plan=plans.find(p=>p.id===musSrc)||activePlan();
-    ({totals, byEx}=planVolume(plan));
-  }
+  document.querySelectorAll("#musSeg .s").forEach(s=> s.classList.toggle("active", +s.dataset.d===musWindow));
+  document.querySelectorAll("#musMetric .s").forEach(s=> s.classList.toggle("active", s.dataset.m===musMetric));
+  document.querySelectorAll("#musVolMode .s").forEach(s=> s.classList.toggle("active", s.dataset.vm===musVolMode));
+  ({totals, byEx}=muscleVolume(musWindow||null, musMetric, musVolMode));
   const useTarget = isLog && musMetric==="sets";   // sets/week vs a weekly-volume target
   const useKg = isLog && musMetric==="vol";
   const relative = useTarget && musScale==="rel";  // scale to top muscle instead of the fixed target ring
@@ -8416,7 +8415,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v139";
+const APP_VER="v140";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH

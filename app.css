@@ -1100,11 +1100,17 @@
   .ovspot .ovchev{ position:absolute; top:14px; right:2px; }
   /* one toggle style across every detail sheet: the balance sheet's segmented controls
      render as the same underline tabs used by the Strength & Volume sheets */
-  .detailsheet .seg{ background:none; border:none; padding:0; margin:12px 0 6px; gap:20px; border-radius:0; overflow:visible; }
+  .detailsheet .seg{ background:none; border:none; padding:0; margin:12px 0 6px; gap:20px; border-radius:0; overflow-x:auto; scrollbar-width:none; }
+  .detailsheet .seg::-webkit-scrollbar{ display:none; }
   .detailsheet .seg .s{ flex:0 0 auto; padding:1px 0 6px; border-radius:0; font-size:13px; font-weight:600; color:var(--l3); background:none; box-shadow:none; position:relative; }
   .detailsheet .seg .s.active{ background:none; box-shadow:none; color:var(--ink); }
   .detailsheet .seg .s.active::after{ content:""; position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:2px; background:var(--accent); }
   html.dark .detailsheet .seg .s.active{ border:none; box-shadow:none; }
+  /* per-plan balance rose, revealed inline under a plan in the Plans list */
+  .psccar{ display:inline-block; transition:transform .2s; color:var(--l3); }
+  .planbal{ padding:2px 0 6px; animation:spanelIn .18s ease; }
+  .planbalc{ width:100%; max-width:250px; height:auto; aspect-ratio:1/1; display:block; margin:2px auto 2px; }
+  .planbalcap{ font-size:12px; color:var(--l2); text-align:center; margin:0 8px 6px; line-height:1.4; }
   #musSrcList{ list-style:none; padding:2px 2px 4px; margin:0; }
   #musSrcList li{ font-size:12px; color:var(--l2); line-height:1.5; padding:8px 0; border-top:.5px solid var(--sep); }
   #musSrcList li:first-child{ border-top:none; }
