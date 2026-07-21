@@ -1113,7 +1113,7 @@
   .wkpick .wsub{ color:var(--l2); font-weight:500; }
   .mrow{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
   .mlab{ width:90px; flex:0 0 auto; font-size:13px; font-weight:600; }
-  .mbarwrap{ flex:1; background:var(--track); border-radius:8px; height:15px; overflow:hidden; }
+  .mbarwrap{ flex:1; background:var(--track); border-radius:6px; height:11px; overflow:hidden; }
   .mbar{ height:100%; border-radius:8px; transition:width .5s cubic-bezier(.2,.8,.2,1); }
   .mval{ width:48px; flex:0 0 auto; text-align:right; font-size:13px; font-weight:700; }
   .mrow.under .mval{ color:#e8590c; }

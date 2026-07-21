@@ -1971,7 +1971,7 @@ function roseTotals(tot, expanded){ const t=expandLegacyMtot(tot||{}), out={};
 // One typography scale for every canvas chart. Charts render at very different internal widths but all
 // display at roughly the same on-screen column width, so sizing the font as a fraction of the canvas
 // width makes the ON-SCREEN size the same across every graph (fontPx = k·W → displayed = k·W·(D/W) = k·D).
-const CHART_FONT={ tick:0.023, label:0.028, value:0.034, big:0.045 };
+const CHART_FONT={ tick:0.023, label:0.028, value:0.030, big:0.045 };
 function cfont(W, role, weight){ const px=Math.max(9, Math.round(W*(CHART_FONT[role]||CHART_FONT.label))); return (weight||"600")+" "+px+"px -apple-system,system-ui,sans-serif"; }
 function drawRose(x, cx, cy, R, G, tot, o){
   // tot is already display-prepared by roseTotals() (legacy keys expanded, heads rolled into Back/Shoulders).
@@ -4621,7 +4621,7 @@ function drawRadar(totals, canvasId, target, noLabels, relative, prog){
   G.forEach((g,i)=>{ const rr=R*radii[i]; if(rr<=0.5) return;
     const a=(-90+i*360/n)*Math.PI/180, col=MCOLOR[g]||accent;
     ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rr,a-half,a+half); ctx.closePath();
-    ctx.globalAlpha=.24; ctx.fillStyle=col; ctx.fill(); ctx.globalAlpha=1;
+    ctx.globalAlpha=.34; ctx.fillStyle=col; ctx.fill(); ctx.globalAlpha=1;
     ctx.lineWidth=2; ctx.strokeStyle=col; ctx.stroke(); });
   if(target && !relative){ ctx.strokeStyle=accent; ctx.globalAlpha=.5; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; }
   else if(target && relative){ const tr=R*Math.min(1,target/max);   // where the ~target/wk line falls on the relative scale
@@ -7197,7 +7197,7 @@ function drawForecastSens(f, prog){
   const padL=124, padR=72, padT=8, padB=8, rowH=(H-padT-padB)/rows.length;
   const trackX=padL, trackW=W-padL-padR;
   ctx.textBaseline="middle";
-  rows.forEach((r,i)=>{ const cy=padT+i*rowH+rowH/2, bw=Math.max(3,trackW*(r.impact/maxI))*prog, bh=Math.min(22,rowH*0.5), rr=bh/2;
+  rows.forEach((r,i)=>{ const cy=padT+i*rowH+rowH/2, bw=Math.max(3,trackW*(r.impact/maxI))*prog, bh=Math.min(15,rowH*0.42), rr=bh/2;
     ctx.fillStyle=hexAlpha(accent,.13); if(ctx.roundRect){ctx.beginPath();ctx.roundRect(trackX,cy-bh/2,trackW,bh,rr);ctx.fill();} else ctx.fillRect(trackX,cy-bh/2,trackW,bh);
     ctx.fillStyle=hexAlpha(accent,.9); if(bw>0.6){ if(ctx.roundRect){ctx.beginPath();ctx.roundRect(trackX,cy-bh/2,bw,bh,rr);ctx.fill();} else ctx.fillRect(trackX,cy-bh/2,bw,bh); }
     ctx.fillStyle=l3; ctx.textAlign="right"; ctx.font=cfont(W,"label"); ctx.fillText(r.label, padL-12, cy);
@@ -7231,7 +7231,7 @@ function drawForecastMuscles(f, which, prog){
   const rowH=(H-padT-padB)/rows.length, zeroX=X(0);
   ctx.strokeStyle=hexAlpha(l3,.35); ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(zeroX,padT); ctx.lineTo(zeroX,H-padB); ctx.stroke();
   rows.forEach((r,i)=>{ const cy=padT+i*rowH+rowH/2, x=X(r.gain), col=MCOLOR[r.g]||l3;
-    const bw=Math.max(2,Math.abs(x-zeroX))*prog, bx=(r.gain>=0)?zeroX:zeroX-bw, bh=Math.min(22,rowH*0.5);   // bars grow out from the zero line
+    const bw=Math.max(2,Math.abs(x-zeroX))*prog, bx=(r.gain>=0)?zeroX:zeroX-bw, bh=Math.min(15,rowH*0.42);   // bars grow out from the zero line
     ctx.fillStyle=hexAlpha(col,.92);
     if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(bx, cy-bh/2, bw, bh, 5); ctx.fill(); } else ctx.fillRect(bx, cy-bh/2, bw, bh);
     ctx.fillStyle=l3; ctx.textAlign="right"; ctx.font=cfont(W,"label"); ctx.fillText(MSHORT[r.g]||r.g, padL-12, cy+7);
@@ -8557,7 +8557,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v178";
+const APP_VER="v179";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
