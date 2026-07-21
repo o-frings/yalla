@@ -3821,6 +3821,16 @@ function updateRepeatBtn(){ const btn=$("repeatBtn"); if(!btn) return;
   btn.style.display = any ? "" : "none";
 }
 $("repeatBtn").onclick=repeatLastWorkout;
+// abort: throw away the in-progress session (unsaved sets), reset the clocks, and return to Set up
+function abortSession(){
+  const sig=draftSig();
+  delete draft[sig]; sset("draft", draft);
+  swaps={}; tmrReset(); restStop(); endLive(true);
+  if(freeMode){ renderSeg(); renderFree(); } else { renderSeg(); renderWorkout(); }
+  renderDash();
+  toast("Session discarded.");
+}
+if($("abortBtn")) $("abortBtn").onclick=()=> confirmAsk("Discard this session? Your logged sets won't be saved.", "Discard", abortSession, "danger");
 $("saveBtn").onclick=async()=>{
   const savedSig=draftSig();
   const p=activePlan(); const w = freeMode ? null : p.workouts[curWk]; let logged=0, beaten=0;
@@ -8423,7 +8433,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v156";
+const APP_VER="v157";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH

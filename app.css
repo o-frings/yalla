@@ -242,6 +242,9 @@
   body.training #largeTitle .ltmain{ display:none; }
   body.training #pageWorkout .startrow,
   body.training #pageWorkout #seg{ display:none; }
+  /* discard the in-progress session — only offered once you're training */
+  #abortBtn{ display:none; margin-top:8px; color:var(--red); font-weight:600; }
+  body.training #abortBtn{ display:block; }
   .largeTitle .ltmain .iconbtn{ flex:0 0 auto; align-self:flex-start; margin-top:2px; }
   .largeTitle small{ display:block; font-size:15px; font-weight:500; color:var(--l2); letter-spacing:0; margin-top:8px; }
   /* Overview header → Friends destination: a tappable people chip with a request badge */
