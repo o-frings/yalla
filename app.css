@@ -226,9 +226,14 @@
   .largeTitle .ltmain .titleBtn{ flex:1; min-width:0; line-height:1.08; }
   /* Workout is a working screen — the training leads, not the program name. Demote the plan title to a
      quiet label (still tappable to open Plans) and tighten the header so the first set sits higher. */
-  #largeTitle{ font-size:20px; letter-spacing:-.4px; padding: calc(env(safe-area-inset-top) + 12px) 0 8px; }
+  #largeTitle{ font-size:20px; letter-spacing:-.4px; padding: calc(env(safe-area-inset-top) + 16px) 0 18px; }
   #largeTitle .titleBtn{ font-weight:650; color:var(--l2); }
-  #largeTitle small{ font-size:13px; margin-top:3px; }
+  #largeTitle small{ font-size:13px; margin-top:6px; }
+  #largeTitle .ltmain{ gap:16px; }
+  #strengthWrap > #seg{ margin-top:2px; margin-bottom:22px; }
+  /* Suggest a session — a co-equal way to start, no longer a tiny header glyph */
+  .sponhero{ display:flex; align-items:center; justify-content:center; gap:9px; margin:0 0 14px; font-size:16px; font-weight:650; }
+  .sponhero svg{ width:19px; height:19px; flex:0 0 auto; }
   .largeTitle .ltmain .iconbtn{ flex:0 0 auto; align-self:flex-start; margin-top:2px; }
   .largeTitle small{ display:block; font-size:15px; font-weight:500; color:var(--l2); letter-spacing:0; margin-top:8px; }
   /* Overview header → Friends destination: a tappable people chip with a request badge */

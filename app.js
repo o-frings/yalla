@@ -5007,7 +5007,7 @@ function renderTravelBreakdown(){
 }
 function renderTravel(){ renderTravelSeg(); renderTravelFab(); renderTravelBreakdown(); }
 if($("travelQuick")) $("travelQuick").onclick=()=> openTravel();
-if($("sponQuick")) $("sponQuick").onclick=()=> openSpontaneous();
+if($("sponHero")) $("sponHero").onclick=()=> openSpontaneous();
 if($("openTravelBtn")) $("openTravelBtn").onclick=()=> openTravel();
 document.querySelectorAll("#travelSeg .s").forEach(s=>{
   s.onclick=async()=>{ if(s.dataset.tv===(settings.travelMode||"off")) return;   // no change → don't reset the clock
@@ -8418,7 +8418,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v151";
+const APP_VER="v153";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
