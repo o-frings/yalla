@@ -7027,23 +7027,24 @@ function drawForecast(f){
 // tornado: how much the 16-week median gain swings as each key parameter goes low↔high (around the plan)
 function drawForecastSens(f){
   const c=$("fcTornado"); if(!c||!f||!f.sens) return;
+  const rows=f.sens.map(s=>({label:s.label.replace(" ±3",""), lo:Math.min(s.lo,s.hi), hi:Math.max(s.lo,s.hi)}));
+  if(!rows.length) return;
+  c.height = Math.max(150, rows.length*40);          // identical row rhythm to the by-muscle chart above
   const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const cs=getComputedStyle(document.documentElement);
   const l3=(cs.getPropertyValue('--l3')||'#888').trim(), ink=(cs.getPropertyValue('--ink')||'#000').trim();
   const accent=accentHex();
-  const rows=f.sens.map(s=>({label:s.label, lo:Math.min(s.lo,s.hi), hi:Math.max(s.lo,s.hi)}));
   let vmin=f.base, vmax=f.base; rows.forEach(r=>{ vmin=Math.min(vmin,r.lo); vmax=Math.max(vmax,r.hi); });
-  const pad=6; vmin=Math.min(vmin,0)-pad*0; const span=Math.max(1,vmax-vmin);
-  const padL=96, padR=44, padT=6, padB=20, rowH=(H-padT-padB)/rows.length;
+  const span=Math.max(1,vmax-vmin);
+  const padL=124, padR=88, padT=8, padB=8, rowH=(H-padT-padB)/rows.length;
   const X=v=> padL + (v-vmin)/span*(W-padL-padR);
-  // baseline (plan median)
-  ctx.strokeStyle=hexAlpha(l3,.5); ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(X(f.base),padT); ctx.lineTo(X(f.base),H-padB); ctx.stroke(); ctx.setLineDash([]);
-  ctx.font=cfont(W,"tick"); ctx.fillStyle=l3; ctx.textAlign="center"; ctx.fillText("median "+f.base.toFixed(1)+"%", X(f.base), H-6);
-  rows.forEach((r,i)=>{ const cy=padT+i*rowH+rowH/2, x0=X(r.lo), x1=X(r.hi);
-    ctx.fillStyle=hexAlpha(accent,.28); ctx.strokeStyle=accent; ctx.lineWidth=1;
-    ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(x0, cy-7, Math.max(2,x1-x0), 14, 3); else ctx.rect(x0,cy-7,Math.max(2,x1-x0),14); ctx.fill(); ctx.stroke();
-    ctx.fillStyle=l3; ctx.textAlign="right"; ctx.font=cfont(W,"tick"); ctx.fillText(r.label, padL-8, cy+4);
-    ctx.fillStyle=ink; ctx.textAlign="left"; ctx.font=cfont(W,"tick"); ctx.fillText(r.hi.toFixed(1)+"%", x1+4, cy+3.5);
+  // plan-median reference line (explained in the caption)
+  ctx.strokeStyle=hexAlpha(l3,.4); ctx.lineWidth=1.5; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(X(f.base),padT); ctx.lineTo(X(f.base),H-padB); ctx.stroke(); ctx.setLineDash([]);
+  rows.forEach((r,i)=>{ const cy=padT+i*rowH+rowH/2, x0=X(r.lo), x1=X(r.hi), bh=Math.min(22,rowH*0.5);
+    ctx.fillStyle=hexAlpha(accent,.7);
+    if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(x0, cy-bh/2, Math.max(2,x1-x0), bh, 5); ctx.fill(); } else ctx.fillRect(x0, cy-bh/2, Math.max(2,x1-x0), bh);
+    ctx.fillStyle=l3; ctx.textAlign="right"; ctx.font=cfont(W,"label"); ctx.fillText(r.label, padL-12, cy+7);
+    ctx.fillStyle=ink; ctx.font=cfont(W,"value","700"); ctx.textAlign="left"; ctx.fillText(r.hi.toFixed(1)+"%", x1+8, cy+6.5);
   });
   // actionable read-out: the biggest swing among the levers the lifter can actually change
   const ACT={ effort:"push a little closer to failure on your hard sets",
@@ -7053,8 +7054,8 @@ function drawForecastSens(f){
                   .filter(s=>s.act).sort((a,b)=>b.sw-a.sw)[0];
   const cap=$("fcSensCap");
   if(cap) cap.textContent = top
-    ? "Each bar is how far the "+f.ahead+"-week gain swings when one input goes low→high. Biggest lever you control: "+top.label.replace(" ±3","")+" — "+top.act+"."
-    : "Each bar is how far the "+f.ahead+"-week gain swings when one input goes low→high.";
+    ? "The dashed line is your median gain ("+f.base.toFixed(1)+"%); each bar is how far the "+f.ahead+"-week gain swings when one input goes low→high. Biggest lever you control: "+top.label.replace(" ±3","")+" — "+top.act+"."
+    : "The dashed line is your median gain ("+f.base.toFixed(1)+"%); each bar is how far the "+f.ahead+"-week gain swings when one input goes low→high.";
 }
 // per-muscle projected 16-week gain, one bar per muscle in its app colour (negative = below maintenance)
 function drawForecastMuscles(f, which){
@@ -8396,7 +8397,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v143";
+const APP_VER="v144";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
