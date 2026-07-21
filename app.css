@@ -244,16 +244,20 @@
   body.training #pageWorkout #wkMode,
   body.training #pageWorkout #startAction,
   body.training #pageWorkout #seg{ display:none; }
-  .wkseg{ margin:2px 0 14px; }
-  #startAction{ margin:0 0 16px; }
-  #startAction .btn{ display:flex; align-items:center; justify-content:center; gap:8px; font-weight:650; }
+  /* segmented Plan/Surprise switch — the one loud control at the top */
+  .wkseg{ margin:2px 0 14px; padding:4px; border-radius:13px; }
+  .wkseg .s{ flex:1 0 0; padding:10px 0; font-size:15px; font-weight:650; letter-spacing:-.2px; border-radius:10px; }
+  #startAction{ margin:0; }
+  #startAction .btn{ display:flex; align-items:center; justify-content:center; gap:8px; font-weight:650; margin:2px 0 14px; }
   #startAction .btn svg{ width:18px; height:18px; flex:0 0 auto; }
-  #sponLen2{ margin:0; }
-  .surphd{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin:12px 0 2px; }
-  .surpname{ font-size:15px; font-weight:700; letter-spacing:-.2px; color:var(--ink); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .surpshuf{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:10px; background:var(--row); border:none; color:var(--accent); cursor:pointer; -webkit-tap-highlight-color:transparent; }
-  .surpshuf:active{ opacity:.6; }
-  .surpshuf svg{ width:18px; height:18px; }
+  #sponLen2{ margin:0 0 2px; }
+  /* the surprise session reads as a plain headline + one small shuffle — no box */
+  .sesshead{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin:16px 2px 8px; }
+  .surpname{ font-size:22px; font-weight:750; letter-spacing:-.5px; color:var(--ink); line-height:1.15; }
+  .surpsub{ font-size:13px; color:var(--l2); margin-top:3px; font-variant-numeric:tabular-nums; }
+  .shuf{ flex:0 0 auto; width:38px; height:38px; border-radius:11px; border:1px solid var(--line); background:transparent; color:var(--accent); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .shuf:active{ opacity:.55; }
+  .shuf svg{ width:19px; height:19px; }
   /* day tabs share the underline-tab language of the mode toggle (was a filled segmented control) */
   #seg{ background:none; border:none; padding:0; gap:20px; border-radius:0; overflow-x:auto; scrollbar-width:none; }
   #seg::-webkit-scrollbar{ display:none; }
@@ -607,7 +611,10 @@
   .progverd.v-reduce{ border-left-color:var(--red); } .progverd.v-reduce .pvdot{ background:var(--red); }
 
   .group{ background:var(--card); border:.5px solid var(--line); border-radius:var(--r-lg); overflow:hidden; margin-bottom:20px; box-shadow:var(--shadow), inset 0 .5px 0 var(--hi); }
-  #exlist .group{ margin-bottom:26px; }   /* a touch more breathing room between exercises on the workout screen */
+  /* workout exercises as clean, borderless sections divided by hairlines, not boxes */
+  #exlist .group{ background:none; border:none; box-shadow:none; border-radius:0; margin:0; border-top:1px solid var(--sep); }
+  #exlist .group:first-child{ border-top:none; }
+  #exlist .secgrp{ margin-bottom:4px; }
   .pad{ padding:20px; }
   .row{ display:flex; gap:10px; }
 

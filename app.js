@@ -5064,10 +5064,11 @@ function renderStartMode(){
   const swap='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>';
   if(on){
     const fd=draft["free"]||{}, nm=fd.name||"Surprise session", nEx=fd.s?Object.keys(fd.s).length:0, L=settings.sponLen||"standard";
+    const sub=(nEx?'~'+sponMins(nEx)+' min · '+nEx+' move'+(nEx>1?'s':''):'')+' · picked for you';
     act.innerHTML='<div class="mewintabs paneltabs" id="sponLen2">'
       +[["quick","Quick"],["standard","Standard"],["full","Full"]].map(([v,l])=>'<button class="mewintab'+(L===v?" active":"")+'" data-sl="'+v+'" type="button">'+l+'</button>').join('')+'</div>'
-      +'<div class="surphd"><span class="surpname">'+esc(nm)+(nEx?' · ~'+sponMins(nEx)+' min':'')+'</span>'
-      +'<button class="surpshuf" id="surpriseShuffle" type="button" aria-label="New surprise">'+refresh+'</button></div>';
+      +'<div class="sesshead"><div style="min-width:0;"><div class="surpname">'+esc(nm)+'</div><div class="surpsub">'+esc(sub)+'</div></div>'
+      +'<button class="shuf" id="surpriseShuffle" type="button" aria-label="New surprise">'+refresh+'</button></div>';
     act.querySelectorAll("#sponLen2 .mewintab").forEach(b=> b.onclick=()=>{ settings.sponLen=b.dataset.sl; sset("settings",settings); relenSurprise(); });
     $("surpriseShuffle").onclick=surpriseShuffle;
   } else {
@@ -8499,7 +8500,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v161";
+const APP_VER="v162";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
