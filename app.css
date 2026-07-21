@@ -226,11 +226,11 @@
   .largeTitle .ltmain .titleBtn{ flex:1; min-width:0; line-height:1.08; }
   /* Workout is a working screen — the training leads, not the program name. Demote the plan title to a
      quiet label (still tappable to open Plans) and tighten the header so the first set sits higher. */
-  #largeTitle{ font-size:20px; letter-spacing:-.4px; padding: calc(env(safe-area-inset-top) + 16px) 0 18px; }
-  #largeTitle .wktitle{ font-weight:650; color:var(--l2); }
-  #largeTitle small{ font-size:13px; margin-top:6px; }
-  #largeTitle .ltmain{ gap:16px; }
-  .largeTitle .ltmain .wktitle{ flex:1; min-width:0; line-height:1.08; }
+  /* the current session lives in the day toggle below, so the top needs no title: a slim bar of just
+     the travel + mode controls, right-aligned. */
+  #largeTitle{ padding: calc(env(safe-area-inset-top) + 12px) 0 10px; }
+  #largeTitle .wktitle, #largeTitle small{ display:none; }
+  #largeTitle .ltmain{ gap:16px; justify-content:flex-end; }
   #strengthWrap > #seg{ margin-top:2px; margin-bottom:22px; }
   /* Two ways to start the workout, as a pair: Suggest (primary) + Choose a plan (secondary) */
   .startrow{ display:flex; gap:10px; margin:0 0 16px; }
