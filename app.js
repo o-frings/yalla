@@ -3444,8 +3444,10 @@ function renderGrowth(){
 }
 // Draw ONE progress metric into a given canvas (static — the swipe provides motion). Returns the
 // caption HTML + the data the verdict needs, so the active page's meta can be shown below the carousel.
-function drawProgChart(metric, canvasId){
+function drawProgChart(metric, canvasId, prog){
+  prog = prog==null ? 1 : prog;
   const c=$(canvasId); if(!c) return {capHTML:"", vData:null}; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  _figFns[canvasId]=(p)=>drawProgChart(metric, canvasId, p);
   const ac=accentHex();
   const l3=(getComputedStyle(document.documentElement).getPropertyValue('--l3')||'#888').trim();
   const ink=(getComputedStyle(document.documentElement).getPropertyValue('--ink')||'#000').trim();
@@ -3464,6 +3466,7 @@ function drawProgChart(metric, canvasId){
   if(metric==="weight"){ const nz=data.filter(v=>v>0); lo=Math.min(...nz); hi=Math.max(...nz); const span=Math.max(1,hi-lo); lo=Math.max(0,lo-span*0.2); hi=hi+span*0.1; }
   const mapY=v=> base-(hi>lo?(v-lo)/(hi-lo):0)*(base-top);
   baseline();
+  ctx.save(); ctx.beginPath(); ctx.rect(0,0, pad+prog*(W-pad*2)+2, H); ctx.clip();   // reveal the plotted line left→right; axes stay
   // line + dots over the weeks that have data (weight skips gaps; sessions/PRs plot every week incl. zeros)
   const valid=[]; data.forEach((v,i)=>{ if(metric!=="weight" || v>0) valid.push([i,v]); });
   ctx.strokeStyle=ac; ctx.lineWidth=3; ctx.lineJoin="round"; ctx.lineCap="round";
@@ -3478,6 +3481,7 @@ function drawProgChart(metric, canvasId){
     ctx.strokeStyle=hexAlpha(ink,.45); ctx.lineWidth=2.5; ctx.setLineDash([5,5]);
     ctx.beginPath(); ctx.moveTo(cx(i0), mapY(m*i0+b0)); ctx.lineTo(cx(i1), mapY(m*i1+b0)); ctx.stroke(); ctx.setLineDash([]);
   }
+  ctx.restore();
   xLabels();
   const latest=data[N-1], fmt = metric==="weight" ? (latest>0?round1(latest)+" kg":"—") : Math.round(latest);
   const capHTML=PROG_LABELS[metric]+' · last '+PROG_WEEKS+' weeks · <b>this week: '+(latest>0?fmt:"—")+'</b>';
@@ -3925,20 +3929,18 @@ function celebrate(big){
 }
 
 // ================= plans sheet =================
-// reveal an already-drawn canvas by wiping it in left→right — generic, works for any chart type
-function clipReveal(c){
-  if(!c || !c.offsetParent) return;   // skip hidden (folded/off-screen) canvases
-  const ctx=c.getContext("2d"), W=c.width, H=c.height;
-  if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const snap=document.createElement("canvas"); snap.width=W; snap.height=H;
-  try{ snap.getContext("2d").drawImage(c,0,0); }catch(e){ return; }
-  const start=Date.now(), dur=620;
-  (function frame(){ const p=Math.min(1,(Date.now()-start)/dur), e=1-Math.pow(1-p,3), w=Math.max(1,W*e);
-    ctx.clearRect(0,0,W,H); ctx.drawImage(snap, 0,0,w,H, 0,0,w,H);
-    if(p<1) requestAnimationFrame(frame); })();
+// Each animatable chart registers a redraw closure keyed by its canvas id. On sheet open we replay it
+// with progress 0→1, so the PLOTTED DATA grows in (bars rise, lines draw, wedges expand) while the axes
+// stay put — the same feel as the home spotlight.
+let _figFns={};
+function animateFig(id){
+  const fn=_figFns[id], c=$(id); if(!fn||!c||!c.offsetParent) return;
+  if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches){ fn(1); return; }
+  const start=Date.now(), dur=660;
+  (function frame(){ const p=Math.min(1,(Date.now()-start)/dur), e=1-Math.pow(1-p,3); fn(e); if(p<1) requestAnimationFrame(frame); })();
 }
 function openSheet(s){ $("scrim"+s).classList.add("show"); const sh=$("sheet"+s); if(sh) sh.classList.add("show");
-  if(sh && sh.classList.contains("detailsheet")) setTimeout(()=>{ sh.querySelectorAll(".sheetbody canvas").forEach(clipReveal); }, 170);   // figures draw in once the sheet has settled
+  if(sh && sh.classList.contains("detailsheet")) setTimeout(()=>{ sh.querySelectorAll(".sheetbody canvas").forEach(cv=>{ if(cv.id) animateFig(cv.id); }); }, 170);
 }
 function closeSheet(s){ $("scrim"+s).classList.remove("show"); $("sheet"+s).classList.remove("show"); }
 if($("planPick")) $("planPick").onclick=()=>{ renderPlanList(); openSheet("Plans"); };
@@ -4594,8 +4596,10 @@ function radarVal(det, g, target){
   }
   return det[g]||0;
 }
-function drawRadar(totals, canvasId, target, noLabels, relative){
+function drawRadar(totals, canvasId, target, noLabels, relative, prog){
+  prog = prog==null ? 1 : prog;
   const c=$(canvasId||"musRadar"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  _figFns[canvasId||"musRadar"]=(p)=>drawRadar(totals, canvasId, target, noLabels, relative, p);
   const det=expandLegacyMtot(totals||{}), G=roseGroups(musExpanded), n=G.length;
   const cx=W/2, cy=H/2, R=W*(noLabels?0.42:0.33);
   const cs=getComputedStyle(document.documentElement);
@@ -4611,7 +4615,7 @@ function drawRadar(totals, canvasId, target, noLabels, relative){
   // permanent gaps. Match the small roses: show an aux spoke/label only when it was actually trained.
   const showSpoke=g=> val(g)>0 || !NO_TARGET.has(g);
   // Render the wedges with the shared rose renderer, so the balance radar matches the feed & planner roses.
-  const radii=G.map(g=> showSpoke(g) ? norm(g) : 0);
+  const radii=G.map(g=> showSpoke(g) ? norm(g)*prog : 0);   // wedges grow out from the centre
   drawRose(ctx, cx, cy, R, G, roseTotals(totals||{}, musExpanded), {
     radii, color:g=>MCOLOR[g]||accent, alpha:.8, stroke:"rgba(127,127,127,.18)", strokeW:1,
     rings:[0.5,1], grid:"rgba(128,128,128,.22)", gridW:1.5 });
@@ -5900,8 +5904,10 @@ function strengthIndex(){
   const forecast = hasF ? { weeks:LG.H, mid:lastIdx*gm/k, lo:lastIdx*gl/k, hi:lastIdx*gh/k, pct:(gm/k-1)*100 } : null;
   return { series:out, weeks:maxWk-startWk+1, lifts:names.length, forecast };
 }
-function drawStrengthIndex(si){
+function drawStrengthIndex(si, prog){
+  prog = prog==null ? 1 : prog;
   const c=$("exProgChart"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  _figFns["exProgChart"]=(p)=>drawStrengthIndex(si,p);
   const s=si.series, vals=s.map(p=>p.idx), n=s.length, f=si.forecast;
   const l3=(getComputedStyle(document.documentElement).getPropertyValue('--l3')||'#888').trim();
   const ac=accentHex(), padL=34, padR=14, padT=12, padB=24;
@@ -5917,6 +5923,7 @@ function drawStrengthIndex(si){
   // baseline at 100 (each lift's start)
   ctx.strokeStyle=hexAlpha(l3,.5); ctx.setLineDash([4,4]); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(padL,y(100)); ctx.lineTo(W-padR,y(100)); ctx.stroke(); ctx.setLineDash([]);
   ctx.fillStyle=l3; ctx.font=cfont(W,"tick"); ctx.textAlign="right"; ctx.fillText("100",padL-4,y(100)+4);
+  ctx.save(); ctx.beginPath(); ctx.rect(0,0, padL+prog*(W-padL-padR)+2, H); ctx.clip();   // reveal the plotted line left→right; axes stay
   // linear trend line over the history
   const xs=s.map((_,i)=>i), sx=xs.reduce((a,b)=>a+b,0), sy=vals.reduce((a,b)=>a+b,0),
         sxy=xs.reduce((a,xx,i)=>a+xx*vals[i],0), sxx=xs.reduce((a,xx)=>a+xx*xx,0), den=n*sxx-sx*sx;
@@ -5938,6 +5945,7 @@ function drawStrengthIndex(si){
     ctx.strokeStyle=hexAlpha(l3,.4); ctx.lineWidth=1; ctx.setLineDash([2,3]); ctx.beginPath(); ctx.moveTo(xNow,padT); ctx.lineTo(xNow,H-padB); ctx.stroke(); ctx.setLineDash([]);
   }
   ctx.beginPath(); ctx.arc(xNow,y(vals[n-1]),4.5,0,7); ctx.fillStyle=ac; ctx.fill();
+  ctx.restore();
   ctx.fillStyle=l3; ctx.font=cfont(W,"label"); ctx.textAlign="left"; ctx.fillText(si.weeks+"w ago",padL,H-6);
   ctx.textAlign="right"; ctx.fillText(f?"+"+f.weeks+"w":"now", W-padR, H-6);
   if(f){ ctx.textAlign="center"; ctx.fillStyle=hexAlpha(l3,.9); ctx.fillText("now", xNow, H-6); }
@@ -7132,8 +7140,10 @@ function growthForecast(){
   const perMuscle = { plan:permusc(planDose,full), pace:permusc(paceDose,paceOv) };
   return { plan, pace, ahead:AHEAD, n:muscles.length, base:w16(plan), sens, perMuscle, bridged };
 }
-function drawForecast(f){
+function drawForecast(f, prog){
+  prog = prog==null ? 1 : prog;
   const c=$("fcChart"); if(!c||!f) return;
+  _figFns["fcChart"]=(p)=>drawForecast(f,p);
   const sub=$("fcSub"); if(sub) sub.textContent="projected muscle gain over the next "+f.ahead+" weeks · "+f.n+" muscles"+(f.bridged?" · personalised from your strength data":"");
   const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const cs=getComputedStyle(document.documentElement);
@@ -7150,6 +7160,7 @@ function drawForecast(f){
     ctx.strokeStyle=hexAlpha(l3, zero?.5:.18); ctx.lineWidth=zero?1.2:1; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
     ctx.fillStyle=l3; ctx.fillText(v.toFixed(0)+"%", padL-6, y+4); }
   ctx.fillStyle=l3; ctx.textAlign="center"; ctx.fillText("now", X(0), H-padB+16); ctx.fillText("+"+x1+"w", X(x1), H-padB+16);
+  ctx.save(); ctx.beginPath(); ctx.rect(0,0, padL+prog*(W-padL-padR)+2, H); ctx.clip();   // reveal the bands/lines left→right; axes stay
   const band=(b,hex)=>{ ctx.fillStyle=hexAlpha(hex,.15); ctx.beginPath();
     b.p90.forEach((v,i)=>{ const x=X(i), y=Y(v); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
     for(let i=b.p10.length-1;i>=0;i--){ ctx.lineTo(X(i), Y(b.p10[i])); }
@@ -7162,11 +7173,14 @@ function drawForecast(f){
   ctx.font=cfont(W,"label"); ctx.textAlign="left";
   ctx.fillStyle=accent; ctx.fillText(sgn(f.plan.p50[x1]), X(x1)+5, yp+4);
   ctx.fillStyle=blue;   ctx.fillText(sgn(f.pace.p50[x1]), X(x1)+5, yc+4);
+  ctx.restore();
   const lg=$("fcLegend"); if(lg) lg.innerHTML='<span class="fclg"><i style="background:'+accent+'"></i>this plan</span><span class="fclg"><i style="background:'+blue+'"></i>current pace</span><span class="fclg"><i class="fcbandi"></i>10–90% range</span>';
 }
 // tornado: how much the 16-week median gain swings as each key parameter goes low↔high (around the plan)
-function drawForecastSens(f){
+function drawForecastSens(f, prog){
+  prog = prog==null ? 1 : prog;
   const c=$("fcTornado"); if(!c||!f||!f.sens) return;
+  _figFns["fcTornado"]=(p)=>drawForecastSens(f,p);
   // intuitive: rank the levers by how much they move your gain; each bar grows from the left, biggest first
   const rows=f.sens.map(s=>({label:s.label.replace(" ±3",""), impact:Math.abs(s.hi-s.lo)})).sort((a,b)=>b.impact-a.impact);
   if(!rows.length) return;
@@ -7179,13 +7193,14 @@ function drawForecastSens(f){
   const padL=124, padR=72, padT=8, padB=8, rowH=(H-padT-padB)/rows.length;
   const trackX=padL, trackW=W-padL-padR;
   ctx.textBaseline="middle";
-  rows.forEach((r,i)=>{ const cy=padT+i*rowH+rowH/2, bw=Math.max(3,trackW*(r.impact/maxI)), bh=Math.min(22,rowH*0.5), rr=bh/2;
+  rows.forEach((r,i)=>{ const cy=padT+i*rowH+rowH/2, bw=Math.max(3,trackW*(r.impact/maxI))*prog, bh=Math.min(22,rowH*0.5), rr=bh/2;
     ctx.fillStyle=hexAlpha(accent,.13); if(ctx.roundRect){ctx.beginPath();ctx.roundRect(trackX,cy-bh/2,trackW,bh,rr);ctx.fill();} else ctx.fillRect(trackX,cy-bh/2,trackW,bh);
-    ctx.fillStyle=hexAlpha(accent,.9); if(ctx.roundRect){ctx.beginPath();ctx.roundRect(trackX,cy-bh/2,bw,bh,rr);ctx.fill();} else ctx.fillRect(trackX,cy-bh/2,bw,bh);
+    ctx.fillStyle=hexAlpha(accent,.9); if(bw>0.6){ if(ctx.roundRect){ctx.beginPath();ctx.roundRect(trackX,cy-bh/2,bw,bh,rr);ctx.fill();} else ctx.fillRect(trackX,cy-bh/2,bw,bh); }
     ctx.fillStyle=l3; ctx.textAlign="right"; ctx.font=cfont(W,"label"); ctx.fillText(r.label, padL-12, cy);
     ctx.fillStyle=ink; ctx.textAlign="right"; ctx.font=cfont(W,"value","700"); ctx.fillText("±"+r.impact.toFixed(1)+"%", W-8, cy);
   });
   // actionable read-out: the biggest swing among the levers the lifter can actually change
+  if(prog<1) return;
   const ACT={ effort:"push a little closer to failure on your hard sets",
               progression:"add a rep or a bit of load most weeks",
               "volume ±3":"add ~2–3 weekly sets to your lagging muscles" };
@@ -7197,9 +7212,11 @@ function drawForecastSens(f){
     : "Longer bar = bigger effect on your "+f.ahead+"-week gain; the % is how much that one thing could move it.";
 }
 // per-muscle projected 16-week gain, one bar per muscle in its app colour (negative = below maintenance)
-function drawForecastMuscles(f, which){
+function drawForecastMuscles(f, which, prog){
+  prog = prog==null ? 1 : prog;
   const c=$("fcMuscles"); if(!c||!f||!f.perMuscle) return;
   const rows=f.perMuscle[which||"plan"]||f.perMuscle.plan||[]; if(!rows.length) return;
+  _figFns["fcMuscles"]=(p)=>drawForecastMuscles(f, which, p);
   c.height = Math.max(170, rows.length*40);          // roomy rows; the CSS keeps it full-width, so bigger bitmap rows = bigger on screen
   const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const cs=getComputedStyle(document.documentElement);
@@ -7210,7 +7227,7 @@ function drawForecastMuscles(f, which){
   const rowH=(H-padT-padB)/rows.length, zeroX=X(0);
   ctx.strokeStyle=hexAlpha(l3,.35); ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(zeroX,padT); ctx.lineTo(zeroX,H-padB); ctx.stroke();
   rows.forEach((r,i)=>{ const cy=padT+i*rowH+rowH/2, x=X(r.gain), col=MCOLOR[r.g]||l3;
-    const bx=Math.min(zeroX,x), bw=Math.max(2,Math.abs(x-zeroX)), bh=Math.min(22,rowH*0.5);
+    const bw=Math.max(2,Math.abs(x-zeroX))*prog, bx=(r.gain>=0)?zeroX:zeroX-bw, bh=Math.min(22,rowH*0.5);   // bars grow out from the zero line
     ctx.fillStyle=hexAlpha(col,.92);
     if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(bx, cy-bh/2, bw, bh, 5); ctx.fill(); } else ctx.fillRect(bx, cy-bh/2, bw, bh);
     ctx.fillStyle=l3; ctx.textAlign="right"; ctx.font=cfont(W,"label"); ctx.fillText(MSHORT[r.g]||r.g, padL-12, cy+7);
@@ -8536,7 +8553,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v175";
+const APP_VER="v176";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
