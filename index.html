@@ -836,7 +836,7 @@
   <div class="grabber"></div>
   <div class="sheethdr"><span class="t">Strength</span><button class="btn plain sm" id="strengthClose">Done</button></div>
   <div class="sheetbody">
-    <div class="exprogsum" id="exProgSum"></div>
+    <div class="sheetlead"><div class="lh" id="exProgSum"></div></div>
     <canvas id="exProgChart" width="660" height="150"></canvas>
     <p class="fcnote" id="slCal"></p>
     <div class="fcfold">
@@ -893,7 +893,7 @@
   <div class="grabber"></div>
   <div class="sheethdr"><span class="t">Training volume</span><button class="btn plain sm" id="volClose">Done</button></div>
   <div class="sheetbody">
-    <div class="progobj" id="progObj"></div>
+    <div class="sheetlead"><div class="lh" id="progObj"></div></div>
     <div class="mewintabs paneltabs" id="progMetric">
       <button class="mewintab active" data-pm="prs" type="button">PRs</button>
       <button class="mewintab" data-pm="sessions" type="button">Sessions</button>
@@ -1036,11 +1036,11 @@
 
 <!-- MUSCLE VOLUME SHEET -->
 <div class="scrim" id="scrimMus"></div>
-<div class="sheet" id="sheetMus">
+<div class="sheet detailsheet" id="sheetMus">
   <div class="grabber"></div>
   <div class="sheethdr"><span class="t">Muscle balance</span><button class="btn plain sm" id="musClose">Done</button></div>
   <div class="sheetbody">
-    <p id="musIntro" style="color:var(--l2);font-size:13px;margin:0 4px 12px;line-height:1.45;">How balanced your training is — a full circle means even coverage, a dent means an undertrained group.</p>
+    <div class="sheetlead"><div class="lh" id="musLeadH"></div><div class="lc" id="musIntro">How balanced your training is — a full circle means even coverage, a dent means an undertrained group.</div></div>
     <div class="seg" id="musSrc" style="margin-bottom:8px;"></div>
     <div class="seg appearance" id="musSeg">
       <div class="s" data-d="7">This week</div>
@@ -1065,11 +1065,13 @@
     <div id="musBars"></div>
     <div class="ed-label">By exercise</div>
     <div id="musByEx"></div>
-    <details class="hsrc" id="musSrcBox" style="margin-top:16px;">
-      <summary>How this is measured &amp; sources</summary>
-      <p id="musMethod" style="color:var(--l2);font-size:13px;line-height:1.5;margin:8px 0 8px;"></p>
-      <ul id="musSrcList"></ul>
-    </details>
+    <div class="fcfold" id="musSrcBox" style="margin-top:16px;">
+      <button type="button" class="fcfoldhd">How this is measured &amp; sources</button>
+      <div class="fcfoldbody">
+        <p id="musMethod" style="color:var(--l2);font-size:13px;line-height:1.5;margin:8px 0 8px;"></p>
+        <ul id="musSrcList"></ul>
+      </div>
+    </div>
   </div>
 </div>
 

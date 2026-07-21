@@ -3026,6 +3026,17 @@ function renderOverview(){
     h+='<div class="ed-label" style="margin-top:18px;">Feeling spontaneous?</div>';
     h+='<div class="group ovtap ovspon"><div class="pad ovstartpad"><div class="ovstarttext"><div class="ovbig">Suggest a session</div><div class="ovmeta">a day picked from your recent training &amp; goals</div></div><span class="ovchev ovgo">›</span></div></div>';
   }
+  // --- Spotlight — the single most notable thing right now, with a real graph; celebrate a win or flag a gap ---
+  const spot=spotlight();
+  if(spot){
+    h+='<div class="ed-label">'+(spot.kind==="win"?"Nice work":"In focus")+'</div>';
+    h+='<div class="group ovtap ovspot '+spot.kind+'" id="ovSpot"><div class="pad">'
+      +'<div class="spothd"><span class="spotico">'+spot.ico+'</span><span class="spotk">'+esc(spot.tag)+'</span></div>'
+      +'<div class="spotbig">'+esc(spot.title)+'</div>'
+      +'<div class="spotcap">'+esc(spot.detail)+'</div>'
+      +'<canvas id="ovSpotC" width="640" height="150"></canvas>'
+      +'<span class="ovchev">›</span></div></div>';
+  }
   // --- the one trend that matters: are you getting stronger? (leads the home; taps to the Strength sheet) ---
   const ovSI=strengthIndex();
   if(ovSI){ const p=ovSI.series[ovSI.series.length-1].idx-100;
@@ -3127,6 +3138,8 @@ function renderOverview(){
       dots.querySelectorAll(".discdot").forEach((el,i)=> el.classList.toggle("on", i===best)); }, {passive:true}); }
   host.querySelectorAll(".ovtodo .ovtap").forEach(li=> li.onclick=()=>ovAct(li.dataset.act));
   { const os=$("ovStrength"); if(os) os.onclick=()=>ovAct("strength"); }
+  if(spot && $("ovSpot")){ if(spot.unders) drawSpotBalance("ovSpotC", spot.unders); else drawSpotChart("ovSpotC", spot.series, spot.kind);
+    $("ovSpot").onclick=()=>ovAct(spot.act); }
   if(settings.objective && !document.querySelector("#onboardWrap.show")) coach("swipe","Swipe left or right to move between your three pages — Overview, Workout and Me.");
 }
 // route a Needs-attention item to where the user acts on it
@@ -3134,6 +3147,7 @@ function ovAct(act){
   const goto=(id,focus)=>{ showTab("me"); setTimeout(()=>{ const el=$(id); if(el){ el.scrollIntoView({behavior:"smooth",block:"center"}); if(focus) el.focus(); } },80); };
   if(act==="weight") goto("bwInput", true);
   else if(act==="strength"){ showTab("me"); setTimeout(()=>openSheet("Strength"), 90); }
+  else if(act==="vol"){ showTab("me"); setTimeout(()=>openSheet("Vol"), 90); }
   else if(act==="balance") openMuscles();
   else if(act==="account") goAccount();
   else if(act==="objective") goto("objChips");
@@ -3180,8 +3194,8 @@ function renderDash(){
   renderGrowth();          // per-muscle current status (in the size-by-muscle fold)
   applyTileOrder();
   const po=$("progObj");   // objective-adherence score, moved onto the Progress tile
-  if(po){ if(!Object.keys(hist).length){ po.textContent=""; po.className="progobj"; }
-    else { const os=meObjectiveScore(7); po.className="progobj "+(os.pct>=85?"good":os.pct<50?"under":"");
+  if(po){ if(!Object.keys(hist).length){ po.textContent="No sessions yet"; po.className="lh"; }
+    else { const os=meObjectiveScore(7); po.className="lh "+(os.pct>=85?"good":os.pct<50?"under":"");
       po.textContent=os.objLabel+" · "+os.pct+"% "+(os.pct>=85?"on track":os.pct<50?"behind":"on your way"); } }
   renderCardioCard();
   renderAchievements();
@@ -4735,7 +4749,7 @@ function renderMeRadar(){
   const mini=$("meMini"); if(!mini) return;
   meCache = { 7: weeklyEquiv(muscleVolume(7, "sets", "total").totals, 7),
               30: weeklyEquiv(muscleVolume(30, "sets", "total").totals, 30) };
-  drawSuccessGauge("meMini", meCache[7]);
+  drawRadar(meCache[7], "meMini", WEEKLY_SET_TARGET, true, false);   // the balance shape at a glance (no labels); full radar is the sheet
   const head=$("meBalHead"), st=$("meBalStat");
   if(!Object.keys(hist).length){ if(head) head.textContent="—"; if(st) st.textContent="No sessions yet — log a workout"; return; }
   const det=expandLegacyMtot(meCache[7]||{}), under=GAUGE_GROUPS.filter(g=>gaugeVal(det,g)<WEEKLY_SET_MIN).length;
@@ -4765,6 +4779,73 @@ function drawSummarySpark(id, series){
   ctx.strokeStyle=ac; ctx.lineWidth=2.5; ctx.lineJoin="round"; ctx.beginPath();
   series.forEach((v,i)=>{ const px=x(i),py=y(v); i?ctx.lineTo(px,py):ctx.moveTo(px,py); }); ctx.stroke();
   ctx.beginPath(); ctx.arc(x(n-1),y(series[n-1]),3.5,0,7); ctx.fillStyle=ac; ctx.fill();
+}
+// ---- Home spotlight: pick the single most notable thing right now and show it with a real graph ----
+function spotColor(kind){ return kind==="win" ? "#2b8a3e" : kind==="watch" ? "#e8890c" : accentHex(); }
+// weekly bars, latest highlighted, dashed mean baseline
+function drawSpotChart(id, series, kind){
+  const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  series=(series||[]).filter(v=>v!=null); if(series.length<2) return;
+  const col=spotColor(kind), n=series.length, mn=Math.min(...series,0), mx=Math.max(...series), sp=(mx-mn)||1;
+  const padX=10, top=12, bot=14, gap=(W-padX*2)/n, bw=Math.min(36, gap*0.6);
+  const y=v=> (H-bot)-((v-mn)/sp)*(H-top-bot);
+  const mean=series.reduce((a,b)=>a+b,0)/n;
+  ctx.strokeStyle=hexAlpha(col,.30); ctx.lineWidth=1.5; ctx.setLineDash([5,6]);
+  ctx.beginPath(); ctx.moveTo(padX,y(mean)); ctx.lineTo(W-padX,y(mean)); ctx.stroke(); ctx.setLineDash([]);
+  series.forEach((v,i)=>{ const x=padX+gap*i+(gap-bw)/2, yy=y(v);
+    ctx.fillStyle = i===n-1 ? col : hexAlpha(col,.34); ctx.fillRect(x, yy, bw, Math.max(2,(H-bot)-yy)); });
+}
+// horizontal bars of the under-dosed muscles vs the weekly target (dashed line = target)
+function drawSpotBalance(id, unders){
+  const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
+  const wk=weeklyEquiv(muscleVolume(7,"sets","total").totals,7), rows=(unders||[]).slice(0,4);
+  if(!rows.length) return;
+  const lab=(getComputedStyle(document.documentElement).getPropertyValue("--l2")||"#888").trim();
+  const x0=170, bw=W-x0-26, rh=H/rows.length;
+  ctx.textBaseline="middle"; ctx.font="600 22px -apple-system,sans-serif";
+  rows.forEach((g,i)=>{ const y=i*rh+rh/2, v=wk[g]||0, frac=Math.max(0,Math.min(1,v/WEEKLY_SET_TARGET)), col=MCOLOR[g]||accentHex();
+    ctx.fillStyle=lab; ctx.textAlign="right"; ctx.fillText(MSHORT[g]||g, x0-14, y);
+    ctx.fillStyle=hexAlpha(col,.16); ctx.fillRect(x0, y-10, bw, 20);
+    ctx.fillStyle=col; ctx.fillRect(x0, y-10, Math.max(3,bw*frac), 20); });
+  ctx.strokeStyle=hexAlpha(accentHex(),.5); ctx.lineWidth=2; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(x0+bw, 6); ctx.lineTo(x0+bw, H-6); ctx.stroke(); ctx.setLineDash([]);
+}
+function spotlight(){
+  const c=[];
+  const prs=(typeof progWeeklyData==="function")?progWeeklyData("prs"):[];
+  const recPR=prs.slice(-2).reduce((a,b)=>a+(b||0),0);
+  if(recPR>=1) c.push({ kind:"win", score:2+recPR*1.2, ico:"🏅", tag:"Milestone",
+    title:recPR+" new PR"+(recPR>1?"s":"")+" in the last two weeks",
+    detail:"Records are falling — your training is landing. Hold the intensity here and keep logging.", series:prs, act:"strength" });
+  const si=strengthIndex();
+  if(si && si.series.length>=2){ const p=si.series[si.series.length-1].idx-100, ser=si.series.map(s=>Math.round(s.idx));
+    if(p>=4) c.push({ kind:"win", score:1.6+p/4, ico:"📈", tag:"On the up",
+      title:"Strength up "+p.toFixed(1)+"% overall",
+      detail:"Your lifts are trending up across "+si.lifts+" exercise"+(si.lifts>1?"s":"")+". Momentum like this is the moment to add a little load.", series:ser, act:"strength" });
+    else if(p<=-3) c.push({ kind:"watch", score:2.2+Math.abs(p)/3, ico:"👀", tag:"Worth a look",
+      title:"Strength slipped "+p.toFixed(1)+"%",
+      detail:"A few lifts are drifting down. Check sleep and recovery, and make sure the loads didn't creep too high.", series:ser, act:"strength" });
+  }
+  const vol=(typeof progWeeklyData==="function")?progWeeklyData("volume").filter(v=>v>0):[];
+  if(vol.length>=6){ const pr=vol.slice(-6,-3), rc=vol.slice(-3);
+    const pm=pr.reduce((a,b)=>a+b,0)/pr.length, rm=rc.reduce((a,b)=>a+b,0)/rc.length, d=pm>0?(rm-pm)/pm*100:0;
+    if(d<=-20) c.push({ kind:"watch", score:2+Math.abs(d)/12, ico:"📉", tag:"Slipping",
+      title:"Training volume down "+Math.round(-d)+"%",
+      detail:"You're doing less work than a few weeks ago. A couple more sets, or one more session, brings it back up.", series:vol, act:"vol" });
+    else if(d>=25) c.push({ kind:"win", score:1.4+d/25, ico:"🔥", tag:"Building",
+      title:"Training volume up "+Math.round(d)+"%",
+      detail:"More quality work than a few weeks back — a strong base for growth.", series:vol, act:"vol" });
+  }
+  const under=(typeof ovUnderMuscles==="function")?ovUnderMuscles():[];
+  if(under.length){ const names=under.slice(0,3).map(g=>MSHORT[g]||g);
+    c.push({ kind:"watch", score:1.8+under.length*0.3, ico:"🎯", tag:"Easy win",
+      title:names.join(", ")+(under.length>3?" +"+(under.length-3):"")+" under target",
+      detail:under.length+" muscle group"+(under.length>1?"s are":" is")+" below the weekly volume to grow. A couple of extra sets closes the gap.", unders:under, act:"balance" });
+  }
+  if(!c.length) return null;
+  c.sort((a,b)=>b.score-a.score);
+  const band=c.filter(x=>x.score>=c[0].score-1.0);
+  return band[Math.floor(Date.now()/86400000)%band.length];   // importance-led, rotates daily among the near-top
 }
 function renderMuscles(){
   buildSrc();
@@ -4796,6 +4877,15 @@ function renderMuscles(){
   $("musVolMode").style.display = showVolMode ? "" : "none";
   $("musVolNote").style.display = showVolMode ? "" : "none";
   const view = useTarget ? weeklyEquiv(totals, musWindow) : totals;
+  // lead headline: a plain verdict so the sheet opens with the same read as the summary card
+  const lead=$("musLeadH");
+  if(lead){
+    if(!isLog){ lead.className="lh"; lead.textContent=(plans.find(p=>p.id===musSrc)||activePlan()).name; }
+    else if(!Object.keys(hist).length){ lead.className="lh"; lead.textContent="No sessions yet"; }
+    else { const det=expandLegacyMtot(view), under=GAUGE_GROUPS.filter(g=>gaugeVal(det,g)<WEEKLY_SET_MIN).length;
+      lead.className="lh "+(under?"under":"good");
+      lead.textContent = under ? (under+" group"+(under>1?"s":"")+" under target") : "Every major muscle on target"; }
+  }
   drawRadar(view, "musRadar", useTarget ? WEEKLY_SET_TARGET : null, false, relative);
   const groups=Object.keys(view).filter(g=>view[g]>0).sort((a,b)=>view[b]-view[a]);
   const max=Math.max(1, ...groups.map(g=>view[g]));
@@ -8323,7 +8413,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v137";
+const APP_VER="v138";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH

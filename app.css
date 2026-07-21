@@ -1078,6 +1078,30 @@
   /* detail sheets that host the moved-in charts/folds */
   .detailsheet{ height:92vh; }
   .detailsheet .sheetbody .fchd2:first-child{ margin-top:2px; }
+  /* one shared lead for every detail sheet: big headline + caption + hairline, echoing the summary card */
+  .sheetlead{ margin:2px 2px 16px; padding-bottom:14px; border-bottom:.5px solid var(--sep); }
+  .sheetlead:empty{ display:none; border:none; margin:0; padding:0; }
+  .sheetlead .lh{ font-size:21px; font-weight:750; letter-spacing:-.5px; color:var(--ink); line-height:1.2; }
+  .sheetlead .lh .exprogsub{ display:block; margin-top:5px; font-size:13px; font-weight:500; color:var(--l2); letter-spacing:0; }
+  .sheetlead .lh.good{ color:#2b8a3e; } .sheetlead .lh.under{ color:#c92a2a; }
+  .sheetlead .lc{ font-size:13px; color:var(--l2); line-height:1.42; margin-top:6px; }
+  /* home spotlight: one importance-picked card with a real graph — celebrate a win or flag a gap */
+  .ovspot{ overflow:hidden; }
+  .ovspot .pad{ position:relative; }
+  .ovspot.win{ box-shadow:inset 3px 0 0 #2b8a3e; }
+  .ovspot.watch{ box-shadow:inset 3px 0 0 #e8890c; }
+  .spothd{ display:flex; align-items:center; gap:7px; margin-bottom:6px; }
+  .spotico{ font-size:17px; line-height:1; }
+  .spotk{ font-size:11px; font-weight:750; letter-spacing:.6px; text-transform:uppercase; color:var(--l3); }
+  .ovspot.win .spotk{ color:#2b8a3e; } .ovspot.watch .spotk{ color:#e8890c; }
+  .spotbig{ font-size:18px; font-weight:700; letter-spacing:-.3px; color:var(--ink); line-height:1.25; padding-right:20px; }
+  .spotcap{ font-size:13px; color:var(--l2); line-height:1.45; margin-top:6px; }
+  #ovSpotC{ width:100%; height:auto; aspect-ratio:640/150; display:block; margin:12px 0 0; }
+  .ovspot .ovchev{ position:absolute; top:14px; right:2px; }
+  #musSrcList{ list-style:none; padding:2px 2px 4px; margin:0; }
+  #musSrcList li{ font-size:12px; color:var(--l2); line-height:1.5; padding:8px 0; border-top:.5px solid var(--sep); }
+  #musSrcList li:first-child{ border-top:none; }
+  #musSrcList li span{ color:var(--l3); }
   /* spontaneous-session sheet */
   .sponpick{ display:flex; flex-direction:column; gap:8px; }
   .sponcard{ display:flex; flex-direction:column; gap:2px; text-align:left; width:100%; padding:12px 14px; border-radius:12px; border:.5px solid var(--line); background:var(--row); cursor:pointer; -webkit-tap-highlight-color:transparent; }
