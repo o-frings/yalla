@@ -2021,7 +2021,7 @@ function muscleLegend(mt, max){
 
 async function renderFeed(){
   const list=$("feedList"); if(!list || !cloudReady()) return;
-  renderLiveCards(); subscribeLiveFeed();   // friends training live, streamed in real time
+  renderLiveCards(); setTimeout(subscribeLiveFeed, 800);   // friends training live — defer the realtime channel off the open path so the home paints first
   // Liberal viewing: you see friends' posts even if you share nothing yourself. Each post shows at
   // the level its author published (s.lvl); your own level only governs what you publish.
   list.innerHTML='<div class="levelcap" style="margin:0 4px;">Loading…</div>';
@@ -4613,11 +4613,16 @@ function drawRadar(totals, canvasId, target, noLabels, relative, prog){
   // Auxiliary (NO_TARGET) muscles have no weekly goal, so against the target ring they'd read as
   // permanent gaps. Match the small roses: show an aux spoke/label only when it was actually trained.
   const showSpoke=g=> val(g)>0 || !NO_TARGET.has(g);
-  // Render the wedges with the shared rose renderer, so the balance radar matches the feed & planner roses.
   const radii=G.map(g=> showSpoke(g) ? norm(g)*prog : 0);   // wedges grow out from the centre
-  drawRose(ctx, cx, cy, R, G, roseTotals(totals||{}, musExpanded), {
-    radii, color:g=>MCOLOR[g]||accent, alpha:.8, stroke:"rgba(127,127,127,.18)", strokeW:1,
-    rings:[0.5,1], grid:"rgba(128,128,128,.22)", gridW:1.5 });
+  // the original Me-page look: two faint grid rings + translucent wedges with a light coloured edge (softer than a solid rose)
+  ctx.strokeStyle="rgba(128,128,128,.20)"; ctx.lineWidth=1.5;
+  [0.5,1].forEach(fr=>{ ctx.beginPath(); ctx.arc(cx,cy,R*fr,0,Math.PI*2); ctx.stroke(); });
+  const half=Math.PI/n - 0.06;
+  G.forEach((g,i)=>{ const rr=R*radii[i]; if(rr<=0.5) return;
+    const a=(-90+i*360/n)*Math.PI/180, col=MCOLOR[g]||accent;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rr,a-half,a+half); ctx.closePath();
+    ctx.globalAlpha=.24; ctx.fillStyle=col; ctx.fill(); ctx.globalAlpha=1;
+    ctx.lineWidth=2; ctx.strokeStyle=col; ctx.stroke(); });
   if(target && !relative){ ctx.strokeStyle=accent; ctx.globalAlpha=.5; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; }
   else if(target && relative){ const tr=R*Math.min(1,target/max);   // where the ~target/wk line falls on the relative scale
     ctx.strokeStyle=accent; ctx.globalAlpha=.5; ctx.lineWidth=2; ctx.setLineDash([7,7]);
@@ -6993,7 +6998,7 @@ function renderStrength(){
     if(capL) capL.textContent=cap;
     drawSummarySpark("slMini", si.series.map(p=>p.idx));
   } else if(f && f.base!=null){
-    if(stat) stat.innerHTML='<span class="u">size outlook</span> <span class="'+up(f.base)+'">'+(f.base>=0?"+":"")+f.base.toFixed(1)+'%</span>';
+    if(stat) stat.innerHTML='<span class="'+up(f.base)+'">'+(f.base>=0?"+":"")+f.base.toFixed(1)+'%</span> <span class="u">size / 16w</span>';
     if(capL) capL.textContent="projected muscle gain over 16 weeks";
   } else { if(stat) stat.textContent="Log a few sessions"; if(capL) capL.textContent="your strength trend + forecast will appear here"; }
   // DETAIL sheet: headline + chart: overall strength (indexed, averaged) with the forecast continuation
@@ -8552,7 +8557,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v177";
+const APP_VER="v178";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
