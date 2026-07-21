@@ -4589,7 +4589,7 @@ function drawRadar(totals, canvasId, target, noLabels, relative){
   const cx=W/2, cy=H/2, R=W*(noLabels?0.42:0.33);
   const cs=getComputedStyle(document.documentElement);
   const accent=(cs.getPropertyValue("--accent")||"#0a84ff").trim();
-  const lab=(cs.getPropertyValue("--l2")||"#888").trim();
+  const lab=(cs.getPropertyValue("--l3")||"#888").trim();
   const val=g=>radarVal(det, g, target);
   const max=Math.max(1, ...G.map(val));
   // Absolute (target) mode: the rim is a fixed per-muscle weekly goal, so short wedges read as gaps.
@@ -4689,7 +4689,7 @@ function gaugeVal(det, g){ const h=GAUGE_HEADS[g]; return h ? h.reduce((a,m)=>a+
 function drawSuccessGauge(canvasId, wk){
   const c=$(canvasId); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const det=expandLegacyMtot(wk||{});
-  const lab=(getComputedStyle(document.documentElement).getPropertyValue("--l2")||"#888").trim();
+  const lab=(getComputedStyle(document.documentElement).getPropertyValue("--l3")||"#888").trim();
   const cx=W/2, cy=H/2, R=W*0.30, n=GAUGE_GROUPS.length, half=Math.PI/n-0.06;
   const val=g=>gaugeVal(det, g);
   // light mode washes out translucent fills on the pale card, so push alpha up there for legibility
@@ -4791,7 +4791,7 @@ function drawSpotBalance(id, unders){
   const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const wk=weeklyEquiv(muscleVolume(7,"sets","total").totals,7), rows=(unders||[]).slice(0,4);
   if(!rows.length) return;
-  const lab=(getComputedStyle(document.documentElement).getPropertyValue("--l2")||"#888").trim();
+  const lab=(getComputedStyle(document.documentElement).getPropertyValue("--l3")||"#888").trim();
   const x0=170, bw=W-x0-26, rh=H/rows.length;
   ctx.textBaseline="middle"; ctx.font=cfont(W,"label");
   rows.forEach((g,i)=>{ const y=i*rh+rh/2, v=wk[g]||0, frac=Math.max(0,Math.min(1,v/WEEKLY_SET_TARGET)), col=MCOLOR[g]||accentHex();
@@ -7694,7 +7694,7 @@ function emphVal(g){
 function drawEmphasisRadar(){
   const c=$("buildRadar"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const G=roseGroups(buildExpanded), cx=W/2, cy=H/2, R=W*0.30, n=G.length;
-  const cs=getComputedStyle(document.documentElement), accent=(cs.getPropertyValue("--accent")||"#0a84ff").trim(), lab=(cs.getPropertyValue("--l2")||"#888").trim();
+  const cs=getComputedStyle(document.documentElement), accent=(cs.getPropertyValue("--accent")||"#0a84ff").trim(), lab=(cs.getPropertyValue("--l3")||"#888").trim();
   const pt=(i,rr)=>{ const a=(-90+i*360/n)*Math.PI/180; return [cx+rr*Math.cos(a), cy+rr*Math.sin(a)]; };
   // Sums-to-1 distribution; radius is a gentle curve of each muscle's share (shared roseRadii / ROSE_GAMMA).
   const em={}; G.forEach(g=> em[g]=emphVal(g));
@@ -8397,7 +8397,7 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
 // number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
 // Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v145";
+const APP_VER="v146";
 (function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
