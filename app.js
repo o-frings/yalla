@@ -3152,6 +3152,7 @@ function goAccount(){
     const e=$("acctEmail"); if(e && $("acctOut") && $("acctOut").style.display!=="none") e.focus(); } }, 380);
 }
 function renderDash(){
+  _musGainCache=null;   // training data may have changed — the per-muscle projection has to be recomputed
   const now = bw.length?bw[bw.length-1].kg:null;
   $("bwNow").textContent = now!=null?now.toFixed(1):"—";
   $("bwNow").parentElement.classList.toggle("empty", now==null);
@@ -3180,7 +3181,7 @@ function renderDash(){
   renderGrowthForecast();  // draws the muscle-size projection inside the Strength detail sheet; sets _fcF
   renderStrength();        // strength summary card + strength detail sheet (reads _fcF for the size line)
   renderTrainingVolume();  // volume summary card (detail = Vol sheet, drawn by animateProgBars)
-  renderGrowth();          // per-muscle current status (in the size-by-muscle fold)
+  renderGrowth();          // per-muscle "fix this first" line, above the per-muscle rows on the balance sheet
   applyTileOrder();
   const po=$("progObj");   // objective-adherence score, moved onto the Progress tile
   if(po){ if(!Object.keys(hist).length){ po.textContent="No sessions yet"; po.className="lh"; }
@@ -3265,9 +3266,8 @@ function drawSpark(){
 }
 // ---- weekly progress bars (Me sheet) ----
 const PROG_WEEKS=10;
-let progMetric="prs", progIdx=0, progMeta={};
-const PROG_METRICS=["prs","sessions","volume","sets","weight"];   // PRs first, then Sessions, then the rest
-// (re)draw all five metric pages and re-show the active page — name kept for existing callers
+let progMeta={};
+// (re)draw the metric charts and their captions — name kept for existing callers
 function animateProgBars(){ drawAllProg(); fillProgSections(); }
 function progWeeklyData(metric){
   const wkMs=7*86400000, now=Date.now(), N=PROG_WEEKS, out=new Array(N).fill(0);
@@ -3442,12 +3442,14 @@ function renderGrowth(){
   else if(hold.length) box.textContent="Holding but not building: "+hold.join(", ")+". Add a rep or a little load to push these.";
   else box.textContent="Every trained muscle is getting a growth stimulus — keep the overload going.";
 }
-// Draw ONE progress metric into a given canvas (static — the swipe provides motion). Returns the
-// caption HTML + the data the verdict needs, so the active page's meta can be shown below the carousel.
-function drawProgChart(metric, canvasId, prog){
+// Draw ONE progress metric into a given canvas, optionally with a second metric laid faintly over it.
+// Each series is scaled to its own range, so an overlay compares SHAPE rather than units — the point is
+// to see when two measures of "how much did I train" stop agreeing. Returns the caption HTML + the data
+// the verdict needs.
+function drawProgChart(metric, canvasId, prog, overlay){
   prog = prog==null ? 1 : prog;
   const c=$(canvasId); if(!c) return {capHTML:"", vData:null}; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
-  _figFns[canvasId]=(p)=>drawProgChart(metric, canvasId, p);
+  _figFns[canvasId]=(p)=>drawProgChart(metric, canvasId, p, overlay);
   const ac=accentHex();
   const l3=(getComputedStyle(document.documentElement).getPropertyValue('--l3')||'#888').trim();
   const ink=(getComputedStyle(document.documentElement).getPropertyValue('--ink')||'#000').trim();
@@ -3457,23 +3459,40 @@ function drawProgChart(metric, canvasId, prog){
   const xLabels=()=>{ ctx.fillStyle=l3; ctx.font=cfont(W,"label"); ctx.textAlign="left"; ctx.fillText(PROG_WEEKS+"w ago", pad, H-6); ctx.textAlign="right"; ctx.fillText("now", W-pad, H-6); };
   const baseline=()=>{ ctx.strokeStyle=hexAlpha(ac,.18); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad,base+0.5); ctx.lineTo(W-pad,base+0.5); ctx.stroke(); };
 
-  // every metric draws the same way — one trend line — so the five figures tell one consistent story
+  // every metric draws the same way — one trend line — so the figures tell one consistent story
   // (per-muscle detail lives on the Muscle-balance sheet, not here)
   // ---- single trend line ----
   const data=progWeeklyData(metric);
   if(!data.some(v=>v>0)){ emptyMsg(); return {capHTML:"", vData:null}; }
-  let lo=0, hi=Math.max(...data);
-  if(metric==="weight"){ const nz=data.filter(v=>v>0); lo=Math.min(...nz); hi=Math.max(...nz); const span=Math.max(1,hi-lo); lo=Math.max(0,lo-span*0.2); hi=hi+span*0.1; }
-  const mapY=v=> base-(hi>lo?(v-lo)/(hi-lo):0)*(base-top);
+  // y-mapper for a series. A lone line is zero-based, so its height still reads as magnitude. Weight never
+  // is — and neither is either line on an overlaid chart, where the units differ and only the shapes are
+  // comparable; zero-basing both there just presses them into a flat pair at the top of the plot.
+  const scaleOf=(series, m)=>{
+    let lo=0, hi=Math.max(...series);
+    if(m==="weight" || overlay){
+      const nz=series.filter(v=>v>0);
+      if(nz.length){ lo=Math.min(...nz); hi=Math.max(...nz); const span=Math.max(1,hi-lo); lo=Math.max(0,lo-span*0.3); hi=hi+span*0.18; }
+    }
+    return v=> base-(hi>lo?(v-lo)/(hi-lo):0)*(base-top);
+  };
+  const mapY=scaleOf(data, metric);
+  const oData = overlay ? progWeeklyData(overlay) : null;
+  const hasOverlay = !!(oData && oData.some(v=>v>0));
   baseline();
   ctx.save(); ctx.beginPath(); ctx.rect(0,0, pad+prog*(W-pad*2)+2, H); ctx.clip();   // reveal the plotted line left→right; axes stay
+  // companion line first, so the primary metric always reads on top of it
+  if(hasOverlay){
+    const oY=scaleOf(oData, overlay);
+    ctx.strokeStyle=hexAlpha(ink,.30); ctx.lineWidth=2; ctx.lineJoin="round"; ctx.lineCap="round";
+    ctx.beginPath(); oData.forEach((v,i)=>{ const x=cx(i), y=oY(v); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.stroke();
+  }
   // line + dots over the weeks that have data (weight skips gaps; sessions/PRs plot every week incl. zeros)
   const valid=[]; data.forEach((v,i)=>{ if(metric!=="weight" || v>0) valid.push([i,v]); });
   ctx.strokeStyle=ac; ctx.lineWidth=3; ctx.lineJoin="round"; ctx.lineCap="round";
   ctx.beginPath(); valid.forEach(([i,v],k)=>{ const x=cx(i), y=mapY(v); k?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.stroke();
   valid.forEach(([i,v])=>{ ctx.beginPath(); ctx.arc(cx(i), mapY(v), i===N-1?5:3.5, 0, Math.PI*2); ctx.fillStyle = i===N-1?ac:hexAlpha(ac,.55); ctx.fill(); });
-  // trend line
-  const tp=[]; data.forEach((v,i)=>{ if(v>0) tp.push([i,v]); });
+  // trend line — skipped when a companion line is present; three lines over ten weeks is noise, not detail
+  const tp=[]; if(!hasOverlay) data.forEach((v,i)=>{ if(v>0) tp.push([i,v]); });
   if(tp.length>=2){
     const k=tp.length, sx=tp.reduce((a,p)=>a+p[0],0), sy=tp.reduce((a,p)=>a+p[1],0),
           sxy=tp.reduce((a,p)=>a+p[0]*p[1],0), sxx=tp.reduce((a,p)=>a+p[0]*p[0],0), den=k*sxx-sx*sx;
@@ -3483,21 +3502,38 @@ function drawProgChart(metric, canvasId, prog){
   }
   ctx.restore();
   xLabels();
-  const latest=data[N-1], fmt = metric==="weight" ? (latest>0?round1(latest)+" kg":"—") : Math.round(latest);
-  const capHTML=PROG_LABELS[metric]+' · last '+PROG_WEEKS+' weeks · <b>this week: '+(latest>0?fmt:"—")+'</b>';
+  const fmtOf=(m,v)=> v>0 ? (m==="weight" ? round1(v)+" kg" : String(Math.round(v))) : "—";
+  // with two unlabelled lines on the plot, the caption has to say which is which — a dot per series
+  const dot=k=>'<span class="progdot '+k+'"></span>';
+  let capHTML=PROG_LABELS[metric]+' · last '+PROG_WEEKS+' weeks · '+(hasOverlay?dot("a"):"")
+    +'<b>this week: '+fmtOf(metric,data[N-1])+'</b>';
+  if(hasOverlay) capHTML+=' · '+dot("b")+'<b>'+fmtOf(overlay,oData[N-1])+'</b> '+(PROG_OVERLAY_NOUN[overlay]||overlay);
   return {capHTML, vData:data};
 }
-// pre-draw all five metric pages; show the active page's caption + verdict below
-function drawAllProg(){ PROG_METRICS.forEach((m,i)=> progMeta[m]=drawProgChart(m, "progBars"+i)); }
-// all five metric charts are stacked vertically in the sheet; fill each one's caption + verdict
-const PROG_CAPID=["progCap0","progCap1","progCap2v","progCap3","progCap4"];
+const PROG_OVERLAY_NOUN={ sets:"hard sets", sessions:"sessions", volume:"volume", prs:"PRs", weight:"kg" };
+// One chart per question, each in the sheet that owns that question. Training load answers "am I training
+// enough" — volume with hard sets over it, since the two only tell you something when they disagree.
+// PRs answer "am I getting stronger", so they render in the Strength sheet; body weight sits under Body.
+const PROG_CHARTS=[
+  {metric:"volume", overlay:"sets", canvas:"progLoad", cap:"progCapLoad", verd:"progVerdLoad"},
+  {metric:"prs",                    canvas:"progPR",   cap:"progCapPR",   verd:"progVerdPR"}
+];
+function drawAllProg(){ PROG_CHARTS.forEach(c=> progMeta[c.metric]=drawProgChart(c.metric, c.canvas, 1, c.overlay)); }
+function setProgVerdict(id, metric, data){
+  const ve=$(id); if(!ve) return;
+  if(!data || !data.some(v=>v>0)){ ve.style.display="none"; return; }
+  const v=progVerdict(metric, data);
+  ve.style.display="flex"; ve.className="progverd v-"+v.lvl; ve.querySelector(".pvtxt").textContent=v.msg;
+}
 function fillProgSections(){
-  PROG_METRICS.forEach((m,i)=>{
-    const meta=progMeta[m]||{capHTML:"",vData:null};
-    const cap=$(PROG_CAPID[i]); if(cap) cap.innerHTML=meta.capHTML;
-    const ve=$("progVerd"+i);
-    if(ve){ if(meta.vData){ const v=progVerdict(m, meta.vData); ve.style.display="flex"; ve.className="progverd v-"+v.lvl; ve.querySelector(".pvtxt").textContent=v.msg; } else ve.style.display="none"; }
+  PROG_CHARTS.forEach(c=>{
+    const meta=progMeta[c.metric]||{capHTML:"",vData:null};
+    const cap=$(c.cap); if(cap) cap.innerHTML=meta.capHTML;
+    setProgVerdict(c.verd, c.metric, meta.vData);
   });
+  // the bodyweight chart is gone from the volume sheet, but its pacing verdict still earns its place —
+  // it now sits under the Body sparkline, which is the weight trend it was judging all along
+  setProgVerdict("bwVerd", "weight", progWeeklyData("weight"));
 }
 $("bwBtn").onclick=async()=>{ const v=parseFloat($("bwInput").value);
   if(isNaN(v)||v<30||v>250){ toast("Enter a valid weight"); return; }
@@ -4769,12 +4805,16 @@ function renderMeRadar(){
 // Training-volume SUMMARY card: headline PR/trend + a mini sparkline of the default metric. Detail = Vol sheet.
 function renderTrainingVolume(){
   const stat=$("progStat"), cap=$("progCap2"); if(!stat) return;
-  const prd=progWeeklyData("prs"), prTot=prd.reduce((a,b)=>a+b,0);
+  const mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
   const vol=progWeeklyData("volume"), e=vol.slice(0,-3).filter(v=>v>0), r=vol.slice(-3).filter(v=>v>0);
-  const em=e.length?e.reduce((a,b)=>a+b,0)/e.length:0, rm=r.length?r.reduce((a,b)=>a+b,0)/r.length:0;
-  const dv = em>0 ? Math.round((rm-em)/em*100) : null;
-  stat.innerHTML = '<span>'+prTot+'</span> <span class="u">PRs · 10 wks</span>';
-  cap.textContent = dv!=null ? ("volume "+(dv>=0?"+":"")+dv+"% vs the prior weeks") : "sessions, volume, sets & bodyweight";
+  const dv = mean(e)>0 ? Math.round((mean(r)-mean(e))/mean(e)*100) : null;
+  // The headline reads the same metric the sparkline draws. It used to count PRs over a volume line, and
+  // PRs now live in the Strength sheet where they belong.
+  const dir = dv==null ? "" : dv>=1 ? "up" : dv<=-1 ? "down" : "";
+  stat.innerHTML = (dv!=null ? '<span class="'+dir+'">'+(dv>=0?"+":"")+dv+'%</span>' : '<span>—</span>')
+    + ' <span class="u">volume · 10 wks</span>';
+  const sr=mean(progWeeklyData("sets").slice(-3).filter(v=>v>0));
+  cap.textContent = sr>0 ? ("~"+round1(sr)+" hard sets/wk lately") : "log a few sessions to see your load";
   drawSummarySpark("progMini", vol.filter(v=>v>0));
 }
 // small filled sparkline for a summary card
@@ -4908,6 +4948,18 @@ function spotlight(){
   const band=c.filter(x=>x.score>=c[0].score-1.2);      // the near-top band…
   return band[Math.floor((_spotSeed||0)*band.length)] || band[0];   // …rotated per app-open, so the home feels fresh each time
 }
+// 16-week projected gain per muscle, keyed by group. This used to be its own bar chart in the Strength
+// sheet, which ranked muscles by dose — the same ranking the balance radar already shows. It now rides on
+// the per-muscle rows instead, putting each muscle's dose next to what that dose projects to.
+// growthForecast() is a 500-run Monte Carlo and the window/metric toggles redraw these rows repeatedly,
+// so it's memoised for the render pass and cleared by renderDash.
+let _musGainCache=null;
+function musProjectedGain(){
+  if(_musGainCache) return _musGainCache;
+  const f=(typeof growthForecast==="function")?growthForecast():null, gain={};
+  if(f && f.perMuscle && f.perMuscle.pace) f.perMuscle.pace.forEach(m=>{ gain[m.g]=m.gain; });
+  _musGainCache=gain; return gain;
+}
 function renderMuscles(){
   const isLog=true;   // the balance sheet always reflects YOUR logged training; each plan's balance lives with that plan
   let totals, byEx;
@@ -4946,14 +4998,18 @@ function renderMuscles(){
   if(!groups.length){ bars.innerHTML='<p class="freehint">'+(isLog?'No sets logged in this window yet — finish a workout to see your split.':'This plan has no exercises yet.')+'</p>'; }
   else {
     bars.innerHTML="";
+    // the projection only makes sense against a weekly-sets dose, so it rides along in that view only
+    const gain = (isLog && useTarget) ? musProjectedGain() : {};
     groups.forEach(g=>{
       const v=view[g];
       const pct = useTarget ? Math.min(100, Math.round(v/WEEKLY_SET_TARGET*100)) : Math.round(v/max*100);
       const valTxt = useTarget ? (round1(v)+"/wk") : (useKg ? fmtKg(v) : round1(v));
+      const gp = gain[g];
+      const projTxt = gp!=null ? '<small class="mproj">'+(gp>=0?"+":"")+gp.toFixed(1)+'%/16w</small>' : "";
       const row=document.createElement("div"); row.className="mrow"+(useTarget && v<WEEKLY_SET_MIN?" under":"");
       row.innerHTML='<div class="mlab">'+g+'</div>'
         +'<div class="mbarwrap"><div class="mbar" style="width:'+pct+'%;background:'+(MCOLOR[g]||"#888")+'"></div></div>'
-        +'<div class="mval">'+valTxt+'</div>';
+        +'<div class="mval">'+valTxt+projTxt+'</div>';
       bars.appendChild(row);
     });
   }
@@ -4974,6 +5030,7 @@ function renderMuscles(){
         : (useKg ? "Bars show <b>total load</b> (weight × reps, bodyweight-aware), scaled to your biggest group."
                  : "Switch to <b>Sets</b> to compare against weekly volume targets."));
   $("musMethod").innerHTML += " The rose rolls the three delt heads into <b>Shoulders</b> and the back regions into <b>Back</b> — tap either wedge to split it into its individual muscles (the bars below always list them in full).";
+  if(isLog && useTarget) $("musMethod").innerHTML += " Each row's second figure is that muscle's <b>projected 16-week gain</b> at your current pace — the same Monte Carlo behind the size projection in Strength, read per muscle so the dose sits next to what it's projected to buy. An estimate with real uncertainty, not a promise.";
   if(isLog) $("musMethod").innerHTML += " The <b>growth signal</b> above reads each muscle's recent weekly sets against a growth dose (~"+WEEKLY_SET_MIN+"–"+WEEKLY_SET_TARGET+") and a maintenance floor (~"+WEEKLY_SET_MAINT+"), then checks whether its weekly volume is trending up, flat or down — growth needs both an adequate dose and progressive overload; below maintenance, muscle is slowly lost. It estimates the training stimulus, not measured size.";
   $("musMethod").innerHTML += " " + WP_LINK;
   let keys = useTarget ? ["sch17","drr","rpvol","vigotsky","mps"] : ["sch17","drr","vigotsky"];
@@ -6726,17 +6783,9 @@ function renderGrowthForecast(){
   if(!$("fcChart")) return;
   const f=(typeof growthForecast==="function")?growthForecast():null;
   _fcF=f; if(!f) return;
-  drawForecast(f); drawForecastMuscles(f, fcMuscleMode); drawForecastSens(f);
+  drawForecast(f); drawForecastSens(f);
 }
-let fcMuscleMode="pace", _fcF=null;   // per-muscle graph scenario: "pace" (default) or "plan"
-(function initFcMuscleToggle(){
-  const seg=$("fcMuscleSeg"); if(!seg) return;
-  seg.querySelectorAll(".mewintab").forEach(b=> b.onclick=()=>{
-    fcMuscleMode=b.dataset.fm;
-    seg.querySelectorAll(".mewintab").forEach(x=>x.classList.toggle("active", x===b));
-    if(_fcF) drawForecastMuscles(_fcF, fcMuscleMode);
-  });
-})();
+let _fcF=null;   // last computed forecast, reused by the strength summary line
 // ===== customisable Me tiles — reorder (drag in edit mode) and show/hide, persisted per user =====
 const TILE_ICON = { eye:'<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>',
   eyeoff:'<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.4 10.4 0 0 1 12 19C5.5 19 2 12 2 12a18.5 18.5 0 0 1 5.1-5.9M9.9 4.2A10.9 10.9 0 0 1 12 4c6.5 0 10 7 10 7a18.6 18.6 0 0 1-2.2 3.2M1 1l22 22M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>' };
@@ -7215,32 +7264,6 @@ function drawForecastSens(f, prog){
     ? "Longer bar = bigger effect on your "+f.ahead+"-week gain; the % is how much that one thing could move it. Your biggest lever: "+top.label.replace(" ±3","")+" — "+top.act+"."
     : "Longer bar = bigger effect on your "+f.ahead+"-week gain; the % is how much that one thing could move it.";
 }
-// per-muscle projected 16-week gain, one bar per muscle in its app colour (negative = below maintenance)
-function drawForecastMuscles(f, which, prog){
-  prog = prog==null ? 1 : prog;
-  const c=$("fcMuscles"); if(!c||!f||!f.perMuscle) return;
-  const rows=f.perMuscle[which||"plan"]||f.perMuscle.plan||[]; if(!rows.length) return;
-  _figFns["fcMuscles"]=(p)=>drawForecastMuscles(f, which, p);
-  c.height = Math.max(170, rows.length*40);          // roomy rows; the CSS keeps it full-width, so bigger bitmap rows = bigger on screen
-  const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
-  const cs=getComputedStyle(document.documentElement);
-  const l3=(cs.getPropertyValue('--l3')||'#888').trim(), ink=(cs.getPropertyValue('--ink')||'#000').trim();
-  let gmax=0.5, gmin=0; rows.forEach(r=>{ gmax=Math.max(gmax,r.gain); gmin=Math.min(gmin,r.gain); });
-  const padL=124, padR=88, padT=8, padB=8, span=Math.max(0.5, gmax-gmin);
-  const X=v=> padL + (v-gmin)/span*(W-padL-padR);
-  const rowH=(H-padT-padB)/rows.length, zeroX=X(0);
-  ctx.strokeStyle=hexAlpha(l3,.35); ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(zeroX,padT); ctx.lineTo(zeroX,H-padB); ctx.stroke();
-  rows.forEach((r,i)=>{ const cy=padT+i*rowH+rowH/2, x=X(r.gain), col=MCOLOR[r.g]||l3;
-    const bw=Math.max(2,Math.abs(x-zeroX))*prog, bx=(r.gain>=0)?zeroX:zeroX-bw, bh=Math.min(15,rowH*0.42);   // bars grow out from the zero line
-    ctx.fillStyle=hexAlpha(col,.92);
-    if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(bx, cy-bh/2, bw, bh, 5); ctx.fill(); } else ctx.fillRect(bx, cy-bh/2, bw, bh);
-    ctx.fillStyle=l3; ctx.textAlign="right"; ctx.font=cfont(W,"label"); ctx.fillText(MSHORT[r.g]||r.g, padL-12, cy+7);
-    ctx.fillStyle=ink; ctx.font=cfont(W,"value"); ctx.textAlign="left";
-    const lab=(r.gain>=0?"+":"")+r.gain.toFixed(1)+"%";
-    ctx.fillText(lab, (r.gain>=0 ? x+8 : zeroX+8), cy+6.5);   // negatives label right of the zero line, clear of names
-  });
-}
-
 // ================= automatic plan builder =================
 const BUILD_POOL={
   chest:["Barbell Bench Press","Incline Barbell Press","Incline DB Press","Machine Chest Press","Weighted Dip","Dumbbell Bench Press","Cable Fly","Incline Dumbbell Fly","Low-to-High Cable Fly","Dumbbell Fly","Cable Crossover","Pec Deck","Machine Chest Fly","Push-Ups","Decline Push-Ups","Diamond Push-Ups","Incline Push-Ups","Kettlebell Floor Press"],

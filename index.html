@@ -303,6 +303,9 @@
     </div>
     <div class="bar"><i id="bwBar" style="width:0%"></i></div>
     <canvas id="spark" width="500" height="48"></canvas>
+    <!-- pacing verdict for the weight trend — used to live under a duplicate bodyweight chart in the
+         Training-volume sheet; the chart went, the verdict belongs next to the weight it judges -->
+    <div class="progverd" id="bwVerd" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div>
     <div class="row" style="margin-top:12px;">
       <input id="bwInput" type="number" inputmode="decimal" placeholder="Log today's weight">
       <button class="btn sm" id="bwBtn">Log</button>
@@ -854,18 +857,20 @@
     <div class="ed-label">By exercise</div>
     <div id="exProgList"></div>
     <p class="fcnote">The solid line is your overall strength: each lift indexed to its own start (=100), averaged across lifts, so different loads combine into one trend. The dashed continuation is the model's 4-week forecast (80% band). Tap a lift for its full chart.</p>
+    <!-- A PR is a strength event, so it lives here rather than in the Training-volume sheet -->
+    <div class="ed-label">New PRs</div>
+    <canvas id="progPR" class="progchart" width="660" height="180"></canvas>
+    <div class="progcap" id="progCapPR"></div>
+    <div class="progverd" id="progVerdPR" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div>
     <div class="ed-label">Projected muscle size</div>
     <div class="fcsub" id="fcSub"></div>
     <canvas id="fcChart" width="760" height="340"></canvas>
     <div class="fclegend" id="fcLegend"></div>
     <p class="fcconn">Muscle size can't be measured, so this projects it from your logged training — “current pace” follows your recent trend, “this plan” assumes progressive overload. Strength (above) is the measured yardstick.</p>
-    <div class="fchd2">Projected 16-week gain by muscle</div>
-    <div class="mewintabs paneltabs" id="fcMuscleSeg" style="margin-top:2px;">
-      <button class="mewintab" data-fm="plan" type="button">This plan</button>
-      <button class="mewintab active" data-fm="pace" type="button">Current pace</button>
-    </div>
-    <canvas id="fcMuscles" width="760" height="230"></canvas>
-    <p class="fcnote" id="fcLagCap"></p>
+    <!-- The per-muscle projection used to be a second bar chart here, ranking muscles by dose the same way
+         the balance radar already does. It now sits on each muscle's row in Muscle balance, next to the
+         weekly sets that drive it. -->
+    <p class="fcnote">Per muscle, this projection sits beside its weekly sets in <b>Muscle balance</b>.</p>
     <div class="fchd2">What would move this most</div>
     <canvas id="fcTornado" width="760" height="190"></canvas>
     <p class="fcnote" id="fcSensCap"></p>
@@ -897,30 +902,17 @@
   <div class="sheethdr"><span class="t">Training volume</span><button class="btn plain sm" id="volClose">Done</button></div>
   <div class="sheetbody">
     <div class="sheetlead"><div class="lh" id="progObj"></div></div>
-    <div class="ed-label">New PRs</div>
-    <canvas id="progBars0" class="progchart" width="660" height="180"></canvas>
-    <div class="progcap" id="progCap0"></div>
-    <div class="progverd" id="progVerd0" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div>
-    <div class="ed-label">Sessions</div>
-    <canvas id="progBars1" class="progchart" width="660" height="180"></canvas>
-    <div class="progcap" id="progCap1"></div>
-    <div class="progverd" id="progVerd1" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div>
-    <div class="ed-label">Training volume</div>
-    <canvas id="progBars2" class="progchart" width="660" height="180"></canvas>
-    <div class="progcap" id="progCap2v"></div>
-    <div class="progverd" id="progVerd2" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div>
-    <div class="ed-label">Hard sets</div>
-    <canvas id="progBars3" class="progchart" width="660" height="180"></canvas>
-    <div class="progcap" id="progCap3"></div>
-    <div class="progverd" id="progVerd3" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div>
-    <div class="ed-label">Body weight</div>
-    <canvas id="progBars4" class="progchart" width="660" height="180"></canvas>
-    <div class="progcap" id="progCap4"></div>
-    <div class="progverd" id="progVerd4" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div>
+    <!-- One chart, not five. Volume, hard sets and sessions all answer "am I training enough" and move
+         together; the only informative case is when they disagree, which two lines on shared weeks show
+         and three stacked panels hid. PRs moved to Strength, body weight to the Body section. -->
+    <div class="ed-label">Training load</div>
+    <canvas id="progLoad" class="progchart" width="660" height="180"></canvas>
+    <div class="progcap" id="progCapLoad"></div>
+    <div class="progverd" id="progVerdLoad" style="display:none;"><span class="pvdot"></span><span class="pvtxt"></span></div>
     <div class="fcfold" style="margin-top:20px;">
       <button type="button" class="fcfoldhd">How it's measured</button>
       <div class="fcfoldbody">
-        <p class="fcnote"><b>PRs</b> — weeks you set an estimated-1RM record. <b>Sessions</b> — session-equivalents (a short session counts in proportion). <b>Volume</b> — effort-weighted work (weight × reps, bodyweight-aware). <b>Sets</b> — hard sets near failure. <b>Weight</b> — your bodyweight trend. All over the last 10 weeks. <a class="srclink" href="growth-model-whitepaper.pdf" target="_blank" rel="noopener">The method &amp; evidence (PDF) ↗</a></p>
+        <p class="fcnote"><b>Volume</b> — effort-weighted work (weight × reps, bodyweight-aware), the solid line. <b>Hard sets</b> — sets taken near failure, the faint line. Each is scaled to its own range so the shapes can be compared; when they part company, you're changing how you train, not just how much. Last 10 weeks. Sessions per week is the counter at the top of Me; PRs are in <b>Strength</b>; body weight is under <b>Body</b>. <a class="srclink" href="growth-model-whitepaper.pdf" target="_blank" rel="noopener">The method &amp; evidence (PDF) ↗</a></p>
       </div>
     </div>
   </div>
@@ -1069,8 +1061,14 @@
     <p class="levelcap" id="musVolNote" style="display:none;">“Lifted only” counts the weight you load; “+ Bodyweight” adds an estimate of your own body load on calisthenics.</p>
     <canvas id="musRadar" width="900" height="900"></canvas>
     <div id="musSuggest"></div>
-    <div class="ed-label">Per muscle</div>
-    <div id="musBars"></div>
+    <!-- The radar and these bars render the same numbers, so the bars are a disclosure rather than a
+         second scroll of the same thing. In the default sets-vs-target view each row also carries the
+         16-week gain that dose projects to — the per-muscle chart that used to live in Strength. -->
+    <p class="fcnote" id="fcLagCap"></p>
+    <div class="fcfold" id="musBarsFold">
+      <button type="button" class="fcfoldhd">Per muscle, exact numbers</button>
+      <div class="fcfoldbody"><div id="musBars"></div></div>
+    </div>
     <div class="ed-label">By exercise</div>
     <div id="musByEx"></div>
     <div class="fcfold" id="musSrcBox" style="margin-top:16px;">

@@ -609,6 +609,10 @@
   .progpage canvas{ display:block; width:100%; height:auto; aspect-ratio:11/3; outline:none; -webkit-tap-highlight-color:transparent; }
   .progchart{ width:100%; height:auto; aspect-ratio:11/3; display:block; }
   .progcap{ font-size:13px; color:var(--l3); margin:8px 0 2px; line-height:1.4; }
+  /* legend swatch for a two-line chart — matches the stroke colours in drawProgChart */
+  .progcap .progdot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; }
+  .progcap .progdot.a{ background:var(--accent); }
+  .progcap .progdot.b{ background:color-mix(in srgb, var(--ink) 30%, transparent); }
   .proglegend{ display:flex; flex-wrap:wrap; gap:5px 12px; margin-top:8px; }
   .pglg{ display:inline-flex; align-items:center; gap:5px; font-size:12px; color:var(--l2); }
   .pglg i{ width:9px; height:9px; border-radius:3px; flex:0 0 auto; }
@@ -673,7 +677,7 @@
   /* forward growth-stimulus forecast chart */
   /* growth-forecast internals (the card itself uses the shared .panel look) */
   .fcsub{ display:block; font-size:12px; font-weight:500; color:var(--l3); margin-top:2px; }
-  #fcChart, #fcMuscles, #fcTornado{ width:100%; height:auto; display:block; margin:12px 0 10px; }
+  #fcChart, #fcTornado{ width:100%; height:auto; display:block; margin:12px 0 10px; }
   .fclegend{ display:flex; gap:14px; flex-wrap:wrap; margin-top:6px; font-size:12.5px; color:var(--l3); }
   .fclg{ display:inline-flex; align-items:center; gap:6px; }
   .fclg i{ width:11px; height:3px; border-radius:2px; display:inline-block; }
@@ -1065,8 +1069,13 @@
   .sheethdr .t{ font-size:20px; font-weight:650; letter-spacing:-.5px; }
  .sheetbody{ flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; padding:8px 16px calc(28px + env(safe-area-inset-bottom)); }
   /* in-app white-paper viewer: near-full-height sheet, pages rendered as a scrollable image column
-     (iOS won't render a multi-page PDF in an iframe — it shows only page 1 and zooms oddly) */
-  .pdfsheet{ height:94vh; }
+     (iOS won't render a multi-page PDF in an iframe — it shows only page 1 and zooms oddly).
+     It always opens from inside another sheet (Strength, Volume, Muscle, plan forecast), and every
+     .sheet shares z-index:100 — with #sheetPDF earlier in the DOM than those, the tie broke the wrong
+     way and the viewer opened behind the sheet you tapped from. Lift it, and put its scrim above the
+     other sheets (100) but below the viewer so the sheet underneath is dimmed, not clickable. */
+  .pdfsheet{ height:94vh; max-height:94vh; z-index:112; }
+  #scrimPDF{ z-index:110; }
   .pdfsheet .pdfbody{ padding:0; background:var(--sep); }
   .pdfpg{ display:block; width:100%; height:auto; margin:0 0 6px; background:#fff; }
   .pdffallback{ text-align:center; padding:14px 16px calc(18px + env(safe-area-inset-bottom)); margin:0; }
@@ -1116,7 +1125,9 @@
   .mlab{ width:90px; flex:0 0 auto; font-size:13px; font-weight:600; }
   .mbarwrap{ flex:1; background:var(--track); border-radius:6px; height:11px; overflow:hidden; }
   .mbar{ height:100%; border-radius:8px; transition:width .5s cubic-bezier(.2,.8,.2,1); }
-  .mval{ width:48px; flex:0 0 auto; text-align:right; font-size:13px; font-weight:700; }
+  .mval{ width:66px; flex:0 0 auto; text-align:right; font-size:13px; font-weight:700; }
+  /* projected 16-week gain, sat under the weekly dose that drives it */
+  .mval .mproj{ display:block; font-size:11px; font-weight:500; color:var(--l3); margin-top:1px; }
   .mrow.under .mval{ color:#e8590c; }
   .mrow.under .mbar{ opacity:.5; }
   .hsrc li span{ color:var(--l3); }

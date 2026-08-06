@@ -9,7 +9,7 @@
  * new service worker; the new SW then re-fetches the shell with cache:"reload" (bypassing the HTTP
  * cache) and deletes the old cache on activate, so friends get the update on next open.
  */
-const CACHE = "yalla-v203";
+const CACHE = "yalla-v204";
 const SHELL = ["./", "./index.html", "./app.css", "./app.js", "./manifest.webmanifest", "./icon-1024.png", "./evidence.json"];
 
 self.addEventListener("install", (e) => {
@@ -46,7 +46,14 @@ self.addEventListener("fetch", (e) => {
         return res;
       })
       .catch(() =>
-        caches.match(req).then((hit) => hit || caches.match("./index.html"))
+        caches.match(req).then((hit) => {
+          if (hit) return hit;
+          // The index.html fallback is for page navigations only. Handing it to an <img>/fetch for an
+          // uncached asset (the lazy-loaded wp/page-NN.jpg white-paper pages, offline) made every page
+          // slot resolve to an HTML document — 17 broken images instead of 17 misses.
+          if (req.mode === "navigate") return caches.match("./index.html");
+          return Response.error();
+        })
       )
   );
 });
