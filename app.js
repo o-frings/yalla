@@ -182,6 +182,8 @@ const ICON={
   play:'<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5.5v13l11-6.5z"/></svg>',
   info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11.5v4.5"/><path d="M12 8h.01"/></svg>',
   warn:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+  heartF:'<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 20.7l-1.5-1.35C5.4 14.75 2 11.7 2 7.95 2 5.2 4.2 3 6.95 3c1.55 0 3.05.72 4.05 1.87l1 1.15 1-1.15C14 3.72 15.5 3 17.05 3 19.8 3 22 5.2 22 7.95c0 3.75-3.4 6.8-8.5 11.4z"/></svg>',
+  heartE:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 20.7l-1.5-1.35C5.4 14.75 2 11.7 2 7.95 2 5.2 4.2 3 6.95 3c1.55 0 3.05.72 4.05 1.87l1 1.15 1-1.15C14 3.72 15.5 3 17.05 3 19.8 3 22 5.2 22 7.95c0 3.75-3.4 6.8-8.5 11.4z"/></svg>',
   starF:'<svg class="star" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 17.95 6.2 20.5l1.1-6.45-4.7-4.6 6.5-.95z"/></svg>',
   starH:'<svg class="star" viewBox="0 0 24 24" fill="none"><defs><linearGradient id="hg"><stop offset="50%" stop-color="currentColor"/><stop offset="50%" stop-color="transparent"/></linearGradient></defs><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 17.95 6.2 20.5l1.1-6.45-4.7-4.6 6.5-.95z" fill="url(#hg)" stroke="currentColor" stroke-width="1"/></svg>',
   starE:'<svg class="star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 17.95 6.2 20.5l1.1-6.45-4.7-4.6 6.5-.95z"/></svg>',
@@ -357,7 +359,8 @@ Object.assign(MUSCLES, {
   "Pendlay Row":["Upper Back","Lats","Biceps"], "Seal Row":["Upper Back","Lats","Biceps"],
   "Machine High Row":["Upper Back","Lats","Biceps"],
   "Neutral-Grip Lat Pulldown":["Lats","Biceps"], "Single-Arm Lat Pulldown":["Lats","Biceps"],
-  "Wide-Grip Pull-Up":["Lats","Upper Back","Biceps"], "Reverse Hyperextension":["Lower Back","Glutes"],
+  "Wide-Grip Pull-Up":["Lats","Upper Back","Biceps"], "Neutral-Grip Pull-Up":["Lats","Biceps"],
+  "Reverse Hyperextension":["Lower Back","Glutes"],
   // chest
   "Dip":["Chest","Triceps","Front Delts"], "Dumbbell Floor Press":["Chest","Triceps"],
   // shoulders
@@ -430,7 +433,7 @@ const LIBRARY=[
   "Reverse Plank","Wall Sit","Dead Hang","Incline Barbell Press",
   // back & traps — the catalogue had no shrug at all, and no horizontal-row variants beyond the basics
   "Barbell Shrug","Dumbbell Shrug","Pendlay Row","Seal Row","Machine High Row",
-  "Neutral-Grip Lat Pulldown","Single-Arm Lat Pulldown","Wide-Grip Pull-Up","Reverse Hyperextension",
+  "Neutral-Grip Lat Pulldown","Single-Arm Lat Pulldown","Wide-Grip Pull-Up","Neutral-Grip Pull-Up","Reverse Hyperextension",
   // chest
   "Dip","Dumbbell Floor Press",
   // shoulders
@@ -638,6 +641,7 @@ Object.assign(HSCORE, {
  "Neutral-Grip Lat Pulldown":[4,"The comfiest pulldown grip for most shoulders, with a full lat stretch."],
  "Single-Arm Lat Pulldown":[4,"One side at a time, so the stronger lat can't take over."],
  "Wide-Grip Pull-Up":[4.5,"The classic lat-width builder; add weight once you clear 10 clean reps."],
+ "Neutral-Grip Pull-Up":[4.5,"The kindest pull-up on the elbows and shoulders, and the one most people can load soonest."],
  "Reverse Hyperextension":[3.5,"Loads the glutes and spinal erectors with almost no spinal compression."],
  "Cable Front Raise":[3,"Constant tension on the front delts — useful, though pressing already covers them."],
  "Leaning Cable Lateral Raise":[4.5,"Leaning away puts tension on the side delt at its longest — the best lateral variant."],
@@ -2265,7 +2269,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi] || (rot[xi]!=null && !rotKeep.has(xi) ? rot[xi] : e.n); }
-let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, age:null, exp:null, sponLen:null, meTileOrder:null, meTileHidden:null, theme:"auto", restSec:180, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{}, baseActivity:null };
+let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, age:null, exp:null, sponLen:null, meTileOrder:null, meTileHidden:null, theme:"auto", restSec:180, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{}, baseActivity:null, favEx:[] };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -5484,6 +5488,21 @@ function addPlanExercise(name){
   closeSheet("Add"); renderWorkout(); toast("Added "+name+" to "+w.name);
 }
 let addTarget="free", addFilter=null;
+// ---- favourite exercises: a starred shortlist, pinned to the top of the Add list and floated to the
+// top of a Swap. Stored as names in settings so it syncs with everything else the lifter owns. ----
+const favList=()=> settings.favEx||(settings.favEx=[]);
+function isFav(name){ return favList().indexOf(name)>=0; }
+async function toggleFav(name){
+  const f=favList(), i=f.indexOf(name);
+  if(i>=0) f.splice(i,1); else f.push(name);
+  await sset("settings", settings);
+  // repaint whichever list is on screen so the star and the Favourites section agree
+  if($("sheetAdd") && $("sheetAdd").classList.contains("show")) renderAddList($("addSearch").value);
+  else if($("sheetSwap") && $("sheetSwap").classList.contains("show")) renderSwapList();
+  toast(i>=0 ? ("Removed "+name+" from favourites") : ("Favourited "+name));
+}
+// favourites first, then whatever order the caller already chose
+function favFirst(arr){ return arr.slice().sort((a,b)=> (isFav(b)?1:0)-(isFav(a)?1:0)); }
 $("addClose").onclick=()=>closeSheet("Add");
 $("scrimAdd").onclick=()=>closeSheet("Add");
 $("addSearch").addEventListener("input", e=>renderAddList(e.target.value));
@@ -5499,10 +5518,11 @@ function openAdd(target){ addTarget=target||"free"; addFilter=null; $("addSearch
 function chooseAdd(name){ if(addTarget==="plan") addPlanExercise(name); else addFreeExercise(name); }
 function renderAddChips(order){
   const wrap=$("addChips"); wrap.innerHTML="";
-  const mk=(key,label,color)=>{ const c=document.createElement("button"); c.className="chip"+((addFilter===key)?" on":"");
-    c.innerHTML=(color?'<span class="cdot" style="background:'+color+'"></span>':'')+esc(label);
+  const mk=(key,label,color,html)=>{ const c=document.createElement("button"); c.className="chip"+((addFilter===key)?" on":"");
+    c.innerHTML=(html||(color?'<span class="cdot" style="background:'+color+'"></span>':''))+esc(label);
     c.onclick=()=>{ addFilter=key; renderAddList($("addSearch").value); }; wrap.appendChild(c); };
   mk(null,"All",null);
+  if(favList().length) mk("__fav","Favourites",null,'<span class="chipstar">'+ICON.heartF+'</span>');
   order.forEach(k=> mk(k, sectionLabel(k), MCOLOR[k]||"#888"));
 }
 function renderAddList(filter){
@@ -5517,14 +5537,26 @@ function renderAddList(filter){
   const bySec={}; matches.forEach(n=>{ const k=sectionKeyFor(n); (bySec[k]=bySec[k]||[]).push(n); });
   const order=sectionOrder().filter(k=>bySec[k]); Object.keys(bySec).forEach(k=>{ if(order.indexOf(k)<0) order.push(k); });
   renderAddChips(order);
+  const favs=matches.filter(isFav);
+  // "Favourites" is a view of the same list, not a muscle — handle it before the section machinery
+  if(addFilter==="__fav"){
+    if(!favs.length) wrap.innerHTML='<p class="freehint">No favourites yet — tap the ♡ on any exercise to keep it here.</p>';
+    else favs.forEach(n=>{ const row=buildExRow(n); row.querySelector(".info").onclick=()=>chooseAdd(n); wrap.appendChild(row); });
+    return;
+  }
   if(exSort==="score"){
     let arr = addFilter ? (bySec[addFilter]||[]) : matches.slice();
-    arr = arr.slice().sort((a,b)=> hScore(b).s-hScore(a).s || a.localeCompare(b));
+    arr = favFirst(arr.slice().sort((a,b)=> hScore(b).s-hScore(a).s || a.localeCompare(b)));
     arr.slice(0,90).forEach(n=>{ const row=buildExRow(n); row.querySelector(".info").onclick=()=>chooseAdd(n); wrap.appendChild(row); });
     return;
   }
   const keys = (addFilter && bySec[addFilter]) ? [addFilter] : order;
   let shown=0;
+  if(!addFilter && favs.length){          // starred lifts sit above the muscle sections, and repeat within them
+    const lab=document.createElement("div"); lab.className="addhdr";
+    lab.innerHTML='<span class="chipstar">'+ICON.heartF+'</span>Favourites'; wrap.appendChild(lab);
+    favs.forEach(n=>{ shown++; const row=buildExRow(n); row.querySelector(".info").onclick=()=>chooseAdd(n); wrap.appendChild(row); });
+  }
   keys.forEach(k=>{
     if(shown>=90) return;
     if(!addFilter){ const lab=document.createElement("div"); lab.className="addhdr";
@@ -5545,8 +5577,10 @@ function buildExRow(name, opts){
     +'<div class="info"><div class="nm"><span class="mdot" style="background:'+mcol+'"></span>'+esc(name)+'</div>'+(opts.meta?'<div class="meta">'+esc(opts.meta)+'</div>':'')+'</div>'
     +'<span class="scoretag">'+ICON.starF+hScore(name).s+'</span>'
     +(opts.checked?'<span class="swapcheck">✓</span>':'')
+    +'<a class="lnkic favbtn'+(isFav(name)?' on':'')+'" title="'+(isFav(name)?'Remove from favourites':'Add to favourites')+'" aria-label="Favourite">'+(isFav(name)?ICON.heartF:ICON.heartE)+'</a>'
     +'<a class="lnkic inspect" title="Inspect">'+ICON.info+'</a>';
   row.querySelector(".inspect").onclick=(ev)=>{ ev.stopPropagation(); openInfo(name); };
+  row.querySelector(".favbtn").onclick=(ev)=>{ ev.stopPropagation(); toggleFav(name); };
   return row;
 }
 
@@ -5722,6 +5756,7 @@ function renderSwapList(){
     const cur=swapFreeName, wrap=$("swapList"); wrap.innerHTML="";
     let opts=swapOptions({n:cur}).filter(o=> o===cur || levelAllows(o));
     if(exSort==="score") opts=opts.slice().sort((a,b)=> hScore(b).s-hScore(a).s || a.localeCompare(b));
+    opts=favFirst(opts);
     opts.forEach(o=>{
       const row=buildExRow(o, {checked:o===cur, meta:o===cur?"current":""});
       row.querySelector(".info").onclick=()=>{
@@ -5744,6 +5779,7 @@ function renderSwapList(){
   const cur=dispName(e,swapIdx), wrap=$("swapList"); wrap.innerHTML="";
   let opts=swapOptions(e).filter(o=> o===e.n || levelAllows(o));
   if(exSort==="score") opts=opts.slice().sort((a,b)=> hScore(b).s-hScore(a).s || a.localeCompare(b));
+  opts=favFirst(opts);
   opts.forEach(o=>{
     const row=buildExRow(o, {checked:o===cur, meta:o===e.n?"original":""});
     row.querySelector(".info").onclick=async()=>{
@@ -7377,7 +7413,7 @@ function drawForecastSens(f, prog){
 // ================= automatic plan builder =================
 const BUILD_POOL={
   chest:["Barbell Bench Press","Incline Barbell Press","Incline DB Press","Machine Chest Press","Weighted Dip","Dumbbell Bench Press","Cable Fly","Incline Dumbbell Fly","Low-to-High Cable Fly","Dumbbell Fly","Cable Crossover","Pec Deck","Machine Chest Fly","Push-Ups","Decline Push-Ups","Diamond Push-Ups","Incline Push-Ups","Kettlebell Floor Press","Dip","Dumbbell Floor Press"],
-  lats:["Weighted Pull-Up","Pull-Up","Lat Pulldown","Chin-Up","Straight-Arm Pulldown","Dumbbell Pullover","One-Arm DB Row","Wide-Grip Pull-Up","Neutral-Grip Lat Pulldown","Single-Arm Lat Pulldown"],
+  lats:["Weighted Pull-Up","Pull-Up","Lat Pulldown","Chin-Up","Straight-Arm Pulldown","Dumbbell Pullover","One-Arm DB Row","Wide-Grip Pull-Up","Neutral-Grip Pull-Up","Neutral-Grip Lat Pulldown","Single-Arm Lat Pulldown"],
   upperback:["Chest-Supported Row","Bent-Over Row","Seated Row","One-Arm DB Row","T-Bar Row","Meadows Row","Face Pulls","Inverted / Backpack Row","Kettlebell Row","Pendlay Row","Seal Row","Machine High Row","Barbell Shrug","Dumbbell Shrug"],
   lowerback:["Back Extension","Good Morning","Rack Pull","Superman","Romanian Deadlift","Reverse Hyperextension","Stiff-Leg Deadlift"],
   forearms:["Wrist Curl","Reverse Wrist Curl","Hammer Curl","Reverse Curl","Farmer's Carry","Dead Hang","Zottman Curl"],

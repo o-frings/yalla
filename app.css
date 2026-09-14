@@ -834,6 +834,15 @@
   .exrow .info .nm{ display:flex; align-items:center; }
   .exrow .lnkic.inspect{ min-width:34px; min-height:34px; margin:-8px 0; color:var(--l2); }
   .exrow .lnkic.inspect svg{ width:19px; height:19px; }
+  /* favourite toggle — hollow heart until set, then filled. A heart, not a star, because the
+     star beside it is the hypertrophy rating and two accent stars per row read as one thing twice. */
+  .exrow .lnkic.favbtn{ min-width:34px; min-height:34px; margin:-8px 0; color:var(--l3); }
+  .exrow .lnkic.favbtn svg{ width:19px; height:19px; }
+  .exrow .lnkic.favbtn.on{ color:var(--accent); }
+  .exrow .lnkic.favbtn:active{ transform:scale(.88); }
+  .chipstar{ display:inline-flex; align-items:center; margin-right:5px; color:var(--accent); }
+  .chipstar svg{ width:12px; height:12px; }
+  .chip.on .chipstar, .addhdr .chipstar{ color:inherit; }
   #confirmWrap{ position:fixed; inset:0; z-index:300; display:none; align-items:center; justify-content:center; padding:28px; }
   #confirmWrap.show{ display:flex; }
   #confirmWrap .cscrim{ position:absolute; inset:0; background:rgba(0,0,0,.5); }
