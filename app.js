@@ -319,31 +319,60 @@ function muscleFor(name){
 function equipFor(name){
   const n=String(name).toLowerCase();
   if(/kettlebell|\bkb\b|turkish get-?up|goblet/.test(n)) return {key:"kb",label:"Kettlebell"};
-  if(/push.?up|pull.?up|chin.?up|\bdip\b|plank|hollow|hanging|inverted|pike|sit.?up|dead bug|burpee|pistol|nordic|handstand|chair dip|bodyweight|leg.?raise|knee raise|flutter|toes.?to.?bar|v-?up|bicycle crunch|reverse crunch|russian twist|captain|\bl-?sit\b|dead hang|step.?up|bridge|prone|superman|wall slide|wall angel|wall sit|scapular|chin.?tuck|bird.?dog|snow.?angel|cat.?cow/.test(n)) return {key:"body",label:"Bodyweight"};
-  if(/cable|pulldown|pushdown|pull-through|kickback|face.?pull|rope|crossover|abduction|woodchop|pallof|band /.test(n)) return {key:"cable",label:"Cable / band"};
-  if(/machine|leg press|leg curl|leg extension|pec.?deck|hack|smith|seated row|lat pulldown|ab.?machine|reverse pec/.test(n)) return {key:"machine",label:"Machine"};
+  if(/push.?up|pull.?up|chin.?up|\bdip\b|plank|hollow|hanging|inverted|pike|sit.?up|dead bug|burpee|pistol|nordic|handstand|chair dip|bodyweight|leg.?raise|knee raise|flutter|toes.?to.?bar|v-?up|bicycle crunch|reverse crunch|russian twist|captain|\bl-?sit\b|dead hang|step.?up|bridge|prone|superman|wall slide|wall angel|wall sit|scapular|chin.?tuck|bird.?dog|snow.?angel|cat.?cow|backpack|towel row|glute.?ham|clamshell/.test(n)) return {key:"body",label:"Bodyweight"};
+  if(/cable|pulldown|pushdown|pull-through|kickback|face.?pull|rope|crossover|abduction|woodchop|pallof|\bband(ed)?\b/.test(n)) return {key:"cable",label:"Cable / band"};
+  if(/machine|leg press|leg curl|leg extension|pec.?deck|hack|smith|seated row|lat pulldown|ab.?machine|reverse pec|hyperextension|belt squat/.test(n)) return {key:"machine",label:"Machine"};
   return {key:"free",label:"Free weights"};
 }
 function listWords(a){ return a.length<2?(a[0]||""):a.slice(0,-1).join(", ")+" and "+a[a.length-1]; }
 // extended catalogue — muscle mapping for items the keyword fallback can't place cleanly
+// Extension of the catalogue above. Nothing here may repeat a key from the MUSCLES literal — a repeat
+// silently overwrites it, which is how "Good Morning" lost its lower-back credit and "Superman" its glutes.
 Object.assign(MUSCLES, {
   "Incline Bench Press":["Chest","Front Delts","Triceps"], "Decline Bench Press":["Chest","Triceps"],
   "Cable Fly":["Chest"], "Pec Deck":["Chest"], "Machine Chest Fly":["Chest"], "Dumbbell Fly":["Chest"], "Incline Dumbbell Fly":["Chest"],
   "Cable Crossover":["Chest"], "Low-to-High Cable Fly":["Chest"], "Dumbbell Pullover":["Lats","Chest"],
-  "Straight-Arm Pulldown":["Lats"], "T-Bar Row":["Upper Back","Lats","Biceps"], "Chest-Supported Row":["Upper Back","Lats","Biceps"],
-  "Meadows Row":["Upper Back","Lats","Biceps"], "Front Raise":["Front Delts"], "Upright Row":["Side Delts","Upper Back"],
-  "Rear Delt Fly":["Rear Delts"], "Cable Lateral Raise":["Side Delts"],
-  "Dumbbell Lateral Raise":["Side Delts"], "Reverse Pec Deck":["Rear Delts","Upper Back"], "Cable Rear Delt Fly":["Rear Delts"], "Bent-Over Lateral Raise":["Rear Delts"],
+  "Straight-Arm Pulldown":["Lats"], "Meadows Row":["Upper Back","Lats","Biceps"], "Front Raise":["Front Delts"],
   "Concentration Curl":["Biceps"], "Spider Curl":["Biceps"], "Reverse Curl":["Forearms","Biceps"],
   "Triceps Kickback":["Triceps"], "Skull Crusher":["Triceps"], "Close-Grip Bench Press":["Triceps","Chest"],
-  "Sissy Squat":["Quads"], "Hack Squat":["Quads","Glutes"], "Walking Lunge":["Quads","Glutes"],
-  "Step-Up":["Quads","Glutes"], "Glute Kickback":["Glutes"], "Cable Pull-Through":["Glutes","Hamstrings"],
-  "Single-Leg RDL":["Hamstrings","Glutes"], "Nordic Curl":["Hamstrings"], "Good Morning":["Hamstrings","Glutes"],
-  "Seated Calf Raise":["Calves"], "Single-Leg Calf Raise":["Calves"], "Leg-Press Calf Raise":["Calves"],
-  "Russian Twist":["Core"], "Cable Woodchopper":["Core"], "Pallof Press":["Core"], "Landmine Rotation":["Core"],
+  "Glute Kickback":["Glutes"],
+  "Russian Twist":["Core"], "Cable Woodchopper":["Core"], "Landmine Rotation":["Core"],
   "Cable Rotation":["Core"], "Medicine Ball Rotational Throw":["Core"], "Bicycle Crunch":["Core"],
-  "Reverse Crunch":["Core"], "Side Plank":["Core"], "Mountain Climbers":["Core"], "Bird Dog":["Core"],
-  "Dead Bug":["Core"], "Superman":["Lower Back"]
+  "Side Plank":["Core"], "Mountain Climbers":["Core"],
+
+  // ---- previously unmapped: these all fell through muscleFor() to "Other" and so contributed
+  // nothing to the muscle-balance radar, the growth signal or the per-muscle projection ----
+  "Two-Hand Kettlebell Swing":["Glutes","Hamstrings","Lower Back"], "One-Arm Kettlebell Swing":["Glutes","Hamstrings","Lower Back"],
+  "Kettlebell Snatch":["Glutes","Hamstrings","Front Delts"], "Kettlebell Clean":["Glutes","Hamstrings","Upper Back"],
+  "Kettlebell High Pull":["Side Delts","Upper Back","Glutes"], "Kettlebell Windmill":["Core","Side Delts"],
+  "Kettlebell Halo":["Side Delts","Core"], "Turkish Get-Up":["Core","Front Delts"],
+  "Kettlebell Suitcase Carry":["Core","Forearms"], "Kettlebell Farmer's Carry":["Forearms","Core"],
+  "Suitcase Carry":["Core","Forearms"],
+  "Dead Hang":["Forearms","Lats"], "L-Sit":["Core"], "Wall Sit":["Quads"],
+  "Toes-to-Bar":["Core"], "Hanging Knee Raise":["Core"],
+
+  // ---- added movements ----
+  // back & traps
+  "Barbell Shrug":["Upper Back"], "Dumbbell Shrug":["Upper Back"],
+  "Pendlay Row":["Upper Back","Lats","Biceps"], "Seal Row":["Upper Back","Lats","Biceps"],
+  "Machine High Row":["Upper Back","Lats","Biceps"],
+  "Neutral-Grip Lat Pulldown":["Lats","Biceps"], "Single-Arm Lat Pulldown":["Lats","Biceps"],
+  "Wide-Grip Pull-Up":["Lats","Upper Back","Biceps"], "Reverse Hyperextension":["Lower Back","Glutes"],
+  // chest
+  "Dip":["Chest","Triceps","Front Delts"], "Dumbbell Floor Press":["Chest","Triceps"],
+  // shoulders
+  "Cable Front Raise":["Front Delts"], "Leaning Cable Lateral Raise":["Side Delts"],
+  // arms
+  "Machine Preacher Curl":["Biceps"], "Zottman Curl":["Biceps","Forearms"],
+  "Machine Triceps Extension":["Triceps"], "Bench Dip":["Triceps","Chest"],
+  // legs
+  "Belt Squat":["Quads","Glutes"], "Smith Machine Squat":["Quads","Glutes"],
+  "Split Squat":["Quads","Glutes"], "Box Squat":["Quads","Glutes"],
+  "Sumo Deadlift":["Glutes","Quads","Adductors"], "Stiff-Leg Deadlift":["Hamstrings","Glutes","Lower Back"],
+  "Glute-Ham Raise":["Hamstrings","Glutes"],
+  "Donkey Calf Raise":["Calves"], "Tibialis Raise":["Calves"], "Clamshell":["Glute Med"],
+  // neck & core
+  "Neck Curl":["Neck"], "Neck Extension":["Neck"], "Dumbbell Side Bend":["Core"],
 });
 // newer additions — incline barbell press, a reverse plank, extra core moves & isometric holds
 Object.assign(MUSCLES, {
@@ -398,7 +427,27 @@ const LIBRARY=[
   "Plank","Side Plank","Russian Twist","Cable Woodchopper","Pallof Press","Landmine Rotation","Cable Rotation",
   "Medicine Ball Rotational Throw","Bicycle Crunch","Reverse Crunch","Mountain Climbers","Bird Dog","Dead Bug","Superman",
   "Lying Leg Raise","Hanging Knee Raise","Toes-to-Bar","V-Up","Flutter Kicks","Decline Sit-Up","L-Sit",
-  "Reverse Plank","Wall Sit","Dead Hang","Incline Barbell Press"
+  "Reverse Plank","Wall Sit","Dead Hang","Incline Barbell Press",
+  // back & traps — the catalogue had no shrug at all, and no horizontal-row variants beyond the basics
+  "Barbell Shrug","Dumbbell Shrug","Pendlay Row","Seal Row","Machine High Row",
+  "Neutral-Grip Lat Pulldown","Single-Arm Lat Pulldown","Wide-Grip Pull-Up","Reverse Hyperextension",
+  // chest
+  "Dip","Dumbbell Floor Press",
+  // shoulders
+  "Cable Front Raise","Leaning Cable Lateral Raise",
+  // arms
+  "Machine Preacher Curl","Zottman Curl","Machine Triceps Extension","Bench Dip",
+  // legs
+  "Belt Squat","Smith Machine Squat","Split Squat","Box Squat",
+  "Sumo Deadlift","Stiff-Leg Deadlift","Glute-Ham Raise",
+  "Donkey Calf Raise","Tibialis Raise","Clamshell",
+  // neck & core
+  "Neck Curl","Neck Extension","Dumbbell Side Bend",
+  // Already reachable by the plan builder (they sit in BUILD_POOL) but previously absent from the Add
+  // list, so a generated plan could contain an exercise the lifter could not find or re-add by hand.
+  "Pull-Up","Overhead Triceps Extension","Incline DB Curl","Dumbbell Lateral Raise","Reverse Pec Deck",
+  "Cable Rear Delt Fly","Bent-Over Lateral Raise","Push Press","Landmine Press","Chair Dips",
+  "Pistol Progression","Weighted Decline Crunch","Prone T-Raise","Wall Angels","Cat-Cow"
 ];
 const EXPLAIN={
  "Barbell Bench Press":{why:"The benchmark upper-body press — chest, front delts and triceps, and the clearest measure of pushing strength.",cues:["Shoulder blades pulled back and down, feet planted.","Lower the bar to your lower chest with control.","Drive up and slightly back toward your face."]},
@@ -576,6 +625,39 @@ const HSCORE={
  "Wall Sit":[2.5,"A quad-endurance isometric — easy on the joints, capped for size; build the time."],
  "Dead Hang":[2.5,"Grip, shoulder and lat decompression hold — supportive work, not a size driver."],
 };
+// ratings for the movements added to the catalogue; anything unrated falls back to hScore()'s defaults
+Object.assign(HSCORE, {
+ "Dip":[4.5,"One of the best chest-and-triceps builders going — deep stretch, easy to load with a belt."],
+ "Bench Dip":[2.5,"Convenient triceps work, but the shoulder position is unkind and the load caps fast."],
+ "Dumbbell Floor Press":[3.5,"Bench pressing with the range cut at the floor — kind on the shoulder, lighter on the stretch."],
+ "Barbell Shrug":[4,"The most direct trap builder; load it heavy and hold the top for a beat."],
+ "Dumbbell Shrug":[4,"Traps through a slightly longer range than the bar allows."],
+ "Pendlay Row":[4,"Dead-stop rowing — strict, powerful, and honest about the weight you can actually move."],
+ "Seal Row":[4.5,"Chest-supported so the lower back is out of it entirely; near-pure upper-back work."],
+ "Machine High Row":[4,"Upper-back rowing with a fixed path — easy to take close to failure safely."],
+ "Neutral-Grip Lat Pulldown":[4,"The comfiest pulldown grip for most shoulders, with a full lat stretch."],
+ "Single-Arm Lat Pulldown":[4,"One side at a time, so the stronger lat can't take over."],
+ "Wide-Grip Pull-Up":[4.5,"The classic lat-width builder; add weight once you clear 10 clean reps."],
+ "Reverse Hyperextension":[3.5,"Loads the glutes and spinal erectors with almost no spinal compression."],
+ "Cable Front Raise":[3,"Constant tension on the front delts — useful, though pressing already covers them."],
+ "Leaning Cable Lateral Raise":[4.5,"Leaning away puts tension on the side delt at its longest — the best lateral variant."],
+ "Machine Preacher Curl":[4,"Fixed-path biceps work with the arm in front — very easy to push to true failure."],
+ "Zottman Curl":[3,"Curls up, reverses down — biceps and forearms in one, at the cost of load."],
+ "Machine Triceps Extension":[3.5,"Stable overhead-style triceps work you can take right to failure."],
+ "Belt Squat":[4,"Heavy quad work with the load on the hips instead of the spine."],
+ "Smith Machine Squat":[3.5,"A fixed bar path lets you chase failure without a spotter."],
+ "Split Squat":[4,"A static lunge — brutal on the quads and the easiest single-leg move to progress."],
+ "Box Squat":[3.5,"Squatting to a fixed depth; great for consistency, slightly less stretch under load."],
+ "Sumo Deadlift":[4,"A wide-stance pull that shares the work between glutes, quads and adductors."],
+ "Stiff-Leg Deadlift":[4.5,"A long loaded hamstring stretch — one of the strongest hamstring stimuli there is."],
+ "Glute-Ham Raise":[4.5,"Knee-flexion hamstring work at bodyweight; add a plate once you own the reps."],
+ "Donkey Calf Raise":[4,"Bent at the hip, the calves sit at a longer stretch than in a standing raise."],
+ "Tibialis Raise":[3,"Trains the shin — a small muscle, but it balances the calf and helps the ankles."],
+ "Clamshell":[2.5,"Light glute-medius activation; useful for hips and warm-ups, not a size driver."],
+ "Neck Curl":[3,"Direct neck flexor work — start very light and keep the reps slow."],
+ "Neck Extension":[3,"Builds the back of the neck; go light, and never force the end range."],
+ "Dumbbell Side Bend":[2.5,"Loaded lateral flexion for the obliques; modest, and easy to overdo."],
+});
 function hScore(name){
   if(HSCORE[name]) return {s:HSCORE[name][0], why:HSCORE[name][1]};
   const eq=equipFor(name).key;
@@ -590,8 +672,11 @@ function starHTML(s){
 function scoreTag(name){ const s=hScore(name).s; return '<span class="scoretag" title="Hypertrophy rating '+s+'/5">'+ICON.starF+s+'</span>'; }
 // venue: where you'd do the exercise — Gym (loaded), Park (bar/structure bodyweight), Home (floor/band)
 // bodyweight-capable movements — performable home, park and gym, so they show in every venue filter
-const VENUE_HOME=["Push-Ups","Pike Push-Ups","Walking Lunge","Reverse Lunge","Sissy Squat","Single-Leg RDL","Single-Leg Calf Raise","Standing Calf Raise","Bulgarian Split Squat","Glute Kickback","Lying Leg Raise","Superman","Bird Dog","Dead Bug","Side Plank","Bicycle Crunch","Reverse Crunch","Russian Twist","Mountain Climbers","Glute Bridge","Single-Leg Glute Bridge","Step-Up","Inverted / Backpack Row","Backpack Bent-Over Row","Towel Row","Chair Dips"];
+const VENUE_HOME=["Push-Ups","Pike Push-Ups","Walking Lunge","Reverse Lunge","Sissy Squat","Single-Leg RDL","Single-Leg Calf Raise","Standing Calf Raise","Bulgarian Split Squat","Glute Kickback","Lying Leg Raise","Superman","Bird Dog","Dead Bug","Side Plank","Bicycle Crunch","Reverse Crunch","Russian Twist","Mountain Climbers","Glute Bridge","Single-Leg Glute Bridge","Step-Up","Inverted / Backpack Row","Backpack Bent-Over Row","Towel Row","Chair Dips","Bench Dip","Clamshell"];
+// bodyweight movements that still need gym apparatus (a GHD, a captain's chair, an ab wheel station)
+const VENUE_GYM=["Glute-Ham Raise","Nordic Curl","Captain's Chair Raise"];
 function venueFor(name){
+  if(VENUE_GYM.indexOf(name)>=0) return "Gym";
   if(VENUE_HOME.indexOf(name)>=0) return "Home";
   const n=String(name).toLowerCase();
   // bands are purchased gear, not a zero-equipment home staple — they fall through to the loaded (gym) tier
@@ -740,6 +825,7 @@ function isTimed(name){ return TIMED_RE.test(String(name)); }
 // fraction of bodyweight a hold supports — used for the time-based volume proxy
 function holdFrac(name){ const n=String(name).toLowerCase();
   if(/dead hang|\bhang\b/.test(n)) return 1;       // whole bodyweight on the grip/lats
+  if(/handstand/.test(n)) return 0.9;              // matches BWLOAD's rep-load for the same movement
   if(/\bl-?sit\b/.test(n)) return 0.9;
   if(/wall sit/.test(n)) return 0.6;
   if(/side plank|copenhagen/.test(n)) return 0.45;
@@ -759,6 +845,13 @@ function bwLoadFrac(name){
   // core flexion (leg raises, crunches, sit-ups, twists): you move your legs/torso, not your whole bodyweight —
   // counting them at the 0.65 default massively overstated tonnage. ~0.18 of bodyweight is a fairer rep load.
   if(/leg.?raise|knee raise|flutter|toes.?to.?bar|v-?up|bicycle|russian twist|reverse crunch|crunch|\bsit-?up\b|captain|dead bug/.test(n)) return 0.18;
+  // These have to be checked before the BWLOAD table below, whose "pull-up" and "dip" keys are
+  // substrings of them and would otherwise charge the full bodyweight.
+  if(/assisted/.test(n)) return 0.55;                 // the machine/band carries the rest
+  if(/chair dip|bench dip/.test(n)) return 0.45;      // feet on the floor — not a parallel-bar dip
+  if(/superman/.test(n)) return 0.15;                 // a prone extension lifts the torso, not the body
+  if(/clamshell|fire.?hydrant/.test(n)) return 0.12;  // side-lying hip work moves one limb
+  if(/glute.?ham/.test(n)) return 0.7;                // GHD raise, like the Nordic curl
   for(const k in BWLOAD){ if(n.includes(k)) return BWLOAD[k]; }
   return 0.65;
 }
@@ -2729,6 +2822,7 @@ const HOME_MOVES=["Push-Ups","Pike Push-Ups","Reverse Lunge","Glute Bridge","Pla
 function startHomeWorkout(){
   const s={}; HOME_MOVES.forEach(m=> s[m]=[]);
   draft["free"]={ t:Date.now(), s }; sset("draft", draft);
+  if(settings.surprise){ settings.surprise=false; sset("settings",settings); }   // else the tab-show surprise pick clobbers this draft
   freeMode=true; swaps={};
   renderSeg(); renderFree();
   showTab("workout");
@@ -3550,10 +3644,6 @@ function renderSeg(){
     s.onclick=()=>{ freeMode=false; curWk=i; swaps={}; renderSeg(); renderWorkout(); };
     seg.appendChild(s);
   });
-  const fs=document.createElement("div"); fs.className="s"+(freeMode?" active":"");
-  fs.innerHTML=ICON.plus+"Free";
-  fs.onclick=()=>{ freeMode=true; swaps={}; renderSeg(); renderFree(); };
-  seg.appendChild(fs);
   const ab=document.createElement("div"); ab.className="s segabout";   // coach notes for the active plan, far right
   ab.innerHTML=ICON.info+"About";
   ab.onclick=()=> openAbout(activePlan());
@@ -5144,19 +5234,21 @@ function surpriseShuffle(){
   if(sessionUnderway()) confirmAsk("Start a new surprise? Your current sets will be discarded.", "New surprise", ()=>{ tmrReset(); restStop(); loadSurprise(); }, "danger");
   else loadSurprise();
 }
+function startMode(){ return settings.surprise ? "surprise" : (freeMode ? "free" : "plan"); }
 function renderStartMode(){
-  const on=!!settings.surprise;
-  document.querySelectorAll("#wkMode .s").forEach(t=> t.classList.toggle("active",(t.dataset.wm==="surprise")===on));
-  const seg=$("seg"); if(seg) seg.style.display = on ? "none" : "";
+  const mode=startMode();
+  document.querySelectorAll("#wkMode .s").forEach(t=> t.classList.toggle("active", t.dataset.wm===mode));
+  const seg=$("seg"); if(seg) seg.style.display = mode==="plan" ? "" : "none";   // plan-day tabs only mean something in Plan mode
   const act=$("startAction"); if(!act) return;
   const refresh='<svg class="mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v4h-4"/></svg>';
   const swap='<svg class="mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>';
-  // the mode's action is a header icon beside the travel button: New surprise (Surprise) / Change plan (Plan)
+  // the mode's action is a header icon beside the travel button: New surprise (Surprise) / Change plan (Plan) / hidden (Free)
   const sh=$("headerShuf");
-  if(sh){ sh.style.display=""; sh.innerHTML = on ? refresh : swap;
+  if(sh){ const on=mode==="surprise";
+    sh.style.display = mode==="free" ? "none" : ""; sh.innerHTML = on ? refresh : swap;
     sh.setAttribute("aria-label", on ? "New surprise" : "Change plan"); sh.setAttribute("title", on ? "New surprise" : "Change plan");
     sh.onclick = on ? surpriseShuffle : (()=>{ renderPlanList(); openSheet("Plans"); }); }
-  if(on){
+  if(mode==="surprise"){
     const fd=draft["free"]||{}, nm=fd.name||"Surprise session", nEx=fd.s?Object.keys(fd.s).length:0, L=settings.sponLen||"standard";
     // the session IS the title (fills the top-left); its shape is the subtitle
     if($("ltName")) $("ltName").textContent=nm;
@@ -5164,18 +5256,28 @@ function renderStartMode(){
     act.innerHTML='<div class="mewintabs paneltabs" id="sponLen2">'
       +[["quick","Quick"],["standard","Standard"],["full","Full"]].map(([v,l])=>'<button class="mewintab'+(L===v?" active":"")+'" data-sl="'+v+'" type="button">'+l+'</button>').join('')+'</div>';
     act.querySelectorAll("#sponLen2 .mewintab").forEach(b=> b.onclick=()=>{ settings.sponLen=b.dataset.sl; sset("settings",settings); relenSurprise(); });
-  } else {
+  } else if(mode==="plan"){
     if($("ltName")) $("ltName").textContent="Workout";
     if($("planSub")) $("planSub").textContent = (typeof planMeta==="function") ? planMeta(activePlan()) : "";
+    act.innerHTML="";
+  } else {
+    // Free: renderFree() owns the title/subtitle (it knows suggested-session names) — don't clobber it here
     act.innerHTML="";
   }
 }
 document.querySelectorAll("#wkMode .s").forEach(t=> t.onclick=()=>{
-  const on = t.dataset.wm==="surprise";
-  if(on===!!settings.surprise){ if(on) surpriseShuffle(); return; }   // re-tapping active Surprise → reshuffle
-  const apply=()=>{ settings.surprise=on; sset("settings",settings);
-    if(on){ loadSurprise(); }
-    else { freeMode=false; if(draft["free"]&&draft["free"].spon){ delete draft["free"]; sset("draft",draft); } tmrReset(); restStop(); renderSeg(); renderWorkout(); }
+  const m=t.dataset.wm, cur=startMode();
+  if(m===cur){ if(m==="surprise") surpriseShuffle(); return; }   // re-tapping active Surprise → reshuffle
+  if(m!=="surprise" && cur!=="surprise"){
+    // Plan ↔ Free: each keeps its own draft, so switching loses nothing — no confirm, timers keep running
+    freeMode = m==="free"; swaps={}; renderSeg();
+    if(freeMode) renderFree(); else renderWorkout();
+    return;
+  }
+  // entering or leaving Surprise replaces/clears the surprise draft, so confirm mid-session
+  const apply=()=>{ settings.surprise = m==="surprise"; sset("settings",settings);
+    if(m==="surprise"){ loadSurprise(); }
+    else { freeMode = m==="free"; if(draft["free"]&&draft["free"].spon){ delete draft["free"]; sset("draft",draft); } tmrReset(); restStop(); swaps={}; renderSeg(); if(freeMode) renderFree(); else renderWorkout(); }
     renderStartMode(); };
   if(sessionUnderway()) confirmAsk("Switch mode? Your current sets will be discarded.", "Switch", apply, "danger");
   else apply();
@@ -5190,11 +5292,19 @@ document.querySelectorAll("#travelSeg .s").forEach(s=>{
 renderTravel();   // boot: reflect any saved travel mode in the badge + header button immediately
 
 // ================= free workout =================
+// Alternate spellings of a movement the picker already lists under another name. They stay valid
+// everywhere (muscleFor, old plans, old history) — they just don't get a second row in the Add list,
+// because logging the same lift under two names splits its strength trend in two.
+const DUP_ALIAS=["Band Pull-Apart","Reverse Pec-Deck","Walking Lunges","Calf Raises","Close-Grip Bench",
+  "Incline Press","Shoulder Press","Rear-Delt Fly","Face Pull","Pull-Ups","Chin Tucks","Wall Slides",
+  "Hollow Hold","Leg Curl"];
 function exerciseLibrary(){
   const set=new Set(LIBRARY);
   Object.keys(ALTS).forEach(k=>{ set.add(k); ALTS[k].forEach(a=>set.add(a)); });
-  plans.forEach(p=>p.workouts.forEach(w=>w.ex.forEach(e=>{ set.add(e.n); (e.alts||[]).forEach(a=>set.add(a)); })));
-  Object.keys(hist).forEach(n=>set.add(n));
+  const mine=new Set();   // anything the lifter actually uses is never hidden, whatever it's called
+  plans.forEach(p=>p.workouts.forEach(w=>w.ex.forEach(e=>{ set.add(e.n); mine.add(e.n); (e.alts||[]).forEach(a=>{set.add(a); mine.add(a);}); })));
+  Object.keys(hist).forEach(n=>{ set.add(n); mine.add(n); });
+  DUP_ALIAS.forEach(n=>{ if(!mine.has(n)) set.delete(n); });
   return [...set].filter(Boolean).sort((a,b)=>a.localeCompare(b));
 }
 // one set row. Timed/hold moves (plank, wall sit, dead hang…) swap the × for a hold-timer button and log
@@ -7266,23 +7376,23 @@ function drawForecastSens(f, prog){
 }
 // ================= automatic plan builder =================
 const BUILD_POOL={
-  chest:["Barbell Bench Press","Incline Barbell Press","Incline DB Press","Machine Chest Press","Weighted Dip","Dumbbell Bench Press","Cable Fly","Incline Dumbbell Fly","Low-to-High Cable Fly","Dumbbell Fly","Cable Crossover","Pec Deck","Machine Chest Fly","Push-Ups","Decline Push-Ups","Diamond Push-Ups","Incline Push-Ups","Kettlebell Floor Press"],
-  lats:["Weighted Pull-Up","Pull-Up","Lat Pulldown","Chin-Up","Straight-Arm Pulldown","Dumbbell Pullover","One-Arm DB Row"],
-  upperback:["Chest-Supported Row","Bent-Over Row","Seated Row","One-Arm DB Row","T-Bar Row","Meadows Row","Face Pulls","Inverted / Backpack Row","Kettlebell Row"],
-  lowerback:["Back Extension","Good Morning","Rack Pull","Superman","Romanian Deadlift"],
-  forearms:["Wrist Curl","Reverse Wrist Curl","Hammer Curl","Reverse Curl","Farmer's Carry","Dead Hang"],
+  chest:["Barbell Bench Press","Incline Barbell Press","Incline DB Press","Machine Chest Press","Weighted Dip","Dumbbell Bench Press","Cable Fly","Incline Dumbbell Fly","Low-to-High Cable Fly","Dumbbell Fly","Cable Crossover","Pec Deck","Machine Chest Fly","Push-Ups","Decline Push-Ups","Diamond Push-Ups","Incline Push-Ups","Kettlebell Floor Press","Dip","Dumbbell Floor Press"],
+  lats:["Weighted Pull-Up","Pull-Up","Lat Pulldown","Chin-Up","Straight-Arm Pulldown","Dumbbell Pullover","One-Arm DB Row","Wide-Grip Pull-Up","Neutral-Grip Lat Pulldown","Single-Arm Lat Pulldown"],
+  upperback:["Chest-Supported Row","Bent-Over Row","Seated Row","One-Arm DB Row","T-Bar Row","Meadows Row","Face Pulls","Inverted / Backpack Row","Kettlebell Row","Pendlay Row","Seal Row","Machine High Row","Barbell Shrug","Dumbbell Shrug"],
+  lowerback:["Back Extension","Good Morning","Rack Pull","Superman","Romanian Deadlift","Reverse Hyperextension","Stiff-Leg Deadlift"],
+  forearms:["Wrist Curl","Reverse Wrist Curl","Hammer Curl","Reverse Curl","Farmer's Carry","Dead Hang","Zottman Curl"],
   adductors:["Hip Adduction","Cable Adduction (inner)","Cossack Squat","Copenhagen Plank"],
-  "glute med":["Hip Abduction","Cable Abduction","Banded Side Steps","Side-Lying Leg Raise"],
-  shoulders:["Overhead Press","Seated DB Press","Machine Shoulder Press","Arnold Press","Pike Push-Ups","Kettlebell Overhead Press","Kettlebell Push Press","Kettlebell Clean & Press"],
-  sidedelts:["Lateral Raise","Cable Lateral Raise","Dumbbell Lateral Raise","Machine Lateral Raise","Upright Row","Kettlebell High Pull"],
+  "glute med":["Hip Abduction","Cable Abduction","Banded Side Steps","Side-Lying Leg Raise","Clamshell"],
+  shoulders:["Overhead Press","Seated DB Press","Machine Shoulder Press","Arnold Press","Pike Push-Ups","Kettlebell Overhead Press","Kettlebell Push Press","Kettlebell Clean & Press","Cable Front Raise"],
+  sidedelts:["Lateral Raise","Cable Lateral Raise","Dumbbell Lateral Raise","Machine Lateral Raise","Upright Row","Kettlebell High Pull","Leaning Cable Lateral Raise"],
   reardelts:["Rear Delt Fly","Face Pulls","Reverse Pec Deck","Cable Rear Delt Fly","Bent-Over Lateral Raise","Band Pull-Aparts","Prone Y-Raise"],
-  triceps:["Overhead Triceps Extension","Triceps Pushdown","Close-Grip Bench Press","Skull Crusher","Diamond Push-Ups"],
-  biceps:["EZ-Bar Curl","Incline DB Curl","Hammer Curl","Cable Curl","Preacher Curl","Chin-Up"],
-  quads:["Back Squat","Hack Squat","Leg Press","Front Squat","Goblet Squat","Leg Extension","Bulgarian Split Squat","Walking Lunge","Reverse Lunge","Step-Up","Sissy Squat","Wall Sit","Kettlebell Front Squat","Kettlebell Reverse Lunge","Kettlebell Bulgarian Split Squat"],
-  hamstrings:["Romanian Deadlift","Seated Leg Curl","Lying Leg Curl","Single-Leg RDL","Nordic Curl","Kettlebell Romanian Deadlift","Two-Hand Kettlebell Swing"],
-  glutes:["Hip Thrust","Bulgarian Split Squat","Cable Pull-Through","Glute Bridge","Single-Leg Glute Bridge","Reverse Lunge","Two-Hand Kettlebell Swing","One-Arm Kettlebell Swing","Kettlebell Snatch"],
-  calves:["Standing Calf Raise","Seated Calf Raise","Leg-Press Calf Raise","Single-Leg Calf Raise"],
-  core:["Cable Crunch","Hanging Leg Raise","Hanging Knee Raise","Toes-to-Bar","Ab Wheel Rollout","Pallof Press","Cable Woodchopper","Landmine Rotation","Russian Twist","Plank","Reverse Plank","Hollow Hold (sec)","L-Sit","Side Plank","Bicycle Crunch","Reverse Crunch","V-Up","Decline Sit-Up","Flutter Kicks","Dead Bug","Kettlebell Windmill"]
+  triceps:["Overhead Triceps Extension","Triceps Pushdown","Close-Grip Bench Press","Skull Crusher","Diamond Push-Ups","Machine Triceps Extension","Bench Dip"],
+  biceps:["EZ-Bar Curl","Incline DB Curl","Hammer Curl","Cable Curl","Preacher Curl","Chin-Up","Machine Preacher Curl","Zottman Curl"],
+  quads:["Back Squat","Hack Squat","Leg Press","Front Squat","Goblet Squat","Leg Extension","Bulgarian Split Squat","Walking Lunge","Reverse Lunge","Step-Up","Sissy Squat","Wall Sit","Kettlebell Front Squat","Kettlebell Reverse Lunge","Kettlebell Bulgarian Split Squat","Belt Squat","Smith Machine Squat","Split Squat","Box Squat"],
+  hamstrings:["Romanian Deadlift","Seated Leg Curl","Lying Leg Curl","Single-Leg RDL","Nordic Curl","Kettlebell Romanian Deadlift","Two-Hand Kettlebell Swing","Glute-Ham Raise","Stiff-Leg Deadlift"],
+  glutes:["Hip Thrust","Bulgarian Split Squat","Cable Pull-Through","Glute Bridge","Single-Leg Glute Bridge","Reverse Lunge","Two-Hand Kettlebell Swing","One-Arm Kettlebell Swing","Kettlebell Snatch","Sumo Deadlift"],
+  calves:["Standing Calf Raise","Seated Calf Raise","Leg-Press Calf Raise","Single-Leg Calf Raise","Donkey Calf Raise"],
+  core:["Cable Crunch","Hanging Leg Raise","Hanging Knee Raise","Toes-to-Bar","Ab Wheel Rollout","Pallof Press","Cable Woodchopper","Landmine Rotation","Russian Twist","Plank","Reverse Plank","Hollow Hold (sec)","L-Sit","Side Plank","Bicycle Crunch","Reverse Crunch","V-Up","Decline Sit-Up","Flutter Kicks","Dead Bug","Kettlebell Windmill","Dumbbell Side Bend"]
 };
 const FB_GROUPS=["quads","chest","upperback","lats","shoulders","sidedelts","hamstrings","glutes","core"];
 // Kettlebell-only mode: a dedicated per-muscle pool (rep-based moves only — carries & get-ups stay
