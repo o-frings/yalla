@@ -248,9 +248,21 @@
   body.training #pageWorkout #wkMode,
   body.training #pageWorkout #startAction,
   body.training #pageWorkout #seg{ display:none; }
-  /* segmented Plan/Surprise switch — the one loud control at the top */
-  .wkseg{ margin:4px 0 16px; padding:4px; border-radius:13px; }
-  .wkseg .s{ flex:1 0 0; padding:10px 0; font-size:15px; font-weight:650; letter-spacing:-.2px; border-radius:10px; }
+  /* How you start: Plan · Surprise me · Free. It was the tallest thing on the screen and outweighed the
+     session itself, so it's tightened to a compact pill — still the primary control, no longer the loudest. */
+  /* Selectors are id-qualified on purpose: the generic `.seg .s` block further down this file has the
+     same specificity and comes later, so the old class-only `.wkseg` rules lost every declaration to it
+     and never applied. That's why this control rendered at the full 16px/16px-padding `.seg` size. */
+  #wkMode.wkseg{ margin:2px 0 12px; padding:3px; border-radius:11px; border:none;
+    background:var(--segtrack); gap:2px; overflow:visible; }
+  #wkMode.wkseg .s{ flex:1 0 0; padding:8px 0 8.5px; font-size:13.5px; font-weight:600; letter-spacing:-.15px;
+    border-radius:9px; color:var(--l2); transition:background .18s ease, color .18s ease, transform .12s ease; }
+  #wkMode.wkseg .s.active{ font-weight:680; color:var(--ink); background:var(--segthumb);
+    box-shadow:0 1px 2px rgba(0,0,0,.10), 0 0 0 .5px rgba(0,0,0,.035); }
+  html.dark #wkMode.wkseg .s.active{ border:none; box-shadow:0 1px 2px rgba(0,0,0,.3); }
+  #wkMode.wkseg .s:active{ transform:scale(.975); }
+  /* the day / length tabs underneath are the second tier — keep them close so the two read as one block */
+  #pageWorkout #seg, #pageWorkout #sponLen2{ margin-bottom:14px; }
   #startAction{ margin:0; }
   #startAction .btn{ display:flex; align-items:center; justify-content:center; gap:8px; font-weight:650; margin:2px 0 14px; }
   #startAction .btn svg{ width:18px; height:18px; flex:0 0 auto; }

@@ -224,6 +224,14 @@ const ALTS = {
   "Goblet Squat":["Leg Press","Back Squat","Hack Squat"],
   "Leg Extension":["Step-Up","Sissy Squat","Front-Foot-Elevated Split Squat"],
   "Chest Press":["Dumbbell Bench Press","Push-Ups","Incline Press"],
+  "Cable Fly":["Low-to-High Cable Fly","High-to-Low Cable Fly","Cable Crossover"],
+  "Cable Crossover":["Cable Fly","High-to-Low Cable Fly","Low-to-High Cable Fly"],
+  "Low-to-High Cable Fly":["Incline Cable Fly","Cable Fly","Cable Crossover"],
+  "High-to-Low Cable Fly":["Decline Cable Fly","Cable Crossover","Cable Fly"],
+  "Incline Cable Fly":["Low-to-High Cable Fly","Incline Dumbbell Fly","Cable Fly"],
+  "Decline Cable Fly":["High-to-Low Cable Fly","Decline Dumbbell Fly","Cable Crossover"],
+  "Flat Bench Cable Fly":["Dumbbell Fly","Cable Fly","Pec Deck"],
+  "Single-Arm Cable Fly":["Cable Fly","Cable Crossover","Seated Cable Fly"],
   "Face Pulls":["Band Pull-Apart","Reverse Pec-Deck","Rear Delt Fly"],
   "Walking Lunges":["Reverse Lunge","Step-Up","Bulgarian Split Squat"],
   "Single-Leg Hip Thrust":["Glute Bridge","Step-Up","Hip Thrust"],
@@ -334,6 +342,10 @@ Object.assign(MUSCLES, {
   "Incline Bench Press":["Chest","Front Delts","Triceps"], "Decline Bench Press":["Chest","Triceps"],
   "Cable Fly":["Chest"], "Pec Deck":["Chest"], "Machine Chest Fly":["Chest"], "Dumbbell Fly":["Chest"], "Incline Dumbbell Fly":["Chest"],
   "Cable Crossover":["Chest"], "Low-to-High Cable Fly":["Chest"], "Dumbbell Pullover":["Lats","Chest"],
+  // the cable-fly family by angle — each one shifts the line of pull across a different part of the pec
+  "High-to-Low Cable Fly":["Chest"], "Incline Cable Fly":["Chest"], "Decline Cable Fly":["Chest"],
+  "Flat Bench Cable Fly":["Chest"], "Single-Arm Cable Fly":["Chest"], "Seated Cable Fly":["Chest"],
+  "Decline Dumbbell Fly":["Chest"], "Cable Chest Press":["Chest","Triceps","Front Delts"],
   "Straight-Arm Pulldown":["Lats"], "Meadows Row":["Upper Back","Lats","Biceps"], "Front Raise":["Front Delts"],
   "Concentration Curl":["Biceps"], "Spider Curl":["Biceps"], "Reverse Curl":["Forearms","Biceps"],
   "Triceps Kickback":["Triceps"], "Skull Crusher":["Triceps"], "Close-Grip Bench Press":["Triceps","Chest"],
@@ -450,7 +462,10 @@ const LIBRARY=[
   // list, so a generated plan could contain an exercise the lifter could not find or re-add by hand.
   "Pull-Up","Overhead Triceps Extension","Incline DB Curl","Dumbbell Lateral Raise","Reverse Pec Deck",
   "Cable Rear Delt Fly","Bent-Over Lateral Raise","Push Press","Landmine Press","Chair Dips",
-  "Pistol Progression","Weighted Decline Crunch","Prone T-Raise","Wall Angels","Cat-Cow"
+  "Pistol Progression","Weighted Decline Crunch","Prone T-Raise","Wall Angels","Cat-Cow",
+  // cable chest flyes, the full set of angles (the catalogue had only mid, low-to-high and the crossover)
+  "High-to-Low Cable Fly","Incline Cable Fly","Decline Cable Fly","Flat Bench Cable Fly",
+  "Single-Arm Cable Fly","Seated Cable Fly","Cable Chest Press","Decline Dumbbell Fly"
 ];
 const EXPLAIN={
  "Barbell Bench Press":{why:"The benchmark upper-body press — chest, front delts and triceps, and the clearest measure of pushing strength.",cues:["Shoulder blades pulled back and down, feet planted.","Lower the bar to your lower chest with control.","Drive up and slightly back toward your face."]},
@@ -632,6 +647,14 @@ const HSCORE={
 Object.assign(HSCORE, {
  "Dip":[4.5,"One of the best chest-and-triceps builders going — deep stretch, easy to load with a belt."],
  "Bench Dip":[2.5,"Convenient triceps work, but the shoulder position is unkind and the load caps fast."],
+ "High-to-Low Cable Fly":[4,"Cables set high, hands finishing at the hips — the sternal (lower) pec through a long arc."],
+ "Incline Cable Fly":[4,"An incline bench between the cables: upper-pec emphasis with constant tension and the shoulder supported."],
+ "Decline Cable Fly":[3.5,"Decline bench between the cables — lower pec, with tension held at the top where dumbbells lose it."],
+ "Flat Bench Cable Fly":[4,"A dumbbell fly's path with the cable's even tension; the loaded stretch stays loaded at the bottom."],
+ "Single-Arm Cable Fly":[3.5,"One side at a time through a longer arc across the body, so the stronger pec can't take over."],
+ "Seated Cable Fly":[3.5,"Seated and braced, which takes the torso out of it — easy to take close to failure."],
+ "Cable Chest Press":[3.5,"A press rather than a fly, but the cable holds tension through lockout where a bar doesn't."],
+ "Decline Dumbbell Fly":[3.5,"The lower-pec angle of the dumbbell fly family; tension drops off near the top."],
  "Dumbbell Floor Press":[3.5,"Bench pressing with the range cut at the floor — kind on the shoulder, lighter on the stretch."],
  "Barbell Shrug":[4,"The most direct trap builder; load it heavy and hold the top for a beat."],
  "Dumbbell Shrug":[4,"Traps through a slightly longer range than the bar allows."],
@@ -7412,7 +7435,7 @@ function drawForecastSens(f, prog){
 }
 // ================= automatic plan builder =================
 const BUILD_POOL={
-  chest:["Barbell Bench Press","Incline Barbell Press","Incline DB Press","Machine Chest Press","Weighted Dip","Dumbbell Bench Press","Cable Fly","Incline Dumbbell Fly","Low-to-High Cable Fly","Dumbbell Fly","Cable Crossover","Pec Deck","Machine Chest Fly","Push-Ups","Decline Push-Ups","Diamond Push-Ups","Incline Push-Ups","Kettlebell Floor Press","Dip","Dumbbell Floor Press"],
+  chest:["Barbell Bench Press","Incline Barbell Press","Incline DB Press","Machine Chest Press","Weighted Dip","Dumbbell Bench Press","Cable Fly","Incline Dumbbell Fly","Low-to-High Cable Fly","Dumbbell Fly","Cable Crossover","Pec Deck","Machine Chest Fly","Push-Ups","Decline Push-Ups","Diamond Push-Ups","Incline Push-Ups","Kettlebell Floor Press","Dip","Dumbbell Floor Press","High-to-Low Cable Fly","Incline Cable Fly","Decline Cable Fly","Flat Bench Cable Fly","Single-Arm Cable Fly","Seated Cable Fly","Cable Chest Press","Decline Dumbbell Fly"],
   lats:["Weighted Pull-Up","Pull-Up","Lat Pulldown","Chin-Up","Straight-Arm Pulldown","Dumbbell Pullover","One-Arm DB Row","Wide-Grip Pull-Up","Neutral-Grip Pull-Up","Neutral-Grip Lat Pulldown","Single-Arm Lat Pulldown"],
   upperback:["Chest-Supported Row","Bent-Over Row","Seated Row","One-Arm DB Row","T-Bar Row","Meadows Row","Face Pulls","Inverted / Backpack Row","Kettlebell Row","Pendlay Row","Seal Row","Machine High Row","Barbell Shrug","Dumbbell Shrug"],
   lowerback:["Back Extension","Good Morning","Rack Pull","Superman","Romanian Deadlift","Reverse Hyperextension","Stiff-Leg Deadlift"],
