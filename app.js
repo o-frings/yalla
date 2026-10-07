@@ -163,6 +163,17 @@ const DEFAULT_PLANS = [
   ]
 }
 ];
+// ===== cross-gym detection =====
+// The same machine at two gyms reads differently: different stack numbering, lever arms and pulley
+// ratios. Mixing those numbers into one strength trend makes the trend meaningless, so sessions that
+// look like a different building get detected and (once the lifter confirms) kept out of the modelling.
+const GYM_RATIO   = 1.30;         // >30% apart in e1RM → candidate, two-sided (r>1.3 || r<1/1.3)
+const GYM_REPGAP  = 4;            // ignore a pair whose top-set reps differ by more than this
+const GYM_QUORUM  = 2;            // ≥2 in-scope lifts in a session must agree in sign (1 lift = a typo)
+const GYM_CTRL    = 0.12;         // deload veto: if free weights also moved ≥12%, it's you, not the gym
+const GYM_BASEN   = 3;            // prior same-gym entries needed before a lift can be judged
+const GYM_STALE   = 60*86400000;  // a lift untouched this long carries detraining, not a venue change
+const GYM_SESSGAP = 4*3600000;    // entries more than 4h apart belong to different sessions
 const DELOAD_AT = 24;
 const ICON={
   plus:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg>',
@@ -337,6 +348,21 @@ function equipFor(name){
   if(/machine|leg press|leg curl|leg extension|pec.?deck|hack|smith|seated row|lat pulldown|ab.?machine|reverse pec|hyperextension|belt squat/.test(n)) return {key:"machine",label:"Machine"};
   return {key:"free",label:"Free weights"};
 }
+// Lifts whose logged weight is a property of the MACHINE, not the lifter. Plate-loaded frames (Smith,
+// belt/pendulum/V-squat) are loaded in real kilograms and read the same everywhere, so they sit with the
+// free weights. Bands have no comparable numeric load. Bodyweight is excluded because e.w is ADDED load
+// only — and an Assisted Pull-Up's e.w is a counterweight, where a bigger number means weaker.
+function gymVariable(name){
+  const n=String(name).toLowerCase();
+  if(isTimed(name) || isBW(name)) return false;
+  if(/\bsmith\b|belt squat|pendulum squat|v-?squat|\bband(ed)?\b|pallof|woodchop/.test(n)) return false;
+  const k=equipFor(name).key;
+  return k==="machine" || k==="cable";
+}
+// The control group: barbells and dumbbells weigh the same everywhere, so if THEY moved too it's a
+// deload or a bad day, not a different gym.
+function gymControl(name){ return equipFor(name).key==="free" && !isTimed(name) && !isBW(name); }
+function gymOf(e){ return (e && e.gy!=null) ? e.gy : 0; }   // absent = the primary gym, so nothing migrates
 function listWords(a){ return a.length<2?(a[0]||""):a.slice(0,-1).join(", ")+" and "+a[a.length-1]; }
 // extended catalogue — muscle mapping for items the keyword fallback can't place cleanly
 // Extension of the catalogue above. Nothing here may repeat a key from the MUSCLES literal — a repeat
@@ -2348,6 +2374,7 @@ let timer={ elapsed:0, startedAt:null, running:false, iv:null };
 // honest session length, while only a wall clock can measure "how long have you been away" across an
 // app suspension.
 let _lastSetEl=0, _lastSetAt=0, _absenceAsked=false;
+let sessGym=null;   // the gym this in-progress session is at (null/0 = primary); rides on the draft
 const ABSENT_MS   = 30*60*1000;    // no completed set for this long → offer to finish
 const DRAFT_TTL   = 20*3600*1000;  // how long a mid-session draft stays restorable (matches applyDraft)
 let rest={ elapsed:0, target:180, startedAt:null, alerted:false, iv:null };
@@ -2357,7 +2384,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi] || (rot[xi]!=null && !rotKeep.has(xi) ? rot[xi] : e.n); }
-let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, age:null, exp:null, sponLen:null, meTileOrder:null, meTileHidden:null, theme:"auto", restSec:180, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{}, baseActivity:null, favEx:[] };
+let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, age:null, exp:null, sponLen:null, meTileOrder:null, meTileHidden:null, theme:"auto", restSec:180, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{}, baseActivity:null, favEx:[], gyms:[], gymSplit:0 };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -2786,7 +2813,7 @@ async function init(){
     // a 14-hour workout.
     timer.elapsed=(_d.tm.e||0) + (_d.tm.rn && _d.tm.sa ? Math.max(0,((_d.t||Date.now())-_d.tm.sa)/1000) : 0);
     timer.running=false; timer.startedAt=null;
-    _lastSetEl=_d.le||0; _lastSetAt=_d.la||0;
+    _lastSetEl=_d.le||0; _lastSetAt=_d.la||0; sessGym=_d.gy||null;
     if(_d.tm.rn && gap < ABSENT_MS) tmrStart();   // short gap → pick the clock straight back up
     else tmrRender();                             // long gap → come back paused; maybeAskFinish offers Finish
   }
@@ -3415,6 +3442,7 @@ function renderDash(){
   renderStrength();        // strength summary card + strength detail sheet (reads _fcF for the size line)
   renderTrainingVolume();  // volume summary card (detail = Vol sheet, drawn by animateProgBars)
   renderGrowth();          // per-muscle "fix this first" line, above the per-muscle rows on the balance sheet
+  renderGymCard();         // cross-gym proposal (no-op unless the detector finds something and it's unanswered)
   applyTileOrder();
   const po=$("progObj");   // objective-adherence score, moved onto the Progress tile
   if(po){ if(!Object.keys(hist).length){ po.textContent="No sessions yet"; po.className="lh"; }
@@ -3924,7 +3952,7 @@ function captureDraft(){
     const bar=g.querySelector(".efbar"); if(bar){ efmap[name]=+bar.dataset.ef; efauto[name]=bar.dataset.auto==="1"?1:0; }
   });
   if(Object.keys(map).length===0) return; // nothing on screen (e.g. mid-unload) — don't clobber a saved draft
-  draft[sig]={ t:Date.now(), s:map, ef:efmap, efa:efauto, tm:{e:timer.elapsed, sa:timer.startedAt, rn:timer.running}, le:_lastSetEl, la:_lastSetAt };
+  draft[sig]={ t:Date.now(), s:map, ef:efmap, efa:efauto, tm:{e:timer.elapsed, sa:timer.startedAt, rn:timer.running}, le:_lastSetEl, la:_lastSetAt, gy:sessGym };
   draft.__mode = freeMode ? "free" : "plan";   // draft is device-only (not in CLOUD_KEYS), so no sync surface
   clearTimeout(_draftTimer); _draftTimer=setTimeout(()=>{ sset("draft", draft); }, 350);
   liveTick();   // if broadcasting, stream the latest set to watchers (throttled)
@@ -4090,7 +4118,7 @@ $("exlist").addEventListener("click", e=>{ const b=e.target.closest(".fillast");
 function abortSession(){
   const sig=draftSig();
   delete draft[sig]; sset("draft", draft);
-  swaps={}; tmrReset(); restStop(); endLive(true);
+  swaps={}; sessGym=null; tmrReset(); restStop(); endLive(true);
   if(freeMode){ renderSeg(); renderFree(); } else { renderSeg(); renderWorkout(); }
   renderDash();
   toast("Session discarded.");
@@ -4105,7 +4133,12 @@ $("saveBtn").onclick=async()=>{
   const sessName = freeMode ? ((_fd && _fd.spon && _fd.name) ? _fd.name : "Free workout") : (w?w.name:"Workout");
   const session={ name: sessName, sub:"", totalVol:0, sets:0, beaten:0, top:null, mtot:{}, exercises:[], date:Date.now() };
   document.querySelectorAll("#exlist .group").forEach(g=>{
-    const name=g.dataset.ex, pt=topSet(last[name]), sets=[];
+    const name=g.dataset.ex, sets=[];
+    // Compare against your best at THIS gym. last[name] is gym-blind, so walking into a gym whose stack
+    // numbers read 30% high used to mint a PR on every machine — and beatTotal is a counter, so those
+    // could never be taken back.
+    const _sg=(hist[name]||[]).filter(e=>gymOf(e)===(sessGym||0));
+    const pt = (settings.gymSplit && _sg.length) ? {w:_sg[_sg.length-1].w, r:_sg[_sg.length-1].r} : topSet(last[name]);
     const efbar=g.querySelector(".efbar"), ef = efbar ? (+efbar.dataset.ef) : 1;   // 0 easy · 1 hard (default) · 2 max
     g.querySelectorAll(".setrow").forEach(r=>{ if(r.classList.contains("warm")) return;   // warm-ups don't count as working sets
       const wv=r.querySelector(".w").value.trim(), rv=r.querySelector(".r").value.trim();
@@ -4121,6 +4154,7 @@ $("saveBtn").onclick=async()=>{
       session.exercises.push({ name, sets: sets.map(s=>({w:s.w, r:s.r})) });
       const he={d:Date.now(), w:nt.w, r:nt.r, n:sets.length, v:Math.round(vol)}; if(tvCode) he.tv=tvCode;
       if(ef!==1) he.ef=ef;   // store only non-default effort (Hard=1 is the implied baseline for older logs)
+      if(sessGym) he.gy=sessGym;   // absent = primary gym, same optional-field idiom as tv/ef
       (hist[name]=hist[name]||[]).push(he); }
   });
   if(!logged){ toast(freeMode?"Add an exercise and log a set":"Log at least one set first"); return; }
@@ -4160,7 +4194,7 @@ $("saveBtn").onclick=async()=>{
   }
   const fresh=checkAchievements();
   await sset("settings",settings);
-  delete draft[savedSig]; await sset("draft", draft);
+  delete draft[savedSig]; await sset("draft", draft); sessGym=null;
   swaps={};
   if(freeMode){ renderSeg(); renderFree(); renderDash(); }
   else { const ni=nextRotateIndex(p); if(w.rotate!==false && ni>=0) curWk=ni; renderSeg(); renderWorkout(); renderDash(); }
@@ -6223,9 +6257,10 @@ function drawExChart(data){
 function strengthIndex(){
   const WKMS=7*86400000; const perEx={}; let minWk=Infinity, maxWk=-Infinity;
   Object.keys(hist).forEach(name=>{
-    const loaded=(hist[name]||[]).some(e=>(parseFloat(e.w)||0)>0);
+    const _hm=histModel(name);   // both reads must filter: filtering only the loop would mark a lift
+    const loaded=_hm.some(e=>(parseFloat(e.w)||0)>0);   // "loaded" off entries we then don't plot
     const m=new Map();
-    (hist[name]||[]).forEach(e=>{ const v=loaded?e1rm(e.w,e.r):(parseInt(e.r)||0);
+    _hm.forEach(e=>{ const v=loaded?e1rm(e.w,e.r):(parseInt(e.r)||0);
       if(v>0){ const wk=Math.floor(e.d/WKMS); if(v>(m.get(wk)||0)) m.set(wk,v); if(wk<minWk)minWk=wk; if(wk>maxWk)maxWk=wk; } });
     if(m.size>=2) perEx[name]=m;                                // ≥2 points to contribute a trend
   });
@@ -6303,11 +6338,134 @@ function drawStrengthIndex(si, prog){
 }
 // per-exercise rows for the collapsed detail — history %change vs start, that lift's 4-week forecast (from
 // the ledger, so it matches the aggregate line), a sparkline; tap → full chart.
+// ===== A2: the detector — pure and read-only over hist =====
+// Works in LOG space so a jump up and the matching jump back down are symmetric, and compares e1RM
+// rather than raw weight: hist stores only the top set, so 50kg x12 -> 65kg x5 on the same machine is a
+// 30% raw jump and is exactly what the app's own "topped the range, add weight" cue asks for.
+function _gymMedian(a){ if(!a.length) return 0; const b=a.slice().sort((x,y)=>x-y), m=b.length>>1;
+  return b.length%2 ? b[m] : (b[m-1]+b[m])/2; }   // true median: a lower-median would make the detector sign-asymmetric
+
+let _gymCache=null, _gymSig="";
+function histSignature(){   // hist has one append and three wholesale reassignments, and no edit/delete path
+  let n=0, mx=0; Object.keys(hist).forEach(k=>{ const h=hist[k]||[]; n+=h.length; h.forEach(e=>{ if(e.d>mx) mx=e.d; }); });
+  return n+"|"+mx;
+}
+// Theil-Sen median slope: the outlier-resistant trend of a lift in log space. A rolling-window baseline
+// cannot be used here — four weeks at another gym drag the window up, so the detector goes quiet mid-trip
+// and then reads the trip HOME as yet another gym. Fitting the whole lift at once removes progression
+// while staying immune to a minority block of foreign sessions.
+function _gymTrend(pts){
+  if(pts.length<4) return null;
+  const sl=[];
+  for(let i=0;i<pts.length;i++) for(let j=i+1;j<pts.length;j++){
+    const dt=pts[j].d-pts[i].d; if(dt>0) sl.push((pts[j].lv-pts[i].lv)/dt);
+  }
+  if(!sl.length) return null;
+  const slope=_gymMedian(sl), inter=_gymMedian(pts.map(q=>q.lv-slope*q.d));
+  return {slope, inter};
+}
+function detectGyms(){
+  const sig=histSignature(); if(_gymCache && _gymSig===sig) return _gymCache;
+  // 1. residual of every entry against its own lift's trend
+  const resid={};   // name -> Map(d -> residual in log space)
+  Object.keys(hist).forEach(name=>{
+    if(!gymVariable(name) && !gymControl(name)) return;
+    const pts=[];
+    (hist[name]||[]).forEach(e=>{ const r=parseInt(e.r)||0; if(r>0 && r<=20){ const v=e1rm(e.w,e.r); if(v>0) pts.push({d:e.d, lv:Math.log(v)}); } });
+    if(pts.length < GYM_BASEN+1) return;
+    pts.sort((a,b)=>a.d-b.d);
+    const fit=_gymTrend(pts); if(!fit) return;
+    const m=new Map(); pts.forEach(q=>m.set(q.d, q.lv-(fit.inter+fit.slope*q.d)));
+    resid[name]=m;
+  });
+  // 2. cluster entries into sessions. he.d is stamped per exercise inside one save, so entries from one
+  //    session are milliseconds apart and sessions hours apart. Day-keying would merge a morning home
+  //    session with an evening hotel one — the exact case this exists for.
+  const flat=[];
+  Object.keys(hist).forEach(name=>(hist[name]||[]).forEach(e=>flat.push({name, d:e.d, tv:e.tv})));
+  flat.sort((a,b)=>a.d-b.d);
+  const sessions=[]; let cur=null;
+  flat.forEach(x=>{ if(!cur || x.d-cur.end > GYM_SESSGAP){ cur={start:x.d, end:x.d, items:[]}; sessions.push(cur); }
+    cur.end=x.d; cur.items.push(x); });
+  // 3. quorum on the in-scope lifts, 4. veto on the controls
+  const gate=Math.log(GYM_RATIO), flagged=[];
+  sessions.forEach(sess=>{
+    const varR=[], ctlR=[];
+    sess.items.forEach(x=>{ const m=resid[x.name]; if(!m||!m.has(x.d)) return;
+      (gymVariable(x.name)?varR:ctlR).push(m.get(x.d)); });
+    const up=varR.filter(x=>x>=gate).length, dn=varR.filter(x=>x<=-gate).length;
+    const tv=sess.items.some(x=>x.tv);
+    const quorum = tv ? 1 : GYM_QUORUM;   // a travel-tagged session is already known to be somewhere else
+    let dir=0; if(up>=quorum && up>dn) dir=1; else if(dn>=quorum && dn>up) dir=-1;
+    if(!dir) return;
+    // the free weights are the control: a barbell weighs the same everywhere, so if THEY moved too this
+    // is a deload or a bad day, not a different building. No controls at all → leave it unclassified.
+    if(!ctlR.length) return;
+    if(Math.abs(_gymMedian(ctlR)) >= GYM_CTRL) return;
+    flagged.push({start:sess.start, end:sess.end, dir, mag:Math.abs(_gymMedian(varR.filter(x=>dir>0?x>0:x<0))), tv});
+  });
+  // 5. group flagged sessions by direction and rough size, so repeat visits to one second gym land in a
+  //    single cluster rather than "Gym 2, Gym 3, Gym 4"
+  const clusters=[];
+  flagged.forEach(f=>{
+    const hit=clusters.find(c=>c.dir===f.dir && Math.abs(c.mag-f.mag) < 0.35);
+    if(hit){ hit.sessions.push(f); hit.mag=(hit.mag*(hit.sessions.length-1)+f.mag)/hit.sessions.length; }
+    else clusters.push({dir:f.dir, mag:f.mag, tv:f.tv, sessions:[f]});
+  });
+  clusters.forEach((c,i)=>{ c.id=i+1; c.pct=Math.round((Math.exp(c.mag)-1)*100);
+    c.name = c.tv ? "Travel gym" : ("Gym "+(i+2)); });
+  _gymSig=sig; _gymCache={clusters, flagged, sessions:sessions.length};
+  return _gymCache;
+}
+// which cluster a timestamp belongs to (0 = the primary gym)
+function gymAt(ts){
+  const r=detectGyms();
+  for(const c of r.clusters) for(const sess of c.sessions)
+    if(ts>=sess.start-1000 && ts<=sess.end+1000) return c.id;
+  return 0;
+}
+// ===== A4: the entries comparable for progress modelling =====
+// All-or-nothing per lift: never applied when filtering would push a lift below the sample gates in
+// exerciseProgress or strengthIndex — a lift must not DISAPPEAR from the By-exercise list because we
+// split its gyms.
+function histModel(name){
+  const h=hist[name]||[];
+  if(!settings.gymSplit || !gymVariable(name)) return h;   // free weights read the same everywhere
+  const keep=h.filter(e=>!gymOf(e) && !gymAt(e.d));
+  return (keep.length>=3 && (h.length-keep.length)>=2) ? keep : h;
+}
+// ===== A6: propose, then confirm. The ask was for automatic DETECTION, not automatic relabelling of
+// logged progress — so the split stays off until the lifter says yes, and nothing logged ever changes.
+function renderGymCard(){
+  const box=$("gymCard"); if(!box) return;
+  if(settings.gymSplit || settings.gymDismissed){ box.style.display="none"; box.innerHTML=""; return; }
+  let r; try{ r=detectGyms(); }catch(e){ box.style.display="none"; return; }
+  const cl=(r&&r.clusters)||[];
+  if(!cl.length){ box.style.display="none"; box.innerHTML=""; return; }
+  const nSess=cl.reduce((a,c)=>a+c.sessions.length,0), top=cl[0];
+  const when=cl.flatMap(c=>c.sessions).map(x=>new Date(x.start).toLocaleDateString(undefined,{month:"long"}));
+  const months=[...new Set(when)];
+  const monthTxt = months.length===1 ? months[0] : months.slice(0,-1).join(", ")+" and "+months[months.length-1];
+  box.style.display="";
+  box.innerHTML='<div class="insight v-more"><div class="ititle">These numbers look like a different gym.</div>'
+    +'<div class="itext">'+nSess+' session'+(nSess>1?'s':'')+' in '+esc(monthTxt)+' ran about '+Math.abs(top.pct)
+    +'% '+(top.dir>0?'heavier':'lighter')+' on machines and cables, while your free-weight lifts stayed put. '
+    +'If that was a different gym, I\'ll keep its numbers out of your strength trend so the comparison is '
+    +'like-for-like. <b>Your logged sets don\'t change.</b></div>'
+    +'<div class="row" style="margin-top:12px; gap:8px;">'
+    +'<button class="btn sm" id="gymYes">Yes, different gym</button>'
+    +'<button class="btn tinted sm" id="gymNo">Not now</button></div></div>';
+  $("gymYes").onclick=async()=>{ settings.gymSplit=1;
+    settings.gyms=cl.map(c=>({id:c.id, name:c.name, pct:c.pct, anchors:c.sessions.map(x=>x.start)}));
+    await sset("settings",settings); renderDash();
+    toast("Got it — those sessions are out of your strength trend now."); };
+  $("gymNo").onclick=async()=>{ settings.gymDismissed=1; await sset("settings",settings); renderGymCard(); };
+}
 function exerciseProgress(){
   const fc={}; if(typeof ledger!=="undefined") ledger.forEach(r=>{ if(!r.retro && (!fc[r.x]||r.k>fc[r.x].k)) fc[r.x]=r; });
   const out=[];
   Object.keys(hist).forEach(name=>{
-    const es=(hist[name]||[]).slice().sort((a,b)=>a.d-b.d);
+    const es=histModel(name).slice().sort((a,b)=>a.d-b.d);
     if(es.length<3) return;                                   // need a little history to call a trend
     const loaded=es.some(e=>(parseFloat(e.w)||0)>0);          // weighted lift → e1RM; else bodyweight/timed → reps/secs
     const pts=[]; es.forEach(e=>{ const v=loaded?e1rm(e.w,e.r):(parseInt(e.r)||0); if(v>0) pts.push({d:e.d, v}); });
