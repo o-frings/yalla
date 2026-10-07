@@ -1301,7 +1301,7 @@ async function pushSubscribe(){
   }
   try{
     if(await Notification.requestPermission()!=="granted"){ toast("Allow notifications to get reminders."); return false; }
-    const reg=await navigator.serviceWorker.ready;
+    const reg=await swReady(); if(!reg) return false;
     let sub=await reg.pushManager.getSubscription();
     if(!sub) sub=await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlB64ToUint8(SUPA.vapidPublic) });
     await sb.from("push_subscriptions").upsert({ user_id:cloudUser.id, subscription:sub.toJSON(), reminders_on:true,
@@ -1322,7 +1322,7 @@ async function pushEnsure(opts){
   if(perm==="default" && opts.prompt){ try{ perm=await Notification.requestPermission(); }catch(e){ return false; } }
   if(perm!=="granted") return false;
   try{
-    const reg=await navigator.serviceWorker.ready;
+    const reg=await swReady(); if(!reg) return false;
     let sub=await reg.pushManager.getSubscription();
     if(!sub) sub=await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlB64ToUint8(SUPA.vapidPublic) });
     let exists=false; try{ const { data } = await sb.from("push_subscriptions").select("user_id").eq("user_id",cloudUser.id).maybeSingle(); exists=!!data; }catch(e){}
@@ -1383,7 +1383,8 @@ function updateSocialWrap(){
 function updateLiveRow(){
   const item=$("liveMenuItem"); if(item){ item.style.display = liveAvailable() ? "" : "none"; item.classList.toggle("on", liveOn); }
   const tog=$("liveToggle"); if(tog) tog.checked=liveOn;
-  const lbl=$("liveLbl"); if(lbl) lbl.textContent = liveOn ? "Sharing live" : "Share live";
+  const _lt = liveOn ? "Sharing live" : "Share live";   // the label exists in two places
+  [$("liveLbl"), $("livePanelLbl")].forEach(el=>{ if(el) el.textContent=_lt; });
   updateSocialWrap();
   if(liveAvailable() && _liveFollowers===null) loadLivePicks();   // know the audience up front (powers the summary)
   liveAudienceLabel();
@@ -1464,9 +1465,28 @@ function liveTick(){
   _liveLast=now;
   try{ sb.from("live_sessions").upsert({ user_id:cloudUser.id, active:true, updated_at:new Date().toISOString(), state:buildLiveState() }); }catch(e){}
 }
+// navigator.serviceWorker.ready never rejects and never times out — with no registration (http, or a
+// registration that failed) it simply hangs forever, leaving every awaiting caller pending.
+// $ is getElementById, which returns the FIRST match — a duplicated id silently binds every handler to
+// the wrong element and the feature just stops working, with nothing logged. Three had crept in.
+function assertUniqueIds(){
+  try{
+    const seen=new Set(), dup=[];
+    document.querySelectorAll("[id]").forEach(el=>{ if(seen.has(el.id)) dup.push(el.id); else seen.add(el.id); });
+    if(dup.length) console.warn("[yalla] duplicate element ids:", [...new Set(dup)].join(", "));
+  }catch(e){}
+}
+function swReady(ms){
+  try{
+    if(!("serviceWorker" in navigator)) return Promise.resolve(null);
+    return Promise.race([navigator.serviceWorker.ready, new Promise(r=>setTimeout(()=>r(null), ms||5000))]);
+  }catch(e){ return Promise.resolve(null); }
+}
 async function endLive(silent){
   if(!liveOn) return; liveOn=false; _liveViewers=[]; _liveAudienceCustom=false; clearTimeout(_liveTimer); updateLiveRow(); renderLivePicks();
-  try{ if(cloudReady()) await sb.from("live_sessions").update({ active:false, updated_at:new Date().toISOString() }).eq("user_id",cloudUser.id); }catch(e){}
+  // clear the payload, not just the flag: the read policy has no `active` test, so a retained state
+  // row stays readable by anyone with follows.live or a seat in the last session's viewers list
+  try{ if(cloudReady()) await sb.from("live_sessions").update({ active:false, state:{}, viewers:[], updated_at:new Date().toISOString() }).eq("user_id",cloudUser.id); }catch(e){}
   if(_liveRecvChan){ try{ sb.removeChannel(_liveRecvChan); }catch(e){} _liveRecvChan=null; }
   if(!silent) toast("Live session ended.");
 }
@@ -1996,12 +2016,21 @@ async function renderThread(uid){
 async function loadThreadReactions(mids, friendUid){
   _threadReactions={}; if(!mids || !mids.length) return;
   let rows=[]; try{ const { data } = await sb.from("dm_reactions").select("message_id,actor,ciphertext,iv,salt").in("message_id",mids); rows=data||[]; }catch(e){}
-  for(const r of rows){ const em=await e2eDecrypt(friendUid,r); if(em){ (_threadReactions[r.message_id]=_threadReactions[r.message_id]||{})[r.actor]=em; } }
+  for(const r of rows){ const em=await e2eDecrypt(friendUid,r);
+    // a reaction is an emoji, never markup — reject anything else rather than trusting the sender
+    if(isReactionEmoji(em)){ (_threadReactions[r.message_id]=_threadReactions[r.message_id]||{})[r.actor]=em; } }
 }
 async function refreshThreadReactions(friendUid){
   if(!_msgThreadUid || _msgThreadUid!==friendUid) return;
   await loadThreadReactions(_threadMids, friendUid);
   _threadMids.forEach(renderReactionsFor);
+}
+// Every entry in EMOJI_GROUPS and QUICK_REACT is at most 4 code points; 8 leaves room for a future ZWJ
+// sequence while still refusing anything that could carry markup.
+function isReactionEmoji(e){
+  if(!e || typeof e!=="string") return false;
+  const cps=[...e];
+  return cps.length>0 && cps.length<=8 && /\p{Extended_Pictographic}/u.test(e) && !/[<>"'&]/.test(e);
 }
 function renderReactionsFor(mid){
   const host=document.querySelector('[data-chips="'+mid+'"]'); if(!host) return;
@@ -2009,7 +2038,7 @@ function renderReactionsFor(mid){
   if(!emojis.length){ host.innerHTML=""; return; }
   const counts={}; emojis.forEach(e=> counts[e]=(counts[e]||0)+1);
   const mine=map[cloudUser.id];
-  host.innerHTML=Object.keys(counts).map(e=>'<span class="react-chip'+(mine===e?' mine':'')+'" data-e="'+e+'">'+e+(counts[e]>1?' '+counts[e]:'')+'</span>').join('');
+  host.innerHTML=Object.keys(counts).map(e=>'<span class="react-chip'+(mine===e?' mine':'')+'" data-e="'+esc(e)+'">'+esc(e)+(counts[e]>1?' '+counts[e]:'')+'</span>').join('');
   host.querySelectorAll(".react-chip.mine").forEach(c=> c.onclick=()=>removeReaction(mid));   // tap own chip → remove it
 }
 async function setReaction(mid, friendUid, emoji, toggle){
@@ -2045,7 +2074,7 @@ function showReactBar(bubble, mid, friendUid){
   let acts='<button class="ract" data-act="copy">Copy</button>';
   if(mine){ acts+='<button class="ract" data-act="edit">Edit</button><button class="ract del" data-act="delete">Delete</button>'; }
   bar.innerHTML='<div class="react-row">'
-      +quickEmojis().map(e=>'<button class="react-pick" data-e="'+e+'">'+e+'</button>').join('')
+      +quickEmojis().map(e=>'<button class="react-pick" data-e="'+esc(e)+'">'+esc(e)+'</button>').join('')
       +'<button class="react-pick react-more" id="reactMore" aria-label="More emojis">'+ICON.plus+'</button></div>'
     +'<div class="react-menu">'+acts+'</div>';
   document.body.appendChild(bar);
@@ -2819,6 +2848,7 @@ async function init(){
   const ni = nextRotateIndex(activePlan()); curWk = ni>=0?ni:0;
   await loadEvidence(); // load canonical evidence.json → builds the coach-tip pool + Learn library
   decideTip();          // pick this launch's coach tip (if any) before the first render
+  assertUniqueIds();    // a duplicated id silently binds handlers to the wrong element
   // Bring a mid-workout session back after a reload or an app kill. The service worker reloads the page on
   // every deploy and iOS evicts backgrounded PWAs, so a zeroed clock on a screen full of logged sets was
   // the commonest "the timer bugs" report. ONE-SHOT here — never from applyDraft(), which re-runs on every
@@ -4680,7 +4710,7 @@ function openShare(p){
   });
   shareCompute();
   $("shareNative").style.display = navigator.share ? "" : "none";
-  openSheet("Share");
+  openSheet("SharePlan");
 }
 function shareCompute(){
   const p=sharePlanRef, ta=$("shareCode");
@@ -4694,8 +4724,8 @@ function shareCompute(){
   ta.value=code;
   ta._msg='My Yalla '+(all?'plan':'workout'+(sel.length>1?'s':''))+' “'+obj.name+'”. Open Yalla → Plans → Import a plan, then paste:\n\n'+code;
 }
-$("shareClose").onclick=()=>closeSheet("Share");
-$("scrimShare").onclick=()=>closeSheet("Share");
+$("sharePlanClose").onclick=()=>closeSheet("SharePlan");
+$("scrimSharePlan").onclick=()=>closeSheet("SharePlan");
 if($("woClose")) $("woClose").onclick=()=>closeSheet("WO");
 if($("scrimWO")) $("scrimWO").onclick=()=>closeSheet("WO");
 $("shareCopy").onclick=()=>{
@@ -4710,7 +4740,7 @@ function openImport(prefill){ $("importText").value=prefill||""; openSheet("Impo
 $("importClose").onclick=()=>closeSheet("Import");
 $("scrimImport").onclick=()=>closeSheet("Import");
 $("importPlan").onclick=()=>{ closeSheet("Plans"); openImport(""); };
-$("importBtn").onclick=async()=>{
+$("importPlanBtn").onclick=async()=>{
   let obj; try{ obj=decodePayload($("importText").value); }catch(e){ obj=null; }
   if(!obj || (obj.t!=="plan" && obj.t!=="workouts")){ toast("That doesn’t look like a Yalla code"); return; }
   const np=sanitizePlan(obj);
@@ -6603,7 +6633,7 @@ function renderOtherLog(){
     row.innerHTML='<div class="info"><div class="nm">'+esc(e.name)+'</div><div class="meta">'+esc(sub)+'</div></div>'
       +'<span class="scoretag" style="color:var(--l2)">'+e.vol.toLocaleString()+' kg</span>'
       +'<a class="lnkic rem" title="Delete">'+ICON.trash+'</a>';
-    row.querySelector(".rem").onclick=()=>{ confirmAsk("Delete this "+esc(e.name)+" entry?","Delete",()=>{ extlog=extlog.filter(x=>x!==e); sset("extlog",extlog); renderOtherLog(); renderDash(); toast("Deleted"); }); };
+    row.querySelector(".rem").onclick=()=>{ confirmAsk("Delete this "+e.name+" entry?","Delete",()=>{ extlog=extlog.filter(x=>x!==e); sset("extlog",extlog); renderOtherLog(); renderDash(); toast("Deleted"); }); };
     wrap.appendChild(row);
   });
 }
@@ -6710,7 +6740,7 @@ function renderCardioLog(){
     row.innerHTML=thumb+'<div class="info"><div class="nm">'+title+'</div><div class="meta">'+esc(parts.filter(Boolean).join(" · "))+'</div></div>'
       +'<a class="lnkic rem" title="Delete">'+ICON.trash+'</a>';
     if(e.route){ const cv=row.querySelector(".rthumb"); if(cv) drawRoutePolyline(cv, e.route); }
-    row.querySelector(".rem").onclick=()=>{ confirmAsk("Delete this "+esc(e.routeName||e.name)+" entry?","Delete",()=>{ extlog=extlog.filter(x=>x!==e); sset("extlog",extlog); renderCardioLog(); renderDash(); toast("Deleted"); }); };
+    row.querySelector(".rem").onclick=()=>{ confirmAsk("Delete this "+(e.routeName||e.name)+" entry?","Delete",()=>{ extlog=extlog.filter(x=>x!==e); sset("extlog",extlog); renderCardioLog(); renderDash(); toast("Deleted"); }); };
     wrap.appendChild(row);
   });
 }
@@ -8432,7 +8462,7 @@ $("buildGo").onclick=async()=>{
   const sf=(settings.focusAreas||["balanced"]).slice().sort().join(",");
   if(bf && bf!=="balanced" && bf!==sf){
     const human=listWords((Array.isArray(build.focus)?build.focus:[]).map(f=>FOCUS_LABEL[f]||f));
-    confirmAsk("This plan leans toward "+esc(human)+", different from your stated focus. Make that your overall focus?","Update focus",async()=>{
+    confirmAsk("This plan leans toward "+human+", different from your stated focus. Make that your overall focus?","Update focus",async()=>{
       settings.focusAreas=(build.focus||[]).slice(); await sset("settings",settings); renderObjective(); toast("Focus updated to match.");
     });
   }
@@ -8485,7 +8515,14 @@ async function applyRestore(obj){
     }catch(e){ toast("Wrong passphrase or corrupt file."); return; }
   }
   if(!data || typeof data!=="object" || !("settings" in data || "history" in data || "plans" in data)){ toast("That doesn't look like a Yalla backup."); return; }
-  confirmAsk("Restore replaces all current data on this device with the backup. Continue?","Restore",async()=>{
+  // sset() marks and pushes, so a restore does NOT stop at this device: the restored data is stamped
+  // with now(), beats every other device at the next reconcile, and is adopted everywhere. Say so.
+  const reach = cloudReady()
+    ? "Restore replaces all current data on this device, in your account, and on your other devices. Continue?"
+    : "Restore replaces all current data on this device with the backup. Continue?";
+  confirmAsk(reach,"Restore",async()=>{
+    // keep an escape hatch: nothing else snapshots the pre-restore state, and there is no undo
+    try{ const pre=await gatherData(); if(pre) await _localSet("_preRestore", {t:Date.now(), data:pre}); }catch(e){}
     for(const k of CLOUD_KEYS){ if(data[k]!=null) await sset(k,data[k]); }
     settings=Object.assign({}, (await sget("settings"))||{});
     plans=(await sget("plans"))||[]; last=(await sget("lastsets"))||{}; bw=(await sget("bodyweight"))||[]; hist=(await sget("history"))||{}; extlog=(await sget("extlog"))||[];
@@ -8545,8 +8582,13 @@ function setFriendsBadge(n){
 // ---- avatars: friends read as people. A user's chosen colour+emoji (from their profile) wins;
 // otherwise a deterministic monogram. Per-user prefs are cached as we load them from RPCs/profiles.
 const _avatarCache={};   // uid -> { color, emoji, icon, style }
+// Only a literal hex or hsl() colour may reach a style attribute. Validated on the way IN so one gate
+// covers all 13 render sites. hsl() must stay allowed: avatarColor() below mints hsl(...) and saveAvatar
+// stores it, so a hex-only rule would blank the avatar of every user who never picked a swatch.
+const AV_COLOR_RE=/^(#[0-9a-f]{3}([0-9a-f]{3})?|hsl\(\s*\d{1,3}\s*,\s*\d{1,3}%\s*,\s*\d{1,3}%\s*\))$/i;
+function safeAvColor(c){ c=String(c==null?"":c).trim(); return AV_COLOR_RE.test(c) ? c : null; }
 function recordAvatars(rows){ (rows||[]).forEach(r=>{ if(r && r.user_id && ("avatar_color" in r || "avatar_emoji" in r || "avatar_icon" in r || "avatar_style" in r))
-  _avatarCache[r.user_id]={ color:r.avatar_color||null, emoji:r.avatar_emoji||null, icon:r.avatar_icon||null, style:r.avatar_style||null }; }); }
+  _avatarCache[r.user_id]={ color:safeAvColor(r.avatar_color), emoji:r.avatar_emoji||null, icon:r.avatar_icon||null, style:r.avatar_style||null }; }); }
 function avatarColor(seed){ let h=0; const s=String(seed||"?"); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return "hsl("+(h%360)+",55%,50%)"; }
 function initials(name){ const p=String(name||"").trim().split(/\s+/).filter(Boolean); if(!p.length) return "🙂"; return (p[0][0]+(p[1]?p[1][0]:"")).toUpperCase(); }
 // background per style — solid colour, a deeper gradient, a hue-shifted duotone, or solid (ring adds a class)
@@ -8576,10 +8618,11 @@ function avatarHTML(name, opts){ opts=opts||{}; const sz=opts.size||40, uid=opts
   const style = opts.style!==undefined ? opts.style : pref.style;
   let inner, bg;
   if(icon){ inner='<svg viewBox="0 0 100 100" width="'+sz+'" height="'+sz+'" preserveAspectRatio="xMidYMid slice" style="display:block">'+genAvatarSVG(icon)+'</svg>'; bg='transparent'; }
-  else { const color = opts.color || pref.color || avatarColor(opts.seed||uid||name||"?"); inner = emoji ? esc(emoji) : esc(initials(name)); bg=avatarBg(color,style); }
+  else { const color = safeAvColor(opts.color) || safeAvColor(pref.color) || avatarColor(opts.seed||uid||name||"?");
+    inner = emoji ? esc(emoji) : esc(initials(name)); bg=esc(avatarBg(color,style)); }
   return '<span class="avatar'+(opts.live?" live":"")+(style==="ring"&&!icon?" r-ring":"")+'" style="width:'+sz+'px;height:'+sz+'px;font-size:'+Math.round(sz*(emoji?0.52:0.4))+'px;background:'+bg+';">'+inner+'</span>'; }
 // keep my own cached avatar in sync with my saved prefs (so it shows on my feed posts / Me card)
-function syncSelfAvatar(){ if(cloudUser) _avatarCache[cloudUser.id]={ color:settings.avatarColor||null, emoji:settings.avatarEmoji||null, icon:settings.avatarIcon||null, style:settings.avatarStyle||null }; }
+function syncSelfAvatar(){ if(cloudUser) _avatarCache[cloudUser.id]={ color:safeAvColor(settings.avatarColor), emoji:settings.avatarEmoji||null, icon:settings.avatarIcon||null, style:settings.avatarStyle||null }; }
 
 // palette + symbol options for the editor
 const AV_COLORS=["#e8551c","#ff3b30","#ff9500","#ffcc00","#34c759","#00c7be","#30b0c7","#007aff","#5856d6","#af52de","#ff2d55","#8e8e93"];

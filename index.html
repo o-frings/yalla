@@ -143,7 +143,7 @@
 <!-- social panels drop full-width below the timer bar; each is a dismissable card -->
 <div class="spanel livepanel" id="livePanel" hidden>
   <button class="spanel-x" id="livePanelX" type="button" aria-label="Close">✕</button>
-  <label class="livestart"><span id="liveLbl">Share live</span><input type="checkbox" class="livesw" id="liveToggle" aria-label="Share workout live"><span class="liveswui" aria-hidden="true"></span></label>
+  <label class="livestart"><span id="livePanelLbl">Share live</span><input type="checkbox" class="livesw" id="liveToggle" aria-label="Share workout live"><span class="liveswui" aria-hidden="true"></span></label>
   <div class="livepick" id="livePick"></div>
 </div>
 <div class="spanel gympanel" id="gymPanel" hidden>
@@ -1010,10 +1010,10 @@
 </div>
 
 <!-- SHARE PLAN SHEET -->
-<div class="scrim" id="scrimShare"></div>
-<div class="sheet" id="sheetShare">
+<div class="scrim" id="scrimSharePlan"></div>
+<div class="sheet" id="sheetSharePlan">
   <div class="grabber"></div>
-  <div class="sheethdr"><span class="t" id="shareTitle">Share plan</span><button class="btn plain sm" id="shareClose">Done</button></div>
+  <div class="sheethdr"><span class="t" id="shareTitle">Share plan</span><button class="btn plain sm" id="sharePlanClose">Done</button></div>
   <div class="sheetbody">
     <p style="color:var(--l2);font-size:13px;margin:0 4px 12px;line-height:1.45;">Pick what to share — the whole plan or just some workouts. Your friend imports it under Plans → Import a plan.</p>
     <div id="shareList"></div>
@@ -1033,7 +1033,7 @@
   <div class="sheetbody">
     <p style="color:var(--l2);font-size:13px;margin:0 4px 12px;line-height:1.45;">Paste a plan code a friend shared with you.</p>
     <textarea id="importText" class="codebox" placeholder="Paste code here…"></textarea>
-    <button class="btn wide" id="importBtn" style="margin-top:12px;">Import plan</button>
+    <button class="btn wide" id="importPlanBtn" style="margin-top:12px;">Import plan</button>
   </div>
 </div>
 

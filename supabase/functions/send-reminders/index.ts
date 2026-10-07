@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
   // its own session on finish/toggle-off; this is the backstop. 20-min idle ⇒ closed.
   await sb.from("notify_log").delete().lt("sent_at", new Date(Date.now() - 2 * DAY).toISOString());
   await sb.from("live_reactions").delete().lt("created_at", new Date(Date.now() - 2 * DAY).toISOString());
-  await sb.from("live_sessions").update({ active: false })
+  await sb.from("live_sessions").update({ active: false, state: {}, viewers: [] })
     .eq("active", true).lt("updated_at", new Date(Date.now() - 20 * 60_000).toISOString());
 
   const cutoff = new Date(Date.now() - 2 * DAY).toISOString();
