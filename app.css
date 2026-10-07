@@ -993,8 +993,18 @@
   .setrow.novol .eq, .setrow.novol .vol{ visibility:hidden; }   /* no number yet → hide the "= —" noise, keep column alignment */
   /* focus: completed sets recede so the set you're on leads the eye (visual only; PRs stay bright) */
   .setrow{ transition:opacity .25s ease; }
-  .setrow.done:not(.pr){ opacity:.42; }
+  /* A completed set reads as affirmatively DONE, not disabled. The old treatment only faded the row to
+     .42, which looks identical to "empty and greyed out" — you couldn't tell a logged set from a blank
+     one at a glance. Now the set number fills with the accent and the fade is light enough to read. */
+  .setrow.done:not(.pr){ opacity:.68; }
   .setrow.done:focus-within{ opacity:1; }   /* tapping a completed set to edit brings it back */
+  .setrow.done .sn{ background:var(--accent); color:#fff; font-weight:700; border-radius:999px; }
+  .setrow.warm.done .sn{ background:transparent; color:var(--accent); }   /* warm-ups keep their own mark */
+  /* running tally in the exercise header, so finished lifts are obvious without reading their rows */
+  .exhead .setcount{ font-size:12px; font-weight:700; color:var(--l3); background:var(--track);
+    border-radius:999px; padding:3px 9px; flex:0 0 auto; font-variant-numeric:tabular-nums; letter-spacing:.2px; }
+  .exhead .setcount.all{ background:var(--accent); color:#fff; }
+  .group.gdone .exhead .nm{ color:var(--l2); }
   .setrow .vol.live{ color:var(--ink); cursor:pointer; }
   .setrow .vol.live:active{ transform:scale(.9); opacity:.6; }
   /* previous-session volume doubles as a "tap to copy last time" target */

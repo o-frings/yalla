@@ -2505,7 +2505,11 @@ function beep(){ try{ _ac=_ac||new (window.AudioContext||window.webkitAudioConte
   const o=_ac.createOscillator(), g=_ac.createGain(); o.connect(g); g.connect(_ac.destination);
   o.frequency.value=880; const t=_ac.currentTime; g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.18,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.4);
   o.start(t); o.stop(t+0.42); }catch(e){} }
-function ensureNotifyPerm(){ try{ if(window.Notification && Notification.permission==="default") Notification.requestPermission(); }catch(e){} }
+// requestPermission() returns a promise that REJECTS when called outside a user gesture, and a sync
+// try/catch can't catch that — it surfaced as an unhandled rejection in the console every time a set was
+// logged programmatically. Older Safari uses the callback form and returns undefined, hence the guard.
+function ensureNotifyPerm(){ try{ if(window.Notification && Notification.permission==="default"){
+  const p=Notification.requestPermission(); if(p && p.catch) p.catch(()=>{}); } }catch(e){} }
 // Screen Wake Lock — keep the display awake while a set/rest is running so the timer stays visible without
 // the phone sleeping. (A true lock-screen live countdown like Hevy's needs a native app / iOS Live Activity;
 // a PWA can't render one. This is the feasible half: don't let the screen sleep mid-workout.)
@@ -2582,7 +2586,22 @@ function setRowDone(row, name){
 }
 function refreshSetFocus(g){
   if(!g||!g.dataset) return; const name=g.dataset.ex;
-  g.querySelectorAll(".setrow").forEach(row=> row.classList.toggle("done", setRowDone(row, name)));
+  let done=0, total=0;
+  g.querySelectorAll(".setrow").forEach(row=>{
+    const ok=setRowDone(row, name); row.classList.toggle("done", ok);
+    if(!row.classList.contains("warm")){ total++; if(ok) done++; }   // warm-ups aren't working sets
+  });
+  // The counter is injected rather than built into the two header templates (plan mode and free mode),
+  // so there is one place that knows how to count a set as done.
+  const head=g.querySelector(".exhead"); if(!head) return;
+  let tag=head.querySelector(".setcount");
+  if(!tag){ tag=document.createElement("span"); tag.className="setcount";
+    const nm=head.querySelector(".nm");
+    if(nm && nm.nextSibling) head.insertBefore(tag, nm.nextSibling); else head.appendChild(tag); }
+  tag.textContent = total ? done+"/"+total : "";
+  tag.style.display = total ? "" : "none";
+  tag.classList.toggle("all", total>0 && done===total);
+  g.classList.toggle("gdone", total>0 && done===total);
 }
 // ---- per-set hold timer for isometric moves: tap the button to start a count-up, tap again to log the seconds ----
 let hold={ row:null, startedAt:0, iv:null };
@@ -5843,7 +5862,8 @@ $("exlist").addEventListener("input", e=>{ if(!e.target.classList||(!e.target.cl
   const r=e.target.closest(".setrow"), g=e.target.closest(".group");
   if(r&&g){ updateSetVol(r, g.dataset.ex); refreshAutoEffort(g);
     // stamp only — the rest countdown still starts on blur, as it does today
-    if(!r.dataset.rested && setRowDone(r, g.dataset.ex)){ _lastSetEl=tmrElapsed(); _lastSetAt=Date.now(); _absenceAsked=false; } }
+    if(!r.dataset.rested && setRowDone(r, g.dataset.ex)){ _lastSetEl=tmrElapsed(); _lastSetAt=Date.now(); _absenceAsked=false; }
+    refreshSetFocus(g); }   // done-state and the header tally update as you type, not only on blur
   captureDraft(); });
 function updateSetVol(r, name){
   const wv=r.querySelector(".w").value.trim(), rv=r.querySelector(".r").value.trim(), vEl=r.querySelector(".vol");
