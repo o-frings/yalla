@@ -329,6 +329,9 @@ function muscleFor(name){
 function equipFor(name){
   const n=String(name).toLowerCase();
   if(/kettlebell|\bkb\b|turkish get-?up|goblet/.test(n)) return {key:"kb",label:"Kettlebell"};
+  // Named gear beats the keyword lists below — "Machine Dip" matched \bdip\b and came out a bodyweight
+  // movement charging the full bodyweight. Plate-loaded kit the keywords can't infer is named here too.
+  if(/\bmachine\b|\bsmith\b|iso-?lateral|pendulum squat|v-?squat|rotary torso|low row|hip adduction|seated calf/.test(n)) return {key:"machine",label:"Machine"};
   if(/push.?up|pull.?up|chin.?up|\bdip\b|plank|hollow|hanging|inverted|pike|sit.?up|dead bug|burpee|pistol|nordic|handstand|chair dip|bodyweight|leg.?raise|knee raise|flutter|toes.?to.?bar|v-?up|bicycle crunch|reverse crunch|russian twist|captain|\bl-?sit\b|dead hang|step.?up|bridge|prone|superman|wall slide|wall angel|wall sit|scapular|chin.?tuck|bird.?dog|snow.?angel|cat.?cow|backpack|towel row|glute.?ham|clamshell/.test(n)) return {key:"body",label:"Bodyweight"};
   if(/cable|pulldown|pushdown|pull-through|kickback|face.?pull|rope|crossover|abduction|woodchop|pallof|\bband(ed)?\b/.test(n)) return {key:"cable",label:"Cable / band"};
   if(/machine|leg press|leg curl|leg extension|pec.?deck|hack|smith|seated row|lat pulldown|ab.?machine|reverse pec|hyperextension|belt squat/.test(n)) return {key:"machine",label:"Machine"};
@@ -388,6 +391,24 @@ Object.assign(MUSCLES, {
   "Donkey Calf Raise":["Calves"], "Tibialis Raise":["Calves"], "Clamshell":["Glute Med"],
   // neck & core
   "Neck Curl":["Neck"], "Neck Extension":["Neck"], "Dumbbell Side Bend":["Core"],
+
+  // ---- machines & Smith-machine variants common on a modern gym floor ----
+  "Incline Machine Press":["Chest","Front Delts","Triceps"], "Decline Machine Press":["Chest","Triceps"],
+  "Iso-Lateral Chest Press":["Chest","Triceps","Front Delts"],
+  "Smith Machine Bench Press":["Chest","Triceps","Front Delts"], "Smith Machine Incline Press":["Chest","Front Delts","Triceps"],
+  "Machine Pullover":["Lats","Chest"], "Iso-Lateral Pulldown":["Lats","Biceps"],
+  "Iso-Lateral Row":["Upper Back","Lats","Biceps"], "Low Row Machine":["Upper Back","Lats","Biceps"],
+  "Machine Shrug":["Upper Back"], "Smith Machine Row":["Upper Back","Lats","Biceps"],
+  "Smith Machine Overhead Press":["Front Delts","Side Delts","Triceps"],
+  "Pendulum Squat":["Quads","Glutes"], "V-Squat":["Quads","Glutes"], "Seated Leg Press":["Quads","Glutes"],
+  "Smith Machine Split Squat":["Quads","Glutes"], "Standing Leg Curl":["Hamstrings"],
+  "Smith Machine Hip Thrust":["Glutes","Hamstrings"], "Smith Machine Calf Raise":["Calves"],
+  "Machine Dip":["Triceps","Chest"], "Machine Biceps Curl":["Biceps"],
+  "Smith Machine Close-Grip Press":["Triceps","Chest"], "Rotary Torso":["Core"],
+  // ---- cable attachment / position variants ----
+  "Rope Pushdown":["Triceps"], "Rope Overhead Triceps Extension":["Triceps"],
+  "Cable Shrug":["Upper Back"], "Cable Y-Raise":["Rear Delts","Upper Back"],
+  "Bayesian Cable Curl":["Biceps"],
 });
 // newer additions — incline barbell press, a reverse plank, extra core moves & isometric holds
 Object.assign(MUSCLES, {
@@ -465,7 +486,16 @@ const LIBRARY=[
   "Pistol Progression","Weighted Decline Crunch","Prone T-Raise","Wall Angels","Cat-Cow",
   // cable chest flyes, the full set of angles (the catalogue had only mid, low-to-high and the crossover)
   "High-to-Low Cable Fly","Incline Cable Fly","Decline Cable Fly","Flat Bench Cable Fly",
-  "Single-Arm Cable Fly","Seated Cable Fly","Cable Chest Press","Decline Dumbbell Fly"
+  "Single-Arm Cable Fly","Seated Cable Fly","Cable Chest Press","Decline Dumbbell Fly",
+  // machines & Smith variants — the floor had 22 machine entries and none at all for lats
+  "Incline Machine Press","Decline Machine Press","Iso-Lateral Chest Press",
+  "Smith Machine Bench Press","Smith Machine Incline Press","Machine Pullover","Iso-Lateral Pulldown",
+  "Iso-Lateral Row","Low Row Machine","Machine Shrug","Smith Machine Row","Smith Machine Overhead Press",
+  "Pendulum Squat","V-Squat","Seated Leg Press","Smith Machine Split Squat","Standing Leg Curl",
+  "Smith Machine Hip Thrust","Smith Machine Calf Raise","Machine Dip","Machine Biceps Curl",
+  "Smith Machine Close-Grip Press","Rotary Torso",
+  // cable attachment / position variants
+  "Rope Pushdown","Rope Overhead Triceps Extension","Cable Shrug","Cable Y-Raise","Bayesian Cable Curl"
 ];
 const EXPLAIN={
  "Barbell Bench Press":{why:"The benchmark upper-body press — chest, front delts and triceps, and the clearest measure of pushing strength.",cues:["Shoulder blades pulled back and down, feet planted.","Lower the bar to your lower chest with control.","Drive up and slightly back toward your face."]},
@@ -645,6 +675,34 @@ const HSCORE={
 };
 // ratings for the movements added to the catalogue; anything unrated falls back to hScore()'s defaults
 Object.assign(HSCORE, {
+ "Incline Machine Press":[4,"Upper-chest pressing on a fixed path — easy to push to failure without a spotter."],
+ "Decline Machine Press":[3.5,"Lower-pec emphasis with the shoulder in a friendly position."],
+ "Iso-Lateral Chest Press":[4.5,"One arm at a time, so the stronger side can't carry the set; plate-loaded and deeply loadable."],
+ "Smith Machine Bench Press":[4,"A fixed bar path — slightly less stabiliser work, but you can chase failure safely alone."],
+ "Smith Machine Incline Press":[4,"Upper chest with a guided bar; the easiest incline press to take to the last rep."],
+ "Machine Pullover":[4.5,"The one machine that loads the lats through a full shortened-to-stretched arc — a rare and good stimulus."],
+ "Iso-Lateral Pulldown":[4,"Independent arms on a pulldown path; good for fixing a side-to-side imbalance."],
+ "Iso-Lateral Row":[4.5,"Plate-loaded rowing, one side at a time, with the chest supported — heavy upper-back work and no lower-back tax."],
+ "Low Row Machine":[4,"A low rowing angle that biases the lats more than a chest-height row."],
+ "Machine Shrug":[3.5,"Traps without having to grip a heavy bar — the grip stops being the limit."],
+ "Smith Machine Row":[3.5,"Bar-path-guided rowing; strict, though the fixed line suits some torsos better than others."],
+ "Smith Machine Overhead Press":[3.5,"Pressing overhead without balancing the bar — useful when going near failure alone."],
+ "Pendulum Squat":[4.5,"An arced path that keeps tension on the quads through the whole range, with almost no spinal load."],
+ "V-Squat":[4,"Guided squatting with the torso supported — quad-dominant and easy to load."],
+ "Seated Leg Press":[4,"Horizontal pressing for the quads; gentler on the lower back than the 45-degree sled."],
+ "Smith Machine Split Squat":[4,"Single-leg work without the balance challenge, so the quad is what actually fails."],
+ "Standing Leg Curl":[4,"One hamstring at a time with the hip extended — a different length than the seated curl."],
+ "Smith Machine Hip Thrust":[4,"Hip thrusting without wrestling the bar into place; the setup stops being the hard part."],
+ "Smith Machine Calf Raise":[4,"Calves with a guided bar — simple to load heavy and hold the stretch."],
+ "Machine Dip":[3.5,"Dipping with the load dialled in, so you can work at a weight your bodyweight alone doesn't allow."],
+ "Machine Biceps Curl":[3.5,"Fixed-path curling you can take to failure without swinging."],
+ "Smith Machine Close-Grip Press":[3.5,"Triceps pressing on a guided path; stable enough to overload safely."],
+ "Rotary Torso":[2.5,"Loaded trunk rotation. Go light — the lumbar spine rotates very little by design."],
+ "Rope Pushdown":[4,"The rope lets the hands separate at the bottom, so the triceps finish fully shortened."],
+ "Rope Overhead Triceps Extension":[4.5,"Overhead puts the long head at full stretch — the strongest triceps position there is."],
+ "Cable Shrug":[3.5,"Traps with tension that doesn't fall off at the bottom the way a free-weight shrug does."],
+ "Cable Y-Raise":[4,"Rear delts and lower traps through a long arc — strong for posture and the overhead position."],
+ "Bayesian Cable Curl":[4.5,"Curling with the arm behind the body puts the long head at full stretch under load."],
  "Dip":[4.5,"One of the best chest-and-triceps builders going — deep stretch, easy to load with a belt."],
  "Bench Dip":[2.5,"Convenient triceps work, but the shoulder position is unkind and the load caps fast."],
  "High-to-Low Cable Fly":[4,"Cables set high, hands finishing at the hips — the sternal (lower) pec through a long arc."],
@@ -7435,23 +7493,23 @@ function drawForecastSens(f, prog){
 }
 // ================= automatic plan builder =================
 const BUILD_POOL={
-  chest:["Barbell Bench Press","Incline Barbell Press","Incline DB Press","Machine Chest Press","Weighted Dip","Dumbbell Bench Press","Cable Fly","Incline Dumbbell Fly","Low-to-High Cable Fly","Dumbbell Fly","Cable Crossover","Pec Deck","Machine Chest Fly","Push-Ups","Decline Push-Ups","Diamond Push-Ups","Incline Push-Ups","Kettlebell Floor Press","Dip","Dumbbell Floor Press","High-to-Low Cable Fly","Incline Cable Fly","Decline Cable Fly","Flat Bench Cable Fly","Single-Arm Cable Fly","Seated Cable Fly","Cable Chest Press","Decline Dumbbell Fly"],
-  lats:["Weighted Pull-Up","Pull-Up","Lat Pulldown","Chin-Up","Straight-Arm Pulldown","Dumbbell Pullover","One-Arm DB Row","Wide-Grip Pull-Up","Neutral-Grip Pull-Up","Neutral-Grip Lat Pulldown","Single-Arm Lat Pulldown"],
-  upperback:["Chest-Supported Row","Bent-Over Row","Seated Row","One-Arm DB Row","T-Bar Row","Meadows Row","Face Pulls","Inverted / Backpack Row","Kettlebell Row","Pendlay Row","Seal Row","Machine High Row","Barbell Shrug","Dumbbell Shrug"],
+  chest:["Barbell Bench Press","Incline Barbell Press","Incline DB Press","Machine Chest Press","Weighted Dip","Dumbbell Bench Press","Cable Fly","Incline Dumbbell Fly","Low-to-High Cable Fly","Dumbbell Fly","Cable Crossover","Pec Deck","Machine Chest Fly","Push-Ups","Decline Push-Ups","Diamond Push-Ups","Incline Push-Ups","Kettlebell Floor Press","Dip","Dumbbell Floor Press","High-to-Low Cable Fly","Incline Cable Fly","Decline Cable Fly","Flat Bench Cable Fly","Single-Arm Cable Fly","Seated Cable Fly","Cable Chest Press","Decline Dumbbell Fly","Incline Machine Press","Iso-Lateral Chest Press","Smith Machine Bench Press","Smith Machine Incline Press"],
+  lats:["Weighted Pull-Up","Pull-Up","Lat Pulldown","Chin-Up","Straight-Arm Pulldown","Dumbbell Pullover","One-Arm DB Row","Wide-Grip Pull-Up","Neutral-Grip Pull-Up","Neutral-Grip Lat Pulldown","Single-Arm Lat Pulldown","Machine Pullover","Iso-Lateral Pulldown"],
+  upperback:["Chest-Supported Row","Bent-Over Row","Seated Row","One-Arm DB Row","T-Bar Row","Meadows Row","Face Pulls","Inverted / Backpack Row","Kettlebell Row","Pendlay Row","Seal Row","Machine High Row","Barbell Shrug","Dumbbell Shrug","Iso-Lateral Row","Low Row Machine","Machine Shrug","Cable Shrug"],
   lowerback:["Back Extension","Good Morning","Rack Pull","Superman","Romanian Deadlift","Reverse Hyperextension","Stiff-Leg Deadlift"],
   forearms:["Wrist Curl","Reverse Wrist Curl","Hammer Curl","Reverse Curl","Farmer's Carry","Dead Hang","Zottman Curl"],
   adductors:["Hip Adduction","Cable Adduction (inner)","Cossack Squat","Copenhagen Plank"],
   "glute med":["Hip Abduction","Cable Abduction","Banded Side Steps","Side-Lying Leg Raise","Clamshell"],
-  shoulders:["Overhead Press","Seated DB Press","Machine Shoulder Press","Arnold Press","Pike Push-Ups","Kettlebell Overhead Press","Kettlebell Push Press","Kettlebell Clean & Press","Cable Front Raise"],
+  shoulders:["Overhead Press","Seated DB Press","Machine Shoulder Press","Arnold Press","Pike Push-Ups","Kettlebell Overhead Press","Kettlebell Push Press","Kettlebell Clean & Press","Cable Front Raise","Smith Machine Overhead Press"],
   sidedelts:["Lateral Raise","Cable Lateral Raise","Dumbbell Lateral Raise","Machine Lateral Raise","Upright Row","Kettlebell High Pull","Leaning Cable Lateral Raise"],
-  reardelts:["Rear Delt Fly","Face Pulls","Reverse Pec Deck","Cable Rear Delt Fly","Bent-Over Lateral Raise","Band Pull-Aparts","Prone Y-Raise"],
-  triceps:["Overhead Triceps Extension","Triceps Pushdown","Close-Grip Bench Press","Skull Crusher","Diamond Push-Ups","Machine Triceps Extension","Bench Dip"],
-  biceps:["EZ-Bar Curl","Incline DB Curl","Hammer Curl","Cable Curl","Preacher Curl","Chin-Up","Machine Preacher Curl","Zottman Curl"],
-  quads:["Back Squat","Hack Squat","Leg Press","Front Squat","Goblet Squat","Leg Extension","Bulgarian Split Squat","Walking Lunge","Reverse Lunge","Step-Up","Sissy Squat","Wall Sit","Kettlebell Front Squat","Kettlebell Reverse Lunge","Kettlebell Bulgarian Split Squat","Belt Squat","Smith Machine Squat","Split Squat","Box Squat"],
-  hamstrings:["Romanian Deadlift","Seated Leg Curl","Lying Leg Curl","Single-Leg RDL","Nordic Curl","Kettlebell Romanian Deadlift","Two-Hand Kettlebell Swing","Glute-Ham Raise","Stiff-Leg Deadlift"],
-  glutes:["Hip Thrust","Bulgarian Split Squat","Cable Pull-Through","Glute Bridge","Single-Leg Glute Bridge","Reverse Lunge","Two-Hand Kettlebell Swing","One-Arm Kettlebell Swing","Kettlebell Snatch","Sumo Deadlift"],
-  calves:["Standing Calf Raise","Seated Calf Raise","Leg-Press Calf Raise","Single-Leg Calf Raise","Donkey Calf Raise"],
-  core:["Cable Crunch","Hanging Leg Raise","Hanging Knee Raise","Toes-to-Bar","Ab Wheel Rollout","Pallof Press","Cable Woodchopper","Landmine Rotation","Russian Twist","Plank","Reverse Plank","Hollow Hold (sec)","L-Sit","Side Plank","Bicycle Crunch","Reverse Crunch","V-Up","Decline Sit-Up","Flutter Kicks","Dead Bug","Kettlebell Windmill","Dumbbell Side Bend"]
+  reardelts:["Rear Delt Fly","Face Pulls","Reverse Pec Deck","Cable Rear Delt Fly","Bent-Over Lateral Raise","Band Pull-Aparts","Prone Y-Raise","Cable Y-Raise"],
+  triceps:["Overhead Triceps Extension","Triceps Pushdown","Close-Grip Bench Press","Skull Crusher","Diamond Push-Ups","Machine Triceps Extension","Bench Dip","Rope Pushdown","Rope Overhead Triceps Extension","Machine Dip"],
+  biceps:["EZ-Bar Curl","Incline DB Curl","Hammer Curl","Cable Curl","Preacher Curl","Chin-Up","Machine Preacher Curl","Zottman Curl","Machine Biceps Curl","Bayesian Cable Curl"],
+  quads:["Back Squat","Hack Squat","Leg Press","Front Squat","Goblet Squat","Leg Extension","Bulgarian Split Squat","Walking Lunge","Reverse Lunge","Step-Up","Sissy Squat","Wall Sit","Kettlebell Front Squat","Kettlebell Reverse Lunge","Kettlebell Bulgarian Split Squat","Belt Squat","Smith Machine Squat","Split Squat","Box Squat","Pendulum Squat","V-Squat","Seated Leg Press","Smith Machine Split Squat"],
+  hamstrings:["Romanian Deadlift","Seated Leg Curl","Lying Leg Curl","Single-Leg RDL","Nordic Curl","Kettlebell Romanian Deadlift","Two-Hand Kettlebell Swing","Glute-Ham Raise","Stiff-Leg Deadlift","Standing Leg Curl"],
+  glutes:["Hip Thrust","Bulgarian Split Squat","Cable Pull-Through","Glute Bridge","Single-Leg Glute Bridge","Reverse Lunge","Two-Hand Kettlebell Swing","One-Arm Kettlebell Swing","Kettlebell Snatch","Sumo Deadlift","Smith Machine Hip Thrust"],
+  calves:["Standing Calf Raise","Seated Calf Raise","Leg-Press Calf Raise","Single-Leg Calf Raise","Donkey Calf Raise","Smith Machine Calf Raise"],
+  core:["Cable Crunch","Hanging Leg Raise","Hanging Knee Raise","Toes-to-Bar","Ab Wheel Rollout","Pallof Press","Cable Woodchopper","Landmine Rotation","Russian Twist","Plank","Reverse Plank","Hollow Hold (sec)","L-Sit","Side Plank","Bicycle Crunch","Reverse Crunch","V-Up","Decline Sit-Up","Flutter Kicks","Dead Bug","Kettlebell Windmill","Dumbbell Side Bend","Rotary Torso"]
 };
 const FB_GROUPS=["quads","chest","upperback","lats","shoulders","sidedelts","hamstrings","glutes","core"];
 // Kettlebell-only mode: a dedicated per-muscle pool (rep-based moves only — carries & get-ups stay
