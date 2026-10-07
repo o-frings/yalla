@@ -2343,6 +2343,13 @@ let draft={};   // in-progress entries per workout, kept until the workout is sa
 let swaps={}, swapIdx=null;
 let freeMode=false;
 let timer={ elapsed:0, startedAt:null, running:false, iv:null };
+// Session-clock reading at the last COMPLETED set, and the wall clock of the same moment. Two stamps
+// because they answer different questions: the elapsed reading survives tmrPause/tmrReset and so is the
+// honest session length, while only a wall clock can measure "how long have you been away" across an
+// app suspension.
+let _lastSetEl=0, _lastSetAt=0, _absenceAsked=false;
+const ABSENT_MS   = 30*60*1000;    // no completed set for this long → offer to finish
+const DRAFT_TTL   = 20*3600*1000;  // how long a mid-session draft stays restorable (matches applyDraft)
 let rest={ elapsed:0, target:180, startedAt:null, alerted:false, iv:null };
 function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) set.push(n); };
   add(e.n); (e.alts||[]).forEach(add); (ALTS[e.n]||[]).forEach(add);   // suggested picks first
@@ -2433,6 +2440,19 @@ function tmrRender(){
 // A session is "underway" once the clock is running or paused mid-workout. In that state the Workout
 // screen drops its setup chrome (start buttons, day toggle, header icons) so training fills the screen.
 function sessionUnderway(){ return timer.running || timer.elapsed>0; }
+// "Still training?" — offered when a session is open but no set has been completed for ABSENT_MS.
+// On iOS the page is suspended while backgrounded, so this fires on RETURN rather than during the absence;
+// a true push needs a push listener in sw.js, which doesn't exist. Finishing is non-destructive: the prompt
+// saves through the normal Finish path, which counts time to the last set (B5).
+function maybeAskFinish(){
+  if(!plans.length) return;                       // init() hasn't finished loading yet
+  if(_absenceAsked || !sessionUnderway() || !_lastSetAt) return;
+  if($("confirmWrap") && $("confirmWrap").classList.contains("show")) return;
+  const ago=Math.round((Date.now()-_lastSetAt)/60000); if(ago < ABSENT_MS/60000) return;
+  _absenceAsked=true;                             // re-armed by the next completed set (see restStart)
+  confirmAsk("No sets for "+ago+" minutes. Finish this workout? Your time counts up to your last set.",
+             "Finish", ()=>{ try{ Promise.resolve($("saveBtn").onclick()).catch(()=>toast("Couldn't save — your sets are still here.")); }catch(e){} }, "go");
+}
 function updateTrainingState(){ document.body.classList.toggle("training", sessionUnderway()); }
 // Pin the session + rest timers to the top while a workout's underway (active timer OR a running
 // rest). .stick enables position:sticky; an IntersectionObserver adds .stuck (the backdrop) only once
@@ -2445,7 +2465,10 @@ function updateTimerStick(){
 }
 function tmrStart(){ if(timer.running) return; timer.startedAt=Date.now(); timer.running=true; timer.iv=setInterval(tmrRender,1000); tmrRender(); acquireWake(); }
 function tmrPause(){ if(!timer.running) return; timer.elapsed=tmrElapsed(); timer.running=false; timer.startedAt=null; if(timer.iv){clearInterval(timer.iv);timer.iv=null;} tmrRender(); if(!(rest.iv&&rest.startedAt)) releaseWake(); }
-function tmrReset(){ timer.elapsed=0; timer.running=false; timer.startedAt=null; if(timer.iv){clearInterval(timer.iv);timer.iv=null;} tmrRender(); if(!(rest.iv&&rest.startedAt)) releaseWake(); }
+function tmrReset(){ timer.elapsed=0; timer.running=false; timer.startedAt=null;
+  _lastSetEl=0; _lastSetAt=0; _absenceAsked=false;   // a reset session must not inherit a stale stamp
+  document.querySelectorAll("#exlist .setrow").forEach(r=>r.dataset.rested="");
+  if(timer.iv){clearInterval(timer.iv);timer.iv=null;} tmrRender(); if(!(rest.iv&&rest.startedAt)) releaseWake(); }
 $("tmrToggle").onclick=()=> timer.running ? tmrPause() : tmrStart();
 $("tmrReset").onclick=tmrReset;
 tmrRender();
@@ -2463,11 +2486,19 @@ let _wakeLock=null;
 async function acquireWake(){ try{ if("wakeLock" in navigator && !_wakeLock){ _wakeLock=await navigator.wakeLock.request("screen"); _wakeLock.addEventListener("release",()=>{ _wakeLock=null; }); } }catch(e){} }
 function releaseWake(){ try{ if(_wakeLock){ _wakeLock.release(); _wakeLock=null; } }catch(e){} }
 // the OS drops a wake lock when the tab backgrounds; re-acquire on return if a timer is still active
-document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && (timer.running || (rest.iv && rest.startedAt))) acquireWake(); });
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState!=="visible") return;
+  // repaint both clocks on return: the intervals are throttled or frozen while backgrounded, so the
+  // displayed time can be minutes stale even though the underlying Date.now() maths is sound
+  if(timer.running||timer.elapsed>0) tmrRender();
+  if(rest.iv&&rest.startedAt){ rest.elapsed=Math.max(0,Math.round((Date.now()-rest.startedAt)/1000)); restRender(); }
+  if(timer.running || (rest.iv && rest.startedAt)) acquireWake();
+  maybeAskFinish(); });
+setInterval(()=>{ try{ maybeAskFinish(); }catch(e){} }, 60000);
 function restRender(){ const t=rest.elapsed; $("restTime").textContent=tmrFmt(t);
   $("restProg").style.width=(rest.target?Math.max(0,Math.min(100,(t/rest.target)*100)):0)+"%"; }
 // counts UP from 0; called fresh every time a set is finished so rest never carries over between sets
-function restStart(sec){ rest.target=Math.max(5, sec||settings.restSec||180); rest.elapsed=0; rest.startedAt=Date.now(); rest.alerted=false; ensureNotifyPerm();
+function restStart(sec){ _lastSetEl=tmrElapsed(); _lastSetAt=Date.now(); _absenceAsked=false;
+  rest.target=Math.max(5, sec||settings.restSec||180); rest.elapsed=0; rest.startedAt=Date.now(); rest.alerted=false; ensureNotifyPerm();
   $("restBar").classList.add("show"); $("restBar").classList.remove("done"); restRender(); updateTimerStick(); acquireWake();
   if(rest.iv) clearInterval(rest.iv);
   rest.iv=setInterval(()=>{ rest.elapsed=Math.max(0,Math.round((Date.now()-rest.startedAt)/1000)); restRender(); if(!rest.alerted && rest.elapsed>=rest.target) restReached(); }, 250); }
@@ -2509,7 +2540,10 @@ $("exlist").addEventListener("change", e=>{ if(!e.target.classList||(!e.target.c
   const wv=row.querySelector(".w").value.trim(), rv=row.querySelector(".r").value.trim();
   // a set is "done" once reps are in and either a weight is entered, it's a timed hold, or it's a
   // bodyweight move (no weight needed) — the bodyweight case is why rest sometimes didn't start.
-  if(rv!=="" && (wv!=="" || row.classList.contains("timed") || (name&&isBW(name)))){ if(!timer.running && timer.elapsed===0) tmrStart(); restStart(); } captureDraft();
+  // write-once per row: going back to fix a typo on set 1 used to send a running 2:40 rest back to 0:00,
+  // and the blur fired by tapping Finish used to re-stamp the last-set time at Finish time
+  if(!row.dataset.rested && rv!=="" && (wv!=="" || row.classList.contains("timed") || (name&&isBW(name)))){
+    row.dataset.rested="1"; if(!timer.running && timer.elapsed===0) tmrStart(); restStart(); } captureDraft();
   refreshSetFocus(g); });
 // Visual focus only: fade the sets you've completed so the one you're on leads the eye. Same "done"
 // rule as the rest-timer trigger; never changes what's logged.
@@ -2739,6 +2773,23 @@ async function init(){
   const ni = nextRotateIndex(activePlan()); curWk = ni>=0?ni:0;
   await loadEvidence(); // load canonical evidence.json → builds the coach-tip pool + Learn library
   decideTip();          // pick this launch's coach tip (if any) before the first render
+  // Bring a mid-workout session back after a reload or an app kill. The service worker reloads the page on
+  // every deploy and iOS evicts backgrounded PWAs, so a zeroed clock on a screen full of logged sets was
+  // the commonest "the timer bugs" report. ONE-SHOT here — never from applyDraft(), which re-runs on every
+  // mid-session render and would snap a live clock backwards on every tap.
+  if(draft.__mode==="free") freeMode=true;
+  const _d=draft[draftSig()];
+  if(_d && _d.tm && Date.now()-(_d.t||0) <= DRAFT_TTL){
+    const gap=Date.now()-(_d.t||0);
+    // count only up to the last moment the app actually saw you (draft.t is refreshed by every keystroke
+    // and by flushDraft on pagehide) — a phone that evicted the tab overnight must not come back showing
+    // a 14-hour workout.
+    timer.elapsed=(_d.tm.e||0) + (_d.tm.rn && _d.tm.sa ? Math.max(0,((_d.t||Date.now())-_d.tm.sa)/1000) : 0);
+    timer.running=false; timer.startedAt=null;
+    _lastSetEl=_d.le||0; _lastSetAt=_d.la||0;
+    if(_d.tm.rn && gap < ABSENT_MS) tmrStart();   // short gap → pick the clock straight back up
+    else tmrRender();                             // long gap → come back paused; maybeAskFinish offers Finish
+  }
   renderAll();
   showTab("overview");   // open on the coach home
   hideSplash();          // UI is painted — fade out the launch splash
@@ -2758,7 +2809,10 @@ function maybeBackupNudge(){
     setTimeout(()=>toast("Tip: back up your log in Settings ⚙ → Your data. Phones can clear saved app data.", true), 1400);
   }catch(e){}
 }
-function renderAll(){ renderNav(); renderDash(); renderSeg(); renderWorkout(); }
+// renderAll was the one render path that ignored freeMode, so anything calling it mid-free-session (theme
+// apply, plan save/delete, restore, boot resume) painted the plan day over the free workout — and the next
+// captureDraft() then wrote those plan rows into draft["free"].
+function renderAll(){ renderNav(); renderDash(); renderSeg(); if(freeMode) renderFree(); else renderWorkout(); }
 
 // ================= dashboard =================
 function renderNav(){
@@ -3870,7 +3924,8 @@ function captureDraft(){
     const bar=g.querySelector(".efbar"); if(bar){ efmap[name]=+bar.dataset.ef; efauto[name]=bar.dataset.auto==="1"?1:0; }
   });
   if(Object.keys(map).length===0) return; // nothing on screen (e.g. mid-unload) — don't clobber a saved draft
-  draft[sig]={ t:Date.now(), s:map, ef:efmap, efa:efauto };
+  draft[sig]={ t:Date.now(), s:map, ef:efmap, efa:efauto, tm:{e:timer.elapsed, sa:timer.startedAt, rn:timer.running}, le:_lastSetEl, la:_lastSetAt };
+  draft.__mode = freeMode ? "free" : "plan";   // draft is device-only (not in CLOUD_KEYS), so no sync surface
   clearTimeout(_draftTimer); _draftTimer=setTimeout(()=>{ sset("draft", draft); }, 350);
   liveTick();   // if broadcasting, stream the latest set to watchers (throttled)
   renderSessionRose();   // keep the bottom-of-page balance rose in step with what's logged
@@ -4073,7 +4128,11 @@ $("saveBtn").onclick=async()=>{
   await sset("history",hist);
   _repDenom=null;   // new Max sets may shift the self-calibrated effort denominator
   await ledgerTick(true);   // score matured forecasts, update the posterior, emit this week's predictions
-  const mins=Math.round(tmrElapsed()/60);
+  // Session length runs to the LAST SET COMPLETED, not to the moment Finish was tapped — packing up,
+  // showering or forgetting to hit Finish shouldn't inflate your training time. Floor at a minute so a
+  // quick session doesn't read "0 min" (the first set stamps at ~0s, since the clock auto-starts on the
+  // very keystroke being stamped); a session with nothing stamped falls back to the full clock.
+  const mins=Math.max(session.sets>0?1:0, Math.round((_lastSetEl>0 ? _lastSetEl : tmrElapsed())/60));
   if(mins>0){ settings.timeTotal=(settings.timeTotal||0)+mins; }
   session.mins=mins; session.beaten=beaten; session.sub=logged+" exercise"+(logged>1?"s":"");
   tmrReset(); restStop(); endLive(true);   // close any live broadcast; the finished workout posts to the feed below
@@ -5739,7 +5798,7 @@ function removeSetRow(r){
   const g=r.closest(".group"); if(!g) return;
   const rows=g.querySelectorAll(".setrow");
   if(rows.length<=1){ const w=r.querySelector(".w"), rp=r.querySelector(".r");
-    if(w) w.value=""; if(rp) rp.value=""; r.dataset.pvol=""; updateSetVol(r, g.dataset.ex); captureDraft(); return; }
+    if(w) w.value=""; if(rp) rp.value=""; r.dataset.pvol=""; r.dataset.rested=""; updateSetVol(r, g.dataset.ex); captureDraft(); return; }
   r.remove();
   g.querySelectorAll(".setrow .sn").forEach((sn,i)=> sn.textContent=i+1);
   captureDraft();
@@ -5747,7 +5806,11 @@ function removeSetRow(r){
 $("exlist").addEventListener("input", e=>{ if(!e.target.classList||(!e.target.classList.contains("w")&&!e.target.classList.contains("r"))) return;
   if(e.target.classList.contains("w")){ let v=e.target.value.replace(/,/g,".").replace(/[^0-9.]/g,""); const i=v.indexOf("."); if(i>=0) v=v.slice(0,i+1)+v.slice(i+1).replace(/\./g,""); if(v!==e.target.value) e.target.value=v; }
   if(!timer.running && timer.elapsed===0 && e.target.value.trim()!=="") tmrStart();
-  const r=e.target.closest(".setrow"), g=e.target.closest(".group"); if(r&&g){ updateSetVol(r, g.dataset.ex); refreshAutoEffort(g); } captureDraft(); });
+  const r=e.target.closest(".setrow"), g=e.target.closest(".group");
+  if(r&&g){ updateSetVol(r, g.dataset.ex); refreshAutoEffort(g);
+    // stamp only — the rest countdown still starts on blur, as it does today
+    if(!r.dataset.rested && setRowDone(r, g.dataset.ex)){ _lastSetEl=tmrElapsed(); _lastSetAt=Date.now(); _absenceAsked=false; } }
+  captureDraft(); });
 function updateSetVol(r, name){
   const wv=r.querySelector(".w").value.trim(), rv=r.querySelector(".r").value.trim(), vEl=r.querySelector(".vol");
   if(r.classList.contains("warm")){ vEl.textContent="warm-up"; vEl.classList.remove("live","fillable"); r.classList.remove("novol"); setRowPR(r,false); return; }

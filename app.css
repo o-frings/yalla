@@ -864,6 +864,8 @@
   .cbox .cbtns button{ flex:1; padding:16px; border-radius:12px; font-size:15px; font-weight:600; cursor:pointer; border:none; }
   .cbox .cancel{ background:var(--row); color:var(--ink); }
   .cbox .danger{ background:var(--red); color:#fff; }
+  /* affirmative confirm — finishing a workout isn't destructive, so it must not render red */
+  .cbox .go{ background:var(--accent); color:#fff; }
   .cbox .go{ background:var(--accent); color:#fff; }
   .cue{ font-size:14px; color:var(--accent); font-weight:500; padding:0 0 16px; line-height:1.45; }
   .cue.soft{ color:var(--l2); font-weight:400; }
