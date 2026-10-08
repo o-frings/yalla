@@ -9,9 +9,8 @@
     --on-accent:#ffffff;     /* label on --accent-fill and on --grad */
     --accent-hi:#ff7a3a;     /* accent on the always-dark toast (the reduced-motion ✦) */
     --series2:#4dabf7;       /* forecast "current pace" companion series */
-    /* brand + effort never follow the accent picker */
+    /* brand never follows the accent picker */
     --brand:#e8551c; --brand-grad:linear-gradient(135deg,#ff7a18 0%,#ff2f3d 100%);
-    --effort:#e8551c; --effort-soft:rgba(232,85,28,.10);
     --pop:#ffffff; --pop-shadow:0 14px 38px rgba(0,0,0,.24);   /* floating menus */
     --grad:linear-gradient(135deg,#ff7a18 0%,#ff2f3d 100%);
     --segtrack:#e8e8ee; --segthumb:#ffffff;
@@ -66,7 +65,6 @@
     --warntx:#ffc566;
     --goodtx:#69db7c; --holdtx:#ffc078; --badtx:#ff8787;
     --brand:#ff7a3a; --brand-grad:linear-gradient(135deg,#ff7a18 0%,#ff3450 100%);
-    --effort:#ff7a3a; --effort-soft:rgba(255,122,58,.16);
   }
   /* accent picker (Settings → Appearance). Orange is the default above, with no attribute.
      Light blocks are html[data-accent] (0,1,1); dark blocks html.dark[data-accent] (0,2,1) and restate every token. */
@@ -1489,7 +1487,7 @@
   .efseg{ flex:0 0 auto; border:.5px solid transparent; background:var(--field); color:var(--l2);
     font-size:var(--t-sm); font-weight:var(--w-semi); padding:7px 12px; border-radius:var(--r-sm); cursor:pointer; transition:transform .12s, background .15s, color .15s, border-color .15s; }
   .efseg:active{ transform:scale(.93); }
-  .efseg.on{ background:var(--effort-soft); color:var(--effort); border-color:var(--effort); }   /* stays orange under every accent */
+  .efseg.on{ background:var(--accent-soft); color:var(--accent); border-color:var(--accent); }
   .freeadd{ padding:12px var(--pad-card); }
   .addset{ cursor:pointer; font-weight:var(--w-semi); display:inline-flex; align-items:center; gap:3px; padding:0 8px; margin:-8px -8px; min-height:44px; }   /* 44px hit box, 28px in the row */
 
@@ -1513,6 +1511,19 @@
   .confetti i{ position:absolute; top:-14px; width:calc(9px*var(--sz,1)); height:calc(14px*var(--sz,1)); border-radius:2px; opacity:.95;
     animation:fall var(--dur,1.5s) cubic-bezier(.18,.7,.4,1) forwards; }
   @keyframes fall{ to{ transform:translate(var(--dx,0), 110vh) rotate(620deg); opacity:.85; } }
+  /* gold/white 4-point sparks in the confetti: they twinkle while they fall (or fly) */
+  .confetti i.spk{ width:var(--s); height:var(--s); border-radius:0; clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%);
+    animation:fall var(--dur,1.5s) cubic-bezier(.18,.7,.4,1) forwards, spkTw .7s ease-in-out infinite alternate; }
+  @keyframes spkTw{ from{ scale:.5; } to{ scale:1.2; } }
+  /* cannons (PRs, unlocks): shot up from a bottom corner to --bx/--by, then a fall of --dy with sway, spinning */
+  .confetti i.can{ opacity:0; animation:canMove var(--life) linear var(--dl) forwards, canSpin var(--life) linear var(--dl) forwards; }
+  .confetti i.can.spk{ animation:canMove var(--life) linear var(--dl) forwards, canSpin var(--life) linear var(--dl) forwards, spkTw .7s ease-in-out infinite alternate; }
+  @keyframes canMove{
+    0%{ translate:0 0; opacity:1; animation-timing-function:cubic-bezier(.12,.75,.3,1); }
+    34%{ translate:var(--bx) var(--by); animation-timing-function:ease-in; }
+    80%{ opacity:1; }
+    100%{ translate:calc(var(--bx) + var(--sw)) calc(var(--by) + var(--dy)); opacity:0; } }
+  @keyframes canSpin{ from{ rotate:var(--r0,0deg); } to{ rotate:calc(var(--r0,0deg) + var(--rot,540deg)); } }
   /* pink glitter: sequins (.sq), 4-point sparkles (.sp) and holographic flakes (.fl), built by glitter() in app.js.
      A radial burst (0–22% of life), then an ease-in drift with sway. Only translate, scale, rotate and opacity
      animate. Per piece: --s size, --bx/--by burst end, --dy drift, --sw sway, --life, --dl delay, --r0/--rot spin. */
@@ -1524,6 +1535,11 @@
   .glitter i.t2{ animation-name:glitMove, glitTw2; }
   .glitter .sq{ border-radius:50%; }
   .glitter .sp{ clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%); }
+  /* a soft flash where the burst starts */
+  .glitter .flash{ position:absolute; display:block; width:280px; height:280px; margin:-140px 0 0 -140px; border-radius:50%; opacity:0;
+    background:radial-gradient(circle, rgba(255,255,255,.95) 0, var(--glit-2) 20%, color-mix(in srgb, var(--glit-1) 40%, transparent) 42%, transparent 70%);
+    animation:glitFlash .75s ease-out forwards; }
+  @keyframes glitFlash{ 0%{ scale:.15; opacity:0; } 16%{ opacity:.8; } 100%{ scale:1.7; opacity:0; } }
   @keyframes glitMove{
     0%{ translate:0 0; animation-timing-function:cubic-bezier(.12,.8,.3,1); }
     22%{ translate:var(--bx) var(--by); }
