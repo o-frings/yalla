@@ -5,7 +5,13 @@
     --ink:#1c1c1e; --l2:#6e6e73; --l3:#a6a6ac;
     --sep:rgba(60,60,67,.11);
     --accent:#e8551c; --accent-soft:rgba(232,85,28,.10);
-    --accent-fill:#e8551c;   /* solid fill under white text (dark mode's --accent is too light for that) */
+    --accent-fill:#e8551c;   /* solid fill under --on-accent text (dark mode's --accent is too light for that) */
+    --on-accent:#ffffff;     /* label on --accent-fill and on --grad */
+    --accent-hi:#ff7a3a;     /* accent on the always-dark toast (the reduced-motion ✦) */
+    --series2:#4dabf7;       /* forecast "current pace" companion series */
+    /* brand + effort never follow the accent picker */
+    --brand:#e8551c; --brand-grad:linear-gradient(135deg,#ff7a18 0%,#ff2f3d 100%);
+    --effort:#e8551c; --effort-soft:rgba(232,85,28,.10);
     --pop:#ffffff; --pop-shadow:0 14px 38px rgba(0,0,0,.24);   /* floating menus */
     --grad:linear-gradient(135deg,#ff7a18 0%,#ff2f3d 100%);
     --segtrack:#e8e8ee; --segthumb:#ffffff;
@@ -59,7 +65,49 @@
     --red:#ff453a;
     --warntx:#ffc566;
     --goodtx:#69db7c; --holdtx:#ffc078; --badtx:#ff8787;
+    --brand:#ff7a3a; --brand-grad:linear-gradient(135deg,#ff7a18 0%,#ff3450 100%);
+    --effort:#ff7a3a; --effort-soft:rgba(255,122,58,.16);
   }
+  /* accent picker (Settings → Appearance). Orange is the default above, with no attribute.
+     Light blocks are html[data-accent] (0,1,1); dark blocks html.dark[data-accent] (0,2,1) and restate every token. */
+  /* celebrations: Pink bursts glitter (--glit-*); Blue, Teal and Graphite burst confetti in --cel-1…6 = accent,
+     accent + 35% white, + 65% white, + 20% black, gold, cream (no cream on light). Orange keeps its JS palettes. */
+  html[data-accent="pink"]{
+    --accent:#c02c85; --accent-soft:rgba(212,80,181,.09); --accent-glow:rgba(242,86,156,.38); --accent-fill:#c02c85;
+    --grad:linear-gradient(135deg,#f2569c 0%,#ce3aa0 100%); --accent-hi:#fc68c5;
+    /* glitter: accent, rose, blush, pearl, champagne, lilac (on light: pearl, not white, and both deepened to show on the page) */
+    --glit-1:var(--accent); --glit-2:#f06aa8; --glit-3:#f08cbc; --glit-4:#e09cbf; --glit-5:#d9a94a; --glit-6:#a77be8; }
+  html.dark[data-accent="pink"]{
+    --accent:#fc68c5; --accent-soft:rgba(212,80,181,.15); --accent-glow:rgba(252,104,197,.36); --accent-fill:#de4caa;
+    --grad:linear-gradient(135deg,#f2569c 0%,#ce3aa0 100%);
+    --glit-1:var(--accent); --glit-2:#ff8cc3; --glit-3:#ffc2df; --glit-4:#ffffff; --glit-5:#f6d38a; --glit-6:#c8a2ff; }
+  html[data-accent="blue"]{
+    --accent:#016ccc; --accent-soft:rgba(54,133,234,.11); --accent-glow:rgba(42,138,223,.40); --accent-fill:#016ccc;
+    --grad:linear-gradient(135deg,#2a8adf 0%,#3d66df 100%); --accent-hi:#53a1fc;
+    --cel-1:#016ccc; --cel-2:#5a9fde; --cel-3:#a6cced; --cel-4:#0156a3; --cel-5:#e0a800;
+    --series2:#6e6e73; }   /* = --l2: "current pace" goes neutral next to a blue plan line */
+  html.dark[data-accent="blue"]{
+    --accent:#53a1fc; --accent-soft:rgba(54,133,234,.18); --accent-glow:rgba(83,161,252,.38); --accent-fill:#3886df;
+    --grad:linear-gradient(135deg,#2a8adf 0%,#3d66df 100%);
+    --cel-1:#53a1fc; --cel-2:#8fc2fd; --cel-3:#c3defe; --cel-4:#4281ca; --cel-5:#ffd60a; --cel-6:#fff8e7;
+    --series2:#98989e; }
+  html[data-accent="teal"]{
+    --accent:#087a7c; --accent-soft:rgba(0,160,153,.09); --accent-glow:rgba(0,150,145,.34); --accent-fill:#087a7c;
+    --grad:linear-gradient(135deg,#00a199 0%,#007d8f 100%); --accent-hi:#15b1b0;
+    --cel-1:#087a7c; --cel-2:#5ea9aa; --cel-3:#a9d0d1; --cel-4:#066263; --cel-5:#e0a800; }
+  html.dark[data-accent="teal"]{
+    --accent:#15b1b0; --accent-soft:rgba(21,177,176,.15); --accent-glow:rgba(21,177,176,.34); --accent-fill:#029494;
+    --grad:linear-gradient(135deg,#00a199 0%,#007d8f 100%);
+    --cel-1:#15b1b0; --cel-2:#67cccc; --cel-3:#ade4e3; --cel-4:#118e8d; --cel-5:#ffd60a; --cel-6:#fff8e7; }
+  html[data-accent="graphite"]{
+    --accent:#3a3a3c; --accent-soft:rgba(60,60,67,.07); --accent-glow:rgba(28,28,30,.28); --accent-fill:#3a3a3c;
+    --grad:linear-gradient(135deg,#5c5c60 0%,#2c2c2e 100%); --accent-hi:#d1d1d6;
+    --cel-1:#3a3a3c; --cel-2:#7f7f80; --cel-3:#bababb; --cel-4:#2e2e30; --cel-5:#e0a800; }
+  html.dark[data-accent="graphite"]{
+    --accent:#d1d1d6; --accent-soft:rgba(235,235,245,.08); --accent-glow:rgba(255,255,255,.14); --accent-fill:#d1d1d6;
+    --grad:linear-gradient(135deg,#f2f2f7 0%,#c7c7cc 100%);
+    --on-accent:#1c1c1e;     /* light button, dark label */
+    --cel-1:#d1d1d6; --cel-2:#e1e1e4; --cel-3:#efeff1; --cel-4:#a7a7ab; --cel-5:#ffd60a; --cel-6:#fff8e7; }
   *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; -webkit-font-smoothing:antialiased; -webkit-text-size-adjust:100%; text-size-adjust:100%;}
   html,body{ touch-action:manipulation; }
   html,body{ color:var(--ink); font-size:var(--t-md);
@@ -106,9 +154,9 @@
   @keyframes splashRise{ from{ opacity:0; transform:translateY(2%) scale(.96); } to{ opacity:1; transform:translateY(-4%) scale(1); } }
 
   .wordmark{ font-size:var(--t-lg); font-weight:var(--w-bold); letter-spacing:.5px; text-transform:lowercase;
-    background:var(--grad); -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    background:var(--brand-grad); -webkit-background-clip:text; -webkit-text-fill-color:transparent;
     background-clip:text; display:inline-block; }
-  .wordmark::after{ content:"."; color:var(--accent); -webkit-text-fill-color:var(--accent); }
+  .wordmark::after{ content:"."; color:var(--brand); -webkit-text-fill-color:var(--brand); }
  .nav{ padding: calc(6px + env(safe-area-inset-top)) 16px 4px; display:flex; align-items:center; justify-content:flex-end;
     position:sticky; top:0; z-index:30; margin:0 -16px;
     background:color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); }
@@ -390,7 +438,7 @@
   .codeval{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:var(--t-xl); font-weight:var(--w-bold); letter-spacing:4px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; }
   /* editable own-avatar: a little pencil overlay */
   .avwrap{ position:relative; flex:0 0 auto; cursor:pointer; -webkit-tap-highlight-color:transparent; }
-  .avwrap .avedit{ position:absolute; right:-2px; bottom:-2px; width:20px; height:20px; border-radius:50%; background:var(--accent-fill); color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 0 0 2px var(--card); }
+  .avwrap .avedit{ position:absolute; right:-2px; bottom:-2px; width:20px; height:20px; border-radius:50%; background:var(--accent-fill); color:var(--on-accent); display:flex; align-items:center; justify-content:center; box-shadow:0 0 0 2px var(--card); }
   .avwrap .avedit svg{ width:11px; height:11px; }
   /* avatar editor */
   .avpreview{ display:flex; justify-content:center; padding:6px 0 14px; }
@@ -586,7 +634,7 @@
   .msg-row.mine{ align-items:flex-end; }
   .msg-row.theirs{ align-items:flex-start; }
   .msg-bubble{ max-width:78%; padding:9px 13px; border-radius:18px; font-size:var(--t-md); line-height:1.4; word-wrap:break-word; position:relative; user-select:none; -webkit-user-select:none; touch-action:manipulation; }
-  .msg-row.mine .msg-bubble{ background:var(--accent-fill); color:#fff; border-bottom-right-radius:5px; }
+  .msg-row.mine .msg-bubble{ background:var(--accent-fill); color:var(--on-accent); border-bottom-right-radius:5px; }
   .msg-row.theirs .msg-bubble{ background:var(--row); color:var(--ink); border-bottom-left-radius:5px; }
   .msg-time{ display:block; font-size:var(--t-xs); margin-top:3px; opacity:.65; text-align:right; }
   .msg-row.theirs .msg-time{ text-align:left; }
@@ -706,7 +754,7 @@
   input[type=number]{ -moz-appearance:textfield; appearance:textfield; }
   input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{ -webkit-appearance:none; margin:0; }
 
-  .btn{ background:var(--grad); color:#fff; border:none; border-radius:var(--r-md); padding:16px 20px;
+  .btn{ background:var(--grad); color:var(--on-accent); border:none; border-radius:var(--r-md); padding:16px 20px;
     font-size:var(--t-lg); font-weight:var(--w-semi); cursor:pointer; font-family:inherit;
     box-shadow:0 6px 18px -6px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,.22); }
   /* gradient + glow are for a screen's one primary CTA; small and secondary buttons stay flat */
@@ -806,6 +854,23 @@
   .seg.appearance{ margin:8px 0 4px; }
   .seg.appearance .s{ flex:1; }
   .setcard .seg.appearance .s{ min-width:0; padding:9px 4px; font-size:var(--t-sm); }
+  /* accent picker: 30px swatches in 44px hit areas; ring in that option's accent with a 2px gap */
+  .accsws{ display:flex; margin:0 -7px; }
+  .accsw{ flex:0 0 44px; width:44px; height:44px; padding:0; border:none; background:none; border-radius:50%; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; }
+  .accsw::before{ content:""; width:30px; height:30px; border-radius:50%; background:var(--sw); transition:box-shadow .15s, transform .12s; }
+  .accsw:active::before{ transform:scale(.9); }
+  .accsw[aria-checked="true"]::before{ box-shadow:0 0 0 2px var(--surface), 0 0 0 4px var(--swr); }
+  .accsw[data-acc="orange"]{ --sw:linear-gradient(135deg,#ff7a18 0%,#ff2f3d 100%); --swr:#e8551c; }
+  .accsw[data-acc="pink"]{ --sw:linear-gradient(135deg,#f2569c 0%,#ce3aa0 100%); --swr:#c02c85; }
+  .accsw[data-acc="blue"]{ --sw:linear-gradient(135deg,#2a8adf 0%,#3d66df 100%); --swr:#016ccc; }
+  .accsw[data-acc="teal"]{ --sw:linear-gradient(135deg,#00a199 0%,#007d8f 100%); --swr:#087a7c; }
+  .accsw[data-acc="graphite"]{ --sw:linear-gradient(135deg,#5c5c60 0%,#2c2c2e 100%); --swr:#3a3a3c; }
+  html.dark .accsw[data-acc="orange"]{ --sw:linear-gradient(135deg,#ff7a18 0%,#ff3450 100%); --swr:#ff7a3a; }
+  html.dark .accsw[data-acc="pink"]{ --swr:#fc68c5; }
+  html.dark .accsw[data-acc="blue"]{ --swr:#53a1fc; }
+  html.dark .accsw[data-acc="teal"]{ --swr:#15b1b0; }
+  html.dark .accsw[data-acc="graphite"]{ --sw:linear-gradient(135deg,#f2f2f7 0%,#c7c7cc 100%); --swr:#d1d1d6; }
 
   .exhead{ display:flex; align-items:center; gap:8px; padding:2px 0 8px; }
   .exhead .nm{ font-size:var(--t-lg); font-weight:var(--w-bold); letter-spacing:-.3px; flex:1; min-width:0; }
@@ -876,7 +941,7 @@
     background:var(--row); color:var(--ink); border:.5px solid var(--line); cursor:pointer; white-space:nowrap;
     transition:transform .12s cubic-bezier(.34,1.4,.6,1), background .15s, color .15s, border-color .15s; }
   .chip:active{ transform:scale(.94); }
-  .chip.on{ background:var(--accent-fill); color:#fff; border-color:var(--accent-fill); }
+  .chip.on{ background:var(--accent-fill); color:var(--on-accent); border-color:var(--accent-fill); }
   .cdot{ width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
   .exrow .eqic.sm{ color:var(--l3); display:inline-flex; align-items:center; flex:0 0 auto; }
   .exrow .eqic.sm svg{ width:17px; height:17px; }
@@ -914,7 +979,7 @@
   .cbox .cancel{ background:var(--row); color:var(--ink); }
   .cbox .danger{ background:var(--red); color:#fff; }
   /* affirmative confirm — finishing a workout isn't destructive, so it must not render red */
-  .cbox .go{ background:var(--accent-fill); color:#fff; }
+  .cbox .go{ background:var(--accent-fill); color:var(--on-accent); }
   .cue{ font-size:var(--t-md); color:var(--accent); font-weight:var(--w-med); padding:0 0 16px; line-height:1.45; }
   .cue.soft{ color:var(--l2); font-weight:var(--w-reg); }
   .sessrose-pad{ text-align:center; }
@@ -1036,7 +1101,7 @@
     display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:transform .12s; }
   .setrow .holdbtn svg{ width:16px; height:16px; }
   .setrow .holdbtn:active{ transform:scale(.9); }
-  .setrow .holdbtn.running{ background:var(--accent-fill); color:#fff; box-shadow:0 0 0 4px var(--accent-soft); }
+  .setrow .holdbtn.running{ background:var(--accent-fill); color:var(--on-accent); box-shadow:0 0 0 4px var(--accent-soft); }
   .setrow.timed .w{ max-width:66px; }
   .setrow .eq{ color:var(--l3); flex:0 0 auto; font-weight:var(--w-semi); font-size:var(--t-sm); }
   .setrow .vol{ font-size:var(--t-md); color:var(--l2); font-weight:var(--w-bold); min-width:56px; flex:0 0 auto; text-align:right; line-height:1; font-variant-numeric:tabular-nums; }
@@ -1047,12 +1112,12 @@
      one at a glance. Now the set number fills with the accent and the fade is light enough to read. */
   .setrow.done:not(.pr){ opacity:.68; }
   .setrow.done:focus-within{ opacity:1; }   /* tapping a completed set to edit brings it back */
-  .setrow.done .sn{ background:var(--accent-fill); color:#fff; font-weight:var(--w-bold); border-radius:var(--r-pill); }
+  .setrow.done .sn{ background:var(--accent-fill); color:var(--on-accent); font-weight:var(--w-bold); border-radius:var(--r-pill); }
   .setrow.warm.done .sn{ background:transparent; color:var(--accent); }   /* warm-ups keep their own mark */
   /* running tally in the exercise header, so finished lifts are obvious without reading their rows */
   .exhead .setcount{ font-size:var(--t-xs); font-weight:var(--w-bold); color:var(--l2); background:var(--track);
     border-radius:var(--r-pill); padding:3px 9px; flex:0 0 auto; font-variant-numeric:tabular-nums; letter-spacing:.2px; }
-  .exhead .setcount.all{ background:var(--accent-fill); color:#fff; }
+  .exhead .setcount.all{ background:var(--accent-fill); color:var(--on-accent); }
   .group.gdone .exhead .nm{ color:var(--l2); }
   .setrow .vol.live{ color:var(--ink); cursor:pointer; }
   .setrow .vol.live:active{ transform:scale(.9); opacity:.6; }
@@ -1070,7 +1135,7 @@
     cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; border-radius:50%; transition:color .15s, background .15s; }
   .setrow .setdel svg{ width:19px; height:19px; }
   .setrow .setdel:active{ color:var(--red); background:var(--fill); }
-  .setrow .prtag{ display:none; flex:0 0 auto; font-size:var(--t-xs); font-weight:var(--w-bold); letter-spacing:.4px; color:#fff; background:var(--accent-fill); padding:2px 8px; border-radius:var(--r-sm); line-height:1; }
+  .setrow .prtag{ display:none; flex:0 0 auto; font-size:var(--t-xs); font-weight:var(--w-bold); letter-spacing:.4px; color:var(--on-accent); background:var(--accent-fill); padding:2px 8px; border-radius:var(--r-sm); line-height:1; }
   .setrow.pr .prtag{ display:inline-flex; animation:prpop .5s cubic-bezier(.2,1.3,.5,1) both; }
   @keyframes prpop{ 0%{transform:scale(0);opacity:0;} 55%{transform:scale(1.3);} 100%{transform:scale(1);opacity:1;} }
   .prspark{ position:fixed; inset:0; pointer-events:none; z-index:250; }
@@ -1125,7 +1190,10 @@
     padding:12px 12px 12px 16px; border-radius:var(--r-md); box-shadow:0 10px 36px rgba(0,0,0,.4); opacity:0; transition:opacity .3s, transform .3s; }
   .coach.show{ display:flex; opacity:1; transform:translate(-50%,0); }
   .coachbody{ flex:1; font-size:var(--t-md); line-height:1.4; }
-  .coachx{ flex:0 0 auto; background:var(--accent-fill); color:#fff; border:none; border-radius:var(--r-sm); padding:8px 12px; font-size:var(--t-sm); font-weight:var(--w-bold); cursor:pointer; }
+  .coachx{ flex:0 0 auto; background:var(--accent-fill); color:var(--on-accent); border:none; border-radius:var(--r-sm); padding:8px 12px; font-size:var(--t-sm); font-weight:var(--w-bold); cursor:pointer; }
+  /* the coach card is always dark: in light mode the darker accent fills lose their edge on it, so use the
+     on-dark accent with a dark label (Orange keeps its fill) */
+  html[data-accent]:not(.dark) .coachx{ background:var(--accent-hi); color:#1c1c1e; }
   /* inline confirm — appears right under the control you edited; commits only on Confirm */
   .inlineconfirm{ display:none; align-items:center; gap:8px; margin:12px 0 0;
     background:var(--accent-soft); border-radius:var(--r-md); padding:12px 12px 12px 16px;
@@ -1134,7 +1202,7 @@
   .icmsg{ flex:1; font-size:var(--t-md); color:var(--ink); line-height:1.35; }
   .icbtns{ flex:0 0 auto; display:flex; align-items:center; gap:4px; }
   .iccancel{ background:none; border:none; color:var(--l2); font-size:var(--t-sm); font-weight:var(--w-semi); padding:8px 8px; cursor:pointer; }
-  .icok{ background:var(--accent-fill); color:#fff; border:none; border-radius:var(--r-sm); padding:8px 16px; font-size:var(--t-sm); font-weight:var(--w-bold); cursor:pointer; }
+  .icok{ background:var(--accent-fill); color:var(--on-accent); border:none; border-radius:var(--r-sm); padding:8px 16px; font-size:var(--t-sm); font-weight:var(--w-bold); cursor:pointer; }
   .icok:active,.iccancel:active{ opacity:.7; }
   .chip.pending{ box-shadow:0 0 0 2px var(--accent); }
 
@@ -1419,7 +1487,7 @@
   .efseg{ flex:0 0 auto; border:.5px solid transparent; background:var(--field); color:var(--l2);
     font-size:var(--t-sm); font-weight:var(--w-semi); padding:7px 12px; border-radius:var(--r-sm); cursor:pointer; transition:transform .12s, background .15s, color .15s, border-color .15s; }
   .efseg:active{ transform:scale(.93); }
-  .efseg.on{ background:var(--accent-soft); color:var(--accent); border-color:var(--accent); }
+  .efseg.on{ background:var(--effort-soft); color:var(--effort); border-color:var(--effort); }   /* stays orange under every accent */
   .freeadd{ padding:12px var(--pad-card); }
   .addset{ cursor:pointer; font-weight:var(--w-semi); display:inline-flex; align-items:center; gap:3px; padding:0 8px; margin:-8px -8px; min-height:44px; }   /* 44px hit box, 28px in the row */
 
@@ -1443,9 +1511,49 @@
   .confetti i{ position:absolute; top:-14px; width:calc(9px*var(--sz,1)); height:calc(14px*var(--sz,1)); border-radius:2px; opacity:.95;
     animation:fall var(--dur,1.5s) cubic-bezier(.18,.7,.4,1) forwards; }
   @keyframes fall{ to{ transform:translate(var(--dx,0), 110vh) rotate(620deg); opacity:.85; } }
+  /* pink glitter: sequins (.sq), 4-point sparkles (.sp) and holographic flakes (.fl), built by glitter() in app.js.
+     A radial burst (0–22% of life), then an ease-in drift with sway. Only translate, scale, rotate and opacity
+     animate. Per piece: --s size, --bx/--by burst end, --dy drift, --sw sway, --life, --dl delay, --r0/--rot spin. */
+  .glitter{ position:fixed; inset:0; pointer-events:none; z-index:200; contain:strict; overflow:hidden; }
+  .glitter i{ position:absolute; display:block; width:var(--s); height:var(--s); margin:calc(var(--s) / -2) 0 0 calc(var(--s) / -2);
+    opacity:0; rotate:var(--r0,0deg); will-change:transform,opacity;
+    animation:glitMove var(--life) linear var(--dl) forwards, glitTw0 var(--life) ease-in-out var(--dl) forwards; }
+  .glitter i.t1{ animation-name:glitMove, glitTw1; }
+  .glitter i.t2{ animation-name:glitMove, glitTw2; }
+  .glitter .sq{ border-radius:50%; }
+  .glitter .sp{ clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%); }
+  @keyframes glitMove{
+    0%{ translate:0 0; animation-timing-function:cubic-bezier(.12,.8,.3,1); }
+    22%{ translate:var(--bx) var(--by); }
+    45%{ translate:calc(var(--bx) + var(--sw)) calc(var(--by) + var(--dy) * .09); }
+    70%{ translate:calc(var(--bx) - var(--sw)) calc(var(--by) + var(--dy) * .38); }
+    90%{ translate:calc(var(--bx) + var(--sw) * .6) calc(var(--by) + var(--dy) * .76); }
+    100%{ translate:var(--bx) calc(var(--by) + var(--dy)); } }
+  /* twinkle: scale .4 → 1.1 → .7 → 1 → 0, in three phases; opacity fades in by 6% and out from 75% */
+  @keyframes glitTw0{ 0%{ scale:.4; opacity:0; rotate:var(--r0,0deg); } 6%{ opacity:1; } 24%{ scale:1.1; } 44%{ scale:.7; opacity:.7; }
+    62%{ scale:1; opacity:1; } 75%{ opacity:1; } 100%{ scale:0; opacity:0; rotate:calc(var(--r0,0deg) + var(--rot,0deg)); } }
+  @keyframes glitTw1{ 0%{ scale:.4; opacity:0; rotate:var(--r0,0deg); } 6%{ opacity:1; } 14%{ scale:1.1; } 34%{ scale:.7; opacity:.7; }
+    54%{ scale:1; opacity:1; } 75%{ opacity:1; } 100%{ scale:0; opacity:0; rotate:calc(var(--r0,0deg) + var(--rot,0deg)); } }
+  @keyframes glitTw2{ 0%{ scale:.4; opacity:0; rotate:var(--r0,0deg); } 6%{ opacity:1; } 34%{ scale:1.1; } 54%{ scale:.7; opacity:.7; }
+    68%{ scale:1; opacity:1; } 75%{ opacity:1; } 100%{ scale:0; opacity:0; rotate:calc(var(--r0,0deg) + var(--rot,0deg)); } }
+  /* no individual transform properties: one transform keyframe, no twinkle */
+  .glitter.fb i, .glitter.fb i.t1, .glitter.fb i.t2{ rotate:none; transform:rotate(var(--r0,0deg)); animation:glitFb var(--life) linear var(--dl) forwards; }
+  @keyframes glitFb{
+    0%{ transform:translate(0,0) rotate(var(--r0,0deg)); opacity:0; animation-timing-function:cubic-bezier(.12,.8,.3,1); }
+    6%{ opacity:1; }
+    22%{ transform:translate(var(--bx),var(--by)) rotate(var(--r0,0deg)); animation-timing-function:ease-in; }
+    75%{ opacity:1; }
+    100%{ transform:translate(var(--bx),calc(var(--by) + var(--dy))) rotate(var(--r0,0deg)); opacity:0; } }
+  /* pink big toast: one diagonal highlight, 150ms after it appears */
+  html[data-accent="pink"] .toast.big{ overflow:hidden; }
+  html[data-accent="pink"] .toast.big::after{ content:""; position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(110deg, transparent 32%, rgba(255,255,255,.4) 50%, transparent 68%);
+    transform:translateX(-100%); animation:tsheen .7s ease-in-out .15s forwards; }
+  @keyframes tsheen{ to{ transform:translateX(100%); } }
 
   /* --- tap & feel pass: bigger checkboxes + tactile press feedback --- */
   input[type=checkbox]{ width:22px; height:22px; min-width:22px; flex:0 0 auto; accent-color:var(--accent); cursor:pointer; }
+  html.dark[data-accent="graphite"] input[type=checkbox]{ accent-color:#8e8e93; }   /* white tick on #d1d1d6 is ~1.5:1 */
   .btn{ transition:transform .12s ease, opacity .12s ease, box-shadow .2s; }
   .btn:active{ transform:scale(.975); opacity:.94; }
   .tmrbtn:active,.restadj button:active{ transform:scale(.9); }
@@ -1455,7 +1563,12 @@
 
   @media (prefers-reduced-motion: reduce){
     *,*::before,*::after{ animation-duration:.001s!important; transition-duration:.05s!important; }
-    .confetti{ display:none!important; }
+    .confetti,.glitter{ display:none!important; }
+    /* the moment is carried by the toast: a static ✦ and a 240ms fade, no slide, pop or sheen */
+    .toast,.toast.show{ transform:translate(-50%,0)!important; transition-property:opacity!important; transition-duration:.24s!important; }
+    .toast.big{ animation:none!important; }
+    .toast::after{ display:none!important; }
+    .toast.cel::before{ content:"✦"; color:var(--accent-hi); margin-right:8px; }
   }
 
   /* workout-detail sheet — stat grid, muscle-split bars, grouped exercise list */

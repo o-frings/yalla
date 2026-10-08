@@ -1290,6 +1290,8 @@ async function cloudReconcile(){
           adopt=s.v;
           const union=[...new Set([...((lv&&lv.extlogTomb)||[]), ...((s.v&&s.v.extlogTomb)||[])])];
           if(union.length) adopt=Object.assign({}, s.v, {extlogTomb:union});
+          // a device on a pre-accent build pushes rows with no accent — keep ours rather than drop it
+          if(lv && lv.accent && !(adopt && adopt.accent)) adopt=Object.assign({}, adopt, {accent:lv.accent});
         }
         else {
           const tomb=[...new Set([...((settings&&settings.extlogTomb)||[]), ...(((server.settings&&server.settings.v)||{}).extlogTomb||[])])];
@@ -2535,7 +2537,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi] || (rot[xi]!=null && !rotKeep.has(xi) ? rot[xi] : e.n); }
-let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, age:null, exp:null, sponLen:null, meTileOrder:null, meTileHidden:null, theme:"auto", restSec:180, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{}, baseActivity:null, favEx:[], gyms:[], gymSplit:0, extlogTomb:[] };
+let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, age:null, exp:null, sponLen:null, meTileOrder:null, meTileHidden:null, theme:"auto", accent:"orange", restSec:180, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{}, baseActivity:null, favEx:[], gyms:[], gymSplit:0, extlogTomb:[] };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -4294,7 +4296,9 @@ function abortSession(){
   toast("Session discarded.");
 }
 if($("abortBtn")) $("abortBtn").onclick=()=> confirmAsk("Discard this session? Your logged sets won't be saved.", "Discard", abortSession, "danger");
+let _finLock=0;   // swallow a double tap on Finish while the share sheet is still 400ms away
 $("saveBtn").onclick=async()=>{
+  if(Date.now()<_finLock) return;
   const savedSig=draftSig();
   const p=activePlan(); const w = freeMode ? null : p.workouts[curWk]; let logged=0, beaten=0;
   // travel tag: 1 = travel + full gym, 2 = travel + no gym, 3 = travel + partial gym, 0 = home (normal)
@@ -4368,38 +4372,122 @@ $("saveBtn").onclick=async()=>{
   swaps={};
   if(freeMode){ renderSeg(); renderFree(); renderDash(); }
   else { const ni=nextRotateIndex(p); if(w.rotate!==false && ni>=0) curWk=ni; renderSeg(); renderWorkout(); renderDash(); }
-  if(beaten>0){ celebrate(true); haptic([0,60,40,120]); toast("New best! You beat "+beaten+" lift"+(beaten>1?"s":"")+" — keep climbing.", true); }
-  else if(qualifies){ celebrate(false); haptic([0,30,40,70,40,130]); }   // every finished workout gets a buzz + confetti
+  // one burst, one toast, one haptic for the whole finish (PR, finish, unlocks). A micro session counts in
+  // proportion to the work done (see finishCredit) and says so in the toast.
+  _finLock=Date.now()+450;
+  celebrateMoment({ pr:beaten, qualifies, achIds:fresh,
+    micro: (!qualifies && beaten===0) ? { sets:session.sets, pct:Math.round(cred*100) } : null });
   if(qualifies){
-    openShareTile(session);
+    setTimeout(()=>openShareTile(session), 400);   // after the burst's first frames: the 1080×1350 tile paint is heavy
     cloudPublish(session);   // post a summary to the friends feed (no raw weights), if signed in + sharing on
-  } else if(beaten===0){     // a micro session — counts in proportion to the work done (see finishCredit)
-    const pct=Math.round(cred*100);
-    toast("Logged "+session.sets+" set"+(session.sets===1?"":"s")+" — counts as "+pct+"% of a session toward your week. Every bit adds up.");
   }
   cloudTouchWorkout();     // reset the 2-day "train at home" reminder timer (any movement keeps the streak alive)
-  if(fresh.length) setTimeout(()=>celebrateAch(fresh), beaten>0?1300:1200);
 };
 
-// confetti burst. big=true (a new PR) → more pieces, gold-leaning palette, wider spread, longer fall.
-function celebrate(big){
-  if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const N=big?72:48;
-  const colors=big ? ["#ffd60a","#fbbf24","#f5a040","#fff3c4","#ff9f1c","#ff375f","#e8820c"]
-                   : ["#f08020","#f5a040","#ff375f","#ffd60a","#fb923c","#fbbf24","#e8820c"];
+// ================= celebrations =================
+// One moment → one burst, one toast, one haptic. outcome = { pr: lifts beaten, qualifies, micro: {sets, pct}
+// for a sub-qualifying finish, achIds: fresh unlocks }. Star fields (star, constellation) slot in with the stars feature.
+// Tiers: 1 small (a qualifying finish), 2 medium (a PR), 3 big (an achievement). The toast leads with the PR,
+// then the achievement, and takes at most one suffix.
+const CEL_HAPTIC={ 1:10, 2:[10,60,14], 3:[12,50,12,50,18] };
+function celebrateMoment(o){
+  o=o||{};
+  const ach=(o.achIds||[]).map(id=>ACHIEVEMENTS.find(a=>a.id===id)).filter(Boolean);
+  const tier = ach.length ? 3 : o.pr>0 ? 2 : o.qualifies ? 1 : 0;
+  if(tier) celebrate(tier, { stars:!!o.star, pr:o.pr>0 });
+  let msg="";
+  if(o.pr>0) msg="New best! You beat "+o.pr+" lift"+(o.pr>1?"s":"")+(ach.length ? " · "+ach[0].t+" unlocked" : " — keep climbing.");
+  else if(ach.length) msg="Achievement unlocked  "+ach[0].icon+"  "+ach[0].t+(ach.length>1?"  +"+(ach.length-1)+" more":"");
+  if(msg) toast(msg, true, true);
+  else if(o.micro) toast("Logged "+o.micro.sets+" set"+(o.micro.sets===1?"":"s")+" — counts as "+o.micro.pct+"% of a session toward your week. Every bit adds up.");
+  if(tier) haptic(CEL_HAPTIC[tier]);
+  return tier;
+}
+// The single burst entry point. Old callers map: celebrate(true) → 2, celebrate(false) → 1, celebrate() → 3.
+// Pink bursts glitter, every other accent confetti. opts.stars is the hook for star moments (white/gold sparkles, later).
+// A new burst replaces one on screen; it is removed at its end + 150ms or when the app is hidden.
+let _burstEnd=null;
+function celebrate(tier, opts){
+  tier = tier===true ? 2 : tier===false ? 1 : tier==null ? 3 : tier;
+  if(!(tier>=1)) return;
+  if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;   // the toast's ✦ carries it
+  if(document.hidden) return;
+  if(_burstEnd) _burstEnd();
+  document.querySelectorAll(".confetti,.glitter").forEach(n=>n.remove());
+  // low-end hint: half the pieces. WebKit buckets hardwareConcurrency to 4 or 8, so every iPhone says 4 — only
+  // fewer than 4 counts. Orange never halves: it keeps the shipped confetti exactly.
+  const low=accentId()!=="orange" && ((navigator.hardwareConcurrency||8)<4 || (navigator.deviceMemory||8)<=4);
+  const b = document.documentElement.dataset.accent==="pink" ? glitter(Math.min(tier,3), opts||{}, low) : confetti(Math.min(tier,3), opts||{}, low);
+  let timer=0;
+  const onVis=()=>{ if(document.hidden) end(); };
+  const end=()=>{ clearTimeout(timer); b.el.remove(); document.removeEventListener("visibilitychange", onVis); if(_burstEnd===end) _burstEnd=null; };
+  _burstEnd=end; document.addEventListener("visibilitychange", onVis);
+  requestAnimationFrame(()=>{ if(_burstEnd!==end) return; document.body.appendChild(b.el); timer=setTimeout(end, b.ms+150); });
+}
+// "#rrggbb" mixed toward "#rrggbb" by t (0…1); anything else comes back unchanged
+function mixHex(a,b,t){ const p=h=>/^#[0-9a-f]{6}$/i.test(h)?[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)):null, x=p(a), y=p(b);
+  if(!x||!y) return a; return "#"+x.map((v,i)=>Math.round(v+(y[i]-v)*t).toString(16).padStart(2,"0")).join(""); }
+// confetti pieces fall from the top. Orange keeps its original bursts: the small one for a finish or an
+// achievement, the gold-leaning one for a PR (also when a PR and an unlock share the moment). Other accents read --cel-1…6 once per burst, derived from the
+// accent if the tokens are missing.
+function confetti(tier, opts, low){
+  if(tier===3 && accentId()==="orange") tier = opts && opts.pr ? 2 : 1;
+  const big=tier>=2;
+  let N = tier===3 ? 80 : big ? 72 : 48; if(low) N=Math.round(N/2);
+  let colors;
+  if(accentId()==="orange") colors=big ? ["#ffd60a","#fbbf24","#f5a040","#fff3c4","#ff9f1c","#ff375f","#e8820c"]
+                                       : ["#f08020","#f5a040","#ff375f","#ffd60a","#fb923c","#fbbf24","#e8820c"];
+  else { const cs=getComputedStyle(document.documentElement);
+    colors=[1,2,3,4,5,6].map(i=>cs.getPropertyValue("--cel-"+i).trim()).filter(Boolean);
+    if(colors.length<4){ const a=accentHex(), dk=document.documentElement.classList.contains("dark");
+      colors=[a, mixHex(a,"#ffffff",.35), mixHex(a,"#ffffff",.65), mixHex(a,"#000000",.2), dk?"#ffd60a":"#e0a800"].concat(dk?["#fff8e7"]:[]); } }
   const c=document.createElement("div"); c.className="confetti";
+  const f=document.createDocumentFragment(); let ms=0;
   for(let i=0;i<N;i++){ const s=document.createElement("i");
+    const dl=Math.random()*0.3, du=1.3+Math.random()*0.9; ms=Math.max(ms,(dl+du)*1000);
     s.style.left=Math.random()*100+"%";
     s.style.background=colors[i%colors.length];
-    s.style.animationDelay=(Math.random()*0.3)+"s";
+    s.style.animationDelay=dl+"s";
     s.style.setProperty("--dx",((Math.random()*2-1)*(big?210:150))+"px");
     s.style.setProperty("--sz",(0.7+Math.random()*(big?1.2:0.8)).toFixed(2));   // size variety = depth
-    s.style.setProperty("--dur",(1.3+Math.random()*0.9).toFixed(2)+"s");        // staggered fall speed
+    s.style.setProperty("--dur",du.toFixed(2)+"s");                             // staggered fall speed
     if(Math.random()>.5) s.style.borderRadius="50%";
-    c.appendChild(s);
+    f.appendChild(s);
   }
-  document.body.appendChild(c);
-  setTimeout(()=>c.remove(), big?2600:2200);
+  c.appendChild(f);
+  return { el:c, ms };
+}
+// pink glitter: 45% sequins, 30% 4-point sparkles, 25% flakes, in --glit-1…6 at 30/15/10/25/12/8%.
+// A burst from just above centre, then a drift down. Big moments add a second pair of emitters 180ms later.
+const GLIT_SHARE=[30,15,10,25,12,8];
+function glitter(tier, opts, low){
+  const cs=getComputedStyle(document.documentElement), dflt=[accentHex(),"#ff8cc3","#ffc2df","#ffffff","#f6d38a","#c8a2ff"];
+  const cols=GLIT_SHARE.map((_,i)=>cs.getPropertyValue("--glit-"+(i+1)).trim()||dflt[i]);
+  let N=[0,32,48,64][tier]; if(low) N=Math.round(N/2); N=Math.min(64,N);
+  const R=[0,[80,200],[90,260],[120,320]][tier], L=[0,[1.4,1.8],[1.6,2.4],[2.0,2.8]][tier];
+  const rnd=(a,b)=>a+Math.random()*(b-a), vw=innerWidth, vh=innerHeight;
+  const pick=()=>{ let r=Math.random()*100; for(let i=0;i<cols.length;i++){ r-=GLIT_SHARE[i]; if(r<0) return cols[i]; } return cols[0]; };
+  const fx=!!(window.CSS && CSS.supports && CSS.supports("translate","1px"));
+  const c=document.createElement("div"); c.className="glitter"+(fx?"":" fb");
+  const f=document.createDocumentFragment(), n2=tier===3?Math.round(N*.3):0; let ms=0;
+  for(let i=0;i<N;i++){
+    const late=i<n2;   // second emitter pair at 30% / 70% x
+    const ox = late ? vw*(i%2 ? .7 : .3) : vw*(.5+rnd(-.1,.1)), oy=vh*.38;
+    const ang=Math.random()*Math.PI*2, rad=rnd(R[0],R[1]);
+    const life = late ? rnd(L[0],2.6) : rnd(L[0],L[1]), dl=(late?.18:0)+Math.random()*.15;   // all gone by 3.1s
+    ms=Math.max(ms,(life+dl)*1000);
+    const C=pick(), k=Math.random(); let cls, sz, bg, r0="0deg", rot="0deg";
+    if(k<.45){ cls="sq"; sz=rnd(3,6); bg="radial-gradient(circle at 35% 35%,#fff 0 18%,"+C+" 45%,"+mixHex(C,"#000000",.3)+" 100%)"; }
+    else if(k<.75){ cls="sp"; sz=rnd(8,16); bg=C; rot=((Math.random()<.5?-1:1)*rnd(90,180)).toFixed(0)+"deg"; }
+    else { cls="fl"; sz=rnd(3,5); bg="linear-gradient(135deg,"+C+",#fff 50%,"+C+")"; r0="45deg"; }
+    const p=document.createElement("i"); p.className=cls+" t"+(i%3);
+    p.style.cssText="left:"+ox.toFixed(1)+"px;top:"+oy.toFixed(1)+"px;--s:"+sz.toFixed(1)+"px;background:"+bg
+      +";--bx:"+(Math.cos(ang)*rad).toFixed(1)+"px;--by:"+(Math.sin(ang)*rad).toFixed(1)+"px;--dy:"+rnd(140,260).toFixed(0)
+      +"px;--sw:"+rnd(-18,18).toFixed(1)+"px;--life:"+life.toFixed(2)+"s;--dl:"+dl.toFixed(3)+"s;--r0:"+r0+";--rot:"+rot;
+    f.appendChild(p);
+  }
+  c.appendChild(f);
+  return { el:c, ms };
 }
 
 // ================= plans sheet =================
@@ -5075,6 +5163,7 @@ function drawRadar(totals, canvasId, target, noLabels, relative, prog){
   const cx=W/2, cy=H/2, R=W*(noLabels?0.42:0.33);
   const cs=getComputedStyle(document.documentElement);
   const accent=(cs.getPropertyValue("--accent")||"#0a84ff").trim();
+  const ring=(cs.getPropertyValue("--l2")||"#888").trim();   // target rim stays neutral so no accent matches a muscle colour
   const lab=(cs.getPropertyValue("--l3")||"#888").trim();
   const val=g=>radarVal(det, g, target);
   const max=Math.max(1, ...G.map(val));
@@ -5095,9 +5184,9 @@ function drawRadar(totals, canvasId, target, noLabels, relative, prog){
     ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rr,a-half,a+half); ctx.closePath();
     ctx.globalAlpha=.55; ctx.fillStyle=col; ctx.fill(); ctx.globalAlpha=1;
     ctx.lineWidth=2.5; ctx.strokeStyle=col; ctx.stroke(); });
-  if(target && !relative){ ctx.strokeStyle=accent; ctx.globalAlpha=.5; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; }
+  if(target && !relative){ ctx.strokeStyle=ring; ctx.globalAlpha=.5; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; }
   else if(target && relative){ const tr=R*Math.min(1,target/max);   // where the ~target/wk line falls on the relative scale
-    ctx.strokeStyle=accent; ctx.globalAlpha=.5; ctx.lineWidth=2; ctx.setLineDash([7,7]);
+    ctx.strokeStyle=ring; ctx.globalAlpha=.5; ctx.lineWidth=2; ctx.setLineDash([7,7]);
     ctx.beginPath(); ctx.arc(cx,cy,tr,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; }
   if(noLabels) return;
   ctx.fillStyle=lab; ctx.font=cfont(W,"label"); ctx.textBaseline="middle";
@@ -5303,7 +5392,8 @@ function drawSpotBalance(id, unders){
     ctx.fillStyle=lab; ctx.textAlign="right"; ctx.fillText(MSHORT[g]||g, x0-14, y);
     ctx.fillStyle=hexAlpha(col,.16); ctx.fillRect(x0, y-10, bw, 20);
     ctx.fillStyle=col; ctx.fillRect(x0, y-10, Math.max(3,bw*frac), 20); });
-  ctx.strokeStyle=hexAlpha(accentHex(),.5); ctx.lineWidth=2; ctx.setLineDash([4,4]);
+  const l2=(getComputedStyle(document.documentElement).getPropertyValue("--l2")||"#888").trim();
+  ctx.strokeStyle=hexAlpha(l2,.5); ctx.lineWidth=2; ctx.setLineDash([4,4]);   // target line in --l2: an accent here could match a muscle colour
   ctx.beginPath(); ctx.moveTo(x0+bw, 6); ctx.lineTo(x0+bw, H-6); ctx.stroke(); ctx.setLineDash([]);
 }
 // the week's activity rings (session-credit, hard sets, muscles hit, optional cardio) vs growth-scaled targets
@@ -5486,12 +5576,44 @@ function applyTheme(){
   document.documentElement.style.background = dark ? "#000000" : "#f2f2f7";
   try{ localStorage.setItem("yallaTheme", mode); }catch(e){}
   document.querySelectorAll("#appSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.th===mode));
+  applyAccent();
+}
+// accent picker. Orange is the default and sets no attribute; the <head> script applies the localStorage
+// mirror before first paint. tile = the light --grad stops, used by the share tile in either theme.
+const ACCENTS={
+  orange:{ name:"Orange", tile:["#ff7a18","#ff2f3d"] },
+  pink:{ name:"Pink", tile:["#f2569c","#ce3aa0"] },
+  blue:{ name:"Blue", tile:["#2a8adf","#3d66df"] },
+  teal:{ name:"Teal", tile:["#00a199","#007d8f"] },
+  graphite:{ name:"Graphite", tile:["#5c5c60","#2c2c2e"] }
+};
+const isAccent=id=>typeof id==="string" && Object.prototype.hasOwnProperty.call(ACCENTS, id);
+function accentId(){ return isAccent(settings.accent) ? settings.accent : "orange"; }
+function applyAccent(){
+  const id=accentId(), de=document.documentElement;
+  if(id==="orange") de.removeAttribute("data-accent"); else de.setAttribute("data-accent", id);
+  try{ localStorage.setItem("yallaAccent", id); }catch(e){}
+  document.querySelectorAll("#accSeg .accsw").forEach(b=>{ const on=b.dataset.acc===id;
+    b.setAttribute("aria-checked", on?"true":"false"); b.tabIndex=on?0:-1; });
+  const nm=$("accName"); if(nm) nm.textContent=ACCENTS[id].name;
 }
 // canvases bake in theme colours, so redraw Me + Overview (not renderAll: that would rebuild a workout in progress)
 function repaintCharts(){ try{ renderDash(); renderOverview(); }catch(e){} }
 document.querySelectorAll("#appSeg .s").forEach(s=>{
   s.onclick=async()=>{ settings.theme=s.dataset.th; await sset("settings",settings); applyTheme(); repaintCharts(); };
 });
+async function pickAccent(id){
+  if(!isAccent(id) || id===accentId()) return;
+  settings.accent=id; applyAccent(); repaintCharts(); haptic();
+  await sset("settings",settings);
+}
+document.querySelectorAll("#accSeg .accsw").forEach(b=>{ b.onclick=()=>pickAccent(b.dataset.acc); });
+{ const g=$("accSeg"); if(g) g.addEventListener("keydown", e=>{
+  const keys=Object.keys(ACCENTS), step={ArrowRight:1,ArrowDown:1,ArrowLeft:-1,ArrowUp:-1}[e.key];
+  if(!step) return; e.preventDefault();
+  const id=keys[(keys.indexOf(accentId())+step+keys.length)%keys.length];
+  pickAccent(id); const b=g.querySelector('[data-acc="'+id+'"]'); if(b) b.focus();
+}); }
 try{ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>{ if((settings.theme||"auto")==="auto"){ applyTheme(); repaintCharts(); } }); }catch(e){}
 
 // ================= coach-tip cadence =================
@@ -6039,7 +6161,11 @@ function prCelebrate(r){
   if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const vEl=r.querySelector(".vol"); if(!vEl) return;
   const rect=vEl.getBoundingClientRect(), cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
-  const colors=["#f5a040","#ffd60a","#fb923c","#f08020"];
+  // Orange keeps its original dots; Pink takes glitter tokens, the other accents their confetti tokens
+  const id=accentId(), cs=getComputedStyle(document.documentElement);
+  let colors = id==="orange" ? ["#f5a040","#ffd60a","#fb923c","#f08020"]
+    : (id==="pink" ? [1,2,5,3].map(i=>cs.getPropertyValue("--glit-"+i).trim()) : [1,2,4,5].map(i=>cs.getPropertyValue("--cel-"+i).trim())).filter(Boolean);
+  if(!colors.length) colors=[accentHex()];
   const wrap=document.createElement("div"); wrap.className="prspark";
   for(let i=0;i<7;i++){ const s=document.createElement("i");
     s.style.left=cx+"px"; s.style.top=cy+"px"; s.style.background=colors[i%colors.length];
@@ -6783,8 +6909,8 @@ $("otherLog").onclick=()=>{
   extlog.push(entry); sset("extlog",extlog);
   const fresh=checkAchievements(); sset("settings",settings);
   renderOtherLog(); updateOtherPreview(); renderDash(); if($("sheetMus").classList.contains("show")) renderMuscles();
-  toast("Logged "+entry.name+" — "+entry.vol.toLocaleString()+" kg");
-  if(fresh.length) setTimeout(()=>celebrateAch(fresh), 1200);
+  if(fresh.length) celebrateMoment({ achIds:fresh });   // one toast: the unlock stands in for "Logged"
+  else toast("Logged "+entry.name+" — "+entry.vol.toLocaleString()+" kg");
 };
 
 // ================= cardio (Workout tab → Cardio) =================
@@ -6913,8 +7039,8 @@ $("cdLog").onclick=()=>{
   clearCardioRoute();
   renderCardioLog(); updateCardioPreview(); renderDash();
   cloudTouchWorkout();
-  toast("Logged "+(entry.routeName||entry.name)+(mins?" — "+mins+" min":"")+(dist?" · "+round1(dist)+" km":""));
-  if(fresh.length) setTimeout(()=>celebrateAch(fresh), 1200);
+  if(fresh.length) celebrateMoment({ achIds:fresh });   // one toast: the unlock stands in for "Logged"
+  else toast("Logged "+(entry.routeName||entry.name)+(mins?" — "+mins+" min":"")+(dist?" · "+round1(dist)+" km":""));
 };
 
 // ===== GPX route import — free, fully client-side. Works with exports from Strava, Komoot, Garmin,
@@ -7228,8 +7354,8 @@ function renderAchievements(){
   const lf=lifetimeVolume("lifted");
   $("achVol").textContent = fmtBigKg(lf)+" lifted"+(v>lf?" · "+fmtBigKg(v)+" incl. bodyweight":"");
 }
-function celebrateAch(ids){ if(!ids||!ids.length) return; const a=ACHIEVEMENTS.find(x=>x.id===ids[0]); if(!a) return;
-  celebrate(); toast("Achievement unlocked  "+a.icon+"  "+a.t+(ids.length>1?"  +"+(ids.length-1)+" more":""), true); }
+// kept for any caller outside the three log handlers
+function celebrateAch(ids){ if(ids && ids.length) celebrateMoment({ achIds:ids }); }
 
 // ================= progress diagnostic (nutrition vs training) =================
 function bwSlopePctWk(days){
@@ -7820,7 +7946,7 @@ function drawForecast(f, prog){
   const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const cs=getComputedStyle(document.documentElement);
   const l3=(cs.getPropertyValue('--l3')||'#888').trim();
-  const accent=accentHex(), blue="#4dabf7";
+  const accent=accentHex(), blue=(cs.getPropertyValue('--series2')||'#4dabf7').trim();   // "current pace": grey under the Blue accent
   const x1=f.ahead, padT=14, padB=32;
   const hi=Math.max(f.plan.p90[x1], f.pace.p90[x1]);
   const lo=Math.min(0, f.plan.p10[x1], f.pace.p10[x1], ...f.plan.p10, ...f.pace.p10);  // allow negative (loss)
@@ -8715,14 +8841,17 @@ async function applyRestore(obj){
   confirmAsk(reach,"Restore",async()=>{
     // keep an escape hatch: nothing else snapshots the pre-restore state, and there is no undo
     try{ const pre=await gatherData(); if(pre) await _localSet("_preRestore", {t:Date.now(), data:pre}); }catch(e){}
+    const prevAccent=isAccent(settings.accent) ? settings.accent : null;
     for(const k of CLOUD_KEYS){ if(data[k]!=null) await sset(k,data[k]); }
     settings=Object.assign({}, (await sget("settings"))||{});
+    // a backup from before the accent picker has no accent: keep this device's, as cloud adopt does
+    if(prevAccent && !isAccent(settings.accent)){ settings.accent=prevAccent; await sset("settings",settings); }
     plans=(await sget("plans"))||[]; last=(await sget("lastsets"))||{}; bw=(await sget("bodyweight"))||[]; hist=(await sget("history"))||{}; extlog=(await sget("extlog"))||[];
     ledger=(await sget("predledger"))||[]; calib=(await sget("calib"))||lgFreshCalib();
     if(!plans.length) plans=DEFAULT_PLANS.map(p=>JSON.parse(JSON.stringify(p)));
     if(!plans.find(p=>p.id===settings.activePlanId)) settings.activePlanId=plans[0].id;
     curWk=0; freeMode=false; swaps={}; draft={}; await sset("draft", draft);
-    renderAll();
+    applyTheme(); renderAll();
     toast("Backup restored — welcome back.",true);
   });
 }
@@ -8786,7 +8915,7 @@ function initials(name){ const p=String(name||"").trim().split(/\s+/).filter(Boo
 // background per style — solid colour, a deeper gradient, a hue-shifted duotone, or solid (ring adds a class)
 function avatarBg(color, style){
   if(style==="gradient") return "linear-gradient(135deg,"+color+", color-mix(in srgb,"+color+" 60%, #000))";
-  if(style==="duotone")  return "linear-gradient(135deg,"+color+", color-mix(in srgb,"+color+" 45%, var(--accent)))";
+  if(style==="duotone")  return "linear-gradient(135deg,"+color+", color-mix(in srgb,"+color+" 45%, var(--brand)))";   // brand, not the viewer's accent: an avatar looks the same to everyone
   return color;
 }
 // ---- generative art avatars: a seeded PRNG paints abstract, deterministic art (colour blends,
@@ -9196,8 +9325,8 @@ function tileRadar(x,cx,cy,R,tot){
 const SHARE_URL=(()=>{ try{ const p=location.pathname.replace(/\/[^/]*\.[^/]*$/,"/").replace(/\/$/,""); return (location.host+p)||"o-frings.github.io/yalla"; }catch(_){ return "o-frings.github.io/yalla"; } })();
 function renderShareTile(s){
   const W=1080,H=1350,c=document.createElement("canvas"); c.width=W; c.height=H; const x=c.getContext("2d");
-  // match the app's live brand gradient: linear-gradient(135deg,#ff7a18,#ff2f3d) → diagonal top-left→bottom-right
-  const g=x.createLinearGradient(0,0,W,H); g.addColorStop(0,"#ff7a18"); g.addColorStop(1,"#ff2f3d"); x.fillStyle=g; x.fillRect(0,0,W,H);
+  // the accent's light-theme --grad (Orange: #ff7a18 → #ff2f3d), diagonal top-left → bottom-right
+  const ts=ACCENTS[accentId()].tile, g=x.createLinearGradient(0,0,W,H); g.addColorStop(0,ts[0]); g.addColorStop(1,ts[1]); x.fillStyle=g; x.fillRect(0,0,W,H);
   x.fillStyle="#fff"; x.font="800 50px -apple-system,system-ui,sans-serif"; x.textAlign="left"; x.textBaseline="alphabetic";
   x.fillText("yalla", 70, 122); const ww=x.measureText("yalla").width; x.fillStyle="rgba(255,255,255,.7)"; x.fillText(".", 72+ww, 122);
   x.font="600 32px -apple-system,system-ui,sans-serif"; x.textAlign="right"; x.fillStyle="rgba(255,255,255,.82)";
@@ -9237,7 +9366,10 @@ $("saveImgBtn").onclick=()=>shareImage(true);
 $("shareClose").onclick=()=>closeSheet("Share");
 $("scrimShare").onclick=()=>closeSheet("Share");
 
-let tT; function toast(m,big){ const t=$("toast"); t.textContent=m; t.classList.toggle("big",!!big); t.classList.add("show"); clearTimeout(tT); tT=setTimeout(()=>t.classList.remove("show"), big?2800:2300); }
+// cel = a celebration toast (gets the static ✦ under reduced motion). Re-adding .big restarts its pop (and Pink's sheen).
+let tT; function toast(m,big,cel){ const t=$("toast"); t.textContent=m;
+  t.classList.remove("big"); if(big){ void t.offsetWidth; t.classList.add("big"); }
+  t.classList.toggle("cel",!!cel); t.classList.add("show"); clearTimeout(tT); tT=setTimeout(()=>t.classList.remove("show"), big?2800:2300); }
 // first-open coachmark: show a hint once per id (spreads the "how to use" across the app over time)
 function coach(id, msg){
   if(!settings.seenTips) settings.seenTips={};

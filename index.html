@@ -20,6 +20,8 @@
   var de=document.documentElement;
   if(dark) de.classList.add('dark');
   de.style.background = dark ? '#000000' : '#f2f2f7';
+  var a=localStorage.getItem('yallaAccent');   // accent picker: set before first paint so there is no orange flash
+  if(a==='pink'||a==='blue'||a==='teal'||a==='graphite') de.setAttribute('data-accent', a);
   // status-bar colour is handled by the media-query theme-color metas above (iOS reads those at launch)
 }catch(e){}})();
 (function(){try{
@@ -498,6 +500,14 @@
           <div class="s" data-th="auto">Auto</div>
           <div class="s" data-th="light">Light</div>
           <div class="s" data-th="dark">Dark</div>
+        </div>
+        <div class="ed-label edrow">Accent<span class="edmeta" id="accName">Orange</span></div>
+        <div class="accsws" id="accSeg" role="radiogroup" aria-label="Accent colour">
+          <button type="button" class="accsw" data-acc="orange" role="radio" aria-label="Orange"></button>
+          <button type="button" class="accsw" data-acc="pink" role="radio" aria-label="Pink"></button>
+          <button type="button" class="accsw" data-acc="blue" role="radio" aria-label="Blue"></button>
+          <button type="button" class="accsw" data-acc="teal" role="radio" aria-label="Teal"></button>
+          <button type="button" class="accsw" data-acc="graphite" role="radio" aria-label="Graphite"></button>
         </div>
       </div>
     </details>
