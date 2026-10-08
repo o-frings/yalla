@@ -1131,7 +1131,12 @@ async function cloudVerify(email, code){
 }
 async function cloudLogout(){
   if(sb){ try{ await sb.auth.signOut(); }catch(e){} }
-  cloudUser=null; renderAccount();
+  cloudUser=null;
+  // drop per-account derived state so the next account can't reuse this one's shared secrets or keys
+  // _e2ePubCache/_e2eSecretCache are const — clear in place, don't reassign
+  try{ _e2eKeys=null; Object.keys(_e2ePubCache).forEach(k=>delete _e2ePubCache[k]);
+       Object.keys(_e2eSecretCache).forEach(k=>delete _e2eSecretCache[k]); }catch(e){}
+  renderAccount();
   toast("Signed out. Your data stays on this device.");
 }
 // Make THIS device the source of truth: push every local key up with a fresh timestamp, overwriting the cloud.
@@ -1145,19 +1150,30 @@ async function cloudForcePush(){
   await _persistMeta();
   toast(n?"Saved this device's data to your account.":"Nothing to save yet.", true);
 }
-// GDPR: wipe everything this user has in the cloud (synced data, feed posts, profile). Local data is untouched.
+// GDPR: delete the account and everything the server holds for it.
+// This used to delete three tables client-side (activity, user_data, profiles) and leave ten behind —
+// messages, the passphrase-wrapped private key, push endpoints, follows, the last live workout. Those
+// have no client DELETE policy, so the attempts silently affected zero rows. Deleting the auth user is
+// the only complete answer: every table cascades from it. That needs the service role, hence the
+// edge function. If it isn't deployed yet we say so instead of doing a partial wipe and claiming success.
 async function cloudDeleteData(){
   if(!cloudReady()) return;
-  confirmAsk("Delete all your data from the cloud? This removes your synced log, your feed posts, and your profile from the server. The copy on this device stays. This can't be undone.","Delete",async()=>{
-    const uid=cloudUser.id;
+  confirmAsk("Delete your account and everything on the server? That's your synced log, feed posts, profile, messages, message key, follows and push settings. You'll be signed out. The copy on this device stays until you delete it there too. This can't be undone.","Delete",async()=>{
+    let ok=false, msg="";
     try{
-      await sb.from("activity").delete().eq("user_id",uid);
-      await sb.from("user_data").delete().eq("user_id",uid);
-      await sb.from("profiles").delete().eq("user_id",uid);
-      _syncMeta={}; await _persistMeta();
-      await sb.auth.signOut(); cloudUser=null; renderAccount();
-      toast("Your cloud data was deleted. The copy on this device is untouched.", true);
-    }catch(e){ toast("Couldn't delete cloud data: "+((e&&e.message)||e)); }
+      const { data, error } = await sb.functions.invoke("delete-account");
+      if(error) throw error;
+      ok = !!(data && data.ok);
+      if(!ok) msg = (data && data.error) || "the server didn't confirm";
+    }catch(e){ msg = (e && e.message) || String(e); }
+    if(!ok){
+      toast("Couldn't delete your account: "+msg+". Nothing was removed — try again, or check the delete-account function is deployed.");
+      return;
+    }
+    _syncMeta={}; await _persistMeta();
+    try{ await sb.auth.signOut(); }catch(e){}
+    cloudUser=null; renderAccount();
+    toast("Your account and all server data were deleted. The copy on this device is untouched.", true);
   });
 }
 
@@ -1183,7 +1199,7 @@ async function ensureProfile(){
 
 // Mark a key dirty and debounce-push it to the cloud. Called on every sset.
 function cloudMark(k,v){
-  if(k==="_syncMeta" || !cloudReady() || CLOUD_KEYS.indexOf(k)<0) return;
+  if(k==="_syncMeta" || k==="__owner" || !cloudReady() || CLOUD_KEYS.indexOf(k)<0) return;
   _syncMeta[k]=Date.now(); _persistMeta();
   clearTimeout(_pushTimers[k]);
   const ts=_syncMeta[k];
@@ -1199,6 +1215,23 @@ async function cloudPush(k, v, ts){
   }catch(e){ /* left dirty; next change or reconcile retries */ }
 }
 
+// history is {exerciseName:[{d,...}]} and has exactly one append and no delete path anywhere, so a union
+// keyed on the entry timestamp can only ever ADD back something a device was missing. Deliberately NOT
+// applied to extlog, which does have delete paths (a union there would resurrect deleted entries).
+function mergeHistory(localH, serverH){
+  if(!localH || typeof localH!=="object") return serverH;
+  if(!serverH || typeof serverH!=="object") return localH;
+  const out={};
+  for(const name of new Set([...Object.keys(localH), ...Object.keys(serverH)])){
+    const seen=new Set(), merged=[];
+    for(const e of [...(localH[name]||[]), ...(serverH[name]||[])]){
+      const k=String(e && e.d); if(e && !seen.has(k)){ seen.add(k); merged.push(e); }
+    }
+    merged.sort((a,b)=>(a.d||0)-(b.d||0));
+    out[name]=merged;
+  }
+  return out;
+}
 // On login / launch: pull cloud rows, adopt any that are newer than local, push any local that are newer/missing.
 async function cloudReconcile(){
   if(!cloudReady()) return;
@@ -1206,14 +1239,37 @@ async function cloudReconcile(){
   try{ const { data, error } = await sb.from("user_data").select("key,value,updated_at"); if(error) throw error; rows=data||[]; }
   catch(e){ return; }
   const server={}; rows.forEach(r=>{ server[r.key]={ v:r.value, ts:Date.parse(r.updated_at) }; });
-  let adopted=false;
+
+  // A different account signing in on this device must never have the previous owner's data pushed into
+  // its rows, and must never adopt across the boundary. Start that account clean instead.
+  const prevOwner=_syncMeta.__owner||null, foreign = prevOwner && prevOwner!==cloudUser.id;
+  if(foreign){
+    try{ const pre=await gatherData(); if(pre) await _localSet("_preSync", {t:Date.now(), owner:prevOwner, data:pre}); }catch(e){}
+    for(const k of CLOUD_KEYS) await _localSet(k, null);
+    _syncMeta={};
+    toast("Signed in as a different account — this device now shows that account's data.", true);
+  }
+
+  let adopted=false, snapped=false;
   for(const k of CLOUD_KEYS){
     const localTs=_syncMeta[k]||0, s=server[k];
-    if(s && s.ts>localTs){ await _localSet(k, s.v); _syncMeta[k]=s.ts; adopted=true; }
+    if(s && s.ts>localTs){
+      // Nothing else snapshots the pre-adopt state and there is no undo, so take one the first time this
+      // reconcile is about to replace anything. Cheap, and it makes every loss path recoverable.
+      if(!snapped){ snapped=true; try{ const pre=await gatherData(); if(pre) await _localSet("_preSync", {t:Date.now(), owner:prevOwner, data:pre}); }catch(e){} }
+      let adopt=s.v;
+      if(k==="history"){ const lv=await sget(k); const m=mergeHistory(lv, s.v);
+        adopt=m;
+        // the union may be a superset of the server row — push it straight back so both sides agree
+        if(lv && JSON.stringify(m)!==JSON.stringify(s.v)) await cloudPush(k, m, Date.now());
+      }
+      await _localSet(k, adopt); _syncMeta[k]=s.ts; adopted=true;
+    }
     else { const lv=await sget(k); if(lv!=null && (!s || localTs>s.ts)) await cloudPush(k, lv, localTs||Date.now()); }
   }
+  _syncMeta.__owner=cloudUser.id;
   await _persistMeta();
-  if(adopted) await reloadFromStore();
+  if(adopted || foreign) await reloadFromStore();
 }
 // Re-hydrate the in-memory globals from storage after the sync layer changed them, then repaint.
 async function reloadFromStore(){
@@ -1681,7 +1737,11 @@ async function _e2eIdbSet(k,v){ const db=await _e2eOpen(); return new Promise((r
 // load the device identity keypair, generating + persisting one on first use
 async function e2eGetKeys(){
   if(_e2eKeys) return _e2eKeys;
-  let jwk=null; try{ jwk=await _e2eIdbGet(E2E_REC); }catch(e){}
+  let rec=null; try{ rec=await _e2eIdbGet(E2E_REC); }catch(e){}
+  let jwk = rec ? (rec.jwk || rec) : null;          // {jwk,uid} envelope, or a legacy bare JWK
+  if(jwk && !(rec && rec.jwk) && cloudReady()){      // migrate a legacy record in place, stamping its owner
+    try{ await _e2eIdbSet(E2E_REC, {jwk, uid:cloudUser.id}); }catch(e){}
+  }
   if(jwk){
     try{
       const priv=await crypto.subtle.importKey("jwk",jwk,{name:"ECDH",namedCurve:"P-256"},true,["deriveBits"]);
@@ -1691,7 +1751,7 @@ async function e2eGetKeys(){
   }
   const kp=await crypto.subtle.generateKey({name:"ECDH",namedCurve:"P-256"},true,["deriveBits"]);
   const privJwk=await crypto.subtle.exportKey("jwk",kp.privateKey);
-  await _e2eIdbSet(E2E_REC,privJwk);
+  await _e2eIdbSet(E2E_REC, {jwk:privJwk, uid: cloudReady()?cloudUser.id:null});
   _e2eKeys={priv:kp.privateKey,pub:kp.publicKey,jwk:privJwk};
   return _e2eKeys;
 }
@@ -1754,7 +1814,7 @@ async function e2eRestore(pass){
     const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64ToBuf(row.iv)},key,b64ToBuf(row.wrapped));
     const jwk=JSON.parse(new TextDecoder().decode(pt));
     await crypto.subtle.importKey("jwk",jwk,{name:"ECDH",namedCurve:"P-256"},true,["deriveBits"]);   // validate
-    await _e2eIdbSet(E2E_REC,jwk);
+    await _e2eIdbSet(E2E_REC, {jwk, uid: cloudReady()?cloudUser.id:null});   // restored key belongs to this account
     _e2eKeys=null; _e2eNeedsRestore=false;
     for(const k in _e2eSecretCache) delete _e2eSecretCache[k];
     await e2eGetKeys(); await e2ePublish();
@@ -1765,7 +1825,18 @@ async function e2eRestore(pass){
 // --- transport + state ---
 async function e2eInit(){
   if(!cloudReady()) return;
-  let jwk=null; try{ jwk=await _e2eIdbGet(E2E_REC); }catch(e){}
+  let rec=null; try{ rec=await _e2eIdbGet(E2E_REC); }catch(e){}
+  // records written before this change are a bare JWK with no owner — treat those as mine (there was
+  // only ever one account per device then), and stamp the owner on the way past.
+  const recUid = (rec && rec.uid) ? rec.uid : null;
+  const jwk = rec ? (rec.jwk || rec) : null;
+  if(jwk && recUid && recUid!==cloudUser.id){
+    // another account's key is sitting here. Do NOT publish it, and do NOT delete it — without a
+    // passphrase backup, deleting it would destroy that account's own message history on its own device.
+    _e2eKeys=null;
+    _e2eNeedsRestore = await e2eBackupExists() === true;
+    subscribeMessages(); refreshUnread(); return;
+  }
   if(jwk){ try{ await e2eGetKeys(); await e2ePublish(); }catch(e){} _e2eNeedsRestore=false; }
   else if(await e2eBackupExists()){ _e2eNeedsRestore=true; }   // defer: let the user restore before we mint a new key
   else { try{ await e2eGetKeys(); await e2ePublish(); }catch(e){} }   // brand-new user → fresh key
