@@ -2633,7 +2633,7 @@ function maybeAskFinish(){
   confirmAsk("No sets for "+ago+" minutes. Finish this workout? Your time counts up to your last set.",
              "Finish", ()=>{ try{ Promise.resolve($("saveBtn").onclick()).catch(()=>toast("Couldn't save — your sets are still here.")); }catch(e){} }, "go");
 }
-function updateTrainingState(){ document.body.classList.toggle("training", sessionUnderway()); }
+function updateTrainingState(){ document.body.classList.toggle("training", sessionUnderway()); updateClearBtn(); }
 // Pin the session + rest timers to the top while a workout's underway (active timer OR a running
 // rest). .stick enables position:sticky; an IntersectionObserver adds .stuck (the backdrop) only once
 // the bar actually reaches the top, so nothing changes visually until you scroll.
@@ -2729,8 +2729,8 @@ $("exlist").addEventListener("change", e=>{ if(!e.target.classList||(!e.target.c
   if(!row.dataset.rested && rv!=="" && (wv!=="" || row.classList.contains("timed") || (name&&isBW(name)))){
     row.dataset.rested="1"; if(!timer.running && timer.elapsed===0) tmrStart(); restStart(); } captureDraft();
   refreshSetFocus(g); });
-// Visual focus only: fade the sets you've completed so the one you're on leads the eye. Same "done"
-// rule as the rest-timer trigger; never changes what's logged.
+// Visual only: a logged set's number becomes a filled check disc. Same "done" rule as the rest-timer
+// trigger; never changes what's logged.
 function setRowDone(row, name){
   if(row.classList.contains("warm")) return false;
   const w=row.querySelector(".w"), r=row.querySelector(".r");
@@ -2740,9 +2740,15 @@ function setRowDone(row, name){
 function refreshSetFocus(g){
   if(!g||!g.dataset) return; const name=g.dataset.ex;
   let done=0, total=0;
+  let n=0;
   g.querySelectorAll(".setrow").forEach(row=>{
-    const ok=setRowDone(row, name); row.classList.toggle("done", ok);
-    if(!row.classList.contains("warm")){ total++; if(ok) done++; }   // warm-ups aren't working sets
+    const ok=setRowDone(row, name), was=row.classList.contains("done"), sn=row.querySelector(".sn");
+    row.classList.toggle("done", ok);
+    // pop the disc only when a set turns done after the row is on screen, not when a render restores it
+    if(sn && ok && !was && row.dataset.seen){ sn.classList.add("justdone"); sn.addEventListener("animationend", ()=> sn.classList.remove("justdone"), {once:true}); }
+    row.dataset.seen="1";
+    const warm=row.classList.contains("warm"); if(!warm){ total++; n++; if(ok) done++; }   // warm-ups aren't working sets
+    if(sn) sn.setAttribute("aria-label", warm ? "Warm-up set, tap to make it a working set" : "Set "+n+(ok?", done":"")+", tap to mark warm-up");
   });
   // The counter is injected rather than built into the two header templates (plan mode and free mode),
   // so there is one place that knows how to count a set as done.
@@ -2752,9 +2758,9 @@ function refreshSetFocus(g){
     const nm=head.querySelector(".nm");
     if(nm && nm.nextSibling) head.insertBefore(tag, nm.nextSibling); else head.appendChild(tag); }
   tag.textContent = total ? done+"/"+total : "";
+  tag.setAttribute("aria-label", total ? done+" of "+total+" sets done" : "");
   tag.style.display = total ? "" : "none";
   tag.classList.toggle("all", total>0 && done===total);
-  g.classList.toggle("gdone", total>0 && done===total);
 }
 // ---- per-set hold timer for isometric moves: tap the button to start a count-up, tap again to log the seconds ----
 let hold={ row:null, startedAt:0, iv:null };
@@ -3340,7 +3346,7 @@ function sponSwap(xi){
 }
 function sponStart(){
   const day=_sponDays[_sponSel], s={}; day.ex.forEach(e=> s[e.n]=Array.from({length:objSets(e.n)},()=>({w:"",r:""})));
-  draft["free"]={ t:Date.now(), s, spon:1, name:day.name }; sset("draft", draft);
+  draft["free"]={ t:Date.now(), s, spon:1, name:day.name, orig:Object.keys(s) }; sset("draft", draft);
   freeMode=true; swaps={}; closeSheet("Spon"); renderSeg(); renderFree(); showTab("workout");
   toast(day.name+" session ready — picked from your recent training. Let's go!");
 }
@@ -4118,6 +4124,7 @@ function draftSig(){ return freeMode ? "free" : (activePlan().id + "|" + curWk);
 let _draftTimer=null;
 // snapshot every set row currently on screen so nothing typed is lost on a re-render or reload
 function captureDraft(){
+  updateClearBtn();
   const sig=draftSig(), map={}, efmap={}, efauto={};
   document.querySelectorAll("#exlist .group").forEach(g=>{
     const name=g.dataset.ex; if(!name) return; const arr=[];
@@ -4126,7 +4133,9 @@ function captureDraft(){
     const bar=g.querySelector(".efbar"); if(bar){ efmap[name]=+bar.dataset.ef; efauto[name]=bar.dataset.auto==="1"?1:0; }
   });
   if(Object.keys(map).length===0) return; // nothing on screen (e.g. mid-unload) — don't clobber a saved draft
+  const prev=draft[sig];
   draft[sig]={ t:Date.now(), s:map, ef:efmap, efa:efauto, tm:{e:timer.elapsed, sa:timer.startedAt, rn:timer.running}, le:_lastSetEl, la:_lastSetAt, gy:sessGym };
+  if(prev && prev.spon) Object.assign(draft[sig], { spon:1, name:prev.name, tpl:prev.tpl, shuffle:prev.shuffle||0, orig:prev.orig });   // a suggested session keeps its name (and what it suggested) once you log into it
   draft.__mode = freeMode ? "free" : "plan";   // draft is device-only (not in CLOUD_KEYS), so no sync surface
   clearTimeout(_draftTimer); _draftTimer=setTimeout(()=>{ sset("draft", draft); }, 350);
   liveTick();   // if broadcasting, stream the latest set to watchers (throttled)
@@ -4211,7 +4220,7 @@ function renderWorkout(){
     wireEffortBar(g);
     g.querySelector(".addset").onclick=()=>{ const n=g.querySelectorAll(".setrow").length+1;
       const tmp=document.createElement("div"); tmp.innerHTML=freeSetRow(n, null, name);
-      g.querySelector(".cardfoot").insertAdjacentElement("beforebegin", tmp.firstChild); captureDraft(); };
+      g.querySelector(".cardfoot").insertAdjacentElement("beforebegin", tmp.firstChild); captureDraft(); refreshSetFocus(g); };
   });
   // when an injury rests a big chunk of the session, offer alternatives for unaffected areas
   const lost=injRes.filter(r=>r.drop).length;
@@ -4235,12 +4244,13 @@ function renderWorkout(){
   const addBtn=document.createElement("button"); addBtn.className="btn tinted wide";
   addBtn.innerHTML=ICON.plus+"Add exercise"; addBtn.onclick=()=>openAdd("plan"); list.appendChild(addBtn);
   applyDraft();
-  list.querySelectorAll(".group").forEach(refreshSetFocus);   // fade completed sets so the current one leads (visual only)
+  list.querySelectorAll(".group").forEach(refreshSetFocus);   // mark logged sets done (visual only)
   renderStartMode();
   updateRepeatBtn();
   updateLiveRow();
   updateGymRow();
   renderSessionRose();
+  updateClearBtn();
 }
 // the live muscle-balance rose under the workout — same shape friends see when they watch you live
 function renderSessionRose(){
@@ -4286,16 +4296,51 @@ function fillExerciseLast(name){
   toast("Filled "+name+" from last time");
 }
 $("exlist").addEventListener("click", e=>{ const b=e.target.closest(".fillast"); if(!b) return; e.preventDefault(); fillExerciseLast(b.dataset.ex); });
-// abort: throw away the in-progress session (unsaved sets), reset the clocks, and return to Set up
+// Clear workout: throw away everything entered for THIS workout (typed sets, the draft, the session and
+// rest clocks, swaps; in Free mode the exercises you added) and return to Set up. Other workouts' drafts,
+// the plan itself and saved history are untouched. A suggested session (Surprise) goes back to exactly
+// what it suggested: its own exercises, each with its usual number of empty sets.
 function abortSession(){
-  const sig=draftSig();
-  delete draft[sig]; sset("draft", draft);
+  const sig=draftSig(), d=draft[sig], orig=freeMode && d && d.spon ? sponOrig(d) : null;
+  if(hold.row) holdStop(false);
+  if(orig){ const s={}; orig.forEach(n=> s[n]=Array.from({length:objSets(n)},()=>({w:"",r:""})));
+    draft[sig]={ t:Date.now(), s, spon:1, name:d.name, tpl:d.tpl, shuffle:d.shuffle||0, orig }; }
+  else delete draft[sig];
+  sset("draft", draft);
   swaps={}; sessGym=null; tmrReset(); restStop(); endLive(true);
   if(freeMode){ renderSeg(); renderFree(); } else { renderSeg(); renderWorkout(); }
-  renderDash();
-  toast("Session discarded.");
+  renderDash(); updateClearBtn();
+  toast("Workout cleared");
 }
-if($("abortBtn")) $("abortBtn").onclick=()=> confirmAsk("Discard this session? Your logged sets won't be saved.", "Discard", abortSession, "danger");
+// the exercises a suggested session started with (older drafts didn't store them: rebuild once from its template)
+function sponOrig(d){
+  if(!d.orig && d.tpl!=null){ _sponPr=_sponPr||(typeof sponPriorities==="function"?sponPriorities():null);
+    try{ d.orig=buildSponDay(d.tpl, _sponPr, d.shuffle||0).ex.map(e=>e.n); }catch(e){} }
+  return d.orig||null;
+}
+// what Clear would remove right now, read off the screen so it matches what you see
+function workoutEntries(){
+  const fd=freeMode ? draft["free"] : null, orig=fd && fd.spon ? sponOrig(fd) : null;
+  const names=[...document.querySelectorAll("#exlist .group[data-ex]")].map(g=>g.dataset.ex);
+  const ex=!freeMode ? 0 : orig ? names.filter(n=>!orig.includes(n)).length : names.length;   // a suggestion's own exercises stay
+  const sets=[...document.querySelectorAll("#exlist .setrow")].filter(r=> [...r.querySelectorAll(".w,.r")].some(i=> i.value.trim()!=="")).length;
+  const sw=freeMode ? 0 : Object.keys(swaps).length;
+  return { ex, sets, sw, timer:sessionUnderway() };
+}
+function workoutHasEntries(){ const e=workoutEntries(); return !!(e.ex || e.sets || e.sw || e.timer); }
+// shown whenever this workout has anything to lose, not only once the session clock runs
+function updateClearBtn(){ const b=$("abortBtn"); if(b) b.hidden=!workoutHasEntries(); }
+function askClearWorkout(){
+  const e=workoutEntries(), parts=[], pl=(n,w)=> n+" "+w+(n===1?"":"s");
+  if(e.ex) parts.push(pl(e.ex,"exercise"));
+  if(e.sets) parts.push(pl(e.sets,"set"));
+  if(e.sw) parts.push(pl(e.sw,"swap"));
+  const list = parts.length>1 ? parts.slice(0,-1).join(", ")+" and "+parts[parts.length-1] : parts[0];
+  const what = list ? "removes "+list+(e.timer ? " and resets the session timer" : "") : e.timer ? "resets the session timer" : "removes what you've entered";
+  const fd=draft["free"], nm = freeMode ? ((fd&&fd.spon&&fd.name) || "this free workout") : ((activePlan().workouts[curWk]||{}).name || "this workout");
+  confirmAsk("Clear "+nm+"? This "+what+". Your plan and saved workouts stay.", "Clear", abortSession, "danger");
+}
+if($("abortBtn")) $("abortBtn").onclick=askClearWorkout;
 let _finLock=0;   // swallow a double tap on Finish while the share sheet is still 400ms away
 $("saveBtn").onclick=async()=>{
   if(Date.now()<_finLock) return;
@@ -5703,7 +5748,7 @@ function loadSurprise(){
   if(!opts.length){ toast("Log a session or two first — then I can surprise you."); settings.surprise=false; sset("settings",settings); freeMode=false; renderSeg(); renderWorkout(); return; }
   const pick=opts[Math.floor(Math.random()*opts.length)]; _sponSel=_sponDays.indexOf(pick);
   const s={}; pick.ex.forEach(e=> s[e.n]=Array.from({length:objSets(e.n)},()=>({w:"",r:""})));
-  draft["free"]={ t:Date.now(), s, spon:1, name:pick.name, tpl:pick.tpl, shuffle:pick.shuffle||0 }; sset("draft", draft);
+  draft["free"]={ t:Date.now(), s, spon:1, name:pick.name, tpl:pick.tpl, shuffle:pick.shuffle||0, orig:Object.keys(s) }; sset("draft", draft);
   freeMode=true; swaps={}; renderSeg(); renderFree();
 }
 // keep the same surprise focus, just re-fit it to a new length (Quick/Standard/Full)
@@ -5712,7 +5757,7 @@ function relenSurprise(){
   _sponLen=settings.sponLen||"standard"; _sponPr=_sponPr||(typeof sponPriorities==="function"?sponPriorities():null);
   const day=buildSponDay(fd.tpl, _sponPr, fd.shuffle||0), s={};
   day.ex.forEach(e=> s[e.n]=Array.from({length:objSets(e.n)},()=>({w:"",r:""})));
-  draft["free"]={ t:Date.now(), s, spon:1, name:day.name, tpl:fd.tpl, shuffle:fd.shuffle||0 }; sset("draft", draft);
+  draft["free"]={ t:Date.now(), s, spon:1, name:day.name, tpl:fd.tpl, shuffle:fd.shuffle||0, orig:Object.keys(s) }; sset("draft", draft);
   freeMode=true; renderSeg(); renderFree();
 }
 function surpriseShuffle(){
@@ -5804,7 +5849,7 @@ function buildSetRow(i, pv, name){
     ? '<button class="holdbtn" type="button" aria-label="Hold timer — tap to start, tap to stop">'+ICON.play+'</button>'
     : '<span class="x">×</span>';
   const fill = (pvVol&&(pw||pr)) ? ' fillable' : '';
-  return '<div class="setrow'+(timed?' timed':'')+(pvVol?'':' novol')+'" data-pvol="'+(pvVol||'')+'" data-pw="'+pw+'" data-pr="'+pr+'"><span class="sn" title="Tap to mark warm-up">'+i+'</span>'
+  return '<div class="setrow'+(timed?' timed':'')+(pvVol?'':' novol')+'" data-pvol="'+(pvVol||'')+'" data-pw="'+pw+'" data-pr="'+pr+'"><span class="sn" role="button" title="Tap to mark warm-up">'+i+'</span>'
     +'<input class="w" type="text" inputmode="decimal" autocomplete="off" placeholder="'+wPh+'">'
     +sep
     +'<input class="r" type="number" inputmode="numeric" placeholder="'+rPh+'">'
@@ -5920,7 +5965,7 @@ function buildFreeGroup(name){
   wireEffortBar(g);
   g.querySelector(".addset").onclick=()=>{ const n=g.querySelectorAll(".setrow").length+1;
     const tmp=document.createElement("div"); tmp.innerHTML=freeSetRow(n,null,name);
-    g.querySelector(".cardfoot").insertAdjacentElement("beforebegin", tmp.firstChild); captureDraft(); };
+    g.querySelector(".cardfoot").insertAdjacentElement("beforebegin", tmp.firstChild); captureDraft(); refreshSetFocus(g); };
   return g;
 }
 function renderFree(){
@@ -5941,10 +5986,11 @@ function renderFree(){
     Object.keys(fd.s).forEach(name=>{ freeSection(sectionKeyFor(name)).appendChild(buildFreeGroup(name)); });
     applyDraft();
   } else if(fd){ delete draft["free"]; sset("draft", draft); }
-  list.querySelectorAll(".group").forEach(refreshSetFocus);   // same completed-set fade as plan sessions
+  list.querySelectorAll(".group").forEach(refreshSetFocus);   // same done marks as plan sessions
   renderStartMode();
   updateRepeatBtn();
   renderSessionRose();
+  updateClearBtn();
 }
 function freeSection(key){
   const list=$("exlist");
@@ -6102,7 +6148,11 @@ function renumberSets(g){ let n=0; g.querySelectorAll(".setrow").forEach(r=>{ co
   if(r.classList.contains("warm")) sn.textContent="W"; else { n++; sn.textContent=n; } }); }
 $("exlist").addEventListener("click", e=>{ const s=e.target.closest(".sn"); if(!s) return;
   const r=s.closest(".setrow"), g=s.closest(".group"); if(!r||!g) return;
+  const wasDone=r.classList.contains("done"), num=s.textContent;
   r.classList.toggle("warm"); renumberSets(g); updateSetVol(r, g.dataset.ex); refreshAutoEffort(g); captureDraft();
+  refreshSetFocus(g);
+  // the check disc looks tappable: say what the tap did, so "unticking" never silently makes a warm-up
+  if(wasDone) toast("Set "+num+" is now a warm-up. Tap W to undo.");
   if(navigator.vibrate) try{ navigator.vibrate(10); }catch(_){} });
 // Tap a set's volume number:
 //  • an empty row showing a dotted previous-session value → fills last time's weight × reps (the "fillable" hint)
@@ -6139,10 +6189,10 @@ function removeSetRow(r){
   const g=r.closest(".group"); if(!g) return;
   const rows=g.querySelectorAll(".setrow");
   if(rows.length<=1){ const w=r.querySelector(".w"), rp=r.querySelector(".r");
-    if(w) w.value=""; if(rp) rp.value=""; r.dataset.pvol=""; r.dataset.rested=""; updateSetVol(r, g.dataset.ex); captureDraft(); return; }
+    if(w) w.value=""; if(rp) rp.value=""; r.dataset.pvol=""; r.dataset.rested=""; updateSetVol(r, g.dataset.ex); captureDraft(); refreshSetFocus(g); return; }
   r.remove();
-  g.querySelectorAll(".setrow .sn").forEach((sn,i)=> sn.textContent=i+1);
-  captureDraft();
+  renumberSets(g);
+  captureDraft(); refreshSetFocus(g);
 }
 $("exlist").addEventListener("input", e=>{ if(!e.target.classList||(!e.target.classList.contains("w")&&!e.target.classList.contains("r"))) return;
   if(e.target.classList.contains("w")){ let v=e.target.value.replace(/,/g,".").replace(/[^0-9.]/g,""); const i=v.indexOf("."); if(i>=0) v=v.slice(0,i+1)+v.slice(i+1).replace(/\./g,""); if(v!==e.target.value) e.target.value=v; }
@@ -6217,7 +6267,7 @@ function openTargetEditor(xi){
 function removeFreeExercise(g){
   if(!g) return; const name=g.dataset.ex;
   confirmAsk("Remove "+name+"?", "Remove", ()=>{ const sec=g.closest(".secgrp"); g.remove(); if(sec && !sec.querySelector(".group")) sec.remove();
-    if(!document.querySelector("#exlist .group[data-ex]")){ delete draft[draftSig()]; sset("draft",draft); } else captureDraft(); });   // captureDraft skips an empty screen, so the last card would come back
+    if(!document.querySelector("#exlist .group[data-ex]")){ delete draft[draftSig()]; sset("draft",draft); updateClearBtn(); } else captureDraft(); });   // captureDraft skips an empty screen, so the last card would come back
 }
 function removePlanExercise(xi){
   const p=activePlan(), w=p.workouts[curWk], e=w.ex[xi]; if(!e) return;

@@ -374,9 +374,9 @@
   #seg{ flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; padding:11px 0; }   /* day tabs scroll rather than wrap */
   #seg::-webkit-scrollbar{ display:none; }
   #seg .segabout{ font-size:0; margin-left:auto; padding-left:8px; } #seg .segabout::before{ left:-20px; right:0; }   /* 44px wide tap box that grows left, into the gap, not past the scroller's edge */ #seg .segabout svg{ width:16px; height:16px; margin-right:0; vertical-align:-3px; }
-  /* discard the in-progress session — only offered once you're training */
-  #abortBtn{ display:none; margin-top:8px; color:var(--red); font-weight:var(--w-semi); }
-  body.training #abortBtn{ display:block; }
+  /* clear this workout — at the foot of the page, shown whenever anything's been entered (updateClearBtn) */
+  #abortBtn{ display:block; margin-top:calc(var(--gap-card)*2.5); color:var(--red); font-weight:var(--w-semi); }   /* well clear of Finish even before the session card shows */
+  #abortBtn[hidden]{ display:none; }
   .largeTitle .ltmain .iconbtn{ flex:0 0 auto; align-self:center; margin:-9px -12px -9px 0; color:var(--l2); }   /* 49px hit box, 31px of layout */
   #pageMe .pagebody{ margin-top:var(--s1); }
   .largeTitle small{ display:block; font-size:var(--t-md); font-weight:var(--w-med); color:var(--l2); letter-spacing:0; margin-top:8px; }
@@ -1098,12 +1098,16 @@
   /* row dividers inset to the card padding, like iOS grouped lists */
   .setrow::before, .cardfoot::before{ content:""; position:absolute; top:0; left:var(--pad-card); right:var(--pad-card); border-top:.5px solid var(--sep); }
   .cardfoot{ position:relative; }
-  .setrow .sn{ font-size:var(--t-md); color:var(--l3); font-weight:var(--w-semi); width:22px; flex:0 0 auto; text-align:center; cursor:pointer; -webkit-tap-highlight-color:transparent; border-radius:var(--r-sm); padding:3px 0; }
-  .setrow.warm .sn{ color:var(--accent); font-size:var(--t-xs); letter-spacing:.3px; }
-  .setrow.warm .w, .setrow.warm .r{ opacity:.7; }
+  /* the set number sits in a fixed 24px circle on every row, so pending and done rows stay aligned */
+  .setrow .sn{ font-size:var(--t-md); color:var(--l3); font-weight:var(--w-semi); width:24px; height:24px; flex:0 0 auto; position:relative;
+    display:inline-flex; align-items:center; justify-content:center; line-height:1; border-radius:50%; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .setrow .sn::before{ content:""; position:absolute; inset:-10px -4px -10px -16px; }   /* 44px tap box: into the card padding on the left, never across the gap into the weight box */
+  .setrow.warm .sn{ color:var(--l2); font-size:var(--t-xs); letter-spacing:.3px; }   /* accent in this column means done only */
+  .setrow.warm input:placeholder-shown{ opacity:.7; }   /* dim only last time's hint, so a typed warm-up still reads as entered */
   .setrow.warm .vol{ color:var(--l3); font-style:italic; font-size:var(--t-xs); }
   .setrow input{ text-align:center; padding:12px 4px; }   /* 44px tall */
   .setrow input::placeholder{ color:var(--l2); }
+  .setrow input:not(:placeholder-shown){ font-weight:var(--w-semi); }   /* typed beats last time's hint at a glance (not a done mark) */
   .setrow .x{ color:var(--l3); flex:0 0 auto; font-weight:var(--w-semi); }
   /* hold timer for timed/isometric moves — tap to count up, tap to log the seconds into the row */
   .setrow .holdbtn{ flex:0 0 auto; min-width:50px; height:34px; padding:0 9px; border:none; border-radius:var(--r-sm);
@@ -1116,25 +1120,21 @@
   .setrow .eq{ color:var(--l3); flex:0 0 auto; font-weight:var(--w-semi); font-size:var(--t-sm); }
   .setrow .vol{ font-size:var(--t-md); color:var(--l2); font-weight:var(--w-bold); min-width:56px; flex:0 0 auto; text-align:right; line-height:1; font-variant-numeric:tabular-nums; }
   .setrow.novol .eq, .setrow.novol .vol{ visibility:hidden; }   /* no number yet → hide the "= —" noise, keep column alignment */
-  /* A logged set reads as DONE at a glance, never as disabled: its boxes fill with the accent tint and get an
-     accent ring, the values turn bold ink, and the set number becomes a filled ✓ badge. A set still to do keeps
-     plain grey boxes with the last-time hint in grey. */
-  .setrow.done input, .setrow.done input:not(:placeholder-shown):not(:focus){ background:color-mix(in srgb, var(--accent) 16%, var(--field));
-    box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent); color:var(--ink); font-weight:var(--w-bold); }
-  .setrow.done .vol{ color:var(--ink); }
-  .setrow.done .sn{ background:var(--accent-fill); color:var(--on-accent); font-weight:var(--w-bold); border-radius:var(--r-pill); font-size:0; }
-  .setrow.done .sn::after{ content:"✓"; font-size:var(--t-sm); }
-  .setrow.warm.done .sn{ background:transparent; color:var(--accent); font-size:var(--t-xs); }   /* warm-ups keep their own mark */
-  .setrow.warm.done .sn::after{ content:none; }
-  /* running tally in the exercise header, so finished lifts are obvious without reading their rows */
+  /* A logged set shows ONE signal: its set number becomes a filled accent disc with a drawn check (a mask,
+     not the ✓ glyph, so it doesn't depend on the device font). Boxes, values and the card stay as they are;
+     a finished exercise is simply a column of filled discs. Warm-ups are never done, so they keep their W. */
+  .setrow.done .sn{ background:var(--accent-fill); color:var(--on-accent); font-size:0; }
+  .setrow.done .sn::after{ content:""; position:absolute; inset:0; background:currentColor;
+    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6.8 12.4l3.4 3.4 7-7' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% 100% no-repeat;
+            mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6.8 12.4l3.4 3.4 7-7' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% 100% no-repeat; }
+  /* the pop plays only when a set turns done (.justdone is added by refreshSetFocus), never on a re-render */
+  .setrow.done .sn.justdone{ animation:donepop .3s cubic-bezier(.2,1.3,.5,1); }
+  @keyframes donepop{ 0%{ transform:scale(.5); } 60%{ transform:scale(1.12); } 100%{ transform:scale(1); } }
+  @media (prefers-reduced-motion: reduce){ .setrow.done .sn.justdone{ animation:none; } }
+  @media (forced-colors: active){ .setrow.done .sn{ forced-color-adjust:none; } }
+  /* running tally in the exercise header: a plain grey count, the same whether or not the exercise is finished */
   .exhead .setcount{ font-size:var(--t-xs); font-weight:var(--w-bold); color:var(--l2); background:var(--track);
     border-radius:var(--r-pill); padding:3px 9px; flex:0 0 auto; font-variant-numeric:tabular-nums; letter-spacing:.2px; }
-  .exhead .setcount.all{ background:var(--accent-fill); color:var(--on-accent); }
-  .exhead .setcount.all::before{ content:"✓ "; }
-  /* every working set logged: an accent ring around the whole card (drawn on top, so set rows can't cover it) */
-  .group.gdone{ position:relative; }
-  .group.gdone::after{ content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
-    box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--accent) 75%, transparent); }
   .setrow .vol.live{ color:var(--ink); cursor:pointer; }
   .setrow .vol.live:active{ transform:scale(.9); opacity:.6; }
   /* previous-session volume doubles as a "tap to copy last time" target */
@@ -1142,7 +1142,7 @@
   .setrow .vol.fillable:active{ transform:scale(.9); opacity:.6; }
   .setrow .vol.fillable{ position:relative; } .setrow .vol.fillable::before{ content:""; position:absolute; inset:-14px -6px; }   /* 44px tap box; the row's own ::before is the divider */
   /* a new best lights up the whole row, not just the number */
-  .setrow.pr{ background:linear-gradient(90deg, var(--accent-soft) 0%, transparent 78%); box-shadow:inset 3px 0 0 var(--accent); border-radius:var(--r-sm); animation:prrow .55s cubic-bezier(.2,1,.4,1) both; }
+  .setrow.pr{ background:linear-gradient(90deg, var(--accent-soft) 0%, transparent 78%); box-shadow:inset 3px 0 0 var(--accent); animation:prrow .55s cubic-bezier(.2,1,.4,1) both; }
   .setrow.pr:not(.done) .sn, .setrow.pr .x, .setrow.pr .eq{ color:var(--accent); }
   .setrow.pr .vol{ color:var(--accent); }
   .setrow.pr input:not(:placeholder-shown){ color:var(--accent); }
@@ -1152,7 +1152,11 @@
   .setrow .setdel svg{ width:19px; height:19px; }
   .setrow .setdel:active{ color:var(--red); background:var(--fill); }
   .setrow .prtag{ display:none; flex:0 0 auto; font-size:var(--t-xs); font-weight:var(--w-bold); letter-spacing:.4px; color:var(--on-accent); background:var(--accent-fill); padding:2px 8px; border-radius:var(--r-sm); line-height:1; }
-  .setrow.pr .prtag{ display:inline-flex; animation:prpop .5s cubic-bezier(.2,1.3,.5,1) both; }
+  /* the tag rides above the volume, out of the flex row, so a PR row's inputs keep the same width as every other row */
+  .setrow.pr .prtag{ display:inline-flex; position:absolute; top:4px; right:calc(var(--pad-card) + 32px); font-size:10px; padding:2px 6px; animation:prpop .5s cubic-bezier(.2,1.3,.5,1) both; }
+  /* narrow phones: give the width back to the inputs, so a 5-digit weight like 142.5 fits */
+  @media (max-width:374px){ .setrow{ gap:8px; } .setrow .holdbtn{ min-width:40px; padding:0 6px; } }
+  @media (max-width:359px){ .setrow{ gap:6px; } .setrow .vol{ min-width:44px; } .setrow input{ padding-left:2px; padding-right:2px; } }
   @keyframes prpop{ 0%{transform:scale(0);opacity:0;} 55%{transform:scale(1.3);} 100%{transform:scale(1);opacity:1;} }
   .prspark{ position:fixed; inset:0; pointer-events:none; z-index:250; }
   .prspark i{ position:absolute; width:6px; height:6px; border-radius:50%; transform:translate(-50%,-50%); animation:prspark .65s ease-out forwards; }
@@ -1511,7 +1515,6 @@
   body{ animation:appfade .4s ease both; }
   @keyframes appfade{ from{opacity:0;} to{opacity:1;} }
   .sheetbody{ overscroll-behavior:contain; }
-  .setrow input:not(:placeholder-shown):not(:focus){ color:var(--ink); font-weight:var(--w-bold); box-shadow:inset 0 0 0 1.5px var(--accent-soft); }
   #exlist .group:nth-of-type(2){ animation-delay:.05s; }
   #exlist .group:nth-of-type(3){ animation-delay:.10s; }
   #exlist .group:nth-of-type(4){ animation-delay:.15s; }
