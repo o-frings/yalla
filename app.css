@@ -855,6 +855,18 @@
   .chipstar{ display:inline-flex; align-items:center; margin-right:5px; color:var(--accent); }
   .chipstar svg{ width:12px; height:12px; }
   .chip.on .chipstar, .addhdr .chipstar{ color:inherit; }
+  /* passphrase dialog shares the confirm dialog's shell */
+  #passWrap{ position:fixed; inset:0; z-index:301; display:none; align-items:center; justify-content:center; padding:28px; }
+  #passWrap.show{ display:flex; }
+  #passWrap .cscrim{ position:absolute; inset:0; background:rgba(0,0,0,.5); }
+  #passWrap .cbox{ position:relative; background:var(--sheetbg); border-radius:18px; max-width:340px; width:100%; padding:24px 20px 16px; box-shadow:0 12px 44px rgba(0,0,0,.34); }
+  #passWrap .pnote{ font-size:13px; color:var(--l2); line-height:1.5; margin:8px 0 14px; }
+  #passWrap .passuser{ position:absolute; opacity:0; height:0; width:0; padding:0; border:0; pointer-events:none; }
+  #passWrap #passInput{ width:100%; padding:14px 12px; font-size:16px; border-radius:11px; border:.5px solid var(--line);
+    background:var(--chartbg); color:var(--ink); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+  #passWrap .pgen{ display:block; width:100%; margin:10px 0 0; padding:10px; font-size:13px; font-weight:600;
+    color:var(--accent); background:var(--accent-soft); border:none; border-radius:10px; cursor:pointer; }
+  #passWrap .pwarn{ font-size:12.5px; color:var(--red); min-height:17px; margin:9px 0 11px; line-height:1.35; }
   #confirmWrap{ position:fixed; inset:0; z-index:300; display:none; align-items:center; justify-content:center; padding:28px; }
   #confirmWrap.show{ display:flex; }
   #confirmWrap .cscrim{ position:absolute; inset:0; background:rgba(0,0,0,.5); }

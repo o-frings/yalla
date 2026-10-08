@@ -1179,6 +1179,23 @@
   </div>
 </div>
 
+<!-- PASSPHRASE DIALOG — a real form, not window.prompt(), so iOS Passwords and Android's password
+     manager can offer to save and autofill it. The username field is what lets them file the entry
+     against your account; it is shown read-only rather than hidden, since hidden username fields are
+     ignored by some managers. -->
+<div id="passWrap">
+  <div class="cscrim" id="pScrim"></div>
+  <form class="cbox" id="passForm" autocomplete="on">
+    <div class="cmsg" id="pTitle"></div>
+    <div class="pnote" id="pNote"></div>
+    <input id="passUser" type="text" autocomplete="username" readonly tabindex="-1" aria-hidden="true" class="passuser">
+    <input id="passInput" type="password" autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Passphrase">
+    <button type="button" class="pgen" id="passGen">Suggest a strong phrase</button>
+    <div class="pwarn" id="pWarn"></div>
+    <div class="cbtns"><button type="button" class="cancel" id="pNo">Cancel</button><button type="submit" class="go" id="pYes">Save</button></div>
+  </form>
+</div>
+
 <!-- CONFIRM DIALOG -->
 <div id="confirmWrap">
   <div class="cscrim" id="cScrim"></div>

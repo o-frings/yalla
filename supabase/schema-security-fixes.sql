@@ -48,3 +48,13 @@ grant execute on function public.dm_mark_read(uuid) to authenticated;
 -- ---------------------------------------------------------------------------
 alter table public.dm_reactions drop constraint if exists dm_reactions_ct_len;
 alter table public.dm_reactions add constraint dm_reactions_ct_len check (length(ciphertext) < 512);
+
+-- ---------------------------------------------------------------------------
+-- 4. (M10) Record how hard each key backup was stretched.
+-- New backups use 600k PBKDF2 iterations instead of 150k. The count has to be stored PER BACKUP:
+-- raising it in place would make every existing backup undecryptable, and the app reports a failed
+-- decrypt as "wrong passphrase" — which would send you hunting for a typo that never happened.
+-- Existing rows keep the old count via the default, so they stay readable.
+-- Downloaded backup FILES carry the same number inside the file itself; nothing to do for those.
+-- ---------------------------------------------------------------------------
+alter table public.key_backups add column if not exists iterations int not null default 150000;

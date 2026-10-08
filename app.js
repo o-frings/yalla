@@ -1218,6 +1218,28 @@ async function cloudPush(k, v, ts){
 // history is {exerciseName:[{d,...}]} and has exactly one append and no delete path anywhere, so a union
 // keyed on the entry timestamp can only ever ADD back something a device was missing. Deliberately NOT
 // applied to extlog, which does have delete paths (a union there would resurrect deleted entries).
+// extlog DOES have delete paths, so a plain union would resurrect deleted entries. Every entry carries
+// d:Date.now() from its single creation point, so a deletion is recorded as that timestamp and the union
+// then subtracts them. Append-only and capped — you never un-delete, so losing one is the old behaviour,
+// never worse.
+const TOMB_MAX=500;
+function tombAdd(d){
+  if(!d) return;
+  const t=settings.extlogTomb=settings.extlogTomb||[];
+  if(t.indexOf(d)<0){ t.push(d); if(t.length>TOMB_MAX) t.splice(0, t.length-TOMB_MAX); }
+}
+function mergeExtlog(localE, serverE, tomb){
+  const dead=new Set(tomb||[]);
+  const a=Array.isArray(localE)?localE:[], b=Array.isArray(serverE)?serverE:[];
+  const seen=new Set(), out=[];
+  for(const e of [...a, ...b]){
+    if(!e || dead.has(e.d)) continue;
+    const k=String(e.d); if(seen.has(k)) continue;
+    seen.add(k); out.push(e);
+  }
+  out.sort((x,y)=>(x.d||0)-(y.d||0));
+  return out;
+}
 function mergeHistory(localH, serverH){
   if(!localH || typeof localH!=="object") return serverH;
   if(!serverH || typeof serverH!=="object") return localH;
@@ -1258,10 +1280,22 @@ async function cloudReconcile(){
       // reconcile is about to replace anything. Cheap, and it makes every loss path recoverable.
       if(!snapped){ snapped=true; try{ const pre=await gatherData(); if(pre) await _localSet("_preSync", {t:Date.now(), owner:prevOwner, data:pre}); }catch(e){} }
       let adopt=s.v;
-      if(k==="history"){ const lv=await sget(k); const m=mergeHistory(lv, s.v);
-        adopt=m;
+      if(k==="history" || k==="extlog" || k==="settings"){
+        const lv=await sget(k);
+        if(k==="history") adopt=mergeHistory(lv, s.v);
+        else if(k==="settings"){
+          // settings stays last-write-wins, EXCEPT the tombstone list, which is append-only and must
+          // survive from both sides or a delete made on one device comes back from the other
+          adopt=s.v;
+          const union=[...new Set([...((lv&&lv.extlogTomb)||[]), ...((s.v&&s.v.extlogTomb)||[])])];
+          if(union.length) adopt=Object.assign({}, s.v, {extlogTomb:union});
+        }
+        else {
+          const tomb=[...new Set([...((settings&&settings.extlogTomb)||[]), ...(((server.settings&&server.settings.v)||{}).extlogTomb||[])])];
+          adopt=mergeExtlog(lv, s.v, tomb);
+        }
         // the union may be a superset of the server row — push it straight back so both sides agree
-        if(lv && JSON.stringify(m)!==JSON.stringify(s.v)) await cloudPush(k, m, Date.now());
+        if(lv && JSON.stringify(adopt)!==JSON.stringify(s.v)) await cloudPush(k, adopt, Date.now());
       }
       await _localSet(k, adopt); _syncMeta[k]=s.ts; adopted=true;
     }
@@ -1800,17 +1834,19 @@ async function e2eBackup(pass){
   if(!cloudReady() || !pass) return false;
   try{ const keys=await e2eGetKeys();
     const salt=crypto.getRandomValues(new Uint8Array(16)), iv=crypto.getRandomValues(new Uint8Array(12));
-    const key=await deriveKey(pass,salt), ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,new TextEncoder().encode(JSON.stringify(keys.jwk)));
-    await sb.from("key_backups").upsert({ user_id:cloudUser.id, salt:bufToB64(salt), iv:bufToB64(iv), wrapped:bufToB64(ct), updated_at:new Date().toISOString() });
+    const key=await deriveKey(pass,salt,PBKDF2_ITERS), ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,new TextEncoder().encode(JSON.stringify(keys.jwk)));
+    await sb.from("key_backups").upsert({ user_id:cloudUser.id, salt:bufToB64(salt), iv:bufToB64(iv), wrapped:bufToB64(ct), iterations:PBKDF2_ITERS, updated_at:new Date().toISOString() });
     return true;
   }catch(e){ return false; }
 }
 async function e2eRestore(pass){
   if(!cloudReady() || !pass) return false;
-  let row=null; try{ const { data } = await sb.from("key_backups").select("salt,iv,wrapped").eq("user_id",cloudUser.id).maybeSingle(); row=data; }catch(e){}
+  let row=null;
+  try{ const { data } = await sb.from("key_backups").select("salt,iv,wrapped,iterations").eq("user_id",cloudUser.id).maybeSingle(); row=data; }
+  catch(e){ try{ const { data } = await sb.from("key_backups").select("salt,iv,wrapped").eq("user_id",cloudUser.id).maybeSingle(); row=data; }catch(e2){} }
   if(!row) return false;
   try{
-    const key=await deriveKey(pass,b64ToBuf(row.salt));
+    const key=await deriveKey(pass,b64ToBuf(row.salt),row.iterations||PBKDF2_LEGACY);
     const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64ToBuf(row.iv)},key,b64ToBuf(row.wrapped));
     const jwk=JSON.parse(new TextDecoder().decode(pt));
     await crypto.subtle.importKey("jwk",jwk,{name:"ECDH",namedCurve:"P-256"},true,["deriveBits"]);   // validate
@@ -1978,7 +2014,7 @@ function renderRestoreGate(){
   $("msgTitle").textContent="Messages"; $("msgBack").style.display="none";
   b.innerHTML='<div class="msg-empty"><div class="msg-empty-ic">'+ICON.lock+'</div>'
     +'<p>Your encrypted messages are locked on this device. Enter your message passphrase to unlock your history.</p>'
-    +'<input class="comminput" id="msgRestorePass" type="password" placeholder="Message passphrase" style="margin:12px 0; width:100%;">'
+    +'<input class="comminput" id="msgRestorePass" type="password" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Message passphrase" style="margin:12px 0; width:100%;">'
     +'<button class="btn wide" id="msgRestoreBtn">Unlock my messages</button>'
     +'<button class="btn tinted wide" id="msgFreshBtn" style="margin-top:8px;">Start fresh on this device</button>'
     +'<p class="levelcap" style="margin-top:12px; line-height:1.45;">Starting fresh makes a new key — older messages stay locked, and friends will message your new key from now on.</p></div>';
@@ -2033,9 +2069,12 @@ async function renderConversations(){
   const bno=$("msgBackupNo"); if(bno) bno.onclick=async()=>{ settings.msgBackupDismissed=true; await sset("settings",settings); const el=$("msgBackupBanner"); if(el) el.remove(); };
 }
 async function promptBackup(){
-  let p=""; try{ p=window.prompt("Set a message passphrase to back up your key.\n\nOn a new device you'll enter this to unlock your message history.\n\n⚠️ Forget it with no other device signed in and your history is gone — it can't be recovered.","")||""; }catch(e){ p=""; }
+  const p=await askPassphrase({
+    title:"Back up your message key",
+    note:"On a new device you'll enter this to unlock your message history. Forget it with no other device signed in and that history is gone for good \u2014 so let your password manager save it.",
+    action:"Back up"
+  });
   if(!p) return;
-  if(p.length<6){ toast("Use at least 6 characters."); return; }
   const ok=await e2eBackup(p);
   toast(ok?"Message key backed up":"Couldn't back up — is messaging set up on the server?");
   if(ok) renderConversations();
@@ -2489,7 +2528,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   exerciseLibrary().forEach(n=>{ if((muscleFor(n)[0]||"")===primary) add(n); });   // every fitting exercise
   return set; }
 function dispName(e,xi){ return swaps[xi] || (rot[xi]!=null && !rotKeep.has(xi) ? rot[xi] : e.n); }
-let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, age:null, exp:null, sponLen:null, meTileOrder:null, meTileHidden:null, theme:"auto", restSec:180, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{}, baseActivity:null, favEx:[], gyms:[], gymSplit:0 };
+let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, age:null, exp:null, sponLen:null, meTileOrder:null, meTileHidden:null, theme:"auto", restSec:180, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{}, baseActivity:null, favEx:[], gyms:[], gymSplit:0, extlogTomb:[] };
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -6709,7 +6748,7 @@ function renderOtherLog(){
     row.innerHTML='<div class="info"><div class="nm">'+esc(e.name)+'</div><div class="meta">'+esc(sub)+'</div></div>'
       +'<span class="scoretag" style="color:var(--l2)">'+e.vol.toLocaleString()+' kg</span>'
       +'<a class="lnkic rem" title="Delete">'+ICON.trash+'</a>';
-    row.querySelector(".rem").onclick=()=>{ confirmAsk("Delete this "+e.name+" entry?","Delete",()=>{ extlog=extlog.filter(x=>x!==e); sset("extlog",extlog); renderOtherLog(); renderDash(); toast("Deleted"); }); };
+    row.querySelector(".rem").onclick=()=>{ confirmAsk("Delete this "+e.name+" entry?","Delete",()=>{ tombAdd(e.d); sset("settings",settings); extlog=extlog.filter(x=>x!==e); sset("extlog",extlog); renderOtherLog(); renderDash(); toast("Deleted"); }); };
     wrap.appendChild(row);
   });
 }
@@ -6816,7 +6855,7 @@ function renderCardioLog(){
     row.innerHTML=thumb+'<div class="info"><div class="nm">'+title+'</div><div class="meta">'+esc(parts.filter(Boolean).join(" · "))+'</div></div>'
       +'<a class="lnkic rem" title="Delete">'+ICON.trash+'</a>';
     if(e.route){ const cv=row.querySelector(".rthumb"); if(cv) drawRoutePolyline(cv, e.route); }
-    row.querySelector(".rem").onclick=()=>{ confirmAsk("Delete this "+(e.routeName||e.name)+" entry?","Delete",()=>{ extlog=extlog.filter(x=>x!==e); sset("extlog",extlog); renderCardioLog(); renderDash(); toast("Deleted"); }); };
+    row.querySelector(".rem").onclick=()=>{ confirmAsk("Delete this "+(e.routeName||e.name)+" entry?","Delete",()=>{ tombAdd(e.d); sset("settings",settings); extlog=extlog.filter(x=>x!==e); sset("extlog",extlog); renderCardioLog(); renderDash(); toast("Deleted"); }); };
     wrap.appendChild(row);
   });
 }
@@ -8554,9 +8593,63 @@ function accentHex(){ return (getComputedStyle(document.documentElement).getProp
 // codes above. Kept under separate names so the two never collide in this shared script scope.
 function bufToB64(buf){ return btoa(String.fromCharCode.apply(null,new Uint8Array(buf))); }
 function b64ToBuf(str){ const bin=atob(str), a=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i); return a; }
-async function deriveKey(pass,salt){
+// New backups stretch harder. The count MUST travel with each backup: raising it in place would make
+// every existing file undecryptable, and the app would report that as "wrong passphrase" — sending you
+// hunting for a typo that never happened. Old backups carry no count and are read at the old 150k.
+const PBKDF2_ITERS=600000, PBKDF2_LEGACY=150000;
+async function deriveKey(pass,salt,iters){
   const base=await crypto.subtle.importKey("raw",new TextEncoder().encode(pass),"PBKDF2",false,["deriveKey"]);
-  return crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:150000,hash:"SHA-256"},base,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
+  return crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:iters||PBKDF2_LEGACY,hash:"SHA-256"},base,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
+}
+// A 5-word phrase from a 60-word list is ~29 bits; paired with 600k PBKDF2 that is far past anything a
+// GPU chews through, and it is easier to write down correctly than a string of symbols.
+const PASS_WORDS=("anchor amber badge barley beacon birch bramble cedar cinder clover cobalt copper coral crest dapple delta "
+ +"drift ember fathom fennel ferry flint garnet gable harbor hazel heron ivory jasper kettle lantern larch linen marble meadow "
+ +"mellow mosaic nectar nimbus oaken onyx orchard pebble pewter plum quarry quiver ridge rowan saffron sable sorrel spruce "
+ +"thistle timber umber vellum verdant willow zephyr").split(/\s+/).filter(Boolean);
+function genPassphrase(){
+  const n=5, out=[], r=new Uint32Array(n); crypto.getRandomValues(r);
+  for(let i=0;i<n;i++) out.push(PASS_WORDS[r[i]%PASS_WORDS.length]);
+  return out.join("-");
+}
+const PASS_MIN=12;
+// Replaces window.prompt(), which no password manager can see. Resolves to the passphrase, or null.
+let _passResolve=null;
+function askPassphrase(opts){
+  opts=opts||{};
+  return new Promise(res=>{
+    const wrap=$("passWrap"); if(!wrap){ res(null); return; }
+    _passResolve=res;
+    $("pTitle").textContent=opts.title||"Passphrase";
+    $("pNote").textContent=opts.note||"";
+    $("pWarn").textContent="";
+    const inp=$("passInput");
+    inp.value=""; inp.placeholder=opts.placeholder||"Passphrase";
+    inp.setAttribute("autocomplete", opts.existing ? "current-password" : "new-password");
+    $("passUser").value=(cloudUser&&cloudUser.email)||settings.displayName||"yalla";
+    $("passGen").style.display=opts.existing?"none":"";
+    $("pYes").textContent=opts.action||(opts.existing?"Unlock":"Save");
+    wrap.classList.add("show");
+    setTimeout(()=>{ try{ inp.focus(); }catch(e){} },60);
+  });
+}
+function closePass(val){
+  const wrap=$("passWrap"); if(wrap) wrap.classList.remove("show");
+  const r=_passResolve; _passResolve=null; if(r) r(val);
+}
+if($("passForm")){
+  $("passForm").onsubmit=(e)=>{
+    e.preventDefault();
+    const v=$("passInput").value||"";
+    const existing=$("passInput").getAttribute("autocomplete")==="current-password";
+    if(!existing && v.length<PASS_MIN){ $("pWarn").textContent="Use at least "+PASS_MIN+" characters — or tap Suggest."; return; }
+    if(!v){ $("pWarn").textContent="Enter your passphrase."; return; }
+    closePass(v);
+  };
+  $("pNo").onclick=()=>closePass(null);
+  $("pScrim").onclick=()=>closePass(null);
+  $("passGen").onclick=()=>{ const g=genPassphrase(); const i=$("passInput"); i.type="text"; i.value=g;
+    $("pWarn").textContent="Write this down — nobody can recover it for you."; };
 }
 async function gatherData(){ const o={app:"yalla",v:1,exportedAt:Date.now(),data:{}}; for(const k of CLOUD_KEYS){ o.data[k]=await sget(k); } return o; }
 async function shareOrDownload(blob,fname){
@@ -8567,12 +8660,18 @@ async function shareOrDownload(blob,fname){
 }
 async function doExport(){
   const payload=await gatherData(), json=JSON.stringify(payload); let blob, enc=false, pass="";
-  try{ pass=window.prompt("Set a passphrase to encrypt your backup.\nLeave blank for an unencrypted file.","")||""; }catch(e){ pass=""; }
+  pass = await askPassphrase({
+    title:"Encrypt this backup?",
+    note:"This file holds your whole training log. A passphrase encrypts it — your password manager can save it. Cancel to download it unencrypted instead.",
+    action:"Encrypt"
+  }) || "";
   if(pass && crypto && crypto.subtle){
     try{
       const salt=crypto.getRandomValues(new Uint8Array(16)), iv=crypto.getRandomValues(new Uint8Array(12));
-      const key=await deriveKey(pass,salt), ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,new TextEncoder().encode(json));
-      blob=new Blob([JSON.stringify({app:"yalla",v:1,enc:true,exportedAt:payload.exportedAt,salt:bufToB64(salt),iv:bufToB64(iv),data:bufToB64(ct)})],{type:"application/json"}); enc=true;
+      const key=await deriveKey(pass,salt,PBKDF2_ITERS), ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,new TextEncoder().encode(json));
+      // `iter` travels with the file: without it, any future change to the count makes this backup
+      // undecryptable and the app would blame the passphrase
+      blob=new Blob([JSON.stringify({app:"yalla",v:1,enc:true,iter:PBKDF2_ITERS,exportedAt:payload.exportedAt,salt:bufToB64(salt),iv:bufToB64(iv),data:bufToB64(ct)})],{type:"application/json"}); enc=true;
     }catch(e){ toast("Couldn't encrypt — export cancelled. Your data was not written unencrypted."); return; }
   } else if(pass){ toast("Encryption unavailable here — export cancelled to keep your passphrase meaningful."); return; }
   if(!blob) blob=new Blob([json],{type:"application/json"});
@@ -8583,9 +8682,9 @@ async function doExport(){
 async function applyRestore(obj){
   let data = obj && obj.data;
   if(obj && obj.enc){
-    let pass=""; try{ pass=window.prompt("Enter the passphrase for this backup:","")||""; }catch(e){ pass=""; }
+    const pass=await askPassphrase({ title:"Unlock this backup", note:"Enter the passphrase this file was encrypted with.", existing:true, action:"Unlock" });
     if(!pass){ toast("Restore cancelled."); return; }
-    try{ const key=await deriveKey(pass,b64ToBuf(obj.salt)),
+    try{ const key=await deriveKey(pass,b64ToBuf(obj.salt),obj.iter||PBKDF2_LEGACY),
       pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64ToBuf(obj.iv)},key,b64ToBuf(obj.data));
       data=JSON.parse(new TextDecoder().decode(pt)).data;
     }catch(e){ toast("Wrong passphrase or corrupt file."); return; }
