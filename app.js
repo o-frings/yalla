@@ -191,6 +191,7 @@ const ICON={
   key:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 20 3M16 7l3 3M13.5 9.5l2.5 2.5"/></svg>',
   chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16"/><path d="M7 14l3-3 3 2 4-6"/></svg>',
   play:'<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5.5v13l11-6.5z"/></svg>',
+  more:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>',
   info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11.5v4.5"/><path d="M12 8h.01"/></svg>',
   warn:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
   heartF:'<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 20.7l-1.5-1.35C5.4 14.75 2 11.7 2 7.95 2 5.2 4.2 3 6.95 3c1.55 0 3.05.72 4.05 1.87l1 1.15 1-1.15C14 3.72 15.5 3 17.05 3 19.8 3 22 5.2 22 7.95c0 3.75-3.4 6.8-8.5 11.4z"/></svg>',
@@ -1672,7 +1673,7 @@ async function renderLiveCards(){
     const s=r.state||{}, who=names[r.user_id]||"A friend";
     const card=document.createElement("div"); card.className="livecard";
     card.innerHTML=avatarHTML(who,{size:44,live:true,uid:r.user_id})+'<div style="flex:1; min-width:0;"><div style="font-weight:700;">'+esc(who)+' is training live</div>'
-      +'<div class="levelcap" style="margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">'+esc(s.name||"Workout")+(s.exName?' · '+esc(s.exName):'')+' · '+(s.doneSets||0)+' sets</div></div><span class="livego">Watch ›</span>';
+      +'<div class="levelcap" style="margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">'+esc(s.name||"Workout")+(s.exName?' · '+esc(s.exName):'')+' · '+(s.doneSets||0)+' sets</div></div><span class="livego">Watch<span class="ovchev lnkchev">›</span></span>';
     card.onclick=()=>openLiveView(r.user_id, who);
     strip.appendChild(card);
   });
@@ -1711,14 +1712,14 @@ function renderLiveStats(s, active, who){
   const box=$("liveStats"); if(!box) return; s=s||{};
   const acts=$("liveActions"), add=$("liveCommAdd");
   if(!active){
-    box.innerHTML='<div class="ovbig" style="font-size:20px;">'+esc(who||"They")+' finished 🎉</div><p class="levelcap" style="margin-top:6px;">This live session ended — their workout is in the feed below.</p>';
+    box.innerHTML='<div class="ovbig">'+esc(who||"They")+' finished 🎉</div><p class="levelcap" style="margin-top:6px;">This live session ended — their workout is in the feed below.</p>';
     if(acts) acts.style.display="none"; if(add) add.style.display="none"; return;
   }
   if(acts) acts.style.display=""; if(add) add.style.display="";
   const chips=[["Exercise", s.exName||"—"],["Sets",(s.doneSets||0)+(s.totalSets?"/"+s.totalSets:"")],["Volume", s.vol?fmtKg(s.vol):"—"],["Time",(s.mins||0)+" min"]];
-  let h='<div class="ovbig" style="font-size:20px;">'+esc(s.name||"Workout")+'</div>';
+  let h='<div class="ovbig">'+esc(s.name||"Workout")+'</div>';
   h+='<div style="text-align:center; margin:12px 0 2px;"><canvas id="liveRadar" width="320" height="320" style="width:170px;height:170px;"></canvas></div>';
-  h+='<div class="row" style="gap:8px; margin:10px 0;">'+chips.map(c=>'<div style="flex:1; background:var(--row); border-radius:14px; padding:10px 4px; text-align:center;"><div style="font-weight:700; font-size:16px;">'+esc(c[1])+'</div><div class="levelcap" style="margin-top:2px;">'+esc(c[0])+'</div></div>').join('')+'</div>';
+  h+='<div class="row" style="gap:8px; margin:10px 0;">'+chips.map(c=>'<div style="flex:1; background:var(--row); border-radius:14px; padding:10px 4px; text-align:center;"><div style="font-weight:700; font-size:var(--t-lg);">'+esc(c[1])+'</div><div class="levelcap" style="margin-top:2px;">'+esc(c[0])+'</div></div>').join('')+'</div>';
   if(s.ex && s.ex.length){
     h+='<div class="ed-label">So far</div>'+s.ex.map(e=>{ const txt=(e.sets||[]).map(x=> (x.w!=null&&x.w!=="")? x.w+"kg×"+(x.r||0) : (x.r||0)+" reps").join(" · ");
       return '<div style="padding:8px 4px; border-bottom:.5px solid var(--line);"><div style="font-weight:600;">'+esc(e.name)+'</div><div class="levelcap" style="margin-top:2px;">'+esc(txt)+'</div></div>'; }).join('');
@@ -2028,7 +2029,7 @@ async function renderConversations(){
   if(_msgThreadChan){ try{ sb.removeChannel(_msgThreadChan); }catch(e){} _msgThreadChan=null; }
   const ttl=$("msgTitle"); ttl.textContent="Messages"; ttl.classList.remove("tappable"); ttl.onclick=null; $("msgBack").style.display="none";
   const b=$("msgBody"); if(!b) return;
-  b.innerHTML='<div class="levelcap" style="margin:10px 4px;">Loading…</div>';
+  b.innerHTML='<div class="levelcap" style="margin:10px 0;">Loading…</div>';
   const convos=await loadConversations();
   let friends=[]; try{ const { data } = await sb.rpc("my_following"); friends=(data||[]).filter(u=>u.status==="accepted"); recordAvatars(friends); }catch(e){}
   const have=new Set(convos.map(c=>c.uid));
@@ -2044,7 +2045,7 @@ async function renderConversations(){
         +(c.unread?'<span class="msg-dot"></span>':'')+'</div>'; }).join('');
   }
   if(fresh.length){
-    h+='<div class="ed-label" style="margin-top:16px;">Start a chat</div>'+fresh.map(f=>{ const nm=f.display_name||"Friend";
+    h+='<div class="ed-label">Start a chat</div>'+fresh.map(f=>{ const nm=f.display_name||"Friend";
       return '<div class="msg-convo" data-uid="'+esc(f.user_id)+'" data-nm="'+esc(nm)+'">'+statusAvatar(nm,{size:46,uid:f.user_id},isOnline(f.last_seen))
         +'<div class="msg-convo-main"><div class="msg-convo-nm">'+esc(nm)+'</div><div class="msg-convo-prev">Tap to message</div></div></div>'; }).join('');
   }
@@ -2319,7 +2320,12 @@ function roseTotals(tot, expanded){ const t=expandLegacyMtot(tot||{}), out={};
 // One typography scale for every canvas chart. Charts render at very different internal widths but all
 // display at roughly the same on-screen column width, so sizing the font as a fraction of the canvas
 // width makes the ON-SCREEN size the same across every graph (fontPx = k·W → displayed = k·W·(D/W) = k·D).
-const CHART_FONT={ tick:0.023, label:0.028, value:0.028, big:0.045 };
+// At the 358px sheet column: tick ≈10.7px, label/value ≈11.5px on screen. Pads that hold text come from measureText.
+const CHART_FONT={ tick:0.03, label:0.032, value:0.032, big:0.045 };
+// fillText that keeps the label inside the canvas (8px margin) for its current textAlign — radar labels near the edges
+function fitText(ctx, t, x, y){ const w=ctx.measureText(t).width, W=ctx.canvas.width, m=8, al=ctx.textAlign;
+  const lo=al==="right"?w+m:al==="center"?w/2+m:m, hi=al==="right"?W-m:al==="center"?W-w/2-m:W-w-m;
+  ctx.fillText(t, Math.max(lo,Math.min(hi,x)), y); }
 function cfont(W, role, weight){ const px=Math.max(9, Math.round(W*(CHART_FONT[role]||CHART_FONT.label))); return (weight||"600")+" "+px+"px -apple-system,system-ui,sans-serif"; }
 function drawRose(x, cx, cy, R, G, tot, o){
   // tot is already display-prepared by roseTotals() (legacy keys expanded, heads rolled into Back/Shoulders).
@@ -2345,7 +2351,7 @@ function drawRose(x, cx, cy, R, G, tot, o){
       const a=(-90+i*360/n)*Math.PI/180, px=cx+(R+gap)*Math.cos(a), py=cy+(R+gap)*Math.sin(a), co=Math.cos(a);
       x.textAlign=Math.abs(co)<0.3?"center":(co>0?"left":"right");
       x.fillStyle=typeof o.labelColor==="function"?o.labelColor(G[i],i):(o.labelColor||"#888");
-      x.fillText(MSHORT[G[i]]||G[i], px, py);
+      fitText(x, MSHORT[G[i]]||G[i], px, py);
     }
     x.shadowColor="transparent"; x.shadowBlur=0; x.shadowOffsetY=0;
   }
@@ -2372,13 +2378,13 @@ async function renderFeed(){
   renderLiveCards(); setTimeout(subscribeLiveFeed, 800);   // friends training live — defer the realtime channel off the open path so the home paints first
   // Liberal viewing: you see friends' posts even if you share nothing yourself. Each post shows at
   // the level its author published (s.lvl); your own level only governs what you publish.
-  list.innerHTML='<div class="levelcap" style="margin:0 4px;">Loading…</div>';
+  list.innerHTML='<div class="levelcap" style="margin:0;">Loading…</div>';
   let rows=[];
   try{
     const { data, error } = await sb.from("activity").select("id,user_id,created_at,summary").order("created_at",{ascending:false}).limit(30);
     if(error) throw error; rows=data||[];
-  }catch(e){ list.innerHTML='<div class="levelcap" style="margin:0 4px;">Couldn\'t load the feed.</div>'; return; }
-  if(!rows.length){ list.innerHTML='<div class="levelcap" style="margin:0 4px;">No activity yet. Finish a workout to be the first.</div>'; return; }
+  }catch(e){ list.innerHTML='<div class="levelcap" style="margin:0;">Couldn\'t load the feed.</div>'; return; }
+  if(!rows.length){ list.innerHTML='<div class="levelcap" style="margin:0;">No activity yet. Finish a workout to be the first.</div>'; return; }
   let names={};
   { const ids=[...new Set(rows.map(r=>r.user_id))]; let profs=[];
     try{ const { data, error } = await sb.from("profiles").select("user_id,display_name,avatar_color,avatar_emoji,avatar_icon,avatar_style,last_seen").in("user_id",ids); if(error) throw error; profs=data||[]; }
@@ -2410,7 +2416,7 @@ async function renderFeed(){
       '<div class="levelcap" style="margin:4px 0 0;">'+esc(stats)+'</div>'+
       (topLine?'<div class="levelcap" style="margin:2px 0 0;">'+esc(topLine)+'</div>':'')+
       (hl?'<div class="levelcap" style="margin:3px 0 0; opacity:.9;">'+hl+'</div>':'')+
-      '<div class="levelcap" style="margin:2px 0 0; opacity:.7;">'+esc(agoStr(Date.parse(r.created_at)))+(canOpen?' · tap for detail ›':'')+'</div>';
+      '<div class="levelcap" style="margin:2px 0 0; opacity:.7;">'+esc(agoStr(Date.parse(r.created_at)))+(canOpen?' · tap for detail<span class="ovchev lnkchev">›</span>':'')+'</div>';
     const cv=document.createElement("canvas"); cv.width=72; cv.height=72; cv.style.cssText="flex:0 0 auto; width:60px; height:60px;";
     const avt=document.createElement("div"); avt.style.cssText="flex:0 0 auto;"+(mine?"":" cursor:pointer;"); avt.innerHTML=avatarHTML(who,{size:44,uid:r.user_id});
     if(!mine) bindFriendTap(avt, r.user_id, who);   // tap → profile, long-press → chat
@@ -2431,12 +2437,13 @@ async function renderFeed(){
     miniRadar(cv, s.mtot||{});
   });
   // urgency: a friend who trained in the last day gets surfaced at the top of the overview
-  const host=$("ovBody"); if(host){ const old=host.querySelector(".ovfriend"); if(old) old.remove();
+  const host=$("ovBody"); if(host){ host.querySelectorAll(".ovfriend").forEach(el=>el.remove());
     const fresh=rows.find(r=> r.user_id!==cloudUser.id && (Date.now()-Date.parse(r.created_at)) < 24*3600*1000);
     if(fresh){ const who=names[fresh.user_id]||"A friend", s=fresh.summary||{};
       const c=document.createElement("div"); c.className="group ovnudge ovfriend";
-      c.innerHTML='<div class="pad"><div class="ovk" style="color:var(--accent);">Friends</div><div class="ovbig" style="font-size:20px;">'+esc(who)+' just trained 🔥</div><p class="ovp" style="margin-top:8px;">'+esc(s.name||"A workout")+' · '+esc(agoStr(Date.parse(fresh.created_at)))+' — your move?</p></div>';
+      c.innerHTML='<div class="pad"><div class="ovbig sm">'+esc(who)+' just trained 🔥</div><p class="ovp" style="margin-top:8px;">'+esc(s.name||"A workout")+' · '+esc(agoStr(Date.parse(fresh.created_at)))+' — your move?</p></div>';
       host.insertBefore(c, host.firstChild);
+      const lbl=document.createElement("div"); lbl.className="ed-label ovfriend"; lbl.textContent="Friend update"; host.insertBefore(lbl, c);
     }
   }
 }
@@ -2448,7 +2455,7 @@ function openWorkoutDetail(r, who, viewLvl){
   $("woWho").textContent = who||"Workout";
   let when=""; try{ when=new Date(Date.parse(r.created_at)).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); }catch(e){}
   const mt=s.mtot||{};
-  let h='<div class="ovbig" style="font-size:22px;">'+esc(s.name||"Workout")+'</div>';
+  let h='<div class="ovbig">'+esc(s.name||"Workout")+'</div>';
   if(when) h+='<div class="levelcap" style="margin:3px 0 16px;">'+esc(when)+'</div>';
   // headline numbers up top
   const chips=[["Volume", s.vol?fmtKg(s.vol):"—"],["Sets", ""+(s.sets||0)],["Time", (s.mins||0)+" min"],["PRs", ""+(s.prs||0)]];
@@ -2456,20 +2463,20 @@ function openWorkoutDetail(r, who, viewLvl){
   // muscle split as horizontal bars — clean and never clips (a single session is too lopsided for a radar)
   const at=roseTotals(mt), mg=roseGroups().filter(g=>(at[g]||0)>0).sort((a,b)=>(at[b]||0)-(at[a]||0)), mmax=Math.max(1,...mg.map(g=>at[g]));
   if(mg.length){
-    h+='<div class="ed-label" style="margin-top:22px;">Muscles worked</div><div class="wo-mus">';
+    h+='<div class="ed-label">Muscles worked</div><div class="wo-mus">';
     h+=mg.map(g=>{ const pct=Math.max(8,Math.round(at[g]/mmax*100)), col=MCOLOR[g]||"#888";
       return '<div class="wo-mrow"><span class="wo-mlab"><i class="wo-mdot" style="background:'+col+'"></i>'+esc(MSHORT[g]||g)+'</span><span class="wo-mtrack"><i class="wo-mbar" style="width:'+pct+'%;background:'+col+'"></i></span></div>'; }).join('');
     h+='</div>';
   }
   if(viewLvl>=2 && s.ex && s.ex.length){
-    h+='<div class="ed-label" style="margin-top:22px;">Exercises</div><div class="wo-exlist">';
+    h+='<div class="ed-label">Exercises</div><div class="wo-exlist">';
     h+=s.ex.map(e=>{
       const setsTxt=(e.sets||[]).map(st=>{ const hasW=viewLvl>=3 && st.w!=null && st.w!=="";
         return (hasW ? st.w+"kg×"+(st.r||0) : (st.r||0)+" reps"); }).join(" · ");
       const m=muscleFor(e.name)[0], col=MCOLOR[AGG[m]||m]||"#888";
       return '<div class="wo-ex"><span class="wo-exdot" style="background:'+col+'"></span><div><div class="wo-exn">'+esc(e.name)+'</div><div class="wo-exs">'+esc(setsTxt)+'</div></div></div>';
     }).join('')+'</div>';
-    if(viewLvl<3) h+='<p class="levelcap" style="margin:12px 4px 0; opacity:.75;">'+esc(who)+' shared sets &amp; reps but not the weights.</p>';
+    if(viewLvl<3) h+='<p class="levelcap" style="margin:12px 0 0; opacity:.75;">'+esc(who)+' shared sets &amp; reps but not the weights.</p>';
   }
   body.innerHTML=h;
   openSheet("WO");
@@ -3066,7 +3073,7 @@ function renderMeDiscover(){
   const dt=discoverTips();
   if(!dt.length){ if(zone) zone.style.display="none"; wrap.style.display="none"; if(dotsEl) dotsEl.style.display="none"; return; }
   if(zone) zone.style.display=""; wrap.style.display="";
-  wrap.innerHTML=dt.map(d=>'<div class="group ovnudge disccard"><div class="pad"><button class="discx" data-tip="'+d.id+'" aria-label="Dismiss">✕</button><div class="ovbig" style="font-size:18px; padding-right:20px;">'+esc(d.t)+'</div><p class="ovp" style="margin-top:8px;">'+esc(d.s)+'</p>'+(d.act?'<button class="btn wide ovdisc" data-act="'+d.act+'" data-tip="'+d.id+'" style="margin-top:16px;">'+esc(d.btn)+'</button>':'')+'</div></div>').join('');
+  wrap.innerHTML=dt.map(d=>'<div class="group ovnudge disccard"><div class="pad"><button class="discx" data-tip="'+d.id+'" aria-label="Dismiss">✕</button><div class="ovbig sm" style="padding-right:20px;">'+esc(d.t)+'</div><p class="ovp" style="margin-top:8px;">'+esc(d.s)+'</p>'+(d.act?'<button class="btn wide ovdisc" data-act="'+d.act+'" data-tip="'+d.id+'" style="margin-top:16px;">'+esc(d.btn)+'</button>':'')+'</div></div>').join('');
   if(dotsEl){ if(dt.length>1){ dotsEl.style.display=""; dotsEl.innerHTML=dt.map((_,i)=>'<span class="discdot'+(i===0?' on':'')+'"></span>').join(''); } else dotsEl.style.display="none"; }
   wrap.querySelectorAll(".discx").forEach(x=> x.onclick=(ev)=>{ ev.stopPropagation(); dismissTip(x.dataset.tip); renderMeDiscover(); });
   wrap.querySelectorAll(".ovdisc").forEach(b=> b.onclick=()=>{ if(b.dataset.tip){ settings.discRead=settings.discRead||{}; settings.discRead[b.dataset.tip]=1; sset("settings",settings); } ovAct(b.dataset.act); });
@@ -3115,21 +3122,22 @@ function renderRingsDetail(){
   let h="";
   h+=ringRow("#ff6b3d","Sessions",f7,sessTarget,"Session-equivalents this week — a short session counts in proportion to the work done, so a couple of micro sessions add up to a full one. Aim for "+sessTarget+" to spread enough weekly volume for your goal.",null,true);
   h+=ringRow("#4dabf7","Hard sets",setsWk,setsTarget,"Working sets across every muscle this week — quality sets taken near failure are what drive growth.");
-  h+=ringRow("#51cf66","Muscles",musWk.size,12,"Distinct muscle groups you've trained this week. Spreading the work keeps you balanced and injury-resistant.");
-  // trained vs not-trained breakdown (the heart of the muscles ring)
+  // trained vs not-trained breakdown (the heart of the muscles ring), shown inside the Muscles row
   const scope=planScopeMuscles(activePlan());
   const trained=MGROUPS.filter(g=>musWk.has(g));
   const missing=scope.filter(g=>!musWk.has(g));
-  let chips='<div class="ed-label" style="margin-top:2px;">Trained this week</div>';
+  let chips='<div class="ed-label" style="margin-top:12px;">Trained this week</div>';
   chips+= trained.length ? '<div class="muschips">'+trained.map(g=>'<span class="muschip on">'+esc(MSHORT[g]||g)+'</span>').join('')+'</div>'
                          : '<p class="rrdesc">Nothing logged yet this week — your first session lights these up.</p>';
   if(missing.length){ chips+='<div class="ed-label" style="margin-top:10px;">Your plan targets — not yet this week</div>'
     +'<div class="muschips">'+missing.map(g=>'<span class="muschip">'+esc(MSHORT[g]||g)+'</span>').join('')+'</div>'; }
-  h+='<div class="ringrow">'+chips+'</div>';
+  h+=ringRow("#51cf66","Muscles",musWk.size,12,"Distinct muscle groups you've trained this week. Spreading the work keeps you balanced and injury-resistant.").replace(/<\/div>$/, ()=>chips+'</div>');
   const cTgt=cardioTargetMins();
   if(cTgt>0) h+=ringRow("#9775fa","Cardio",cardioDoseWeek(7),cTgt,"Effort-adjusted aerobic minutes — a vigorous minute counts up to ~2× an easy one (you logged "+cardioMinsWeek(7)+" actual min).","min");
   h+='<div class="libteaser" id="ringsToMus" style="margin-top:8px;">See your full muscle balance →</div>';
   box.innerHTML=h;
+  const done=[f7>=sessTarget, setsWk>=setsTarget, musWk.size>=12].concat(cTgt>0?[cardioDoseWeek(7)>=cTgt]:[]), shut=done.filter(Boolean).length;
+  const lead=$("ringsLead"); if(lead){ lead.className="lh"+(shut===done.length?" good":""); lead.textContent=shut+" of "+done.length+" rings closed"; }
   const link=$("ringsToMus"); if(link) link.onclick=()=>{ closeSheet("Rings"); openMuscles(); };
 }
 // small weekly-sets sparkline for the overview
@@ -3291,12 +3299,12 @@ function renderSpon(){
     '<button class="sponcard'+(i===_sponSel?' on':'')+'" type="button" data-i="'+i+'"><span class="spname">'+esc(d.name)+'</span><span class="spwhy">'+esc(d.why)+'</span></button>'
   ).join('')+'</div>';
   const day=_sponDays[_sponSel];
-  h+='<div class="ed-label" style="margin-top:14px;">Session length</div>'
-    +'<div class="mewintabs paneltabs" id="sponLenSeg">'
+  h+='<div class="ed-label">Session length</div>'
+    +'<div class="utabs paneltabs" id="sponLenSeg">'
     +[["quick","Quick ~30m"],["standard","Standard ~45m"],["full","Full ~60m"]].map(([v,l])=>
-      '<button class="mewintab'+(_sponLen===v?' active':'')+'" data-sl="'+v+'" type="button">'+l+'</button>').join('')
+      '<button class="utab'+(_sponLen===v?' active':'')+'" data-sl="'+v+'" type="button" aria-pressed="'+(_sponLen===v)+'">'+l+'</button>').join('')
     +'</div>';
-  h+='<div class="ed-label sponexhd" style="margin-top:14px;"><span>Exercises <span class="subhint">— ≈'+sponMins(day.ex.length)+' min · tap ↻ to swap</span></span>'
+  h+='<div class="ed-label sponexhd"><span>Exercises <span class="subhint">— ≈'+sponMins(day.ex.length)+' min · tap ↻ to swap</span></span>'
     +'<button class="spshuffle" id="sponShuf" type="button">↻ shuffle all</button></div><div class="sponex">'
     +day.ex.map((e,xi)=>{
       const mcol=MCOLOR[muscleFor(e.n)[0]]||"#888", meta=metaHTML(e.n,""), lt=(meta&&meta.lastText)?meta.lastText:"new to you";
@@ -3308,7 +3316,7 @@ function renderSpon(){
   h+='<button class="btn wide" id="sponStart" type="button" style="margin-top:16px;">Start this session</button>';
   box.innerHTML=h;
   box.querySelectorAll(".sponcard").forEach(c=> c.onclick=()=>{ _sponSel=+c.dataset.i; renderSpon(); });
-  box.querySelectorAll("#sponLenSeg .mewintab").forEach(b=> b.onclick=async()=>{
+  box.querySelectorAll("#sponLenSeg .utab").forEach(b=> b.onclick=async()=>{
     _sponLen=b.dataset.sl; settings.sponLen=_sponLen; await sset("settings",settings);
     _sponDays=_sponDays.map(d=>buildSponDay(d.tpl, _sponPr, d.shuffle));   // re-fit every day to the new length
     renderSpon();
@@ -3410,7 +3418,7 @@ function renderLibrary(){
   if(!adv.length){ list.innerHTML='<p class="freehint">'+((EVIDENCE.advice||[]).length?'No advice matches that search.':'Couldn’t load the library — check your connection and reopen.')+'</p>'; return; }
   const showHeaders=(libCat==="all"); let h="", last=null;
   adv.forEach(a=>{
-    if(showHeaders && a.category!==last){ h+='<div class="ed-label" style="margin-top:14px;">'+esc(catLabel[a.category]||a.category)+'</div>'; last=a.category; }
+    if(showHeaders && a.category!==last){ h+='<div class="ed-label">'+esc(catLabel[a.category]||a.category)+'</div>'; last=a.category; }
     const s=EVIDENCE.studies[a.study]||{}, url=studyUrl(a.study);
     const evClass = (s.evidence==="causal"||s.evidence==="causal-leaning") ? "ev-do" : (s.evidence==="marker" ? "ev-marker" : "ev-linked");
     const inner='<div class="pad">'
@@ -3461,35 +3469,33 @@ function renderOverview(){
   // --- Train-at-home nudge (2+ days since the last workout) ---
   const off=daysOff();
   if(off>=2){
-    h+='<div class="group ovnudge"><div class="pad"><div class="ovk" style="color:var(--accent);">'+off+' days off</div>'
-      +'<div class="ovbig">No gym access right now? Train at home!</div>'
+    h+='<div class="ed-label">'+off+' days off</div>';
+    h+='<div class="group ovnudge"><div class="pad"><div class="ovbig sm">No gym access right now? Train at home!</div>'
       +'<p class="ovp" style="margin-top:8px;">A quick bodyweight session keeps your streak alive — no equipment needed.</p>'
       +'<button class="btn wide ovhome" style="margin-top:16px;">Start a home workout</button></div></div>';
   }
-  // --- Today ---
-  h+='<div class="ed-label">Today</div>';
-  if(due){
-    h+='<div class="group"><div class="pad"><div class="ovk">Deload week</div><div class="ovbig">Take it lighter</div><p class="ovp" style="margin-top:8px;">You’ve trained hard for a while. One easier week (~40% less) lets your body catch up — you’ll come back stronger.</p></div></div>';
-  } else if(did){
-    h+='<div class="group"><div class="pad"><div class="ovk">Today</div><div class="ovbig">Done for today 💪</div><p class="ovp" style="margin-top:8px;">You’ve logged a session. Rest and refuel — showing up consistently is what builds it.</p></div></div>';
-  } else if(settings.surprise){
-    // one adaptive start — reflects the mode chosen on the Workout tab (here: Surprise)
-    h+='<div class="group ovtap ovstart"><div class="pad ovstartpad"><div class="ovstarttext"><div class="ovk">Surprise session</div><div class="ovbig">A session, picked for you</div><div class="ovmeta">Tap to see today’s surprise</div></div><span class="ovchev ovgo">›</span></div></div>';
-  } else if(w){
-    h+='<div class="group ovtap ovstart"><div class="pad ovstartpad"><div class="ovstarttext"><div class="ovk">Next session</div><div class="ovbig">'+esc(w.name)+'</div><div class="ovmeta">≈'+workoutMinutes(w)+' min · '+w.ex.length+' exercise'+(w.ex.length===1?'':'s')+'</div></div><span class="ovchev ovgo">›</span></div></div>';
-  } else {
-    h+='<div class="group ovtap ovstart"><div class="pad ovstartpad"><div class="ovstarttext"><div class="ovbig">Pick a plan to begin</div></div><span class="ovchev ovgo">›</span></div></div>';
-  }
-  // a one-line motivator under Today (the full stats live on Me) — session-equivalents, so micro sessions count too
+  // a one-line motivator in the Today card (the full stats live on Me) — session-equivalents, so micro sessions count too
   const f7=sessionCredit(7);
   const motiv = f7>=4?"Strong week — you’re putting in the work." : f7>=2?"Good momentum — keep it rolling." : f7>=1?"You’ve started — one more session lifts the whole week." : "Fresh week. The first session is the hardest — let’s go.";
-  h+='<p class="ovp" style="margin:12px 0 0;">'+motiv+'</p>';
+  // --- Today --- one label per card: the section label is the card's kicker
+  h+='<div class="ed-label">'+(due?'Deload week':did?'Today':settings.surprise?'Surprise session':w?'Next session':'Today')+'</div>';
+  if(due){
+    h+='<div class="group"><div class="pad"><div class="ovbig sm">Take it lighter</div><p class="ovp" style="margin-top:8px;">You’ve trained hard for a while. One easier week (~40% less) lets your body catch up — you’ll come back stronger.</p><div class="ovmeta">'+motiv+'</div></div></div>';
+  } else if(did){
+    h+='<div class="group"><div class="pad"><div class="ovbig sm">Done for today 💪</div><p class="ovp" style="margin-top:8px;">You’ve logged a session. Rest and refuel — showing up consistently is what builds it.</p><div class="ovmeta">'+motiv+'</div></div></div>';
+  } else if(settings.surprise){
+    // one adaptive start — reflects the mode chosen on the Workout tab (here: Surprise)
+    h+='<div class="group ovtap ovstart"><div class="pad ovstartpad"><div class="ovstarttext"><div class="ovbig">A session, picked for you</div><div class="ovmeta">Tap to see today’s surprise</div><div class="ovmeta">'+motiv+'</div></div><span class="ovchev">›</span></div></div>';
+  } else if(w){
+    h+='<div class="group ovtap ovstart"><div class="pad ovstartpad"><div class="ovstarttext"><div class="ovbig">'+esc(w.name)+'</div><div class="ovmeta">≈'+workoutMinutes(w)+' min · '+w.ex.length+' exercise'+(w.ex.length===1?'':'s')+'</div><div class="ovmeta">'+motiv+'</div></div><span class="ovchev">›</span></div></div>';
+  } else {
+    h+='<div class="group ovtap ovstart"><div class="pad ovstartpad"><div class="ovstarttext"><div class="ovbig">Pick a plan to begin</div><div class="ovmeta">'+motiv+'</div></div><span class="ovchev">›</span></div></div>';
+  }
   // --- Spotlight — the single most notable thing right now, with a real graph; celebrate a win or flag a gap ---
   const spot=spotlight();
   if(spot){
-    h+='<div class="ed-label">'+(spot.kind==="win"?"Nice work":spot.kind==="watch"?"In focus":"Your training")+'</div>';
+    h+='<div class="ed-label spotlbl '+spot.kind+'"><span class="spotico">'+spot.ico+'</span>'+esc(spot.tag)+'</div>';
     h+='<div class="group ovtap ovspot '+spot.kind+'" id="ovSpot"><div class="pad">'
-      +'<div class="spothd"><span class="spotico">'+spot.ico+'</span><span class="spotk">'+esc(spot.tag)+'</span></div>'
       +'<div class="spotbig">'+esc(spot.title)+'</div>'
       +'<div class="spotcap">'+esc(spot.detail)+'</div>'
       +'<canvas id="ovSpotC" width="640" height="150"></canvas>'
@@ -3503,14 +3509,14 @@ function renderOverview(){
     // observational ('linked') tips are flagged "Linked in research"; causal ('do') tips "Backed by research"
     const linked = currentTip.tone==="linked", url = TIP_DOI[currentTip.id];
     h+='<div class="ed-label">'+(linked?'Health note':'Coach tip')+'</div>';
-    const inner='<div class="pad"><div class="ovbig" style="font-size:18px;">'+(linked?'🌱':'💡')+' Did you know?</div>'
+    const inner='<div class="pad"><div class="ovbig sm">'+(linked?'🌱':'💡')+' Did you know?</div>'
       +'<p class="ovp" style="margin-top:8px;">'+esc(currentTip.t)+'</p>'
       +'<div class="tipsrc">'+(linked?'Linked in research — ':'Backed by research — ')+esc(currentTip.src)+'</div>'
-      +(url?'<div class="tiplink">Read the study ↗</div>':'')+'</div>';
+      +(url?'<div class="tiplink">Read the study ↗</div>':'')
+      +'<div class="libteaser" id="ovLibLink">Browse all coaching tips →</div></div>';
     // whole panel taps through to the study, like the "Watch a how-to video" button
     h+= url ? '<a class="group tipcard" href="'+esc(url)+'" target="_blank" rel="noopener">'+inner+'</a>'
             : '<div class="group">'+inner+'</div>';
-    h+='<div class="libteaser" id="ovLibLink">Browse all coaching tips →</div>';
   }
   // --- Needs attention --- ordered by urgency (severity first); maps to your objective
   const obj=planObjective(activePlan()), todo=[], under=ovUnderMuscles();
@@ -3536,8 +3542,7 @@ function renderOverview(){
     push(30,"Six strong weeks on this plan 💪 swap 1–2 accessories to keep the gains coming.","workout");
   todo.sort((a,b)=> b.u-a.u);   // most urgent first
   const shown=todo.slice(0,2), more=todo.length-shown.length;   // keep the start page lean — top 2 only
-  h+='<div class="ed-label">Your next wins</div>';
-  h+='<div class="ovobj">Optimising for <b>'+esc(obj.label)+'</b></div>';
+  h+='<div class="ed-label edrow">Your next wins<span class="edmeta">For '+esc(obj.label)+'</span></div>';
   if(shown.length){ h+='<div class="group"><div class="pad"><ul class="ovtodo">'+shown.map(it=>'<li class="ovtap" data-act="'+it.act+'">'+it.t+'<span class="ovchev">›</span></li>').join('')
     +(more>0?'<li class="ovmore">+'+more+' more</li>':'')+'</ul></div></div>'; }
   else { h+='<div class="group"><div class="pad"><p class="ovp">On track for '+esc(obj.label)+' — every muscle your plan targets is getting enough volume. Keep showing up. 👏</p></div></div>'; }
@@ -3545,7 +3550,7 @@ function renderOverview(){
   const sb=host.querySelector(".ovstart"); if(sb) sb.onclick=()=>showTab("workout");
   const hb=host.querySelector(".ovhome"); if(hb) hb.onclick=startHomeWorkout;
   const sp=host.querySelector(".ovspon"); if(sp) sp.onclick=openSpontaneous;
-  const ll=host.querySelector("#ovLibLink"); if(ll) ll.onclick=openLibrary;
+  const ll=host.querySelector("#ovLibLink"); if(ll) ll.onclick=e=>{ e.preventDefault(); e.stopPropagation(); openLibrary(); };   // sits inside the tip card's study link
   host.querySelectorAll(".ovtodo .ovtap").forEach(li=> li.onclick=()=>ovAct(li.dataset.act));
   if(spot && $("ovSpot")){
     if(spot.rings) drawSpotRings("ovSpotC", spot.rings);
@@ -3584,7 +3589,8 @@ function renderDash(){
   const pct = (hasGoal && now!=null) ? Math.max(0,Math.min(100,((now-s)/(g-s))*100)) : 0;
   $("bwBar").style.width = pct+"%";
   $("bwGoalTxt").textContent = hasGoal ? g+" kg" : "—";
-  $("bwLeft").textContent = !hasGoal ? "set a goal weight below" : (now!=null ? (now>=g?"goal reached — amazing":(g-now).toFixed(1)+" kg to go") : "log your first weigh-in");
+  const reached = g<s ? now<=g : now>=g;   // a cut is reached from above, a gain from below
+  $("bwLeft").textContent = !hasGoal ? "set a goal weight below" : (now!=null ? (reached?"reached — nice":Math.abs(g-now).toFixed(1)+" kg to go") : "log your first weigh-in");
   $("stSessions").textContent = Math.floor(settings.sessions||0);   // session-equivalents, whole part
   const hrs=(settings.timeTotal||0)/60;
   $("stTime").textContent = hrs>=10 ? Math.round(hrs) : round1(hrs);
@@ -3611,7 +3617,7 @@ function renderDash(){
   const po=$("progObj");   // objective-adherence score, moved onto the Progress tile
   if(po){ if(!Object.keys(hist).length){ po.textContent="No sessions yet"; po.className="lh"; }
     else { const os=meObjectiveScore(7); po.className="lh "+(os.pct>=85?"good":os.pct<50?"under":"");
-      po.textContent=(os.pct>=85?"On track":os.pct<50?"Behind pace":"On your way")+" for "+os.objLabel.toLowerCase()+" — "+os.pct+"% of this week's target."; } }
+      po.textContent=os.objLabel+": "+(os.pct>=85?"on track":os.pct<50?"behind pace":"on your way")+" — "+os.pct+"% of this week's target."; } }
   renderCardioCard();
   renderMeDiscover();
   renderAchievements();
@@ -3676,7 +3682,7 @@ function renderCalc(now){
 }
 function drawSpark(){
   const c=$("spark"), ctx=c.getContext("2d"), W=c.width,H=c.height; ctx.clearRect(0,0,W,H);
-  if(bw.length<2){ ctx.fillStyle="#636366"; ctx.font=cfont(W,"label");
+  if(bw.length<2){ ctx.fillStyle=_axisColor(); ctx.font=cfont(W,"label");
     ctx.fillText("log weight a few times to see your trend",6,H/2+4); return; }
   const gt=parseFloat(settings.goalTarget), gs=parseFloat(settings.goalStart);
   const ks=bw.map(p=>p.kg), extra=[...ks]; if(!isNaN(gt)) extra.push(gt); if(!isNaN(gs)) extra.push(gs);
@@ -3727,7 +3733,8 @@ function progVerdict(metric, data){
   const N=data.length, mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
   const recent=mean(data.slice(N-3)), earlier=mean(data.slice(Math.max(0,N-6), N-3));
   if(metric==="weight"){
-    const gs=+settings.goalStart, gt=+settings.goalTarget, dir=settings.objective?objectiveDir():((gt>gs+0.5)?"gain":(gt<gs-0.5)?"lose":"maintain");
+    const gs=+settings.goalStart, gt=+settings.goalTarget, hasG=gs>0&&gt>0&&Math.abs(gt-gs)>0.5;
+    const dir=hasG?(gt>gs?"gain":"lose"):settings.objective?objectiveDir():"maintain";   // a set goal weight wins, so this matches the goal line
     const nz=[]; data.forEach((v,i)=>{ if(v>0) nz.push([i,v]); });
     if(nz.length<2) return {lvl:"more", msg:"Log your weight a few weeks running to track this."};
     const f=nz[0], l=nz[nz.length-1], pctWk=((l[1]-f[1])/f[1])*100/Math.max(1,l[0]-f[0]);
@@ -3904,7 +3911,7 @@ function drawProgChart(metric, canvasId, prog, overlay){
   const oData = overlay ? progWeeklyData(overlay) : null;
   const hasOverlay = !!(oData && oData.some(v=>v>0));
   baseline();
-  ctx.save(); ctx.beginPath(); ctx.rect(0,0, pad+prog*(W-pad*2)+2, H); ctx.clip();   // reveal the plotted line left→right; axes stay
+  ctx.save(); ctx.beginPath(); ctx.rect(0,0, pad+prog*(W-pad*2)+8, H); ctx.clip();   // reveal the plotted line left→right; axes stay (+8 keeps the end dot whole)
   // companion line first, so the primary metric always reads on top of it
   if(hasOverlay){
     const oY=scaleOf(oData, overlay);
@@ -3927,12 +3934,12 @@ function drawProgChart(metric, canvasId, prog, overlay){
   }
   ctx.restore();
   xLabels();
-  const fmtOf=(m,v)=> v>0 ? (m==="weight" ? round1(v)+" kg" : String(Math.round(v))) : "—";
-  // with two unlabelled lines on the plot, the caption has to say which is which — a dot per series
-  const dot=k=>'<span class="progdot '+k+'"></span>';
-  let capHTML=PROG_LABELS[metric]+' · last '+PROG_WEEKS+' weeks · '+(hasOverlay?dot("a"):"")
-    +'<b>this week: '+fmtOf(metric,data[N-1])+'</b>';
-  if(hasOverlay) capHTML+=' · '+dot("b")+'<b>'+fmtOf(overlay,oData[N-1])+'</b> '+(PROG_OVERLAY_NOUN[overlay]||overlay);
+  const fmtOf=(m,v)=> v>0 ? (m==="weight" ? round1(v)+" kg" : m==="volume" ? Math.round(v).toLocaleString()+" kg" : String(Math.round(v))) : "—";
+  // with two unlabelled lines on the plot, the caption has to say which is which — a dot per series;
+  // each dot stays on the line with its value
+  const dot=k=>'<span class="progdot '+k+'"></span>', nw=s=>'<span style="white-space:nowrap">'+s+'</span>';
+  let capHTML=PROG_LABELS[metric]+' · last '+PROG_WEEKS+' weeks · '+nw((hasOverlay?dot("a"):"")+'<b>this week: '+fmtOf(metric,data[N-1])+'</b>');
+  if(hasOverlay) capHTML+=' · '+nw(dot("b")+'<b>'+fmtOf(overlay,oData[N-1])+'</b> '+(PROG_OVERLAY_NOUN[overlay]||overlay));
   return {capHTML, vData:data};
 }
 const PROG_OVERLAY_NOUN={ sets:"hard sets", sessions:"sessions", volume:"volume", prs:"PRs", weight:"kg" };
@@ -3970,12 +3977,13 @@ function renderSeg(){
   const p=activePlan(), seg=$("seg"); seg.innerHTML="";
   const ni=nextRotateIndex(p);
   p.workouts.forEach((w,i)=>{
-    const s=document.createElement("div"); s.className="s"+(!freeMode && i===curWk?" active":"");
+    const s=document.createElement("button"); s.type="button"; s.className="utab"+(!freeMode && i===curWk?" active":""); s.setAttribute("aria-pressed", !freeMode && i===curWk);
     s.innerHTML=(i===ni?'<span class="ndot"></span>':'')+esc(w.name);
     s.onclick=()=>{ freeMode=false; curWk=i; swaps={}; renderSeg(); renderWorkout(); };
     seg.appendChild(s);
   });
-  const ab=document.createElement("div"); ab.className="s segabout";   // coach notes for the active plan, far right
+  const ab=document.createElement("button"); ab.type="button"; ab.className="utab segabout";   // coach notes for the active plan, far right
+  ab.setAttribute("aria-label","About this plan"); ab.title="About this plan";
   ab.innerHTML=ICON.info+"About";
   ab.onclick=()=> openAbout(activePlan());
   seg.appendChild(ab);
@@ -4130,7 +4138,7 @@ function applyDraft(){
     const name=g.dataset.ex, arr=d.s[name]; if(!arr) return;
     while(g.querySelectorAll(".setrow").length < arr.length){
       const n=g.querySelectorAll(".setrow").length+1, tmp=document.createElement("div");
-      tmp.innerHTML=freeSetRow(n, null, name); g.querySelector(".freeadd").insertAdjacentElement("beforebegin", tmp.firstChild);
+      tmp.innerHTML=freeSetRow(n, null, name); g.querySelector(".cardfoot").insertAdjacentElement("beforebegin", tmp.firstChild);
     }
     let els=g.querySelectorAll(".setrow");
     for(let i=els.length-1;i>=arr.length;i--) els[i].remove();
@@ -4180,7 +4188,7 @@ function renderWorkout(){
     const rotKept = rot[xi]!=null && rotKeep.has(xi);   // a variety pick is available but pinned back to the base
     const g=document.createElement("div"); g.className="group"+(inSS?" ss":"")+(inSS && e.ss===ssPrev?" ss-cont":""); g.dataset.ex=name; g.style.animationDelay=(xi*0.05)+"s";
     const meta=metaHTML(name, e.t, xi), eq=equipFor(name);
-    const linksHTML='<button class="lnkic menubtn" data-i="'+xi+'" data-ex="'+esc(name)+'" data-swap="'+(canSwap?1:0)+'" aria-label="More actions"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg></button>';
+    const linksHTML='<button class="lnkic menubtn" data-i="'+xi+'" data-ex="'+esc(name)+'" data-swap="'+(canSwap?1:0)+'" aria-label="More actions">'+ICON.more+'</button>';
     const mcol=MCOLOR[muscleFor(name)[0]]||"#888888";
     const mp=[];
     if(e.t) mp.push('<button type="button" class="tg tgedit" data-i="'+xi+'" title="Edit sets &amp; reps">'+esc(e.t)+' '+ICON.pencil+'</button>');
@@ -4197,13 +4205,11 @@ function renderWorkout(){
       ${metaLine}${meta.show?meta.cue:''}</div>`;
     let rows="";
     for(let i=0;i<e.s;i++){ rows+=buildSetRow(i+1, prev[i], name); }
-    // effort bar is the LAST child so it always sits below every set row; new/copied rows insert before
-    // .freeadd (above the effort bar), keeping the toggle in one consistent place (was landing mid-list).
-    g.innerHTML=head+rows+'<div class="freeadd"><a class="demo addset">'+ICON.plus+'add set</a></div>'+effortBar(name); list.appendChild(g);
+    g.innerHTML=head+rows+cardFoot(name); list.appendChild(g);
     wireEffortBar(g);
     g.querySelector(".addset").onclick=()=>{ const n=g.querySelectorAll(".setrow").length+1;
       const tmp=document.createElement("div"); tmp.innerHTML=freeSetRow(n, null, name);
-      g.querySelector(".freeadd").insertAdjacentElement("beforebegin", tmp.firstChild); captureDraft(); };
+      g.querySelector(".cardfoot").insertAdjacentElement("beforebegin", tmp.firstChild); captureDraft(); };
   });
   // when an injury rests a big chunk of the session, offer alternatives for unaffected areas
   const lost=injRes.filter(r=>r.drop).length;
@@ -4214,7 +4220,7 @@ function renderWorkout(){
     const head = shown===0
       ? "🩹 This session is all <b>"+esc(area)+"</b> work — fully rested right now."
       : "🩹 Resting your <b>"+esc(area)+"</b> drops "+lost+" move"+(lost>1?"s":"")+" here.";
-    let h='<div class="pad" style="padding:16px 20px;"><div class="injfill-h">'+head+'</div>';
+    let h='<div class="pad"><div class="injfill-h">'+head+'</div>';
     if(sugg.length){
       h+='<p class="injfill-sub">Train an unaffected area instead — picked from your weak spots, focus and where you\'re light this week:</p>'
         +'<div class="injfill-list">'+sugg.map(s=>'<button class="injfill-add" data-add="'+esc(s.name)+'">'+ICON.plus
@@ -4224,7 +4230,7 @@ function renderWorkout(){
     card.innerHTML=h; list.appendChild(card);
     card.querySelectorAll(".injfill-add").forEach(b=> b.onclick=()=> addToCurrentWorkout(b.dataset.add));
   }
-  const addBtn=document.createElement("button"); addBtn.className="btn tinted wide"; addBtn.style.marginTop="2px";
+  const addBtn=document.createElement("button"); addBtn.className="btn tinted wide";
   addBtn.innerHTML=ICON.plus+"Add exercise"; addBtn.onclick=()=>openAdd("plan"); list.appendChild(addBtn);
   applyDraft();
   list.querySelectorAll(".group").forEach(refreshSetFocus);   // fade completed sets so the current one leads (visual only)
@@ -4634,13 +4640,12 @@ function renderPlanList(){
     const active=p.id===settings.activePlanId;
     const sc=planScores(p);
     const item=document.createElement("div"); item.className="planitem";
-    const row=document.createElement("div"); row.className="planrow";
-    row.innerHTML=`<div class="check">${active?'✓':''}</div>
-      <div class="info"><div class="nm">${esc(p.name)}</div>
+    const row=document.createElement("div"); row.className="planrow"+(active?" active":"");
+    row.innerHTML=`<div class="info"><div class="prhead"><span class="nm">${esc(p.name)}${active?' <span class="actag">Active</span>':''}</span>
+        <button class="edit share" aria-label="Share ${esc(p.name)}">Share</button><button class="edit" aria-label="Edit ${esc(p.name)}">Edit</button></div>
         <div class="meta">${esc(planMeta(p))}</div>
-        <div class="pscores"><span class="psc pscbtn" data-bal="1"><b>Balance</b> ${sc.balance}<small>/5</small> <span class="psccar">›</span></span><span class="psc"><b>Hypertrophy</b> ${sc.hyp}<small>/5</small></span></div></div>
-      <button class="edit share">Share</button><button class="edit">Edit</button>`;
-    row.querySelector(".info").onclick=async(ev)=>{ if(ev.target.closest(".pscbtn")) return;   // Balance chip reveals the plan's rose instead of switching
+        <div class="pscores"><span class="psc pscbtn" data-bal="1"><b>Balance</b> ${sc.balance}<small>/5</small> <span class="psccar">›</span></span><span class="psc"><b>Hypertrophy</b> ${sc.hyp}<small>/5</small></span></div></div>`;
+    row.querySelector(".info").onclick=async(ev)=>{ if(ev.target.closest(".pscbtn,.edit")) return;   // Balance chip reveals the plan's rose; Share/Edit have their own handlers
       settings.activePlanId=p.id; settings.planStartAt=Date.now(); freeMode=false; swaps={}; const ni=nextRotateIndex(p); curWk=ni>=0?ni:0;
       await sset("settings",settings); renderAll(); closeSheet("Plans"); toast("Switched to "+p.name); };
     row.querySelector(".share").onclick=()=>openShare(p);
@@ -4837,7 +4842,7 @@ function shareCompute(){
                   : { t:"workouts", name:p.name+" — "+sel.length+" workout"+(sel.length>1?"s":""), workouts:sel };
   const code=encodePayload(obj);
   ta.value=code;
-  ta._msg='My Yalla '+(all?'plan':'workout'+(sel.length>1?'s':''))+' “'+obj.name+'”. Open Yalla → Plans → Import a plan, then paste:\n\n'+code;
+  ta._msg='My Yalla '+(all?'plan':'workout'+(sel.length>1?'s':''))+' “'+obj.name+'”. Open Yalla → Plans → Import, then paste:\n\n'+code;
 }
 $("sharePlanClose").onclick=()=>closeSheet("SharePlan");
 $("scrimSharePlan").onclick=()=>closeSheet("SharePlan");
@@ -4937,6 +4942,7 @@ const _editing=()=> $("meTiles")&&$("meTiles").classList.contains("editing");
 $("meBalance").onclick=()=>{ if(_meSwiped){ _meSwiped=false; return; } if(_editing()) return; openMuscles(); };
 if($("slCard")) $("slCard").onclick=()=>{ if(_editing()) return; openSheet("Strength"); };
 if($("progPanel")) $("progPanel").onclick=()=>{ if(_editing()) return; openSheet("Vol"); };
+if($("cardioCard")) $("cardioCard").onclick=()=>{ if(_editing()) return; if(cardioList().length) openCardioDetail(); else { showTab("workout"); setTrainMode("cardio"); } };
 if($("strengthClose")) $("strengthClose").onclick=()=>closeSheet("Strength");
 if($("scrimStrength")) $("scrimStrength").onclick=()=>closeSheet("Strength");
 if($("volClose")) $("volClose").onclick=()=>closeSheet("Vol");
@@ -4949,7 +4955,6 @@ function meTrackTo(win, animate){ const tr=$("meRingTrack"); if(!tr) return;
 // position the track + refresh the active window's stat/cta (canvases for both pages are pre-drawn by renderMeRadar)
 function applyMeWindow(win, animate){
   meWindow=win;
-  document.querySelectorAll("#meWinSeg .mewintab").forEach(t=> t.classList.toggle("active", +t.dataset.d===win));
   meTrackTo(win, animate);
   const st=$("meBalStat"), cta=$("meBalCta");
   if(st) st.classList.remove("under","good");
@@ -4958,7 +4963,6 @@ function applyMeWindow(win, animate){
   if(st){ st.textContent = under ? (under+" muscle"+(under>1?"s":"")+" under target") : "All muscles on target"; st.classList.add(under?"under":"good"); }
   if(cta) cta.textContent="detail ›";
 }
-document.querySelectorAll("#meWinSeg .mewintab").forEach(t=> t.onclick=(e)=>{ e.stopPropagation(); applyMeWindow(+t.dataset.d, true); });
 // the gauge track follows the finger and snaps to the nearest page on release (pager ignores canvas touches)
 (function(){ const ring=$("meRing"), tr=$("meRingTrack"); if(!ring||!tr) return;
   let x0=0, y0=0, w=1, startWin=7, active=false, drag=false;
@@ -5028,7 +5032,7 @@ function openAbout(plan){
   look.push("<b>Recover</b> — take an easier week roughly every 6 weeks; I'll nudge you when you're due.");
   look.push("<b>Form first</b> — control the lowering phase and use a full range; that's where most of the growth (and safety) lives.");
   let h='';
-  h+='<p class="ovp" style="margin:0 2px 4px;color:var(--l3);">'+esc(planMeta(plan))+'</p>';
+  h+='<p class="ovp">'+esc(planMeta(plan))+'</p>';   // the next .ed-label brings the 24px gap
   h+='<div class="ed-label">Focus</div><p class="ovp">Built for <b>'+esc(obj.label)+'</b>. Run it on a rolling cycle and let the same exercises progress over time.</p>';
   h+='<div class="ed-label">The split</div><p class="ovp"><b>'+esc(sp.type)+'</b> — '+esc(sp.why)+'</p>';
   h+='<div class="ed-label">What I weighted it for</div><p class="ovp">Hypertrophy <b>'+sc.hyp+'/5</b> and balance <b>'+sc.balance+'/5</b> — '+hypTxt+' with '+balTxt+'.</p>';
@@ -5040,10 +5044,10 @@ function openAbout(plan){
 }
 $("aboutClose").onclick=()=>closeSheet("About");
 $("scrimAbout").onclick=()=>closeSheet("About");
-document.querySelectorAll("#musSeg .s").forEach(s=> s.onclick=()=>{ musWindow=+s.dataset.d; renderMuscles(); });
-document.querySelectorAll("#musMetric .s").forEach(s=> s.onclick=()=>{ musMetric=s.dataset.m; renderMuscles(); });
-document.querySelectorAll("#musVolMode .s").forEach(s=> s.onclick=()=>{ musVolMode=s.dataset.vm; renderMuscles(); });
-document.querySelectorAll("#musScale .s").forEach(s=> s.onclick=()=>{ musScale=s.dataset.sc; renderMuscles(); });
+document.querySelectorAll("#musSeg .utab").forEach(s=> s.onclick=()=>{ musWindow=+s.dataset.d; renderMuscles(); });
+document.querySelectorAll("#musMetric .utab").forEach(s=> s.onclick=()=>{ musMetric=s.dataset.m; renderMuscles(); });
+document.querySelectorAll("#musVolMode .utab").forEach(s=> s.onclick=()=>{ musVolMode=s.dataset.vm; renderMuscles(); });
+document.querySelectorAll("#musScale .utab").forEach(s=> s.onclick=()=>{ musScale=s.dataset.sc; renderMuscles(); });
 const MUS_TIP="This radar shows your logged weekly sets per muscle against the ~10-set growth target — a dent means that muscle is under-dosed. Each plan's own balance lives with the plan.";
 function openMuscles(){ if(!plans.some(p=>p.id===musSrc)) musSrc="log"; renderMuscles(); openSheet("Mus"); coach("muscles",MUS_TIP); }
 function fmtKg(v){ return v>=1000 ? round1(v/1000)+"t" : Math.round(v)+"kg"; }
@@ -5101,7 +5105,7 @@ function drawRadar(totals, canvasId, target, noLabels, relative, prog){
   G.forEach((g,i)=>{ if(!showSpoke(g)) return; const a=(-90+i*360/n)*Math.PI/180, x=cx+(R+gap)*Math.cos(a), y=cy+(R+gap)*Math.sin(a), co=Math.cos(a);
     ctx.textAlign = Math.abs(co)<0.3 ? "center" : (co>0?"left":"right");
     const isParent=SUBGROUPS[g] && !musExpanded.has(g);
-    ctx.fillText((MSHORT[g]||g)+(isParent?" ›":""), x, y); });
+    fitText(ctx, (MSHORT[g]||g)+(isParent?" ›":""), x, y); });
 }
 // tap a rolled-up wedge (Shoulders / Back) to split it into its heads — or any head to collapse it back
 (function(){ const c=$("musRadar"); if(!c) return;
@@ -5229,10 +5233,11 @@ function renderMeRadar(){
   if(!Object.keys(hist).length){ if(head) head.textContent="—"; if(st) st.textContent="No sessions yet — log a workout"; return; }
   const det=expandLegacyMtot(meCache[7]||{}), underG=GAUGE_GROUPS.filter(g=>gaugeVal(det,g)<WEEKLY_SET_MIN);
   const tot=GAUGE_GROUPS.length, under=underG.length, onT=tot-under;
-  if(head){ head.innerHTML = '<span class="up">'+onT+'/'+tot+'</span> <span class="u">on target</span>'; }
-  if(st) st.textContent = under
-    ? ("Nice work — "+onT+" on track. Next up: "+listWords(underG.slice(0,2).map(g=>MSHORT[g]||g))+(under>2?" +"+(under-2)+" more":""))
-    : "Every major muscle hit its weekly target 💪";
+  const rc=onT/tot>=.7?"up":"";   // green only when most muscles are on target; otherwise plain ink, never alarm-red on the dashboard
+  if(head){ head.innerHTML = '<span class="'+rc+'">'+onT+'/'+tot+'</span> <span class="u">on target</span>'; }
+  if(st) st.textContent = under   // one line: the tile caption doesn't wrap
+    ? ("Next: "+underG.slice(0,2).map(g=>MSHORT[g]||g).join(", ")+(under>2?" +"+(under-2):""))
+    : "Every muscle on target 💪";
 }
 // Training-volume SUMMARY card: headline PR/trend + a mini sparkline of the default metric. Detail = Vol sheet.
 function renderTrainingVolume(){
@@ -5250,11 +5255,13 @@ function renderTrainingVolume(){
   drawSummarySpark("progMini", vol.filter(v=>v>0));
 }
 // small filled sparkline for a summary card
-function drawSummarySpark(id, series){
+function drawSummarySpark(id, series, opts){
   const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   if(!series || series.length<2){ return; }
-  const ac=accentHex(), mn=Math.min(...series), mx=Math.max(...series), sp=(mx-mn)||1, n=series.length, pad=6;
+  // opts.ref: a target drawn dashed, with the scale running from zero up to it (cardio minutes); otherwise fit the series
+  const ref=(opts&&opts.ref)||0, ac=(opts&&opts.color)||accentHex(), mn=ref?0:Math.min(...series), mx=ref?Math.max(ref,...series):Math.max(...series), sp=(mx-mn)||1, n=series.length, pad=6;
   const x=i=> pad+(i/(n-1))*(W-pad*2), y=v=> (H-pad)-((v-mn)/sp)*(H-pad*2);
+  if(ref){ ctx.strokeStyle=hexAlpha(ac,.45); ctx.setLineDash([5,5]); ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(pad,y(ref)); ctx.lineTo(W-pad,y(ref)); ctx.stroke(); ctx.setLineDash([]); }
   const grad=ctx.createLinearGradient(0,0,0,H); grad.addColorStop(0,hexAlpha(ac,.28)); grad.addColorStop(1,hexAlpha(ac,0));
   ctx.beginPath(); series.forEach((v,i)=>{ const px=x(i),py=y(v); i?ctx.lineTo(px,py):ctx.moveTo(px,py); });
   ctx.lineTo(x(n-1),H-pad); ctx.lineTo(x(0),H-pad); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
@@ -5263,7 +5270,7 @@ function drawSummarySpark(id, series){
   ctx.beginPath(); ctx.arc(x(n-1),y(series[n-1]),3.5,0,7); ctx.fillStyle=ac; ctx.fill();
 }
 // ---- Home spotlight: pick the single most notable thing right now and show it with a real graph ----
-function spotColor(kind){ return kind==="win" ? "#2b8a3e" : kind==="watch" ? "#e8890c" : accentHex(); }
+function spotColor(kind){ const dk=document.documentElement.classList.contains("dark"); return kind==="win" ? (dk?"#51cf66":"#2b8a3e") : kind==="watch" ? (dk?"#ffa94d":"#e8890c") : accentHex(); }
 // weekly bars, latest highlighted, dashed mean baseline
 function drawSpotChart(id, series, kind){
   const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height;
@@ -5395,15 +5402,15 @@ function musProjectedGain(){
 function renderMuscles(){
   const isLog=true;   // the balance sheet always reflects YOUR logged training; each plan's balance lives with that plan
   let totals, byEx;
-  document.querySelectorAll("#musSeg .s").forEach(s=> s.classList.toggle("active", +s.dataset.d===musWindow));
-  document.querySelectorAll("#musMetric .s").forEach(s=> s.classList.toggle("active", s.dataset.m===musMetric));
-  document.querySelectorAll("#musVolMode .s").forEach(s=> s.classList.toggle("active", s.dataset.vm===musVolMode));
+  document.querySelectorAll("#musSeg .utab").forEach(s=> s.setAttribute("aria-pressed", s.classList.toggle("active", +s.dataset.d===musWindow)));
+  document.querySelectorAll("#musMetric .utab").forEach(s=> s.setAttribute("aria-pressed", s.classList.toggle("active", s.dataset.m===musMetric)));
+  document.querySelectorAll("#musVolMode .utab").forEach(s=> s.setAttribute("aria-pressed", s.classList.toggle("active", s.dataset.vm===musVolMode)));
   ({totals, byEx}=muscleVolume(musWindow||null, musMetric, musVolMode));
   const useTarget = isLog && musMetric==="sets";   // sets/week vs a weekly-volume target
   const useKg = isLog && musMetric==="vol";
   const relative = useTarget && musScale==="rel";  // scale to top muscle instead of the fixed target ring
   $("musScale").style.display = useTarget ? "" : "none";
-  document.querySelectorAll("#musScale .s").forEach(s=> s.classList.toggle("active", s.dataset.sc===musScale));
+  document.querySelectorAll("#musScale .utab").forEach(s=> s.setAttribute("aria-pressed", s.classList.toggle("active", s.dataset.sc===musScale)));
   if(isLog) $("musIntro").textContent = useTarget
     ? (relative
         ? "Your training shape over this window — each muscle scaled to your most-trained, so balance stays readable at any range (it won't shrink on longer windows). The dashed ring marks the ~"+WEEKLY_SET_TARGET+"-set weekly target."
@@ -5480,10 +5487,12 @@ function applyTheme(){
   try{ localStorage.setItem("yallaTheme", mode); }catch(e){}
   document.querySelectorAll("#appSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.th===mode));
 }
+// canvases bake in theme colours, so redraw Me + Overview (not renderAll: that would rebuild a workout in progress)
+function repaintCharts(){ try{ renderDash(); renderOverview(); }catch(e){} }
 document.querySelectorAll("#appSeg .s").forEach(s=>{
-  s.onclick=async()=>{ settings.theme=s.dataset.th; await sset("settings",settings); applyTheme(); };
+  s.onclick=async()=>{ settings.theme=s.dataset.th; await sset("settings",settings); applyTheme(); repaintCharts(); };
 });
-try{ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>{ if((settings.theme||"auto")==="auto") applyTheme(); }); }catch(e){}
+try{ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>{ if((settings.theme||"auto")==="auto"){ applyTheme(); repaintCharts(); } }); }catch(e){}
 
 // ================= coach-tip cadence =================
 function renderTipSeg(){
@@ -5544,7 +5553,7 @@ function renderTravelBreakdown(){
     const wks=travelWeeks(k), perWk = wks>=0.5 ? round1((s.cred||s.n)/wks) : null;   // sessions/wk = consistency
     h+='<div class="tvrow"><span>'+lab+'</span><span>'+(perWk!=null?'<b>'+perWk+'</b>/wk · ':'')
       +'<b>'+round1(perSets)+'</b> sets · <b>'+fmtKg(perVol)+'</b>/session</span></div>'; });
-  h+='</div><p class="levelcap" style="margin:8px 4px 0;">Sessions per week (your consistency) plus average sets &amp; load per session in each context — so you can see what travel really costs.</p>';
+  h+='</div><p class="levelcap" style="margin:8px 0 0;">Sessions per week (your consistency) plus average sets &amp; load per session in each context — so you can see what travel really costs.</p>';
   box.innerHTML=h;
 }
 function renderTravel(){ renderTravelSeg(); renderTravelFab(); renderTravelBreakdown(); }
@@ -5583,11 +5592,11 @@ function renderStartMode(){
   const seg=$("seg"); if(seg) seg.style.display = mode==="plan" ? "" : "none";   // plan-day tabs only mean something in Plan mode
   const act=$("startAction"); if(!act) return;
   const refresh='<svg class="mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v4h-4"/></svg>';
-  const swap='<svg class="mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>';
+  const plans='<svg class="mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h12M9 12h12M9 18h12"/><circle cx="4" cy="6" r="1.2"/><circle cx="4" cy="12" r="1.2"/><circle cx="4" cy="18" r="1.2"/></svg>';
   // the mode's action is a header icon beside the travel button: New surprise (Surprise) / Change plan (Plan) / hidden (Free)
   const sh=$("headerShuf");
   if(sh){ const on=mode==="surprise";
-    sh.style.display = mode==="free" ? "none" : ""; sh.innerHTML = on ? refresh : swap;
+    sh.style.display = mode==="free" ? "none" : ""; sh.innerHTML = on ? refresh : plans;
     sh.setAttribute("aria-label", on ? "New surprise" : "Change plan"); sh.setAttribute("title", on ? "New surprise" : "Change plan");
     sh.onclick = on ? surpriseShuffle : (()=>{ renderPlanList(); openSheet("Plans"); }); }
   if(mode==="surprise"){
@@ -5595,9 +5604,9 @@ function renderStartMode(){
     // the session IS the title (fills the top-left); its shape is the subtitle
     if($("ltName")) $("ltName").textContent=nm;
     if($("planSub")) $("planSub").textContent=(nEx?'~'+sponMins(nEx)+' min · '+nEx+' move'+(nEx>1?'s':''):'picked for you')+(nEx?' · picked for you':'');
-    act.innerHTML='<div class="mewintabs paneltabs" id="sponLen2">'
-      +[["quick","Quick"],["standard","Standard"],["full","Full"]].map(([v,l])=>'<button class="mewintab'+(L===v?" active":"")+'" data-sl="'+v+'" type="button">'+l+'</button>').join('')+'</div>';
-    act.querySelectorAll("#sponLen2 .mewintab").forEach(b=> b.onclick=()=>{ settings.sponLen=b.dataset.sl; sset("settings",settings); relenSurprise(); });
+    act.innerHTML='<div class="utabs paneltabs" id="sponLen2">'
+      +[["quick","Quick"],["standard","Standard"],["full","Full"]].map(([v,l])=>'<button class="utab'+(L===v?" active":"")+'" data-sl="'+v+'" type="button" aria-pressed="'+(L===v)+'">'+l+'</button>').join('')+'</div>';
+    act.querySelectorAll("#sponLen2 .utab").forEach(b=> b.onclick=()=>{ settings.sponLen=b.dataset.sl; sset("settings",settings); relenSurprise(); });
   } else if(mode==="plan"){
     if($("ltName")) $("ltName").textContent="Workout";
     if($("planSub")) $("planSub").textContent = (typeof planMeta==="function") ? planMeta(activePlan()) : "";
@@ -5719,11 +5728,14 @@ function inferEffort(name, g){
 // per-exercise effort picker — auto-estimated from your load vs your best (see inferEffort), one tap to
 // override. Starts in "auto" mode (data-auto="1") and re-estimates as you type until you tap it.
 // Timed/hold moves have no meaningful proximity-to-failure, so they skip it (always counted as Hard).
-function effortBar(name){
-  if(isTimed(name)) return '';
-  return '<div class="efbar" data-ef="1" data-auto="1"><span class="eflbl">How hard?</span>'
+// "+ add set" leads the footer row; holds get it on a row of its own. The footer (.cardfoot) is always the
+// card's last child: new/copied set rows insert before it, so they never land below the effort picker.
+function cardFoot(name){
+  const add='<a class="demo addset" role="button">'+ICON.plus+'add set</a>';
+  if(isTimed(name)) return '<div class="cardfoot freeadd">'+add+'</div>';
+  return '<div class="cardfoot efbar" data-ef="1" data-auto="1">'+add+'<span class="efsegs" role="group" aria-label="How hard?">'
     + EFFORT_OPTS.map((o,ix)=>'<button type="button" class="efseg'+(ix===1?' on':'')+'" data-ef="'+ix+'" title="'+esc(o.tip)+'">'+esc(o.lbl)+'</button>').join('')
-    + '</div>';
+    + '</span></div>';
 }
 function setEffortSel(bar, ef){ bar.dataset.ef=ef; bar.querySelectorAll(".efseg").forEach(s=> s.classList.toggle("on", +s.dataset.ef===ef)); }
 // re-estimate an auto pill from the group's current set inputs; no-op once the user has tapped (manual)
@@ -5768,16 +5780,13 @@ function buildFreeGroup(name){
   const metaLine='<div class="exmeta">'+mp.join('<span class="dot">·</span>')+'</div>';
   g.innerHTML='<div class="pad" style="padding-bottom:0">'
     +'<div class="exhead"><span class="eqic tinted" style="background:'+hexAlpha(mcol,.15)+';color:'+mcol+'" title="'+esc(eq.label)+'">'+EQUIP[eq.key]+'</span><span class="nm">'+esc(name)+'</span>'
-    +'<span class="lnks"><a class="lnkic swapfree" title="Swap exercise">'+ICON.swap+'</a><a class="lnkic info" data-ex="'+esc(name)+'" title="Info & demo">'+ICON.info+'</a></span>'
-    +'<button class="freedel" title="Remove">×</button></div>'
+    +'<button class="lnkic menubtn" data-free="1" data-ex="'+esc(name)+'" aria-label="More actions">'+ICON.more+'</button></div>'
     +metaLine+(meta.show?meta.cue:'')+'</div>'
-    +rows+'<div class="freeadd"><a class="demo addset">'+ICON.plus+'add set</a></div>'+effortBar(name);
+    +rows+cardFoot(name);
   wireEffortBar(g);
-  g.querySelector(".swapfree").onclick=e=>{ e.preventDefault(); openSwapFree(name); };
-  g.querySelector(".freedel").onclick=()=>{ confirmAsk("Remove "+name+"?", "Remove", ()=>{ const sec=g.closest(".secgrp"); g.remove(); if(sec && !sec.querySelector(".group")) sec.remove(); captureDraft(); }); };
   g.querySelector(".addset").onclick=()=>{ const n=g.querySelectorAll(".setrow").length+1;
     const tmp=document.createElement("div"); tmp.innerHTML=freeSetRow(n,null,name);
-    g.querySelector(".freeadd").insertAdjacentElement("beforebegin", tmp.firstChild); captureDraft(); };
+    g.querySelector(".cardfoot").insertAdjacentElement("beforebegin", tmp.firstChild); captureDraft(); };
   return g;
 }
 function renderFree(){
@@ -5910,7 +5919,7 @@ function renderAddList(filter){
 function buildExRow(name, opts){
   opts=opts||{};
   const eq=equipFor(name), mcol=MCOLOR[muscleFor(name)[0]]||"#888888";
-  const row=document.createElement("div"); row.className="planrow exrow";
+  const row=document.createElement("div"); row.className="planrow exrow pick";
   row.innerHTML='<span class="eqic sm" title="'+esc(eq.label)+'">'+EQUIP[eq.key]+'</span>'
     +'<div class="info"><div class="nm"><span class="mdot" style="background:'+mcol+'"></span>'+esc(name)+'</div>'+(opts.meta?'<div class="meta">'+esc(opts.meta)+'</div>':'')+'</div>'
     +'<span class="scoretag">'+ICON.starF+hScore(name).s+'</span>'
@@ -5933,12 +5942,12 @@ $("exlist").addEventListener("click", e=>{ const a=e.target.closest(".rem"); if(
   const close=()=>{ if(!open) return; open=false; pop.classList.remove("show"); pop.innerHTML=""; };
   window.closeExMenu=close;
   function build(btn){
-    const xi=+btn.dataset.i, name=btn.dataset.ex, canSwap=btn.dataset.swap==="1";
+    const xi=+btn.dataset.i, name=btn.dataset.ex, free=btn.dataset.free==="1", canSwap=free||btn.dataset.swap==="1";
     const items=[];
-    if(canSwap) items.push({c:"swap", ic:ICON.swap, t:"Swap exercise", fn:()=>openSwap(xi)});
+    if(canSwap) items.push({c:"swap", ic:ICON.swap, t:"Swap exercise", fn:()=> free ? openSwapFree(name) : openSwap(xi)});
     items.push({c:"info", ic:ICON.info, t:"Info & demo", fn:()=>openInfo(name)});
-    items.push({c:"rem danger", ic:ICON.trash, t:"Remove", fn:()=>removePlanExercise(xi)});
-    pop.innerHTML=items.map((it,k)=>'<div class="mi '+it.c+'" data-k="'+k+'">'+it.ic+'<span>'+it.t+'</span></div>').join("");
+    items.push({c:"rem danger", ic:ICON.trash, t:"Remove", fn:()=> free ? removeFreeExercise(btn.closest(".group")) : removePlanExercise(xi)});
+    pop.innerHTML=items.map((it,k)=>'<button type="button" class="mi '+it.c+'" data-k="'+k+'">'+it.ic+'<span>'+it.t+'</span></button>').join("");
     pop.querySelectorAll(".mi").forEach((el,k)=> el.onclick=()=>{ close(); items[k].fn(); });
     // measure off-screen, then anchor the right edge to the button
     pop.style.visibility="hidden"; pop.classList.add("show"); open=true;
@@ -5982,7 +5991,7 @@ $("exlist").addEventListener("click", e=>{ const v=e.target.closest(".vol"); if(
       if((nw&&nw.value.trim())||(nr&&nr.value.trim())) next=null; }   // next already has data → append instead
     if(!next){ const n=g.querySelectorAll(".setrow").length+1;
       const tmp=document.createElement("div"); tmp.innerHTML=freeSetRow(n,null,name); next=tmp.firstChild;
-      const fa=g.querySelector(".freeadd"); if(fa) fa.insertAdjacentElement("beforebegin", next); else r.insertAdjacentElement("afterend", next); }
+      const fa=g.querySelector(".cardfoot"); if(fa) fa.insertAdjacentElement("beforebegin", next); else r.insertAdjacentElement("afterend", next); }
     const nw=next.querySelector(".w"), nr=next.querySelector(".r");
     if(nw) nw.value=wv; if(nr) nr.value=rv;
     if(!timer.running && timer.elapsed===0) tmrStart();
@@ -6066,6 +6075,11 @@ function openTargetEditor(xi){
     captureDraft();                                  // keep anything already typed before we re-render
     await sset("plans",plans); close(); renderWorkout(); toast("Set "+e.n+" to "+e.t);
   };
+}
+function removeFreeExercise(g){
+  if(!g) return; const name=g.dataset.ex;
+  confirmAsk("Remove "+name+"?", "Remove", ()=>{ const sec=g.closest(".secgrp"); g.remove(); if(sec && !sec.querySelector(".group")) sec.remove();
+    if(!document.querySelector("#exlist .group[data-ex]")){ delete draft[draftSig()]; sset("draft",draft); } else captureDraft(); });   // captureDraft skips an empty screen, so the last card would come back
 }
 function removePlanExercise(xi){
   const p=activePlan(), w=p.workouts[curWk], e=w.ex[xi]; if(!e) return;
@@ -6266,7 +6280,7 @@ function renderInjuryBanner(){
   else { note = swapped ? swapped+" move"+(swapped>1?"s":"")+" adjusted" : "nothing risky today";
     if(flagged) note += " · "+flagged+" to ease off"; }
   const verb = dropped ? "Resting your" : "Working around your";
-  b.innerHTML='🩹 <b>'+verb+' '+esc(listWords(inj.map(k=>INJ_LABEL[k]||k)))+'</b> · '+note+' <span class="injmanage">Manage ›</span>';
+  b.innerHTML='🩹 <b>'+verb+' '+esc(listWords(inj.map(k=>INJ_LABEL[k]||k)))+'</b> · '+note+' <span class="injmanage">Manage<span class="ovchev lnkchev">›</span></span>';
   b.style.display="";
 }
 async function setActiveInjuries(map){
@@ -6385,26 +6399,28 @@ function openChart(name){
     let rows=''; data.slice(-8).reverse().forEach(d=>{ rows+='<div class="crow"><span>'+esc(new Date(d.d).toLocaleDateString())+'</span><span>'+(fmtSet(d)||'—')+'</span></div>'; });
     listEl.innerHTML='<div class="ed-label">Recent sessions</div>'+rows;
   } else {
-    listEl.innerHTML='<p style="color:var(--l3);font-size:14px;padding:8px 4px;">Log this lift and your top set will plot here over time.</p>';
+    listEl.innerHTML='<p style="color:var(--l3);font-size:var(--t-md);padding:8px 4px;">Log this lift and your top set will plot here over time.</p>';
   }
   openSheet("Chart");
 }
 function drawExChart(data){
-  const c=$("exChart"), ctx=c.getContext("2d"), W=c.width, H=c.height, P=48; ctx.clearRect(0,0,W,H);
-  if(!data.length){ ctx.fillStyle="#636366"; ctx.font=cfont(W,"label"); ctx.textAlign="center";
+  const c=$("exChart"), ctx=c.getContext("2d"), W=c.width, H=c.height, P=48, l3=_axisColor(); ctx.clearRect(0,0,W,H);
+  if(!data.length){ ctx.fillStyle=l3; ctx.font=cfont(W,"label"); ctx.textAlign="center";
     ctx.fillText("No history yet",W/2,H/2); ctx.textAlign="left"; return; }
   const hasW=data.some(d=>parseFloat(d.w)>0);
   const vals=data.map(d=> hasW?(parseFloat(d.w)||0):(parseFloat(d.r)||0));
   const unit=hasW?"kg (top set)":"reps (top set)";
   let mn=Math.min(...vals), mx=Math.max(...vals);
   if(mn===mx){ mn-=1; mx+=1; } const pad=(mx-mn)*0.18; mn-=pad; mx+=pad; if(mn<0)mn=0;
-  const n=data.length;
-  const x=i=> n<2? W/2 : P+(i/(n-1))*(W-P-20);
-  const y=v=> H-P-((v-mn)/(mx-mn))*(H-P-30);
+  const n=data.length, gv=[0,1,2].map(g=>mn+(mx-mn)*(g/2));
   ctx.lineWidth=1; ctx.font=cfont(W,"tick");
-  for(let g=0;g<=2;g++){ const v=mn+(mx-mn)*(g/2), yy=y(v);
-    ctx.strokeStyle="rgba(84,84,88,.4)"; ctx.beginPath(); ctx.moveTo(P,yy); ctx.lineTo(W-20,yy); ctx.stroke();
-    ctx.fillStyle="#98989e"; ctx.fillText(Math.round(v)+'', 8, yy+6); }
+  const L=Math.max(P, Math.ceil(Math.max(...gv.map(v=>ctx.measureText(Math.round(v)+'').width)))+20);   // tick column + gap
+  const x=i=> n<2? W/2 : L+(i/(n-1))*(W-L-20);
+  const T=Math.ceil(ctx.measureText(unit).actualBoundingBoxAscent)+40;   // the unit label gets its own band above the top gridline
+  const y=v=> H-P-((v-mn)/(mx-mn))*(H-P-T);
+  gv.forEach(v=>{ const yy=y(v);
+    ctx.strokeStyle="rgba(84,84,88,.4)"; ctx.beginPath(); ctx.moveTo(L,yy); ctx.lineTo(W-20,yy); ctx.stroke();
+    ctx.fillStyle=l3; ctx.fillText(Math.round(v)+'', 8, yy+6); });
   const ac=accentHex();
   const grad=ctx.createLinearGradient(0,0,0,H); grad.addColorStop(0,hexAlpha(ac,.35)); grad.addColorStop(1,hexAlpha(ac,0));
   ctx.beginPath(); data.forEach((d,i)=>{ const px=x(i),py=y(vals[i]); i?ctx.lineTo(px,py):ctx.moveTo(px,py); });
@@ -6412,7 +6428,10 @@ function drawExChart(data){
   ctx.strokeStyle=ac; ctx.lineWidth=3.5; ctx.lineJoin="round"; ctx.beginPath();
   data.forEach((d,i)=>{ const px=x(i),py=y(vals[i]); i?ctx.lineTo(px,py):ctx.moveTo(px,py); }); ctx.stroke();
   ctx.fillStyle=ac; data.forEach((d,i)=>{ ctx.beginPath(); ctx.arc(x(i),y(vals[i]),5,0,7); ctx.fill(); });
-  ctx.fillStyle="#636366"; ctx.textAlign="right"; ctx.fillText(unit,W-20,26); ctx.textAlign="left";
+  ctx.fillStyle=l3; ctx.textAlign="right"; ctx.fillText(unit,W-20,26);
+  if(n>1){ const md=t=> new Date(t).toLocaleDateString(undefined,{month:"short",day:"numeric"});
+    ctx.textAlign="left"; ctx.fillText(md(data[0].d), L, H-12); ctx.textAlign="right"; ctx.fillText(md(data[n-1].d), W-20, H-12); }
+  ctx.textAlign="left";
 }
 
 // ===== strength progress — headline overall-strength trend + per-exercise drilldown (detail reuses openChart) =====
@@ -6461,7 +6480,8 @@ function drawStrengthIndex(si, prog){
   _figFns["exProgChart"]=(p)=>drawStrengthIndex(si,p);
   const s=si.series, vals=s.map(p=>p.idx), n=s.length, f=si.forecast;
   const l3=(getComputedStyle(document.documentElement).getPropertyValue('--l3')||'#888').trim();
-  const ac=accentHex(), padL=34, padR=14, padT=12, padB=24;
+  ctx.font=cfont(W,"tick");
+  const ac=accentHex(), padL=Math.ceil(ctx.measureText("100").width)+12, padR=14, padT=12, padB=24;
   // y-domain includes the forecast band so the continuation fits
   let lo=Math.min(100,...vals), hi=Math.max(100,...vals);
   if(f){ lo=Math.min(lo,f.lo); hi=Math.max(hi,f.hi); }
@@ -6474,7 +6494,7 @@ function drawStrengthIndex(si, prog){
   // baseline at 100 (each lift's start)
   ctx.strokeStyle=hexAlpha(l3,.5); ctx.setLineDash([4,4]); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(padL,y(100)); ctx.lineTo(W-padR,y(100)); ctx.stroke(); ctx.setLineDash([]);
   ctx.fillStyle=l3; ctx.font=cfont(W,"tick"); ctx.textAlign="right"; ctx.fillText("100",padL-4,y(100)+4);
-  ctx.save(); ctx.beginPath(); ctx.rect(0,0, padL+prog*(W-padL-padR)+2, H); ctx.clip();   // reveal the plotted line left→right; axes stay
+  ctx.save(); ctx.beginPath(); ctx.rect(0,0, padL+prog*(W-padL-padR)+6, H); ctx.clip();   // reveal the plotted line left→right; axes stay (+6 keeps the end dot whole)
   // linear trend line over the history
   const xs=s.map((_,i)=>i), sx=xs.reduce((a,b)=>a+b,0), sy=vals.reduce((a,b)=>a+b,0),
         sxy=xs.reduce((a,xx,i)=>a+xx*vals[i],0), sxx=xs.reduce((a,xx)=>a+xx*xx,0), den=n*sxx-sx*sx;
@@ -6949,7 +6969,7 @@ function renderCardioRoutePrev(){
       +'<div class="nm" style="font-weight:600;">'+esc(r.name||"Imported route")+'</div>'
       +'<a class="lnkic" id="cdRouteClear" title="Remove route">'+ICON.trash+'</a></div>'
     +'<canvas id="cdRouteCanvas" width="600" height="200" style="width:100%;height:150px;display:block;margin:8px 0 6px;"></canvas>'
-    +'<div class="meta" style="color:var(--l2);font-size:13px;"><b>'+round1(r.dist)+' km</b>'+(r.ascent?' · ↑ '+r.ascent+' m':'')+(r.mins?' · '+r.mins+' min':'')+' · pick an activity &amp; zone, then Log</div>'
+    +'<div class="meta" style="color:var(--l2);font-size:var(--t-sm);"><b>'+round1(r.dist)+' km</b>'+(r.ascent?' · ↑ '+r.ascent+' m':'')+(r.mins?' · '+r.mins+' min':'')+' · pick an activity &amp; zone, then Log</div>'
   +'</div></div>';
   drawRoutePolyline($("cdRouteCanvas"), r.pts);
   $("cdRouteClear").onclick=clearCardioRoute;
@@ -7070,53 +7090,28 @@ function cardioCoachLine(){
   if(tot<30) return null;
   const hard=(mix.z4||0)+(mix.z5||0), easy=(mix.z1||0)+(mix.z2||0), tgt=cardioTargetMins();
   if((settings.objective==="muscle"||settings.objective==="strength") && cardioMinsWeek(7)>tgt*1.6)
-    return "Lots of cardio this week — while you're chasing size/strength, keep it moderate (and favour cycling) so it doesn't blunt your gains.";
-  if(hard/tot>0.4) return "A lot of your cardio is hard (Z4–Z5). Most weeks work better with ~80% easy — it builds your aerobic base with less fatigue.";
-  if(easy>=tot*0.97 && cardioMinsWeek(14)>=tgt*2) return "Almost all easy lately — with a solid base, one weekly harder session or some intervals nudges your fitness up.";
+    return {short:"ease off", msg:"Lots of cardio this week — while you're chasing size/strength, keep it moderate (and favour cycling) so it doesn't blunt your gains."};
+  if(hard/tot>0.4) return {short:"mostly hard", msg:"A lot of your cardio is hard (Z4–Z5). Most weeks work better with ~80% easy — it builds your aerobic base with less fatigue."};
+  if(easy>=tot*0.97 && cardioMinsWeek(14)>=tgt*2) return {short:"add intervals", msg:"Almost all easy lately — with a solid base, one weekly harder session or some intervals nudges your fitness up."};
   return null;
 }
-// in-card title so the Cardio card matches the Balance/Progress panels (title inside the card, with icon)
-const CARDIO_HEAD='<div class="panelhd" style="margin-bottom:12px;"><span class="panelt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/></svg>Cardio</span></div>';
-function renderCardioCard(){
-  const card=$("cardioCard"); if(!card) return; card.style.display="";
-  if(!cardioList().length){
-    card.classList.remove("ovtap"); card.onclick=null;
-    card.innerHTML='<div class="pad">'+CARDIO_HEAD+'<p class="ovp" style="margin-top:2px;">No cardio logged yet. Add a run, ride or swim from <b>Workout → Cardio</b> — it’s tracked here on its own, separate from your muscle balance.</p></div>';
-    return;
-  }
-  const raw=cardioMinsWeek(7), dose=cardioDoseWeek(7), mins=dose, tgt=cardioTargetMins(), sess=cardioSessionsWeek(7);
-  const pct=tgt?Math.min(100,Math.round(dose/tgt*100)):0;
-  const mix=cardioZoneMix(7), mixTot=Object.values(mix).reduce((a,b)=>a+b,0);
-  const segs=mixTot? CZONES.map(z=>{ const w=mix[z.z]||0; if(!w) return ""; return '<span style="display:block;height:100%;width:'+(w/mixTot*100)+'%;background:'+CZCOL[z.z]+'" title="'+z.lbl+' · '+Math.round(w)+' min"></span>'; }).join("") : "";
-  const obj=planObjective(activePlan());
-  // a distribution nudge takes priority over the volume verdict when there's enough to judge (evidence: rosenblat19/wilson12)
-  const coachLine=cardioCoachLine();
-  const verdict = coachLine ? "💡 "+coachLine
-    : mins>=tgt ? "Target met — strong aerobic week. 👏"
-    : mins>=tgt*0.5 ? "Good base — a little more to reach your weekly target."
-    : "Light so far — aim for ~"+tgt+" min/wk for "+esc((obj.label||"general fitness").toLowerCase())+".";
-  card.innerHTML='<div class="pad">'+CARDIO_HEAD
-    +'<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;">'
-      +'<div><div class="ovk">This week</div><div class="ovbig"><b>'+mins+'</b> <small style="font-weight:500;color:var(--l2);">/ '+tgt+' min</small></div></div>'
-      +'<div style="font-size:13px;color:var(--l2);text-align:right;">'+sess+' session'+(sess===1?'':'s')+(raw&&raw!==dose?'<br>'+raw+' min done':'')+'</div>'
-    +'</div>'
-    +(raw&&raw!==dose?'<p class="levelcap" style="margin:6px 0 0;">Effort- &amp; activity-adjusted — harder, more-aerobic sessions count for more toward your target.</p>':'')
-    +'<div style="height:7px;border-radius:4px;background:var(--sep);overflow:hidden;margin-top:10px;"><i style="display:block;height:100%;width:'+pct+'%;background:#9775fa;border-radius:4px;"></i></div>'
-    +(segs?'<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:7px;gap:1px;">'+segs+'</div>':'')
-    +'<canvas id="cardioSpark" width="500" height="46" style="width:100%;height:46px;margin-top:10px;display:block;"></canvas>'
-    +'<p class="ovp" style="margin-top:6px;font-size:13px;">'+verdict+'</p>'
-    +'<div class="libteaser" style="margin-top:4px;">See your cardio trends →</div>'
-  +'</div>';
-  drawCardioSpark();
-  card.classList.add("ovtap"); card.onclick=openCardioDetail;
+// this week's cardio verdict: a short form for the Me tile caption, the full line for the Cardio sheet.
+// A distribution nudge takes priority over the volume verdict when there's enough to judge (evidence: rosenblat19/wilson12).
+function cardioVerdict(){
+  const mins=cardioDoseWeek(7), tgt=cardioTargetMins(), left=Math.max(0,tgt-mins), coach=cardioCoachLine();
+  if(coach) return {lvl:"watch", short:coach.short, msg:coach.msg};   // tile and sheet say the same thing
+  return mins>=tgt ? {lvl:"good", short:"target met", msg:"Target met — strong aerobic week."}
+    : mins>=tgt*0.5 ? {lvl:"watch", short:"good base", msg:"Good base — "+left+" min to reach your target."}
+    : {lvl:"more", short:"light so far", msg:"Light so far — "+left+" min to go this week."};
 }
-function drawCardioSpark(){ const c=$("cardioSpark"); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
-  const data=cardioWeeklySeries(), ac="#9775fa", tgt=cardioTargetMins(), hi=Math.max(1,tgt,...data), base=H-6, top=8, pad=8;
-  const x=i=>pad+i*((W-pad*2)/(data.length-1)), y=v=>base-(v/hi)*(base-top);
-  if(tgt>0){ ctx.strokeStyle=hexAlpha(ac,.3); ctx.setLineDash([4,4]); ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(pad,y(tgt)); ctx.lineTo(W-pad,y(tgt)); ctx.stroke(); ctx.setLineDash([]); }
-  ctx.strokeStyle=ac; ctx.lineWidth=3; ctx.lineJoin="round"; ctx.lineCap="round"; ctx.beginPath();
-  data.forEach((v,i)=>{ i?ctx.lineTo(x(i),y(v)):ctx.moveTo(x(i),y(v)); }); ctx.stroke();
-  data.forEach((v,i)=>{ ctx.beginPath(); ctx.arc(x(i),y(v), i===data.length-1?4.5:3, 0, 7); ctx.fillStyle=i===data.length-1?ac:hexAlpha(ac,.5); ctx.fill(); });
+// Me tile: effort-adjusted minutes this week against the target, the 10-week trend, sessions + the short verdict
+function renderCardioCard(){
+  const stat=$("cardioStat"), cap=$("cardioCap"); if(!stat) return;
+  if(!cardioList().length){ stat.textContent="—"; if(cap) cap.textContent="No cardio yet"; drawSummarySpark("cardioMini", null); return; }   // tap goes to log some
+  const mins=cardioDoseWeek(7), tgt=cardioTargetMins(), sess=cardioSessionsWeek(7), v=cardioVerdict();
+  stat.innerHTML='<span class="'+(v.lvl==="good"?"up":"")+'">'+mins+'</span> <span class="u">/ '+tgt+' min/wk</span>';   // green only when the sheet agrees
+  if(cap) cap.textContent=sess+" session"+(sess===1?"":"s")+" · "+v.short;
+  drawSummarySpark("cardioMini", cardioWeeklySeries(), {color:"#9775fa", ref:tgt});
 }
 
 // ===== Cardio detail sheet (Phase 4): weekly minutes, effort split, pace trend =====
@@ -7134,13 +7129,16 @@ function cardioZoneWeekly(weeks){ weeks=weeks||8; const wkMs=7*86400000, now=Dat
 }
 function openCardioDetail(){ renderCardioDetail(); openSheet("Cardio"); }
 function renderCardioDetail(){
-  const raw=cardioMinsWeek(7), mins=cardioDoseWeek(7), tgt=cardioTargetMins(), dose28=cardioDoseWeek(28);
-  $("cdcSummary").innerHTML='<div class="group" style="margin-bottom:4px;"><div class="pad" style="display:flex;justify-content:space-around;text-align:center;gap:8px;">'
-    +'<div><div class="ovbig"><b>'+mins+'</b></div><div class="ovk">min this week</div></div>'
-    +'<div><div class="ovbig"><b>'+tgt+'</b></div><div class="ovk">weekly target</div></div>'
-    +'<div><div class="ovbig"><b>'+Math.round(dose28/4)+'</b></div><div class="ovk">avg/wk (4wk)</div></div>'
+  const raw=cardioMinsWeek(7), mins=cardioDoseWeek(7), tgt=cardioTargetMins(), dose28=cardioDoseWeek(28), cv=cardioVerdict(), coach=cardioCoachLine();
+  // the verdict leads (the numbers sit just below); a coaching nudge is too long for a headline, so it gets its own row
+  const lead=$("cdcLead"); if(lead){ lead.className="lh"+(cv.lvl==="good"?" good":""); lead.textContent=!cardioList().length ? "No cardio yet" : coach ? cv.short.charAt(0).toUpperCase()+cv.short.slice(1) : cv.msg; }
+  $("cdcSummary").innerHTML='<div class="group"><div class="pad cdcstats">'
+    +'<div><div class="ovbig"><b>'+mins+'</b></div><div class="ovk">this week</div></div>'
+    +'<div><div class="ovbig"><b>'+tgt+'</b></div><div class="ovk">target</div></div>'
+    +'<div><div class="ovbig"><b>'+Math.round(dose28/4)+'</b></div><div class="ovk">4-wk avg</div></div>'
     +'</div></div>'
-    +'<p class="levelcap" style="margin:0 4px 10px;">Effort-adjusted minutes — a vigorous minute counts up to ~2× an easy one (the 150-moderate-or-75-vigorous guideline). You logged <b>'+raw+'</b> actual min this week.</p>';
+    +(coach ? '<div class="progverd v-'+cv.lvl+'"><span class="pvdot"></span><span class="pvtxt">'+esc(cv.msg)+'</span></div>' : '')
+    +'<p class="levelcap">Effort-adjusted minutes — a vigorous minute counts up to ~2× an easy one (the 150-moderate-or-75-vigorous guideline). You logged <b>'+raw+'</b> actual min this week.</p>';
   // editable cardio goal — drives the weekly target (separate from the lifting objective)
   const gw=$("cdcGoalChips"); if(gw){ const cur=cardioGoalDef(); gw.innerHTML="";
     CARDIO_GOALS.forEach(g=>{ const c=document.createElement("button"); c.className="chip"+(cur.k===g.k?" on":""); c.textContent=g.lbl+" · "+g.mins+"m";
@@ -7148,20 +7146,22 @@ function renderCardioDetail(){
     $("cdcGoalHint").textContent = cur.sub.charAt(0).toUpperCase()+cur.sub.slice(1)+" — target ~"+cur.mins+" min/week.";
   }
   drawCardioMins("cdcMinsC"); drawZoneStack("cdcZoneC");
-  $("cdcZoneLegend").innerHTML = CZONES.map(z=>'<span><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:'+CZCOL[z.z]+';margin-right:4px;vertical-align:-1px;"></i>'+z.lbl+'</span>').join("");
+  $("cdcZoneLegend").innerHTML = CZONES.map(z=>'<span class="pglg"><i style="background:'+CZCOL[z.z]+'"></i>'+z.lbl+'</span>').join("");
   const acts=cardioPaceActivities();
   if(!acts.length){ $("cdcPaceWrap").style.display="none"; return; }
   $("cdcPaceWrap").style.display="";
   if(!cdcPaceSel || !acts.some(a=>a.name===cdcPaceSel)) cdcPaceSel=acts.slice().sort((a,b)=>b.pts.length-a.pts.length)[0].name;
   const chips=$("cdcPaceChips"); chips.innerHTML="";
   acts.forEach(a=>{ const c=document.createElement("button"); c.className="chip"+(cdcPaceSel===a.name?" on":""); c.textContent=a.name; c.onclick=()=>{ cdcPaceSel=a.name; renderCardioDetail(); }; chips.appendChild(c); });
+  chips.style.display = acts.length>1 ? "" : "none";   // one activity: nothing to pick, name it in the label instead
+  const ph=$("cdcPaceWrap").querySelector(".subhint"); if(ph) ph.textContent = acts.length>1 ? "— higher is faster" : "— "+cdcPaceSel.toLowerCase()+", higher is faster";
   drawPaceTrend("cdcPaceC", cdcPaceSel);
   const a=acts.find(x=>x.name===cdcPaceSel), pts=a.pts, best=Math.min(...pts.map(p=>p.pace)), last=pts[pts.length-1].pace, first=pts[0].pace;
   $("cdcPaceCap").textContent = pts.length+" sessions · best "+fmtPace(best)+"/km · latest "+fmtPace(last)+"/km"+(last<first-0.02?" · trending faster":last>first+0.02?" · easing off":" · holding");
 }
 function _axisColor(){ return (getComputedStyle(document.documentElement).getPropertyValue('--l3')||'#888').trim(); }
 function drawCardioMins(id){ const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
-  const data=cardioWeeklySeries(), tgt=cardioTargetMins(), hi=Math.max(1,tgt*1.15,...data), base=H-22, top=12, pad=10, n=data.length, gapX=(W-pad*2)/n, bw=gapX*0.66;
+  const data=cardioWeeklySeries(), tgt=cardioTargetMins(), hi=Math.max(1,tgt*1.15,...data), base=H-28, top=12, pad=10, n=data.length, gapX=(W-pad*2)/n, bw=gapX*0.66;
   const y=v=>base-(v/hi)*(base-top);
   ctx.strokeStyle=hexAlpha("#9775fa",.45); ctx.setLineDash([4,4]); ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(pad,y(tgt)); ctx.lineTo(W-pad,y(tgt)); ctx.stroke(); ctx.setLineDash([]);
   data.forEach((v,i)=>{ const x=pad+i*gapX+(gapX-bw)/2, h=Math.max(0,base-y(v)); ctx.fillStyle = v>=tgt ? "#9775fa" : hexAlpha("#9775fa",.4);
@@ -7169,7 +7169,7 @@ function drawCardioMins(id){ const c=$(id); if(!c) return; const ctx=c.getContex
   ctx.fillStyle=_axisColor(); ctx.font=cfont(W,"label"); ctx.textAlign="left"; ctx.fillText("10w ago",pad,H-5); ctx.textAlign="right"; ctx.fillText("now",W-pad,H-5);
 }
 function drawZoneStack(id){ const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
-  const wk=cardioZoneWeekly(8), base=H-22, top=12, pad=10, n=wk.length, gapX=(W-pad*2)/n, bw=gapX*0.66;
+  const wk=cardioZoneWeekly(8), base=H-28, top=12, pad=10, n=wk.length, gapX=(W-pad*2)/n, bw=gapX*0.66;
   const tots=wk.map(o=>CZONES.reduce((s,z)=>s+o[z.z],0)), hi=Math.max(1,...tots);
   wk.forEach((o,i)=>{ let yb=base; const x=pad+i*gapX+(gapX-bw)/2;
     CZONES.forEach(z=>{ const v=o[z.z]; if(!v) return; const h=(v/hi)*(base-top); yb-=h; ctx.fillStyle=CZCOL[z.z]; ctx.fillRect(x,yb,bw,h); }); });
@@ -7177,7 +7177,7 @@ function drawZoneStack(id){ const c=$(id); if(!c) return; const ctx=c.getContext
 }
 function drawPaceTrend(id, activity){ const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
   const a=cardioPaceActivities().find(a=>a.name===activity); if(!a) return;
-  const pts=a.pts, paces=pts.map(p=>p.pace), mn=Math.min(...paces), mx=Math.max(...paces), range=(mx-mn)||1, pad=12, base=H-22, top=14, ac="#9775fa";
+  const pts=a.pts, paces=pts.map(p=>p.pace), mn=Math.min(...paces), mx=Math.max(...paces), range=(mx-mn)||1, pad=12, base=H-28, top=14, ac="#9775fa";
   const x=i=> pts.length>1 ? pad+i*((W-pad*2)/(pts.length-1)) : W/2;
   const y=v=> top + ((v-mn)/range)*(base-top);   // faster (lower pace) sits higher
   ctx.strokeStyle=ac; ctx.lineWidth=3; ctx.lineJoin="round"; ctx.lineCap="round"; ctx.beginPath();
@@ -7225,7 +7225,8 @@ function renderAchievements(){
     return '<div class="ach'+(on?' on':'')+'"><div class="achi">'+(on?a.icon:'<span class="achlock">'+ICON.lock+'</span>')+'</div><div class="acht">'+esc(a.t)+'</div><div class="achd">'+esc(a.d)+'</div></div>';
   }).join('');
   const v=lifetimeVolume();
-  $("achVol").textContent = fmtBigKg(lifetimeVolume("lifted"))+" lifted · "+fmtBigKg(v)+" incl. bodyweight";
+  const lf=lifetimeVolume("lifted");
+  $("achVol").textContent = fmtBigKg(lf)+" lifted"+(v>lf?" · "+fmtBigKg(v)+" incl. bodyweight":"");
 }
 function celebrateAch(ids){ if(!ids||!ids.length) return; const a=ACHIEVEMENTS.find(x=>x.id===ids[0]); if(!a) return;
   celebrate(); toast("Achievement unlocked  "+a.icon+"  "+a.t+(ids.length>1?"  +"+(ids.length-1)+" more":""), true); }
@@ -7411,7 +7412,7 @@ function applyTileVisibility(){
     el.classList.toggle("tile-off", off);
     const b=el.querySelector(".tilehide"); if(b){ b.innerHTML=off?TILE_ICON.eyeoff:TILE_ICON.eye; b.title=off?"Show tile":"Hide tile"; } });
 }
-const TILE_DEFAULT = ["strength","balance","progress"];   // forecast merged into strength; data-tile ids match the summary cards
+const TILE_DEFAULT = ["strength","balance","progress","cardio"];   // forecast merged into strength; data-tile ids match the summary cards
 function applyTileOrder(){
   const c=$("meTiles"); if(!c) return;
   const present=new Set([...c.querySelectorAll(".metile")].map(el=>el.dataset.tile));
@@ -7454,7 +7455,7 @@ async function saveTileOrder(){
     applyTileVisibility(); toast&&toast("Tiles reset"); };
   // drag-to-reorder (edit mode): the whole tile lifts and follows the finger, a dashed placeholder shows
   // where it will drop, so it's obvious what's grabbed and where it's going.
-  let drag=null, ph=null, dy=0;
+  let drag=null, ph=null, dy=0, ox=0, oy=0;
   c.addEventListener("pointerdown", e=>{
     if(!c.classList.contains("editing")) return;
     const el=e.target.closest(".metile"); if(!el || el.classList.contains("tile-off") || e.target.closest(".tilehide")) return;
@@ -7462,12 +7463,14 @@ async function saveTileOrder(){
     const r=el.getBoundingClientRect(); dy=e.clientY-r.top;
     ph=document.createElement("div"); ph.className="tileph"; ph.style.height=r.height+"px";
     el.parentNode.insertBefore(ph, el);
-    el.style.width=r.width+"px"; el.style.left=r.left+"px"; el.style.top=r.top+"px"; el.classList.add("dragging");
+    // a transformed #track is the containing block for position:fixed, so offset by it
+    const t=c.closest("#track"), cb=t&&getComputedStyle(t).transform!=="none"?t.getBoundingClientRect():{left:0,top:0}; ox=cb.left; oy=cb.top;
+    el.style.width=r.width+"px"; el.style.left=(r.left-ox)+"px"; el.style.top=(r.top-oy)+"px"; el.classList.add("dragging");
     try{ el.setPointerCapture(e.pointerId); }catch(_){}
     haptic(12);
   });
   c.addEventListener("pointermove", e=>{ if(!drag) return; e.preventDefault();
-    drag.style.top=(e.clientY-dy)+"px";
+    drag.style.top=(e.clientY-dy-oy)+"px";
     const sibs=[...c.querySelectorAll(".metile:not(.dragging)")]; let placed=false;
     for(const s of sibs){ const r=s.getBoundingClientRect(); if(e.clientY < r.top+r.height/2){ if(ph.nextSibling!==s) c.insertBefore(ph,s); placed=true; break; } }
     if(!placed) c.appendChild(ph);
@@ -7614,7 +7617,8 @@ function drawLedgerMultiplier(recs){
   const pts=wks.map(k=>{ const a=byWk[k]; const m=a.reduce((s,r)=>s+r.in.thm,0)/a.length, v=a.reduce((s,r)=>s+r.in.thv,0)/a.length;
     return { mult:Math.exp(m), lo:Math.exp(m-1.96*Math.sqrt(v)), hi:Math.exp(m+1.96*Math.sqrt(v)) }; });
   const l3=(getComputedStyle(document.documentElement).getPropertyValue('--l3')||'#888').trim(), ac=accentHex();
-  const padL=30, padR=12, padT=10, padB=20, n=pts.length;
+  ctx.font=cfont(W,"tick");
+  const padL=Math.ceil(ctx.measureText("×1").width)+9, padR=12, padT=10, padB=20, n=pts.length;
   let lo=Math.min(1,...pts.map(p=>p.lo)), hi=Math.max(1,...pts.map(p=>p.hi)); const sp=Math.max(0.3,hi-lo); lo-=sp*0.1; hi+=sp*0.1;
   const x=i=> padL+(n<2?0:(i/(n-1))*(W-padL-padR)), y=v=> padT+(1-(v-lo)/(hi-lo))*(H-padT-padB);
   ctx.strokeStyle=hexAlpha(l3,.5); ctx.setLineDash([4,4]); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(padL,y(1)); ctx.lineTo(W-padR,y(1)); ctx.stroke(); ctx.setLineDash([]);
@@ -7633,12 +7637,13 @@ function drawLedgerPredActual(scored){
   if(scored.length<1) return;
   const pr=scored.map(r=>(Math.exp(r.mu)-1)*100), ac2=scored.map(r=>(Math.exp(r.out.y)-1)*100);
   const l3=(getComputedStyle(document.documentElement).getPropertyValue('--l3')||'#888').trim(), ac=accentHex();
-  const pad=26; let lim=Math.max(3,...pr.map(Math.abs),...ac2.map(Math.abs))*1.1;
+  ctx.font=cfont(W,"tick"); const asc=Math.ceil(ctx.measureText("actual →").actualBoundingBoxAscent);
+  const pad=Math.max(26, asc+18); let lim=Math.max(3,...pr.map(Math.abs),...ac2.map(Math.abs))*1.1;
   const x=v=> pad+((v+lim)/(2*lim))*(W-pad*2), y=v=> (H-pad)-((v+lim)/(2*lim))*(H-pad*2);
   // zero axes + y=x diagonal
   ctx.strokeStyle=hexAlpha(l3,.35); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x(0),pad); ctx.lineTo(x(0),H-pad); ctx.moveTo(pad,y(0)); ctx.lineTo(W-pad,y(0)); ctx.stroke();
   ctx.strokeStyle=hexAlpha(l3,.6); ctx.setLineDash([5,4]); ctx.beginPath(); ctx.moveTo(x(-lim),y(-lim)); ctx.lineTo(x(lim),y(lim)); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle=l3; ctx.font=cfont(W,"tick"); ctx.textAlign="center"; ctx.fillText("predicted →",W/2,H-6); ctx.save(); ctx.translate(9,H/2); ctx.rotate(-Math.PI/2); ctx.fillText("actual →",0,0); ctx.restore();
+  ctx.fillStyle=l3; ctx.font=cfont(W,"tick"); ctx.textAlign="center"; ctx.fillText("predicted →",W/2,H-6); ctx.save(); ctx.translate(asc+8,H/2); ctx.rotate(-Math.PI/2); ctx.fillText("actual →",0,0); ctx.restore();
   scored.forEach((r,i)=>{ const hit=r.out.hit80; ctx.beginPath(); ctx.arc(x(pr[i]),y(ac2[i]),4,0,7);
     ctx.fillStyle=hit?ac:hexAlpha(l3,.55); ctx.fill(); });
 }
@@ -7654,9 +7659,10 @@ function renderStrength(){
   // SUMMARY card (Me tab): one glanceable line — overall strength, the 4-week forecast, and the size outlook
   const stat=$("slStat"), capL=$("slCapLine");
   if(si){ const pct=si.series[si.series.length-1].idx-100;
-    if(stat) stat.innerHTML='<span class="'+up(pct)+'">'+ar(pct)+' '+s1(pct)+'</span> <span class="u">strength</span>';
-    let cap = si.forecast ? ("forecast "+ar(si.forecast.pct)+" "+s1(si.forecast.pct)+" next "+si.forecast.weeks+"w") : ("avg across "+si.lifts+" lift"+(si.lifts>1?"s":""));
-    if(f && f.base!=null) cap += " · size "+(f.base>=0?"+":"")+f.base.toFixed(1)+"%/16w";
+    if(stat) stat.innerHTML='<span class="'+up(pct)+'">'+s1(pct)+'</span> <span class="u">strength</span>';   // colour carries the direction, as on Volume
+    // one short line; the size outlook only when there's no forecast (it stays in the Strength sheet)
+    let cap = si.forecast ? ("next "+si.forecast.weeks+"w "+ar(si.forecast.pct)+" "+s1(si.forecast.pct)) : (si.lifts+" lift"+(si.lifts>1?"s":""));
+    if(!si.forecast && f && f.base!=null) cap += " · size "+(f.base>=0?"+":"")+f.base.toFixed(1)+"%/16w";
     if(capL) capL.textContent=cap;
     drawSummarySpark("slMini", si.series.map(p=>p.idx));
   } else if(f && f.base!=null){
@@ -7815,17 +7821,23 @@ function drawForecast(f, prog){
   const cs=getComputedStyle(document.documentElement);
   const l3=(cs.getPropertyValue('--l3')||'#888').trim();
   const accent=accentHex(), blue="#4dabf7";
-  const padL=42, padR=74, padT=14, padB=28, x1=f.ahead;
+  const x1=f.ahead, padT=14, padB=32;
   const hi=Math.max(f.plan.p90[x1], f.pace.p90[x1]);
   const lo=Math.min(0, f.plan.p10[x1], f.pace.p10[x1], ...f.plan.p10, ...f.pace.p10);  // allow negative (loss)
   const ymax=Math.max(2, Math.ceil(hi*1.1/2)*2), ymin=Math.min(0, Math.floor(lo*1.1/2)*2);
+  const step=(ymax-ymin)>10?4:2, ticks=[];   // whole-number ticks (5 even steps gave 0, 2, 3, 5 …)
+  for(let v=Math.ceil(ymin/step)*step; v<=ymax+1e-6; v+=step) ticks.push(v);
+  const sgn=v=>(v>=0?"+":"")+v.toFixed(1)+"%";
+  ctx.font=cfont(W,"tick"); const padL=Math.ceil(Math.max(...ticks.map(v=>ctx.measureText(v+"%").width)))+14;
+  ctx.font=cfont(W,"label"); const padR=Math.ceil(Math.max(ctx.measureText(sgn(f.plan.p50[x1])).width, ctx.measureText(sgn(f.pace.p50[x1])).width))+13;
   const X=w=> padL + (w/x1)*(W-padL-padR);
   const Y=v=> padT + (1-(v-ymin)/(ymax-ymin))*(H-padT-padB);
   ctx.font=cfont(W,"tick"); ctx.textAlign="right";
-  const ticks=5; for(let k=0;k<=ticks;k++){ const v=ymin+(ymax-ymin)*k/ticks, y=Y(v), zero=Math.abs(v)<1e-6;
+  ticks.forEach(v=>{ const y=Y(v), zero=Math.abs(v)<1e-6;
     ctx.strokeStyle=hexAlpha(l3, zero?.5:.18); ctx.lineWidth=zero?1.2:1; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
-    ctx.fillStyle=l3; ctx.fillText(v.toFixed(0)+"%", padL-6, y+4); }
-  ctx.fillStyle=l3; ctx.textAlign="center"; ctx.fillText("now", X(0), H-padB+16); ctx.fillText("+"+x1+"w", X(x1), H-padB+16);
+    ctx.fillStyle=l3; ctx.fillText(v+"%", padL-6, y+4); });
+  // x labels sit inside the plot ends so "now" clears the y-tick column
+  ctx.fillStyle=l3; ctx.textAlign="left"; ctx.fillText("now", X(0), H-padB+22); ctx.textAlign="right"; ctx.fillText("+"+x1+"w", X(x1), H-padB+22);
   ctx.save(); ctx.beginPath(); ctx.rect(0,0, padL+prog*(W-padL-padR)+2, H); ctx.clip();   // reveal the bands/lines left→right; axes stay
   const band=(b,hex)=>{ ctx.fillStyle=hexAlpha(hex,.15); ctx.beginPath();
     b.p90.forEach((v,i)=>{ const x=X(i), y=Y(v); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
@@ -7834,12 +7846,14 @@ function drawForecast(f, prog){
   const line=(pts,color)=>{ ctx.strokeStyle=color; ctx.lineWidth=2.5; ctx.lineJoin="round"; ctx.lineCap="round"; ctx.beginPath(); pts.forEach((v,i)=>{ const x=X(i), y=Y(v); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.stroke(); };
   band(f.pace, blue); band(f.plan, accent);
   line(f.pace.p50, blue); line(f.plan.p50, accent);
-  let yp=Y(f.plan.p50[x1]), yc=Y(f.pace.p50[x1]); if(Math.abs(yp-yc)<13){ const m=(yp+yc)/2; yp=m-7; yc=m+7; }
-  const sgn=v=>(v>=0?"+":"")+v.toFixed(1)+"%";
-  ctx.font=cfont(W,"label"); ctx.textAlign="left";
-  ctx.fillStyle=accent; ctx.fillText(sgn(f.plan.p50[x1]), X(x1)+5, yp+4);
-  ctx.fillStyle=blue;   ctx.fillText(sgn(f.pace.p50[x1]), X(x1)+5, yc+4);
   ctx.restore();
+  // end values sit in the right margin, outside the reveal clip, once the lines have arrived
+  if(prog>=1){
+    let yp=Y(f.plan.p50[x1]), yc=Y(f.pace.p50[x1]); if(Math.abs(yp-yc)<13){ const m=(yp+yc)/2; yp=m-7; yc=m+7; }
+    ctx.font=cfont(W,"label"); ctx.textAlign="left";
+    ctx.fillStyle=accent; ctx.fillText(sgn(f.plan.p50[x1]), X(x1)+5, yp+4);
+    ctx.fillStyle=blue;   ctx.fillText(sgn(f.pace.p50[x1]), X(x1)+5, yc+4);
+  }
   const lg=$("fcLegend"); if(lg) lg.innerHTML='<span class="fclg"><i style="background:'+accent+'"></i>this plan</span><span class="fclg"><i style="background:'+blue+'"></i>current pace</span><span class="fclg"><i class="fcbandi"></i>10–90% range</span>';
 }
 // tornado: how much the 16-week median gain swings as each key parameter goes low↔high (around the plan)
@@ -7856,14 +7870,17 @@ function drawForecastSens(f, prog){
   const l3=(cs.getPropertyValue('--l3')||'#888').trim(), ink=(cs.getPropertyValue('--ink')||'#000').trim();
   const accent=accentHex();
   const maxI=Math.max(0.5, ...rows.map(r=>r.impact));
-  const padL=124, padR=72, padT=8, padB=8, rowH=(H-padT-padB)/rows.length;
+  const val=r=>"±"+r.impact.toFixed(1)+"%";
+  ctx.font=cfont(W,"label"); const padL=Math.ceil(Math.max(...rows.map(r=>ctx.measureText(r.label).width)))+18;   // label + 12 gap + 6 edge
+  ctx.font=cfont(W,"value"); const padR=Math.ceil(Math.max(...rows.map(r=>ctx.measureText(val(r)).width)))+24;   // bar → value gap 16
+  const padT=8, padB=8, rowH=(H-padT-padB)/rows.length;
   const trackX=padL, trackW=W-padL-padR;
   ctx.textBaseline="middle";
   rows.forEach((r,i)=>{ const cy=padT+i*rowH+rowH/2, bw=Math.max(3,trackW*(r.impact/maxI))*prog, bh=Math.min(15,rowH*0.42), rr=bh/2;
     ctx.fillStyle=hexAlpha(accent,.13); if(ctx.roundRect){ctx.beginPath();ctx.roundRect(trackX,cy-bh/2,trackW,bh,rr);ctx.fill();} else ctx.fillRect(trackX,cy-bh/2,trackW,bh);
     ctx.fillStyle=hexAlpha(accent,.9); if(bw>0.6){ if(ctx.roundRect){ctx.beginPath();ctx.roundRect(trackX,cy-bh/2,bw,bh,rr);ctx.fill();} else ctx.fillRect(trackX,cy-bh/2,bw,bh); }
     ctx.fillStyle=l3; ctx.textAlign="right"; ctx.font=cfont(W,"label"); ctx.fillText(r.label, padL-12, cy);
-    ctx.fillStyle=ink; ctx.textAlign="right"; ctx.font=cfont(W,"value"); ctx.fillText("±"+r.impact.toFixed(1)+"%", W-8, cy);
+    ctx.fillStyle=ink; ctx.textAlign="right"; ctx.font=cfont(W,"value"); ctx.fillText(val(r), W-8, cy);
   });
   // actionable read-out: the biggest swing among the levers the lifter can actually change
   if(prog<1) return;
@@ -8505,7 +8522,7 @@ function drawEmphasisRadar(){
   G.forEach((g,i)=>{ const [x,y]=pt(i,R*frac[i]); ctx.beginPath(); ctx.arc(x,y,14,0,Math.PI*2); ctx.fillStyle=MCOLOR[g]||accent; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle="#fff"; ctx.stroke(); });
   ctx.fillStyle=lab; ctx.font=cfont(W,"label"); ctx.textBaseline="middle";
   G.forEach((g,i)=>{ const [x,y]=pt(i,R+50), co=Math.cos((-90+i*360/n)*Math.PI/180); ctx.textAlign=Math.abs(co)<0.3?"center":(co>0?"left":"right");
-    const isParent=SUBGROUPS[g] && !buildExpanded.has(g); ctx.fillText((MSHORT[g]||g)+(isParent?" ›":""), x, y); });
+    const isParent=SUBGROUPS[g] && !buildExpanded.has(g); fitText(ctx, (MSHORT[g]||g)+(isParent?" ›":""), x, y); });
 }
 // the standard-split picker — repopulated on every preview update so it tracks the chosen day count
 // (and steps aside for the power/kettlebell modes, which carry their own fixed structure)
@@ -8513,7 +8530,7 @@ function renderSplitChips(){
   const box=$("buildSplitChips"); if(!box) return;
   const locked = build.bias==="power" ? "Powerlifting uses a fixed Squat · Bench · Deadlift split."
     : build.access==="kb" ? "Kettlebell-only mode runs full-body kettlebell days." : null;
-  if(locked){ box.innerHTML='<p class="levelcap" style="margin:2px 4px 0;">'+locked+'</p>'; return; }
+  if(locked){ box.innerHTML='<p class="levelcap" style="margin:2px 0 0;">'+locked+'</p>'; return; }
   const opts=availableSplits(build.freq);
   if(!opts.some(o=>o.id===(build.split||"auto"))) build.split="auto";   // current pick invalid at this day count → revert to recommended
   box.innerHTML=opts.map(o=>'<button class="chip'+((build.split||"auto")===o.id?" on":"")+'" data-split="'+o.id+'">'+esc(o.label)+'</button>').join('');
@@ -8932,11 +8949,11 @@ async function openProfile(uid, name){
   const av=$("profActivity"); if(!av) return;
   let rows=[];
   try{ const { data } = await sb.from("activity").select("id,user_id,created_at,summary").eq("user_id",uid).order("created_at",{ascending:false}).limit(6); rows=data||[]; }catch(e){}
-  if(!rows.length){ av.innerHTML='<div class="ed-label">Recent workouts</div><p class="levelcap" style="margin:0 4px;">Nothing shared yet.</p>'; return; }
+  if(!rows.length){ av.innerHTML='<div class="ed-label">Recent workouts</div><p class="levelcap" style="margin:0;">Nothing shared yet.</p>'; return; }
   av.innerHTML='<div class="ed-label">Recent workouts</div>'+rows.map(r=>{ const s=r.summary||{}, lvl=s.lvl||1, can=(lvl>=2&&s.ex&&s.ex.length);
     const stats=[ s.exN?s.exN+" ex":null, s.sets!=null?s.sets+" sets":null, s.vol?fmtKg(s.vol):null, s.mins?Math.round(s.mins)+" min":null ].filter(Boolean).join(" · ");
     return '<div class="profwo" data-id="'+esc(r.id)+'" style="padding:10px 4px; border-bottom:.5px solid var(--line); cursor:'+(can?"pointer":"default")+';">'
-      +'<div style="font-weight:600;">'+esc(s.name||"Workout")+(can?' <span class="levelcap" style="font-weight:500;">· tap ›</span>':'')+'</div>'
+      +'<div style="font-weight:600;">'+esc(s.name||"Workout")+(can?' <span class="levelcap" style="font-weight:500;">· tap<span class="ovchev lnkchev">›</span></span>':'')+'</div>'
       +'<div class="levelcap" style="margin-top:3px;">'+esc(stats)+' · '+esc(agoStr(Date.parse(r.created_at)))+'</div></div>'; }).join('');
   av.querySelectorAll(".profwo").forEach(el=>{ const r=rows.find(x=>String(x.id)===el.dataset.id); if(!r) return; const s=r.summary||{}, lvl=s.lvl||1;
     if(lvl>=2 && s.ex && s.ex.length) el.onclick=()=>openWorkoutDetail(r, name, lvl); });
@@ -8944,10 +8961,12 @@ async function openProfile(uid, name){
 
 // ---- Me: your own profile card (avatar + name + follower/following counts) ----
 const PENCIL_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 5l5 5M4 20l1-4L16 5l3 3L8 19z"/></svg>';
+let meStatsEl=null;   // the stats strip: a footer inside the profile card, or its own card when there's no profile
 async function renderMeProfile(){
   const card=$("meProfile"); if(!card) return;
+  const st=meStatsEl=meStatsEl||$("meStats");
   const nm=settings.displayName||settings.name||"";
-  if(!cloudConfigured() && !nm){ card.style.display="none"; return; }
+  if(!cloudConfigured() && !nm){ card.style.display="none"; if(st && st.parentNode===card) card.after(st); return; }
   card.style.display="";
   syncSelfAvatar();
   const av='<span class="avwrap" id="meAvatar">'+avatarHTML(nm||"You",{size:60,uid:(cloudUser&&cloudUser.id),seed:nm||"you"})+'<span class="avedit">'+PENCIL_SVG+'</span></span>';
@@ -8955,15 +8974,16 @@ async function renderMeProfile(){
     let fr=0, fo=0;
     try{ const { data } = await sb.rpc("my_following"); fo=(data||[]).filter(u=>u.status==="accepted").length; }catch(e){}
     try{ const { data } = await sb.rpc("my_followers"); fr=(data||[]).length; }catch(e){}
-    card.innerHTML=av+'<div style="min-width:0;"><div class="pcname">'+esc(nm||"You")+'</div>'
+    card.innerHTML=av+'<div class="pctext"><div class="pcname">'+esc(nm||"You")+'</div>'
       +'<div class="pccounts"><span class="pccount"><b>'+fr+'</b><span>followers</span></span>'
       +'<span class="pccount"><b>'+fo+'</b><span>following</span></span></div></div>';
-    card.onclick=openFriends;
+    card.onclick=e=>{ if(!e.target.closest(".stats")) openFriends(); };
   } else {
-    card.innerHTML=av+'<div style="min-width:0;"><div class="pcname">'+esc(nm||"You")+'</div>'
-      +'<div class="pchint">'+(cloudReady()?"Friends features warming up…":"Sign in to connect with friends ›")+'</div></div>';
-    card.onclick=()=> (cloudReady()?openFriends():goAccount());
+    card.innerHTML=av+'<div class="pctext"><div class="pcname">'+esc(nm||"You")+'</div>'
+      +'<div class="pchint">'+(cloudReady()?"Friends features warming up…":"Sign in to connect with friends<span class=\"ovchev lnkchev\">›</span>")+'</div></div>';
+    card.onclick=e=>{ if(!e.target.closest(".stats")) (cloudReady()?openFriends():goAccount()); };
   }
+  if(st) card.appendChild(st);
   const avEl=$("meAvatar"); if(avEl) avEl.onclick=(e)=>{ e.stopPropagation(); openAvatarEditor(); };
 }
 
@@ -9041,7 +9061,7 @@ async function renderFriends(){
     let followers=[]; try{ const { data } = await sb.rpc("my_followers"); followers=data||[]; recordAvatars(followers); }catch(e){}
     grantBox.innerHTML = followers.length
       ? '<div class="ed-label">Allow to watch me live</div>'
-        +'<p class="levelcap" style="margin:0 2px 8px; line-height:1.4;">Pick who can watch your workout in real time and cheer you on.</p>'
+        +'<p class="levelcap" style="margin:0 0 8px; line-height:1.4;">Pick who can watch your workout in real time and cheer you on.</p>'
         +'<div class="flist">'+ followers.map(u=>
           '<label class="fitem" data-uid="'+esc(u.user_id)+'">'+avatarHTML(u.display_name,{size:44,uid:u.user_id})
           +'<div class="fmain"><div class="fnm">'+esc(u.display_name||"A lifter")+'</div></div>'
@@ -9215,6 +9235,7 @@ function shareImage(save){
 $("shareImgBtn").onclick=()=>shareImage(false);
 $("saveImgBtn").onclick=()=>shareImage(true);
 $("shareClose").onclick=()=>closeSheet("Share");
+$("scrimShare").onclick=()=>closeSheet("Share");
 
 let tT; function toast(m,big){ const t=$("toast"); t.textContent=m; t.classList.toggle("big",!!big); t.classList.add("show"); clearTimeout(tT); tT=setTimeout(()=>t.classList.remove("show"), big?2800:2300); }
 // first-open coachmark: show a hint once per id (spreads the "how to use" across the app over time)
