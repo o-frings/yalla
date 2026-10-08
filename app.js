@@ -4407,6 +4407,12 @@ function celebrateMoment(o){
 // Pink bursts glitter, every other accent confetti. opts.stars is the hook for star moments (white/gold sparkles, later).
 // A new burst replaces one on screen; it is removed at its end + 150ms or when the app is hidden.
 let _burstEnd=null;
+// where the last tap landed, so a burst starts at the button that earned it (a tap within 3s; else near the centre)
+let _lastTap=null;
+document.addEventListener("pointerdown", e=>{ _lastTap={x:e.clientX, y:e.clientY, t:Date.now()}; }, {capture:true, passive:true});
+function burstOrigin(){ const vw=innerWidth, vh=innerHeight, t=_lastTap;
+  if(t && Date.now()-t.t<3000) return {x:Math.min(vw-40,Math.max(40,t.x)), y:Math.min(vh-90,Math.max(90,t.y))};
+  return {x:vw*.5, y:vh*.42}; }
 function celebrate(tier, opts){
   tier = tier===true ? 2 : tier===false ? 1 : tier==null ? 3 : tier;
   if(!(tier>=1)) return;
@@ -4417,7 +4423,8 @@ function celebrate(tier, opts){
   // low-end hint: half the pieces. WebKit buckets hardwareConcurrency to 4 or 8, so every iPhone says 4 — only
   // fewer than 4 counts.
   const low=(navigator.hardwareConcurrency||8)<4 || (navigator.deviceMemory||8)<=4;
-  const b = document.documentElement.dataset.accent==="pink" ? glitter(Math.min(tier,3), opts||{}, low) : confetti(Math.min(tier,3), opts||{}, low);
+  const o=Object.assign({}, opts||{}); if(!o.from) o.from=burstOrigin();
+  const b = document.documentElement.dataset.accent==="pink" ? glitter(Math.min(tier,3), o, low) : confetti(Math.min(tier,3), o, low);
   let timer=0;
   const onVis=()=>{ if(document.hidden) end(); };
   const end=()=>{ clearTimeout(timer); b.el.remove(); document.removeEventListener("visibilitychange", onVis); if(_burstEnd===end) _burstEnd=null; };
@@ -4428,8 +4435,8 @@ function celebrate(tier, opts){
 function mixHex(a,b,t){ const p=h=>/^#[0-9a-f]{6}$/i.test(h)?[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)):null, x=p(a), y=p(b);
   if(!x||!y) return a; return "#"+x.map((v,i)=>Math.round(v+(y[i]-v)*t).toString(16).padStart(2,"0")).join(""); }
 // Confetti rains from the top in the accent's colours (Orange keeps its own two palettes: gold-leaning for a PR or
-// an unlock, the warm one for a finish), with gold/white 4-point sparks twinkling through it. PRs and unlocks add
-// two cannons that shoot up from the bottom corners and fall back. Other accents read --cel-1…6 once per burst,
+// an unlock, the warm one for a finish), and a fountain of gold/white 4-point sparks erupts from the button that
+// earned it (opts.from). PRs and unlocks add two cannons that shoot up from the bottom corners and fall back. Other accents read --cel-1…6 once per burst,
 // derived from the accent if the tokens are missing.
 function confetti(tier, opts, low){
   const big=tier>=2, orange=accentId()==="orange";
@@ -4441,10 +4448,10 @@ function confetti(tier, opts, low){
     if(colors.length<4){ const a=accentHex(), dk=document.documentElement.classList.contains("dark");
       colors=[a, mixHex(a,"#ffffff",.35), mixHex(a,"#ffffff",.65), mixHex(a,"#000000",.2), dk?"#ffd60a":"#e0a800"].concat(dk?["#fff8e7"]:[]); } }
   const dk=document.documentElement.classList.contains("dark"), sparks=dk ? ["#ffd60a","#fff3c4","#ffffff"] : ["#f5b400","#ffd60a","#f0a020"];
-  let N=[0,80,90,100][tier], P=[0,0,40,55][tier];   // rain pieces; pieces per cannon
-  if(low){ N=Math.round(N/2); P=Math.round(P/2); }
+  let N=[0,80,90,100][tier], P=[0,0,40,55][tier], F=[0,28,40,52][tier];   // rain pieces; pieces per cannon; fountain sparks
+  if(low){ N=Math.round(N/2); P=Math.round(P/2); F=Math.round(F/2); }
   const fx=!!(window.CSS && CSS.supports && CSS.supports("translate","1px"));
-  if(!fx) P=0;   // the cannon arc needs individual transform properties
+  if(!fx){ P=0; F=0; }   // the arcs need individual transform properties
   const rnd=(a,b)=>a+Math.random()*(b-a), vw=innerWidth, vh=innerHeight;
   const c=document.createElement("div"); c.className="confetti";
   const f=document.createDocumentFragment(); let ms=0;
@@ -4452,8 +4459,8 @@ function confetti(tier, opts, low){
     if(spark){ s.className="spk"; s.style.setProperty("--s",rnd(10,20).toFixed(1)+"px"); s.style.background=sparks[Math.floor(Math.random()*sparks.length)]; }
     else { s.style.background=colors[Math.floor(Math.random()*colors.length)]; if(Math.random()>.5) s.style.borderRadius="50%"; }
     return s; };
-  for(let i=0;i<N;i++){ const s=piece(Math.random()<.18);
-    const dl=Math.random()*0.35, du=1.4+Math.random()*1.0; ms=Math.max(ms,(dl+du)*1000);
+  for(let i=0;i<N;i++){ const s=piece(Math.random()<.08);
+    const dl=Math.random()*0.45, du=2.2+Math.random()*1.4; ms=Math.max(ms,(dl+du)*1000);
     s.style.left=Math.random()*100+"%";
     s.style.animationDelay=dl+"s";
     s.style.setProperty("--dx",((Math.random()*2-1)*(big?240:170))+"px");
@@ -4463,35 +4470,45 @@ function confetti(tier, opts, low){
   }
   for(let side=0; side<2; side++) for(let i=0;i<P;i++){ const s=piece(Math.random()<.25);
     const wave = tier===3 && i>=P*.6 ? .35 : 0;   // an unlock fires a second, smaller volley
-    const dl=wave+Math.random()*.12, life=rnd(1.9,2.9); ms=Math.max(ms,(dl+life)*1000);
+    const dl=wave+Math.random()*.12, life=rnd(2.8,3.8); ms=Math.max(ms,(dl+life)*1000);
     s.classList.add("can");
     s.style.cssText+=";left:"+(side? vw+6 : -6)+"px;top:"+(vh+8)+"px;--bx:"+((side?-1:1)*rnd(.12,.62)*vw).toFixed(0)+"px;--by:"+(-rnd(.48,.9)*vh).toFixed(0)
       +"px;--dy:"+(rnd(.3,.55)*vh).toFixed(0)+"px;--sw:"+rnd(-30,30).toFixed(0)+"px;--life:"+life.toFixed(2)+"s;--dl:"+dl.toFixed(3)+"s;--sz:"+(0.7+Math.random()*1.2).toFixed(2)
       +";--r0:"+rnd(0,360).toFixed(0)+"deg;--rot:"+((Math.random()<.5?-1:1)*rnd(360,900)).toFixed(0)+"deg";
     f.appendChild(s);
   }
+  const o=opts.from||{x:vw*.5, y:vh*.42};
+  for(let i=0;i<F;i++){ const s=piece(true), up=o.y>vh*.45;   // low on the screen: a fountain upward; higher: all round
+    const ang = up ? rnd(-Math.PI*.92,-Math.PI*.08) : Math.random()*Math.PI*2, rad=rnd(.18,.5)*Math.min(vw,vh)*(up?1.3:1);
+    const dl=Math.random()*.1, life=rnd(2.8,3.8); ms=Math.max(ms,(dl+life)*1000);
+    s.classList.add("can");
+    s.style.cssText+=";left:"+o.x.toFixed(0)+"px;top:"+o.y.toFixed(0)+"px;--bx:"+(Math.cos(ang)*rad).toFixed(0)+"px;--by:"+(Math.sin(ang)*rad).toFixed(0)
+      +"px;--dy:"+(rnd(.3,.5)*vh).toFixed(0)+"px;--sw:"+rnd(-24,24).toFixed(0)+"px;--life:"+life.toFixed(2)+"s;--dl:"+dl.toFixed(3)+"s;--r0:0deg;--rot:"+((Math.random()<.5?-1:1)*rnd(90,240)).toFixed(0)+"deg";
+    f.appendChild(s);
+  }
   c.appendChild(f);
   return { el:c, ms };
 }
 // Pink glitter: half 4-point sparks (a few large ones), then sequins and holographic flakes, in --glit-1…6.
-// A soft flash at the origin, a wide radial burst from just above centre, then a drift down with sway.
-// PRs add a second pair of emitters at 30% / 70% x; unlocks add a third, later volley.
+// A soft flash and a burst from the button that earned it (opts.from: upward like a fountain when it sits low on
+// the screen), then a slow drift down with sway. PRs add a second pair of emitters either side; unlocks a third volley.
 const GLIT_SHARE=[30,15,10,25,12,8];
 function glitter(tier, opts, low){
   const cs=getComputedStyle(document.documentElement), dflt=[accentHex(),"#ff8cc3","#ffc2df","#ffffff","#f6d38a","#c8a2ff"];
   const cols=GLIT_SHARE.map((_,i)=>cs.getPropertyValue("--glit-"+(i+1)).trim()||dflt[i]);
   let N=[0,72,110,150][tier]; if(low) N=Math.round(N/2);
-  const R=[0,[100,240],[120,320],[150,400]][tier], L=[0,[1.6,2.2],[1.9,2.8],[2.2,3.2]][tier];
+  const R=[0,[100,240],[120,320],[150,400]][tier], L=[0,[2.8,3.6],[3.2,4.2],[3.6,4.6]][tier];
   const rnd=(a,b)=>a+Math.random()*(b-a), vw=innerWidth, vh=innerHeight;
   const pick=()=>{ let r=Math.random()*100; for(let i=0;i<cols.length;i++){ r-=GLIT_SHARE[i]; if(r<0) return cols[i]; } return cols[0]; };
   const fx=!!(window.CSS && CSS.supports && CSS.supports("translate","1px"));
   const c=document.createElement("div"); c.className="glitter"+(fx?"":" fb");
   const f=document.createDocumentFragment(), n2=tier>=2?Math.round(N*.3):0, n3=tier===3?Math.round(N*.2):0; let ms=0;
-  if(fx){ const fl=document.createElement("b"); fl.className="flash"; fl.style.cssText="left:"+(vw*.5).toFixed(0)+"px;top:"+(vh*.38).toFixed(0)+"px"; f.appendChild(fl); }
+  const o=opts.from||{x:vw*.5, y:vh*.42}, up=o.y>vh*.45;
+  if(fx){ const fl=document.createElement("b"); fl.className="flash"; fl.style.cssText="left:"+o.x.toFixed(0)+"px;top:"+o.y.toFixed(0)+"px"; f.appendChild(fl); }
   for(let i=0;i<N;i++){
     const w2=i<n2, w3=!w2 && i<n2+n3;   // second emitter pair at 30% / 70% x; third volley from the centre
-    const ox = w2 ? vw*(i%2 ? .7 : .3) : vw*(.5+rnd(-.1,.1)), oy = w2 ? vh*.44 : vh*.38;
-    const ang=Math.random()*Math.PI*2, rad=rnd(R[0],R[1])*(w3?1.15:1);
+    const ox = Math.min(vw-30, Math.max(30, o.x + (w2 ? (i%2 ? 1 : -1)*vw*.22 : rnd(-12,12)))), oy = o.y + (w2 ? rnd(-10,10) : rnd(-8,8));
+    const ang = up && Math.random()<.85 ? rnd(-Math.PI*.95,-Math.PI*.05) : Math.random()*Math.PI*2, rad=rnd(R[0],R[1])*(w3?1.15:1)*(up?1.25:1);
     const life = rnd(L[0],L[1]), dl=(w2?.16:w3?.42:0)+Math.random()*.15;
     ms=Math.max(ms,(life+dl)*1000);
     const C=pick(), k=Math.random(); let cls, sz, bg, r0="0deg", rot="0deg";
@@ -4500,7 +4517,7 @@ function glitter(tier, opts, low){
     else { cls="fl"; sz=rnd(3,6); bg="linear-gradient(135deg,"+C+",#fff 50%,"+C+")"; r0="45deg"; }
     const p=document.createElement("i"); p.className=cls+" t"+(i%3);
     p.style.cssText="left:"+ox.toFixed(1)+"px;top:"+oy.toFixed(1)+"px;--s:"+sz.toFixed(1)+"px;background:"+bg
-      +";--bx:"+(Math.cos(ang)*rad).toFixed(1)+"px;--by:"+(Math.sin(ang)*rad).toFixed(1)+"px;--dy:"+rnd(160,300).toFixed(0)
+      +";--bx:"+(Math.cos(ang)*rad).toFixed(1)+"px;--by:"+(Math.sin(ang)*rad).toFixed(1)+"px;--dy:"+rnd(220,380).toFixed(0)
       +"px;--sw:"+rnd(-22,22).toFixed(1)+"px;--life:"+life.toFixed(2)+"s;--dl:"+dl.toFixed(3)+"s;--r0:"+r0+";--rot:"+rot;
     f.appendChild(p);
   }

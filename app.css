@@ -1520,8 +1520,8 @@
   .confetti i.can.spk{ animation:canMove var(--life) linear var(--dl) forwards, canSpin var(--life) linear var(--dl) forwards, spkTw .7s ease-in-out infinite alternate; }
   @keyframes canMove{
     0%{ translate:0 0; opacity:1; animation-timing-function:cubic-bezier(.12,.75,.3,1); }
-    34%{ translate:var(--bx) var(--by); animation-timing-function:ease-in; }
-    80%{ opacity:1; }
+    28%{ translate:var(--bx) var(--by); animation-timing-function:ease-in; }
+    88%{ opacity:1; }
     100%{ translate:calc(var(--bx) + var(--sw)) calc(var(--by) + var(--dy)); opacity:0; } }
   @keyframes canSpin{ from{ rotate:var(--r0,0deg); } to{ rotate:calc(var(--r0,0deg) + var(--rot,540deg)); } }
   /* pink glitter: sequins (.sq), 4-point sparkles (.sp) and holographic flakes (.fl), built by glitter() in app.js.
@@ -1542,25 +1542,25 @@
   @keyframes glitFlash{ 0%{ scale:.15; opacity:0; } 16%{ opacity:.8; } 100%{ scale:1.7; opacity:0; } }
   @keyframes glitMove{
     0%{ translate:0 0; animation-timing-function:cubic-bezier(.12,.8,.3,1); }
-    22%{ translate:var(--bx) var(--by); }
+    14%{ translate:var(--bx) var(--by); }
     45%{ translate:calc(var(--bx) + var(--sw)) calc(var(--by) + var(--dy) * .09); }
     70%{ translate:calc(var(--bx) - var(--sw)) calc(var(--by) + var(--dy) * .38); }
     90%{ translate:calc(var(--bx) + var(--sw) * .6) calc(var(--by) + var(--dy) * .76); }
     100%{ translate:var(--bx) calc(var(--by) + var(--dy)); } }
-  /* twinkle: scale .4 → 1.1 → .7 → 1 → 0, in three phases; opacity fades in by 6% and out from 75% */
-  @keyframes glitTw0{ 0%{ scale:.4; opacity:0; rotate:var(--r0,0deg); } 6%{ opacity:1; } 24%{ scale:1.1; } 44%{ scale:.7; opacity:.7; }
-    62%{ scale:1; opacity:1; } 75%{ opacity:1; } 100%{ scale:0; opacity:0; rotate:calc(var(--r0,0deg) + var(--rot,0deg)); } }
-  @keyframes glitTw1{ 0%{ scale:.4; opacity:0; rotate:var(--r0,0deg); } 6%{ opacity:1; } 14%{ scale:1.1; } 34%{ scale:.7; opacity:.7; }
-    54%{ scale:1; opacity:1; } 75%{ opacity:1; } 100%{ scale:0; opacity:0; rotate:calc(var(--r0,0deg) + var(--rot,0deg)); } }
-  @keyframes glitTw2{ 0%{ scale:.4; opacity:0; rotate:var(--r0,0deg); } 6%{ opacity:1; } 34%{ scale:1.1; } 54%{ scale:.7; opacity:.7; }
-    68%{ scale:1; opacity:1; } 75%{ opacity:1; } 100%{ scale:0; opacity:0; rotate:calc(var(--r0,0deg) + var(--rot,0deg)); } }
+  /* twinkle: scale pulses .4 → 1.15 → .7 → 1.1 → .75 → 1, in three phases; full opacity until ~88%, then a fade to half size */
+  @keyframes glitTw0{ 0%{ scale:.4; opacity:0; rotate:var(--r0,0deg); } 4%{ opacity:1; } 16%{ scale:1.15; } 30%{ scale:.7; opacity:.75; }
+    46%{ scale:1.1; opacity:1; } 62%{ scale:.75; opacity:.8; } 78%{ scale:1; opacity:1; } 88%{ opacity:1; } 100%{ scale:.5; opacity:0; rotate:calc(var(--r0,0deg) + var(--rot,0deg)); } }
+  @keyframes glitTw1{ 0%{ scale:.4; opacity:0; rotate:var(--r0,0deg); } 4%{ opacity:1; } 10%{ scale:1.15; } 24%{ scale:.7; opacity:.75; }
+    40%{ scale:1.1; opacity:1; } 56%{ scale:.75; opacity:.8; } 72%{ scale:1; opacity:1; } 88%{ opacity:1; } 100%{ scale:.5; opacity:0; rotate:calc(var(--r0,0deg) + var(--rot,0deg)); } }
+  @keyframes glitTw2{ 0%{ scale:.4; opacity:0; rotate:var(--r0,0deg); } 4%{ opacity:1; } 22%{ scale:1.15; } 36%{ scale:.7; opacity:.75; }
+    52%{ scale:1.1; opacity:1; } 68%{ scale:.75; opacity:.8; } 82%{ scale:1; opacity:1; } 90%{ opacity:1; } 100%{ scale:.5; opacity:0; rotate:calc(var(--r0,0deg) + var(--rot,0deg)); } }
   /* no individual transform properties: one transform keyframe, no twinkle */
   .glitter.fb i, .glitter.fb i.t1, .glitter.fb i.t2{ rotate:none; transform:rotate(var(--r0,0deg)); animation:glitFb var(--life) linear var(--dl) forwards; }
   @keyframes glitFb{
     0%{ transform:translate(0,0) rotate(var(--r0,0deg)); opacity:0; animation-timing-function:cubic-bezier(.12,.8,.3,1); }
     6%{ opacity:1; }
-    22%{ transform:translate(var(--bx),var(--by)) rotate(var(--r0,0deg)); animation-timing-function:ease-in; }
-    75%{ opacity:1; }
+    14%{ transform:translate(var(--bx),var(--by)) rotate(var(--r0,0deg)); animation-timing-function:ease-in; }
+    88%{ opacity:1; }
     100%{ transform:translate(var(--bx),calc(var(--by) + var(--dy))) rotate(var(--r0,0deg)); opacity:0; } }
   /* pink big toast: one diagonal highlight, 150ms after it appears */
   html[data-accent="pink"] .toast.big{ overflow:hidden; }
