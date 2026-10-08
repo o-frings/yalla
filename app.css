@@ -11,6 +11,8 @@
     --series2:#4dabf7;       /* forecast "current pace" companion series */
     /* brand never follows the accent picker */
     --brand:#e8551c; --brand-grad:linear-gradient(135deg,#ff7a18 0%,#ff2f3d 100%);
+    /* glitter sparks (every accent): accent, amber, gold, pearl, champagne, rose — pearl, not white, on light */
+    --glit-1:var(--accent); --glit-2:#ff9f1c; --glit-3:#f5b400; --glit-4:#f2c49b; --glit-5:#d9a94a; --glit-6:#ff5a6e;
     --pop:#ffffff; --pop-shadow:0 14px 38px rgba(0,0,0,.24);   /* floating menus */
     --grad:linear-gradient(135deg,#ff7a18 0%,#ff2f3d 100%);
     --segtrack:#e8e8ee; --segthumb:#ffffff;
@@ -65,11 +67,13 @@
     --warntx:#ffc566;
     --goodtx:#69db7c; --holdtx:#ffc078; --badtx:#ff8787;
     --brand:#ff7a3a; --brand-grad:linear-gradient(135deg,#ff7a18 0%,#ff3450 100%);
+    --glit-1:var(--accent); --glit-2:#ffb347; --glit-3:#ffd60a; --glit-4:#ffffff; --glit-5:#f6d38a; --glit-6:#ff6b81;
   }
   /* accent picker (Settings → Appearance). Orange is the default above, with no attribute.
      Light blocks are html[data-accent] (0,1,1); dark blocks html.dark[data-accent] (0,2,1) and restate every token. */
-  /* celebrations: Pink bursts glitter (--glit-*); Blue, Teal and Graphite burst confetti in --cel-1…6 = accent,
-     accent + 35% white, + 65% white, + 20% black, gold, cream (no cream on light). Orange keeps its JS palettes. */
+  /* celebrations: every accent bursts glitter sparks in --glit-1…6; PRs and unlocks add confetti cannons in --cel-1…6 =
+     accent, accent + 35% white, + 65% white, + 20% black, gold, cream (no cream on light). Orange's cannons use JS palettes,
+     Pink's derive from the accent. */
   html[data-accent="pink"]{
     --accent:#c02c85; --accent-soft:rgba(212,80,181,.09); --accent-glow:rgba(242,86,156,.38); --accent-fill:#c02c85;
     --grad:linear-gradient(135deg,#f2569c 0%,#ce3aa0 100%); --accent-hi:#fc68c5;
@@ -80,28 +84,34 @@
     --grad:linear-gradient(135deg,#f2569c 0%,#ce3aa0 100%);
     --glit-1:var(--accent); --glit-2:#ff8cc3; --glit-3:#ffc2df; --glit-4:#ffffff; --glit-5:#f6d38a; --glit-6:#c8a2ff; }
   html[data-accent="blue"]{
+    --glit-1:var(--accent); --glit-2:#3d8fe0; --glit-3:#7fb6ee; --glit-4:#b9d3ef; --glit-5:#d9a94a; --glit-6:#5f7f9f;
     --accent:#016ccc; --accent-soft:rgba(54,133,234,.11); --accent-glow:rgba(42,138,223,.40); --accent-fill:#016ccc;
     --grad:linear-gradient(135deg,#2a8adf 0%,#3d66df 100%); --accent-hi:#53a1fc;
     --cel-1:#016ccc; --cel-2:#5a9fde; --cel-3:#a6cced; --cel-4:#0156a3; --cel-5:#e0a800;
     --series2:#6e6e73; }   /* = --l2: "current pace" goes neutral next to a blue plan line */
   html.dark[data-accent="blue"]{
+    --glit-1:var(--accent); --glit-2:#8fc2fd; --glit-3:#c3defe; --glit-4:#ffffff; --glit-5:#f6d38a; --glit-6:#a8c8ff;
     --accent:#53a1fc; --accent-soft:rgba(54,133,234,.18); --accent-glow:rgba(83,161,252,.38); --accent-fill:#3886df;
     --grad:linear-gradient(135deg,#2a8adf 0%,#3d66df 100%);
     --cel-1:#53a1fc; --cel-2:#8fc2fd; --cel-3:#c3defe; --cel-4:#4281ca; --cel-5:#ffd60a; --cel-6:#fff8e7;
     --series2:#98989e; }
   html[data-accent="teal"]{
+    --glit-1:var(--accent); --glit-2:#1aa39b; --glit-3:#5ec4bd; --glit-4:#a6d8d3; --glit-5:#d9a94a; --glit-6:#2b8fb0;
     --accent:#087a7c; --accent-soft:rgba(0,160,153,.09); --accent-glow:rgba(0,150,145,.34); --accent-fill:#087a7c;
     --grad:linear-gradient(135deg,#00a199 0%,#007d8f 100%); --accent-hi:#15b1b0;
     --cel-1:#087a7c; --cel-2:#5ea9aa; --cel-3:#a9d0d1; --cel-4:#066263; --cel-5:#e0a800; }
   html.dark[data-accent="teal"]{
+    --glit-1:var(--accent); --glit-2:#67cccc; --glit-3:#ade4e3; --glit-4:#ffffff; --glit-5:#f6d38a; --glit-6:#7fe0d8;
     --accent:#15b1b0; --accent-soft:rgba(21,177,176,.15); --accent-glow:rgba(21,177,176,.34); --accent-fill:#029494;
     --grad:linear-gradient(135deg,#00a199 0%,#007d8f 100%);
     --cel-1:#15b1b0; --cel-2:#67cccc; --cel-3:#ade4e3; --cel-4:#118e8d; --cel-5:#ffd60a; --cel-6:#fff8e7; }
   html[data-accent="graphite"]{
+    --glit-1:var(--accent); --glit-2:#636366; --glit-3:#8e8e93; --glit-4:#c7c7cc; --glit-5:#d9a94a; --glit-6:#48484a;
     --accent:#3a3a3c; --accent-soft:rgba(60,60,67,.07); --accent-glow:rgba(28,28,30,.28); --accent-fill:#3a3a3c;
     --grad:linear-gradient(135deg,#5c5c60 0%,#2c2c2e 100%); --accent-hi:#d1d1d6;
     --cel-1:#3a3a3c; --cel-2:#7f7f80; --cel-3:#bababb; --cel-4:#2e2e30; --cel-5:#e0a800; }
   html.dark[data-accent="graphite"]{
+    --glit-1:var(--accent); --glit-2:#ffffff; --glit-3:#e5e5ea; --glit-4:#ffffff; --glit-5:#f6d38a; --glit-6:#aeaeb2;
     --accent:#d1d1d6; --accent-soft:rgba(235,235,245,.08); --accent-glow:rgba(255,255,255,.14); --accent-fill:#d1d1d6;
     --grad:linear-gradient(135deg,#f2f2f7 0%,#c7c7cc 100%);
     --on-accent:#1c1c1e;     /* light button, dark label */
@@ -1106,19 +1116,25 @@
   .setrow .eq{ color:var(--l3); flex:0 0 auto; font-weight:var(--w-semi); font-size:var(--t-sm); }
   .setrow .vol{ font-size:var(--t-md); color:var(--l2); font-weight:var(--w-bold); min-width:56px; flex:0 0 auto; text-align:right; line-height:1; font-variant-numeric:tabular-nums; }
   .setrow.novol .eq, .setrow.novol .vol{ visibility:hidden; }   /* no number yet → hide the "= —" noise, keep column alignment */
-  /* focus: completed sets recede so the set you're on leads the eye (visual only; PRs stay bright) */
-  /* A completed set reads as affirmatively DONE, not disabled. The old treatment only faded the row to
-     .42, which looks identical to "empty and greyed out" — you couldn't tell a logged set from a blank
-     one at a glance. Now the set number fills with the accent and the fade is light enough to read. */
-  .setrow.done:not(.pr){ opacity:.68; }
-  .setrow.done:focus-within{ opacity:1; }   /* tapping a completed set to edit brings it back */
-  .setrow.done .sn{ background:var(--accent-fill); color:var(--on-accent); font-weight:var(--w-bold); border-radius:var(--r-pill); }
-  .setrow.warm.done .sn{ background:transparent; color:var(--accent); }   /* warm-ups keep their own mark */
+  /* A logged set reads as DONE at a glance, never as disabled: its boxes fill with the accent tint and get an
+     accent ring, the values turn bold ink, and the set number becomes a filled ✓ badge. A set still to do keeps
+     plain grey boxes with the last-time hint in grey. */
+  .setrow.done input, .setrow.done input:not(:placeholder-shown):not(:focus){ background:color-mix(in srgb, var(--accent) 16%, var(--field));
+    box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent); color:var(--ink); font-weight:var(--w-bold); }
+  .setrow.done .vol{ color:var(--ink); }
+  .setrow.done .sn{ background:var(--accent-fill); color:var(--on-accent); font-weight:var(--w-bold); border-radius:var(--r-pill); font-size:0; }
+  .setrow.done .sn::after{ content:"✓"; font-size:var(--t-sm); }
+  .setrow.warm.done .sn{ background:transparent; color:var(--accent); font-size:var(--t-xs); }   /* warm-ups keep their own mark */
+  .setrow.warm.done .sn::after{ content:none; }
   /* running tally in the exercise header, so finished lifts are obvious without reading their rows */
   .exhead .setcount{ font-size:var(--t-xs); font-weight:var(--w-bold); color:var(--l2); background:var(--track);
     border-radius:var(--r-pill); padding:3px 9px; flex:0 0 auto; font-variant-numeric:tabular-nums; letter-spacing:.2px; }
   .exhead .setcount.all{ background:var(--accent-fill); color:var(--on-accent); }
-  .group.gdone .exhead .nm{ color:var(--l2); }
+  .exhead .setcount.all::before{ content:"✓ "; }
+  /* every working set logged: an accent ring around the whole card (drawn on top, so set rows can't cover it) */
+  .group.gdone{ position:relative; }
+  .group.gdone::after{ content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+    box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--accent) 75%, transparent); }
   .setrow .vol.live{ color:var(--ink); cursor:pointer; }
   .setrow .vol.live:active{ transform:scale(.9); opacity:.6; }
   /* previous-session volume doubles as a "tap to copy last time" target */

@@ -4393,7 +4393,7 @@ const CEL_HAPTIC={ 1:10, 2:[10,60,14], 3:[12,50,12,50,18] };
 function celebrateMoment(o){
   o=o||{};
   const ach=(o.achIds||[]).map(id=>ACHIEVEMENTS.find(a=>a.id===id)).filter(Boolean);
-  const tier = ach.length ? 3 : o.pr>0 ? 2 : o.qualifies ? 1 : 0;
+  const tier = ach.length ? 3 : o.pr>0 ? 2 : (o.qualifies || o.micro) ? 1 : 0;   // every finish sparks, short sessions too
   if(tier) celebrate(tier, { stars:!!o.star, pr:o.pr>0 });
   let msg="";
   if(o.pr>0) msg="New best! You beat "+o.pr+" lift"+(o.pr>1?"s":"")+(ach.length ? " · "+ach[0].t+" unlocked" : " — keep climbing.");
@@ -4404,7 +4404,7 @@ function celebrateMoment(o){
   return tier;
 }
 // The single burst entry point. Old callers map: celebrate(true) → 2, celebrate(false) → 1, celebrate() → 3.
-// Pink bursts glitter, every other accent confetti. opts.stars is the hook for star moments (white/gold sparkles, later).
+// Every accent bursts glitter sparks; PRs and unlocks add confetti cannons. opts.stars is the hook for star moments (white/gold sparkles, later).
 // A new burst replaces one on screen; it is removed at its end + 150ms or when the app is hidden.
 let _burstEnd=null;
 // where the last tap landed, so a burst starts at the button that earned it (a tap within 3s; else near the centre)
@@ -4419,12 +4419,14 @@ function celebrate(tier, opts){
   if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;   // the toast's ✦ carries it
   if(document.hidden) return;
   if(_burstEnd) _burstEnd();
-  document.querySelectorAll(".confetti,.glitter").forEach(n=>n.remove());
+  document.querySelectorAll(".burst,.confetti,.glitter").forEach(n=>n.remove());
   // low-end hint: half the pieces. WebKit buckets hardwareConcurrency to 4 or 8, so every iPhone says 4 — only
   // fewer than 4 counts.
   const low=(navigator.hardwareConcurrency||8)<4 || (navigator.deviceMemory||8)<=4;
   const o=Object.assign({}, opts||{}); if(!o.from) o.from=burstOrigin();
-  const b = document.documentElement.dataset.accent==="pink" ? glitter(Math.min(tier,3), o, low) : confetti(Math.min(tier,3), o, low);
+  const t=Math.min(tier,3), parts=[glitter(t, o, low)]; if(t>=2) parts.push(confetti(t, o, low));
+  const b={ el:document.createElement("div"), ms:Math.max(...parts.map(p=>p.ms)) }; b.el.className="burst";
+  parts.forEach(p=>b.el.appendChild(p.el));
   let timer=0;
   const onVis=()=>{ if(document.hidden) end(); };
   const end=()=>{ clearTimeout(timer); b.el.remove(); document.removeEventListener("visibilitychange", onVis); if(_burstEnd===end) _burstEnd=null; };
@@ -4434,67 +4436,42 @@ function celebrate(tier, opts){
 // "#rrggbb" mixed toward "#rrggbb" by t (0…1); anything else comes back unchanged
 function mixHex(a,b,t){ const p=h=>/^#[0-9a-f]{6}$/i.test(h)?[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)):null, x=p(a), y=p(b);
   if(!x||!y) return a; return "#"+x.map((v,i)=>Math.round(v+(y[i]-v)*t).toString(16).padStart(2,"0")).join(""); }
-// Confetti rains from the top in the accent's colours (Orange keeps its own two palettes: gold-leaning for a PR or
-// an unlock, the warm one for a finish), and a fountain of gold/white 4-point sparks erupts from the button that
-// earned it (opts.from). PRs and unlocks add two cannons that shoot up from the bottom corners and fall back. Other accents read --cel-1…6 once per burst,
-// derived from the accent if the tokens are missing.
+// Confetti cannons for PRs and unlocks: volleys shot up from both bottom corners that fall back, in the accent's
+// colours (Orange keeps its own gold-leaning palette) with gold/white sparks mixed in. The main sparks come from
+// glitter(), which every accent bursts.
 function confetti(tier, opts, low){
-  const big=tier>=2, orange=accentId()==="orange";
+  let P=[0,0,40,55][tier]; if(low) P=Math.round(P/2);   // pieces per cannon
+  const fx=!!(window.CSS && CSS.supports && CSS.supports("translate","1px"));
+  const c=document.createElement("div"); c.className="confetti";
+  if(!fx || !P) return { el:c, ms:0 };   // the arcs need individual transform properties
   let colors;
-  if(orange) colors=big ? ["#ffd60a","#fbbf24","#f5a040","#fff3c4","#ff9f1c","#ff375f","#e8820c"]
-                        : ["#f08020","#f5a040","#ff375f","#ffd60a","#fb923c","#fbbf24","#e8820c"];
+  if(accentId()==="orange") colors=["#ffd60a","#fbbf24","#f5a040","#fff3c4","#ff9f1c","#ff375f","#e8820c"];
   else { const cs=getComputedStyle(document.documentElement);
     colors=[1,2,3,4,5,6].map(i=>cs.getPropertyValue("--cel-"+i).trim()).filter(Boolean);
     if(colors.length<4){ const a=accentHex(), dk=document.documentElement.classList.contains("dark");
       colors=[a, mixHex(a,"#ffffff",.35), mixHex(a,"#ffffff",.65), mixHex(a,"#000000",.2), dk?"#ffd60a":"#e0a800"].concat(dk?["#fff8e7"]:[]); } }
   const dk=document.documentElement.classList.contains("dark"), sparks=dk ? ["#ffd60a","#fff3c4","#ffffff"] : ["#f5b400","#ffd60a","#f0a020"];
-  let N=[0,80,90,100][tier], P=[0,0,40,55][tier], F=[0,28,40,52][tier];   // rain pieces; pieces per cannon; fountain sparks
-  if(low){ N=Math.round(N/2); P=Math.round(P/2); F=Math.round(F/2); }
-  const fx=!!(window.CSS && CSS.supports && CSS.supports("translate","1px"));
-  if(!fx){ P=0; F=0; }   // the arcs need individual transform properties
   const rnd=(a,b)=>a+Math.random()*(b-a), vw=innerWidth, vh=innerHeight;
-  const c=document.createElement("div"); c.className="confetti";
   const f=document.createDocumentFragment(); let ms=0;
-  const piece=(spark)=>{ const s=document.createElement("i");
-    if(spark){ s.className="spk"; s.style.setProperty("--s",rnd(10,20).toFixed(1)+"px"); s.style.background=sparks[Math.floor(Math.random()*sparks.length)]; }
-    else { s.style.background=colors[Math.floor(Math.random()*colors.length)]; if(Math.random()>.5) s.style.borderRadius="50%"; }
-    return s; };
-  for(let i=0;i<N;i++){ const s=piece(Math.random()<.08);
-    const dl=Math.random()*0.45, du=2.2+Math.random()*1.4; ms=Math.max(ms,(dl+du)*1000);
-    s.style.left=Math.random()*100+"%";
-    s.style.animationDelay=dl+"s";
-    s.style.setProperty("--dx",((Math.random()*2-1)*(big?240:170))+"px");
-    s.style.setProperty("--sz",(0.7+Math.random()*(big?1.3:0.9)).toFixed(2));   // size variety = depth
-    s.style.setProperty("--dur",du.toFixed(2)+"s");                             // staggered fall speed
-    f.appendChild(s);
-  }
-  for(let side=0; side<2; side++) for(let i=0;i<P;i++){ const s=piece(Math.random()<.25);
+  for(let side=0; side<2; side++) for(let i=0;i<P;i++){ const s=document.createElement("i");
+    if(Math.random()<.25){ s.className="spk can"; s.style.setProperty("--s",rnd(10,20).toFixed(1)+"px"); s.style.background=sparks[Math.floor(Math.random()*sparks.length)]; }
+    else { s.className="can"; s.style.background=colors[Math.floor(Math.random()*colors.length)]; if(Math.random()>.5) s.style.borderRadius="50%"; }
     const wave = tier===3 && i>=P*.6 ? .35 : 0;   // an unlock fires a second, smaller volley
     const dl=wave+Math.random()*.12, life=rnd(2.8,3.8); ms=Math.max(ms,(dl+life)*1000);
-    s.classList.add("can");
     s.style.cssText+=";left:"+(side? vw+6 : -6)+"px;top:"+(vh+8)+"px;--bx:"+((side?-1:1)*rnd(.12,.62)*vw).toFixed(0)+"px;--by:"+(-rnd(.48,.9)*vh).toFixed(0)
       +"px;--dy:"+(rnd(.3,.55)*vh).toFixed(0)+"px;--sw:"+rnd(-30,30).toFixed(0)+"px;--life:"+life.toFixed(2)+"s;--dl:"+dl.toFixed(3)+"s;--sz:"+(0.7+Math.random()*1.2).toFixed(2)
       +";--r0:"+rnd(0,360).toFixed(0)+"deg;--rot:"+((Math.random()<.5?-1:1)*rnd(360,900)).toFixed(0)+"deg";
     f.appendChild(s);
   }
-  const o=opts.from||{x:vw*.5, y:vh*.42};
-  for(let i=0;i<F;i++){ const s=piece(true), up=o.y>vh*.45;   // low on the screen: a fountain upward; higher: all round
-    const ang = up ? rnd(-Math.PI*.92,-Math.PI*.08) : Math.random()*Math.PI*2, rad=rnd(.18,.5)*Math.min(vw,vh)*(up?1.3:1);
-    const dl=Math.random()*.1, life=rnd(2.8,3.8); ms=Math.max(ms,(dl+life)*1000);
-    s.classList.add("can");
-    s.style.cssText+=";left:"+o.x.toFixed(0)+"px;top:"+o.y.toFixed(0)+"px;--bx:"+(Math.cos(ang)*rad).toFixed(0)+"px;--by:"+(Math.sin(ang)*rad).toFixed(0)
-      +"px;--dy:"+(rnd(.3,.5)*vh).toFixed(0)+"px;--sw:"+rnd(-24,24).toFixed(0)+"px;--life:"+life.toFixed(2)+"s;--dl:"+dl.toFixed(3)+"s;--r0:0deg;--rot:"+((Math.random()<.5?-1:1)*rnd(90,240)).toFixed(0)+"deg";
-    f.appendChild(s);
-  }
   c.appendChild(f);
   return { el:c, ms };
 }
-// Pink glitter: half 4-point sparks (a few large ones), then sequins and holographic flakes, in --glit-1…6.
+// Glitter, every accent: half 4-point sparks (a few large ones), then sequins and holographic flakes, in --glit-1…6.
 // A soft flash and a burst from the button that earned it (opts.from: upward like a fountain when it sits low on
 // the screen), then a slow drift down with sway. PRs add a second pair of emitters either side; unlocks a third volley.
 const GLIT_SHARE=[30,15,10,25,12,8];
 function glitter(tier, opts, low){
-  const cs=getComputedStyle(document.documentElement), dflt=[accentHex(),"#ff8cc3","#ffc2df","#ffffff","#f6d38a","#c8a2ff"];
+  const cs=getComputedStyle(document.documentElement), a=accentHex(), dflt=[a, mixHex(a,"#ffffff",.35), mixHex(a,"#ffffff",.6), "#ffffff", "#f6d38a", mixHex(a,"#000000",.2)];
   const cols=GLIT_SHARE.map((_,i)=>cs.getPropertyValue("--glit-"+(i+1)).trim()||dflt[i]);
   let N=[0,72,110,150][tier]; if(low) N=Math.round(N/2);
   const R=[0,[100,240],[120,320],[150,400]][tier], L=[0,[2.8,3.6],[3.2,4.2],[3.6,4.6]][tier];
