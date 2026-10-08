@@ -25,6 +25,7 @@ alter table public.profiles add constraint avatar_color_fmt
 -- A's bubble with text A never wrote and no edit marker. Nothing in the app signs messages.
 -- Replace the policy with a definer RPC that can only touch read_at.
 -- RUN THIS BEFORE deploying a client that calls dm_mark_read.
+-- STATUS: applied 2026-10-08; the client now calls dm_mark_read (app.js markRead).
 -- ---------------------------------------------------------------------------
 drop policy if exists "mark read dm" on public.direct_messages;
 

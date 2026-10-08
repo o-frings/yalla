@@ -1932,7 +1932,12 @@ async function loadConversations(){
 }
 async function markRead(uid){
   if(!cloudReady()) return;
-  try{ await sb.from("direct_messages").update({ read_at:new Date().toISOString() }).eq("recipient",cloudUser.id).eq("sender",uid).is("read_at",null); }catch(e){}
+  // Via an RPC, not a direct UPDATE. The old "mark read dm" policy granted UPDATE on the whole ROW —
+  // Postgres RLS has no column scope — so a recipient could rewrite the sender's ciphertext, and since
+  // both parties hold the same static ECDH secret the GCM tag proved nothing. The policy is dropped;
+  // dm_mark_read is a security-definer function that can only ever touch read_at.
+  try{ const { error } = await sb.rpc("dm_mark_read", { p_sender: uid }); if(error) throw error; }
+  catch(e){ /* read receipts are cosmetic — never block opening a thread */ }
   refreshUnread();
 }
 
