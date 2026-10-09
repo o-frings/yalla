@@ -2815,6 +2815,7 @@ function tmrPause(){ if(!timer.running) return; timer.elapsed=tmrElapsed(); time
 function tmrReset(){ timer.elapsed=0; timer.running=false; timer.startedAt=null;
   _lastSetEl=0; _lastSetAt=0; _absenceAsked=false;   // a reset session must not inherit a stale stamp
   document.querySelectorAll("#exlist .setrow").forEach(r=>r.dataset.rested="");
+  if(typeof _prCelebrated!=="undefined") _prCelebrated.clear();   // a new session celebrates its own PR sets
   if(timer.iv){clearInterval(timer.iv);timer.iv=null;} tmrRender(); if(!(rest.iv&&rest.startedAt)) releaseWake(); }
 $("tmrToggle").onclick=()=> timer.running ? tmrPause() : tmrStart();
 $("tmrReset").onclick=tmrReset;
@@ -2895,7 +2896,7 @@ $("exlist").addEventListener("change", e=>{ if(!e.target.classList||(!e.target.c
   // and the blur fired by tapping Finish used to re-stamp the last-set time at Finish time
   if(!row.dataset.rested && rv!=="" && (wv!=="" || row.classList.contains("timed") || (name&&isBW(name)))){
     row.dataset.rested="1"; if(!timer.running && timer.elapsed===0) tmrStart(); restStart(); } captureDraft();
-  refreshSetFocus(g); });
+  refreshSetFocus(g); prSetDone(row); });
 // Visual only: a logged set's number becomes a filled check disc. Same "done" rule as the rest-timer
 // trigger; never changes what's logged.
 function setRowDone(row, name){
@@ -2939,7 +2940,7 @@ function holdStop(write){
   if(write){ const secs=Math.max(1,Math.round((Date.now()-started)/1000)); const rEl=row.querySelector(".r"); if(rEl) rEl.value=secs;
     const g=row.closest(".group"); updateSetVol(row, g&&g.dataset.ex); captureDraft(); refreshSetFocus(g);
     restStart();   // the hold IS the set — start the rest clock once it ends
-    if(navigator.vibrate) try{ navigator.vibrate([0,40,30,40]); }catch(e){} }
+    if(!prSetDone(row) && navigator.vibrate) try{ navigator.vibrate([0,40,30,40]); }catch(e){} }
 }
 function holdStart(row){
   if(hold.row) holdStop(true);                       // only one hold at a time
@@ -4548,7 +4549,8 @@ function captureDraft(){
   });
   if(Object.keys(map).length===0) return; // nothing on screen (e.g. mid-unload) — don't clobber a saved draft
   const prev=draft[sig];
-  draft[sig]={ t:Date.now(), s:map, ef:efmap, efa:efauto, tm:{e:timer.elapsed, sa:timer.startedAt, rn:timer.running}, le:_lastSetEl, la:_lastSetAt, gy:sessGym };
+  draft[sig]={ t:Date.now(), s:map, ef:efmap, efa:efauto, tm:{e:timer.elapsed, sa:timer.startedAt, rn:timer.running}, le:_lastSetEl, la:_lastSetAt, gy:sessGym,
+    prc:[..._prCelebrated].filter(k=>k.startsWith(sig+"|")) };   // PR sets already celebrated, so a relaunch doesn't fire them again
   if(prev && prev.spon) Object.assign(draft[sig], { spon:1, name:prev.name, tpl:prev.tpl, shuffle:prev.shuffle||0, orig:prev.orig });   // a suggested session keeps its name (and what it suggested) once you log into it
   draft.__mode = freeMode ? "free" : "plan";   // draft is device-only (not in CLOUD_KEYS), so no sync surface
   clearTimeout(_draftTimer); _draftTimer=setTimeout(()=>{ sset("draft", draft); }, 350);
@@ -4559,6 +4561,7 @@ function captureDraft(){
 function applyDraft(){
   const sig=draftSig(), d=draft[sig]; if(!d || !d.s) return;
   if(Date.now()-(d.t||0) > 20*3600*1000){ delete draft[sig]; sset("draft", draft); return; } // forget day-old drafts
+  if(Array.isArray(d.prc)) d.prc.forEach(k=>_prCelebrated.add(k));
   document.querySelectorAll("#exlist .group").forEach(g=>{
     const name=g.dataset.ex, arr=d.s[name]; if(!arr) return;
     while(g.querySelectorAll(".setrow").length < arr.length){
@@ -4933,10 +4936,12 @@ function starShareOf(sr){
 // ring and confetti cannons; unlocks a second ring and a second wave. opts.tile: an element, a selector, a list of
 // them or a function returning one; the first that is on screen (and not under an open sheet) is the tile, else the
 // glitter breaks off the screen edges. opts.at: fire that many ms later (the target is resolved then, so a sheet
-// can slide in first). opts.haptic buzzes with the bang. opts.stars (a star moment) turns a quarter of the pieces
-// into white/gold 4-point sparkles, so stars look the same on every accent.
+// can slide in first). opts.rings / opts.cannon / opts.pieces override the tier's shock-wave rings / pieces per cannon / glitter
+// pieces, and opts.up throws the glitter up and sideways instead of down; opts.minor
+// (a PR set) never interrupts a burst that isn't minor. opts.haptic buzzes with the bang. opts.stars (a star moment)
+// turns a quarter of the pieces into white/gold 4-point sparkles, so stars look the same on every accent.
 // A new burst replaces one on screen; it is removed at its end + 150ms or when the app is hidden.
-let _burstEnd=null, _burstArm=0;
+let _burstEnd=null, _burstArm=0, _burstArmed=false, _burstMajor=0;   // _burstMajor: when a non-minor burst ends
 // where el sits once the sheet it is in has landed (a sheet slides up from translateY(102%))
 function landedRect(el){
   const r=el.getBoundingClientRect(), sh=el.closest(".sheet"); let dy=0;
@@ -4968,12 +4973,13 @@ function celebrate(tier, opts){
   tier = tier===true ? 2 : tier===false ? 1 : tier==null ? 3 : tier;
   if(!(tier>=1)) return;
   const o=Object.assign({}, opts||{});
-  clearTimeout(_burstArm);
-  if(o.at>0){ const at=o.at; o.at=0;
+  if(o.minor && (_burstArmed || _burstMajor>Date.now())) return;   // a PR set never cuts into Finish's moment
+  clearTimeout(_burstArm); _burstArmed=false;
+  if(o.at>0){ const at=o.at; o.at=0; _burstArmed=true;
     // the buzz lands with the bang where the Vibration API exists (Android); iOS only buzzes inside the tap's gesture
     // (haptic() toggles a switch), so there it fires now rather than be dropped 500ms later
     if(o.haptic && !navigator.vibrate){ haptic(o.haptic); o.haptic=0; }
-    _burstArm=setTimeout(()=>celebrate(tier, o), at); return; }
+    _burstArm=setTimeout(()=>{ _burstArmed=false; celebrate(tier, o); }, at); return; }
   if(o.haptic) haptic(o.haptic);
   if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;   // the toast's ✦ carries it
   if(document.hidden) return;
@@ -4984,8 +4990,9 @@ function celebrate(tier, opts){
   const low=(navigator.hardwareConcurrency||8)<4 || (navigator.deviceMemory||8)<=4;
   const vw=innerWidth, vh=innerHeight, tg=boomTarget(o.tile);
   o.box = tg || { x:0, y:0, w:vw, h:vh, rad:0, screen:true };   // no tile on screen: the screen's edges break off, with fewer cannon pieces
-  const t=Math.min(tier,3), parts=[glitter(t, o, low)]; if(t>=2) parts.push(confetti(t, o, low));
+  const t=Math.min(tier,3), parts=[glitter(t, o, low)]; if(t>=2 || o.cannon) parts.push(confetti(t, o, low));
   const b={ el:document.createElement("div"), ms:Math.max(...parts.map(p=>p.ms)) }; b.el.className="burst";
+  _burstMajor = o.minor ? 0 : Date.now()+b.ms;
   parts.forEach(p=>b.el.appendChild(p.el));
   let timer=0;
   const onVis=()=>{ if(document.hidden) end(); };
@@ -5014,7 +5021,7 @@ function mixHex(a,b,t){ const p=h=>/^#[0-9a-f]{6}$/i.test(h)?[1,3,5].map(i=>pars
 // hearts. The main sparks come from glitter(), the exploding tile, which every accent bursts. Everything has
 // landed and faded by about 2.2s, so a share sheet under it is readable again.
 function confetti(tier, opts, low){
-  let P=[0,0,20,24][tier]; if(low) P=Math.round(P/2);   // pieces per cannon
+  let P=opts.cannon||[0,0,20,24][tier]; if(low) P=Math.round(P/2);   // pieces per cannon (opts.cannon: a PR set's small volley)
   if(opts.box && opts.box.screen) P=Math.round(P*.5);   // no tile: the cannons stay light so they don't bury the page
   const fx=!!(window.CSS && CSS.supports && CSS.supports("translate","1px"));
   const c=document.createElement("div"); c.className="confetti";
@@ -5062,7 +5069,7 @@ function glitter(tier, opts, low){
   const cs=getComputedStyle(document.documentElement), a=accentHex(), dflt=[a, mixHex(a,"#ffffff",.35), mixHex(a,"#ffffff",.6), "#ffffff", "#f6d38a", mixHex(a,"#000000",.2)];
   const cols=GLIT_SHARE.map((_,i)=>cs.getPropertyValue("--glit-"+(i+1)).trim()||dflt[i]);
   const pinkish=accentId()==="pink", holo=pinkish ? cs.getPropertyValue("--holo").trim().replace(/"/g,"'") : "", gloss=cs.getPropertyValue("--heart-gloss").trim()||"#fff";
-  let N=[0,140,168,172][tier]; if(low) N=Math.round(N/2);
+  let N=opts.pieces||[0,140,168,172][tier]; if(low) N=Math.round(N/2);
   const K=[0,.5,.62,.72][tier], V=[0,[40,130],[60,170],[70,200]][tier];
   const rnd=(a,b)=>a+Math.random()*(b-a), vw=innerWidth, vh=innerHeight;
   const pick=()=>{ let r=Math.random()*100; for(let i=0;i<cols.length;i++){ r-=GLIT_SHARE[i]; if(r<0) return cols[i]; } return cols[0]; };
@@ -5079,7 +5086,7 @@ function glitter(tier, opts, low){
   if(fx){
     if(scr) f.appendChild(box("tflash scr", 0, 0, vw, vh, 0));
     else { const fl=box("tflash", B.x, B.y, B.w, B.h, rad); fl.appendChild(document.createElement("u")); f.appendChild(fl);
-      for(let k=0;k<(tier===3?2:tier===2?1:0);k++) f.appendChild(box("tring", B.x, B.y, B.w, B.h, rad,
+      for(let k=0;k<(opts.rings!=null ? opts.rings : tier===3?2:tier===2?1:0);k++) f.appendChild(box("tring", B.x, B.y, B.w, B.h, rad,
         ";--rs:"+[B.w,B.h].map(d=>(1+Math.min(1.2, 110/Math.max(40,d))*(k?1.3:1)).toFixed(2)).join(" ")+";--dl:"+(.05+k*.2).toFixed(2)+"s")); }   // grows ~110px each way, whatever its shape
   }
   // a point on the tile's rounded edge, u in 0…1 around it (corners follow the radius), pulled in by j px
@@ -5102,6 +5109,7 @@ function glitter(tier, opts, low){
     let px, py;
     if(onEdge){ edge(Math.random(), scr ? -6 : rnd(0,5)); px=ex; py=ey; }
     else { px=B.x+B.w*(.5+(Math.random()-.5)*.92); py=B.y+B.h*(.5+(Math.random()-.5)*.92); }
+    if(opts.up && py>cy) py=2*cy-py;   // opts.up: the lower half starts from the upper half, clear of the row below
     const nx=(px-cx)/Math.max(hw,1), ny=(py-cy)/Math.max(hh,1), dn=Math.min(1.5,Math.hypot(nx,ny)), dist=Math.hypot(px-cx,py-cy);
     // out from the centre (direction taken on the tile's own proportions, so a wide button still throws up and down)
     let ang=Math.atan2(ny,nx)+rnd(-.38,.38), push;
@@ -5109,6 +5117,7 @@ function glitter(tier, opts, low){
     else push=(onEdge ? .45+.75*Math.pow(Math.random(),1.2) : .1+.6*Math.pow(Math.random(),1.5))*(K*dist*(w2?.55:1)+rnd(V[0],V[1])*(.45+.55*Math.min(1,dn))
       +reach*(onEdge ? rnd(.45,1) : rnd(.1,.6)));   // the face crumbles, the edge flies
     let bx=Math.cos(ang)*push, by=Math.sin(ang)*push-(scr?0:rnd(0,40)+lift*rnd(.4,1));
+    if(opts.up && by>0){ bx*=1.25; by*=.3; }   // opts.up (a PR set): what flies down goes sideways, off the fields below
     if(!scr && (px+bx<10 || px+bx>vw-10)) bx=-bx*.8;   // bounce back in off the screen's side, so a tile by the edge still bursts both ways
     const dl=(w2?.36:.04)+Math.random()*(w2?.12:.06), life=rnd(1.75,2.15)-(w2?dl-.04:0);
     ms=Math.max(ms,(life+dl)*1000);
@@ -5125,7 +5134,7 @@ function glitter(tier, opts, low){
       bg = onEdge ? sqBg[C]||(sqBg[C]="radial-gradient(circle at 35% 35%,#fff 0 18%,"+C+" 45%,"+mixHex(C,"#000000",.3)+" 100%)") : C; }
     else { cls="fl"; sz=rnd(4,7); bg = holo || flBg[C]||(flBg[C]="linear-gradient(135deg,"+C+",#fff 50%,"+C+")"); r0="45deg"; }
     html[i]='<i class="'+cls+' t'+(i%3)+'" style="left:'+px.toFixed(1)+'px;top:'+py.toFixed(1)+'px;--s:'+sz.toFixed(1)+'px;background:'+bg
-      +';--bx:'+bx.toFixed(1)+'px;--by:'+by.toFixed(1)+'px;--dy:'+rnd(110,230).toFixed(0)
+      +';--bx:'+bx.toFixed(1)+'px;--by:'+by.toFixed(1)+'px;--dy:'+(opts.up ? rnd(30,70) : rnd(110,230)).toFixed(0)
       +'px;--sw:'+rnd(-20,20).toFixed(1)+'px;--life:'+life.toFixed(2)+'s;--dl:'+dl.toFixed(3)+'s;--r0:'+r0+';--rot:'+rot+'"></i>';
   }
   c.innerHTML=html.join("");   // one parse for all the pieces (much cheaper than ~170 cssText sets)
@@ -6741,7 +6750,7 @@ $("exlist").addEventListener("click", e=>{ const s=e.target.closest(".sn"); if(!
   const r=s.closest(".setrow"), g=s.closest(".group"); if(!r||!g) return;
   const wasDone=r.classList.contains("done"), num=s.textContent;
   r.classList.toggle("warm"); renumberSets(g); updateSetVol(r, g.dataset.ex); refreshAutoEffort(g); captureDraft();
-  refreshSetFocus(g);
+  refreshSetFocus(g); prSetDone(r);   // a warm-up turned into a working set that beats the best is a completed PR set
   // the check disc looks tappable: say what the tap did, so "unticking" never silently makes a warm-up
   if(wasDone) toast("Set "+num+" is now a warm-up. Tap W to undo.");
   if(navigator.vibrate) try{ navigator.vibrate(10); }catch(_){} });
@@ -6772,6 +6781,7 @@ $("exlist").addEventListener("click", e=>{ const v=e.target.closest(".vol"); if(
     if(!timer.running && timer.elapsed===0) tmrStart();
     restStart();   // copying a completed set means that set is done — start the rest clock
     updateSetVol(next, name); captureDraft();
+    if(prSetDone(next)) return;   // its burst carries the buzz
   }
   if(navigator.vibrate) try{ navigator.vibrate(15); }catch(e){} });
 function removeSetRow(r){
@@ -6779,8 +6789,9 @@ function removeSetRow(r){
   if(hold.row===r) holdStop(false);   // deleting the row mid-hold: kill the timer, don't write a partial time
   const g=r.closest(".group"); if(!g) return;
   const rows=g.querySelectorAll(".setrow");
-  if(rows.length<=1){ const w=r.querySelector(".w"), rp=r.querySelector(".r");
+  if(rows.length<=1){ prKeysShift(g, 0); const w=r.querySelector(".w"), rp=r.querySelector(".r");
     if(w) w.value=""; if(rp) rp.value=""; r.dataset.pvol=""; r.dataset.rested=""; updateSetVol(r, g.dataset.ex); captureDraft(); refreshSetFocus(g); return; }
+  prKeysShift(g, [...rows].indexOf(r));   // the PR keys go by the set's place: the sets below move up one
   r.remove();
   renumberSets(g);
   captureDraft(); refreshSetFocus(g);
@@ -6808,13 +6819,42 @@ function updateSetVol(r, name){
 function setRowPR(r, on){
   const was=r.classList.contains("pr");
   r.classList.toggle("pr", on);
-  if(on && !was){ if(navigator.vibrate) try{ navigator.vibrate([0,55,45,90]); }catch(e){} prCelebrate(r); }
+  if(on && !was) prCelebrate(r);
 }
-// A set that beats the best: the PR pill marks the row and its volume cell pops (no particles: the one burst is the
-// tile explosion at Finish, never a small bang inside a row while the weight is still being typed)
+// A set that beats the best, while it is typed: the PR pill marks the row and its volume cell pops, silently (the
+// PR flag flips as digits go in, so no buzz and no particles here)
 function prCelebrate(r){
   if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const vEl=r.querySelector(".vol"); if(vEl) boomPop(vEl, 1);
+}
+// A PR set that is completed: its inputs were committed (the change event: blur, keyboard Done, the next field), a
+// hold ended, or the set was copied in. The row explodes once per row, lighter than Finish (tier 1 glitter and a
+// small confetti volley; no shock-wave ring, which on a row this thin reads as two lines across the screen) with
+// the PR buzz. A later PR set replaces the burst. Finish (or any other burst armed or running) wins over it, and a
+// set committed by the tap on Finish (its blur) is left to Finish's own moment. Returns whether it fired.
+// Once per set per session: keyed by the draft, the exercise and the set's place, so a re-render (target editor,
+// reorder) can't fire an already-celebrated set again. tmrReset() (Finish, discard, a new mode) clears it.
+let _finTap=0;
+const _prCelebrated=new Set();
+// a set row at index i of group g is removed: drop its key and move the keys below it up one, in the set and the draft
+function prKeysShift(g, i){
+  if(i<0 || !g) return;
+  const pre=draftSig()+"|"+g.dataset.ex+"|", mv=k=>{ if(!k.startsWith(pre)) return k; const n=+k.slice(pre.length);
+    return n===i ? null : n>i ? pre+(n-1) : k; };
+  const next=[..._prCelebrated].map(mv).filter(Boolean); _prCelebrated.clear(); next.forEach(k=>_prCelebrated.add(k));
+  const dr=draft[draftSig()]; if(dr && Array.isArray(dr.prc)) dr.prc=dr.prc.map(mv).filter(Boolean);
+}
+$("saveBtn").addEventListener("pointerdown", ()=>{ _finTap=Date.now(); });
+function prSetDone(row){
+  if(!row || !row.classList.contains("pr") || Date.now()-_finTap<700) return false;
+  const g=row.closest(".group"), ex=g&&g.dataset.ex; if(!setRowDone(row, ex)) return false;
+  const key=draftSig()+"|"+ex+"|"+[...g.querySelectorAll(".setrow")].indexOf(row);
+  if(_prCelebrated.has(key) || document.hidden) return false;   // hidden: celebrate() would skip it, so leave it to fire later
+  _prCelebrated.add(key);
+  const dr=draft[draftSig()]; if(dr) (dr.prc=dr.prc||[]).push(key);   // into the draft too (saved with its pending write)
+  // 96 pieces thrown up and out, so the next set's fields below stay readable while they're typed into
+  celebrate(1, { tile:[row, g], rings:0, cannon:9, pieces:96, up:true, minor:true, haptic:[0,55,45,90] });
+  return true;
 }
 // Inline editor for an exercise's sets + target rep range, straight from the workout screen.
 // Writes back to the active plan so the change sticks across sessions.
@@ -7062,7 +7102,7 @@ async function setActiveInjuries(map){
 let _pend={};                                                // pending { key: severity } while the sheet is open
 function openInjurySheet(){ _pend={}; activeInjuries().forEach(k=>_pend[k]=injSeverityFor(k)); renderInjurySheet(); openSheet("Injury"); }   // activeInjuries() also migrates any old array form
 function injSegHTML(k){ const sev=_pend[k];                  // per-injury 3-way intensity picker
-  return '<div class="seg appearance injsev" data-inj="'+k+'">'+[1,2,3].map(n=>{ const l=SEV_LABEL[n];
+  return '<div class="seg appearance injsev" data-inj="'+k+'" aria-label="'+esc(INJ_LABEL[k]||k)+' intensity">'+[1,2,3].map(n=>{ const l=SEV_LABEL[n];
     return '<div class="s'+(n===sev?" active":"")+'" data-sev="'+n+'">'+l.charAt(0).toUpperCase()+l.slice(1)+'</div>'; }).join('')+'</div>'; }
 function renderInjurySheet(){
   const keys=Object.keys(_pend);
@@ -7107,8 +7147,10 @@ $("exlist").addEventListener("click", e=>{ const a=e.target.closest(".tgedit"); 
 // over-rep nudge: load the suggested heavier weight into empty rows
 $("exlist").addEventListener("click", e=>{ const b=e.target.closest(".cuebtn.addw"); if(!b) return; e.preventDefault();
   const g=b.closest(".group"), wv=b.dataset.w; if(!g||!wv) return; let any=false;
-  g.querySelectorAll(".setrow").forEach(r=>{ const wEl=r.querySelector(".w"); if(wEl && !wEl.value.trim()){ wEl.value=wv; updateSetVol(r, g.dataset.ex); any=true; } });
-  if(any){ if(!timer.running && timer.elapsed===0) tmrStart(); captureDraft(); toast("Loaded "+wv+"kg — chase the lower end of your range."); } });
+  const filled=[];
+  g.querySelectorAll(".setrow").forEach(r=>{ const wEl=r.querySelector(".w"); if(wEl && !wEl.value.trim()){ wEl.value=wv; updateSetVol(r, g.dataset.ex); any=true; filled.push(r); } });
+  if(any){ if(!timer.running && timer.elapsed===0) tmrStart(); captureDraft(); toast("Loaded "+wv+"kg — chase the lower end of your range.");
+    filled.some(r=>prSetDone(r)); } });   // a row that already had its reps is now a completed set: the first PR among them bursts
 // over-rep nudge: bump this exercise's target range up one bracket, saved to the plan
 $("exlist").addEventListener("click", async e=>{ const b=e.target.closest(".cuebtn.raise"); if(!b) return; e.preventDefault();
   const xi=+b.dataset.i, p=activePlan(), w=p&&p.workouts[curWk], ex=w&&w.ex[xi]; if(!ex) return;
@@ -7627,7 +7669,7 @@ function renderCardioChips(){
     : "Log a sport or activity. It counts toward your weekly cardio by how aerobic it is; the strength-y ones (climbing, martial arts) also add a little to your muscle balance.";
   const zw=$("cdZoneChips"); zw.innerHTML="";
   CZONES.forEach(z=>{ const c=document.createElement("button"); c.className="chip"+(cdZone===z.z?" on":"");
-    c.innerHTML=z.lbl+' <small style="opacity:.55">'+z.sub+'</small>';
+    c.innerHTML=z.lbl+' <small class="chipsub">'+z.sub+'</small>';
     c.onclick=()=>{ cdZone=z.z; renderCardioChips(); updateCardioPreview(); }; zw.appendChild(c); });
 }
 function renderCardioLog(){
@@ -7820,7 +7862,7 @@ function renderBaseActivity(){
   const sum=$("baseActSummary"); if(sum) sum.innerHTML = "Daily activity" + (cur?' <span style="color:var(--l3);font-weight:400;">· '+esc(cur.lbl)+'</span>':"");
   cw.innerHTML="";
   OCCUPATION_LEVELS.forEach(o=>{ const c=document.createElement("button"); c.className="chip"+(settings.baseActivity===o.k?" on":"");
-    c.innerHTML=esc(o.lbl)+' <small style="opacity:.55">'+esc(o.sub)+'</small>';
+    c.innerHTML=esc(o.lbl)+' <small class="chipsub">'+esc(o.sub)+'</small>';
     c.onclick=()=>setBaseActivity(o.k); cw.appendChild(c); });
   const stat=$("baseActStat"), hint=$("baseActHint"), cite=$("baseActCite");
   if(!cur){ if(stat) stat.style.display="none";
@@ -8225,7 +8267,7 @@ function renderStarsSheet(anim){
     h+='<div class="ed-label">'+esc(STAR_COPY.yourWeek)+'</div>'+starTargetHTML();
     const cur=starWeekId(), why=(st.light||{})[cur], live=starLiveWhy(cur);
     h+='<div class="ed-label">'+esc(STAR_COPY.light)+'</div><div class="group"><div class="pad">'+swRow("stLight", STAR_COPY.lightSw, !!why || !!live, !!live)
-      +((why||live) ? '<div class="chips wrap">'+Object.keys(STAR_LIGHT).map(k=>'<button type="button" class="chip'+(k===(live||why)?' on':'')+'" data-why="'+k+'"'+(live?' disabled':'')+'>'+esc(STAR_LIGHT[k])+'</button>').join('')+'</div>' : '')
+      +((why||live) ? '<div class="chips wrap one">'+Object.keys(STAR_LIGHT).map(k=>'<button type="button" class="chip'+(k===(live||why)?' on':'')+'" data-why="'+k+'"'+(live?' disabled':'')+'>'+esc(STAR_LIGHT[k])+'</button>').join('')+'</div>' : '')
       +'<p class="levelcap">'+esc(live ? starCopy("lightAuto",{why:STAR_LIGHT[live].toLowerCase()}) : STAR_COPY.lightHelp)+'</p></div></div>';
   }
   h+='<div class="ed-label">'+esc(STAR_COPY.howTitle)+'</div><div class="group"><div class="pad"><p class="ovp">'+esc(STAR_COPY.how)+'</p><div class="chips wrap">'
@@ -8875,7 +8917,8 @@ function drawForecast(f, prog){
   for(let v=Math.ceil(ymin/step)*step; v<=ymax+1e-6; v+=step) ticks.push(v);
   const sgn=v=>(v>=0?"+":"")+v.toFixed(1)+"%";
   ctx.font=cfont(W,"tick"); const padL=Math.ceil(Math.max(...ticks.map(v=>ctx.measureText(v+"%").width)))+14;
-  ctx.font=cfont(W,"label"); const padR=Math.ceil(Math.max(ctx.measureText(sgn(f.plan.p50[x1])).width, ctx.measureText(sgn(f.pace.p50[x1])).width))+13;
+  ctx.font=cfont(W,"label"); const lpx=parseInt(ctx.font.split(" ")[1],10)||12, dotR=Math.max(2,lpx*.26);
+  const padR=Math.ceil(Math.max(ctx.measureText(sgn(f.plan.p50[x1])).width, ctx.measureText(sgn(f.pace.p50[x1])).width)+dotR*2+lpx*.35)+13;
   const X=w=> padL + (w/x1)*(W-padL-padR);
   const Y=v=> padT + (1-(v-ymin)/(ymax-ymin))*(H-padT-padB);
   ctx.font=cfont(W,"tick"); ctx.textAlign="right";
@@ -8897,8 +8940,11 @@ function drawForecast(f, prog){
   if(prog>=1){
     let yp=Y(f.plan.p50[x1]), yc=Y(f.pace.p50[x1]); if(Math.abs(yp-yc)<13){ const m=(yp+yc)/2; yp=m-7; yc=m+7; }
     ctx.font=cfont(W,"label"); ctx.textAlign="left";
-    ctx.fillStyle=accent; ctx.fillText(sgn(f.plan.p50[x1]), X(x1)+5, yp+4);
-    ctx.fillStyle=blue;   ctx.fillText(sgn(f.pace.p50[x1]), X(x1)+5, yc+4);
+    // ink numbers, each led by a dot in its line's colour (the colour stays on the mark, not the text)
+    const ink=(cs.getPropertyValue('--ink')||'#1c1c1e').trim();
+    const tag=(v,y,col)=>{ ctx.fillStyle=col; ctx.beginPath(); ctx.arc(X(x1)+5+dotR, y+4-lpx*.36, dotR, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle=ink; ctx.fillText(sgn(v), X(x1)+5+dotR*2+lpx*.35, y+4); };
+    tag(f.plan.p50[x1], yp, accent); tag(f.pace.p50[x1], yc, blue);
   }
   const lg=$("fcLegend"); if(lg) lg.innerHTML='<span class="fclg"><i style="background:'+accent+'"></i>this plan</span><span class="fclg"><i style="background:'+blue+'"></i>current pace</span><span class="fclg"><i class="fcbandi"></i>10–90% range</span>';
 }
@@ -10384,7 +10430,7 @@ function showShareCard(){
     : S.session ? "Workout complete" : "";   // the title names the card being shown
 }
 if($("shareKind")) $("shareKind").querySelectorAll(".s").forEach(el=>{ const go=()=>{ if(!_shareSt || _shareSt.k===el.dataset.k) return; _shareSt.k=el.dataset.k; haptic(8); showShareCard(); };
-  el.onclick=go; el.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); go(); } }; });
+  el.onclick=go; });   // Space / Enter / arrows: the shared picker helper (segSync)
 if($("shareSess")) $("shareSess").onchange=e=>{ if(_shareSt){ _shareSt.sess=e.target.checked; showShareCard(); } };
 function shareImage(save){
   if(!_shareCanvas) return;
@@ -10449,6 +10495,63 @@ if(window.supabase && window.__cloudInit) window.__cloudInit();
 // DYNAMIC viewport and reports ~62px short on a cold launch (not initialized until a geometry change), so it
 // REINTRODUCED the very bug it tried to fix. 100vh is the static large viewport and is correct from cold
 // start in standalone mode. Removing the JS lets 100vh actually apply.
+
+// ---- segmented pickers: one radiogroup for every .seg / .sexseg row ----
+// role=radiogroup on the row, role=radio and a roving tabindex on each option, aria-checked mirrored from .active.
+// A MutationObserver keeps that in step, so every existing classList.toggle("active") and every generated row
+// (injury severity, the star target, the Learn filter) is covered. Arrows / Home / End move AND select by clicking
+// the option, and Space / Enter click it, so each row's own onclick stays its one handler.
+const SEG_ROW=".seg, .sexseg";
+let _segLbl=0;
+function segSync(row){
+  if(!row.hasAttribute("role")) row.setAttribute("role","radiogroup");
+  if(!row.hasAttribute("aria-label") && !row.hasAttribute("aria-labelledby")){   // no name of its own: the label just above it
+    let l=null;
+    if(row.parentElement && row.parentElement.classList.contains("merow")) l=row.parentElement.querySelector(":scope > label");
+    for(let p=row.previousElementSibling; !l && p; p=p.previousElementSibling){
+      if(p.matches(".ed-label, label")) l=p; else if(!p.matches("p")) break; }   // past an intro line, never past another control
+    if(l){ if(!l.id) l.id="seglbl"+(++_segLbl); row.setAttribute("aria-labelledby", l.id); } }
+  const opts=[...row.children].filter(o=>o.classList.contains("s")), act=opts.find(o=>o.classList.contains("active"));
+  opts.forEach(o=>{ const on=o===act, ti=(on || (!act && o===opts[0])) ? 0 : -1;
+    if(o.getAttribute("role")!=="radio") o.setAttribute("role","radio");
+    if(o.getAttribute("aria-checked")!==String(on)) o.setAttribute("aria-checked", String(on));
+    if(o.getAttribute("tabindex")!==String(ti)) o.setAttribute("tabindex", String(ti)); });   // the attribute: a bare <div> already reports tabIndex -1
+}
+document.querySelectorAll(SEG_ROW).forEach(segSync);
+new MutationObserver(recs=>{ const rows=new Set();
+  for(const r of recs){
+    if(r.type==="attributes"){ const t=r.target; if(t.classList.contains("s") && t.parentElement && t.parentElement.matches(SEG_ROW)) rows.add(t.parentElement); continue; }
+    if(r.target.matches && r.target.matches(SEG_ROW)) rows.add(r.target);
+    r.addedNodes.forEach(n=>{ if(n.nodeType!==1) return; if(n.matches(SEG_ROW)) rows.add(n);
+      if(n.firstElementChild) n.querySelectorAll(SEG_ROW).forEach(x=>rows.add(x)); });
+  }
+  rows.forEach(segSync);
+}).observe(document.body, { subtree:true, childList:true, attributes:true, attributeFilter:["class"] });
+// click an option and keep focus on it. A row may be re-rendered by its own click (the Learn filter refills it; injury
+// severity and the star target are rebuilt with their sheet), so remember where it was: its id, its injury key, or its
+// place on the page
+function segPick(row, tgt){
+  const k=[...row.children].indexOf(tgt), at=[...document.querySelectorAll(SEG_ROW)].indexOf(row), id=row.id, inj=row.dataset.inj;
+  tgt.click();
+  const r2 = row.isConnected ? row : (id && document.getElementById(id)) || (inj && document.querySelector('.injsev[data-inj="'+inj+'"]'))
+    || document.querySelectorAll(SEG_ROW)[at] || null;
+  if(!r2) return;
+  segSync(r2);   // now, not on the observer's next tick, so the option is focusable before it is focused
+  if($("confirmWrap").classList.contains("show")){ $("cYes").focus(); return; }   // the pick asked first (#wkMode mid-session): the question has focus
+  const now = tgt.isConnected ? tgt : r2.children[k]; if(now) now.focus();
+}
+document.addEventListener("keydown", e=>{
+  const o=e.target; if(!o.classList || !o.classList.contains("s")) return;
+  const row=o.parentElement; if(!row || !row.matches(SEG_ROW)) return;
+  if(e.key===" " || e.key==="Enter"){ e.preventDefault(); segPick(row, o); return; }
+  const opts=[...row.children].filter(x=>x.classList.contains("s") && !x.hidden), i=opts.indexOf(o), n=opts.length;
+  const j = e.key==="ArrowRight"||e.key==="ArrowDown" ? (i+1)%n : e.key==="ArrowLeft"||e.key==="ArrowUp" ? (i-1+n)%n
+    : e.key==="Home" ? 0 : e.key==="End" ? n-1 : -1;
+  if(j<0 || j===i) return;
+  e.preventDefault(); const tgt=opts[j];
+  if(tgt.classList.contains("active")){ segSync(row); tgt.focus(); return; }   // never re-click a picked option (#wkMode's Surprise reshuffles)
+  segPick(row, tgt);
+});
 
 // Offline support: register the service worker when served over HTTPS (e.g. GitHub Pages).
 // Skipped silently on file:// so opening the raw file still works.

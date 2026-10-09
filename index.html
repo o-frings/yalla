@@ -93,10 +93,10 @@
 <!-- WORKOUT -->
 <!-- Two ways to start: a data-picked session (leads), or switch the program you're on. -->
 <!-- how you start: a segmented switch — let the app surprise you, or follow your plan -->
-<div class="seg wkseg" id="wkMode">
-  <div class="s" data-wm="free">Free</div>
-  <div class="s" data-wm="plan">Plan</div>
-  <div class="s" data-wm="surprise">Surprise me</div>
+<div class="seg wkseg" id="wkMode" aria-label="How to start">
+  <div class="s" data-wm="free"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/></svg>Free</div>
+  <div class="s" data-wm="plan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Plan</div>
+  <div class="s" data-wm="surprise"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/><circle cx="15" cy="15" r="1.2" fill="currentColor"/><circle cx="15" cy="9" r="1.2" fill="currentColor"/><circle cx="9" cy="15" r="1.2" fill="currentColor"/></svg>Surprise me</div>
 </div>
 <div class="utabs" id="seg"></div>
 <div id="startAction"></div>
@@ -180,7 +180,7 @@
   <input type="file" id="cdGpx" accept=".gpx,application/gpx+xml,application/octet-stream" style="display:none;">
   <div id="cdRoutePrev" style="display:none;margin-bottom:4px;"></div>
   <div class="ed-label">Activity</div>
-  <div class="chips wrap" id="cdActChips"></div>
+  <div class="chips wrap one" id="cdActChips"></div>
   <div id="cdRun" style="display:none;">
     <div class="ed-label">Run details <span class="subhint">— fill any two</span></div>
     <div class="runrow">
@@ -194,7 +194,7 @@
     <div class="meinput"><input id="cdMin" type="number" inputmode="numeric" placeholder="—"><span class="unit">min</span></div>
   </div>
   <div class="ed-label">Effort zone</div>
-  <div class="chips wrap" id="cdZoneChips"></div>
+  <div class="chips wrap one" id="cdZoneChips"></div>
   <div class="ed-label">Heart rate &amp; effort <span class="subhint">— optional</span></div>
   <div class="runrow">
     <div class="rfield"><input id="cdHr" type="number" inputmode="numeric" placeholder="—"><span>avg bpm</span></div>
@@ -349,7 +349,7 @@
       </summary>
       <div class="scbody">
     <div class="ed-label">Main objective</div>
-    <div class="chips wrap" id="objChips">
+    <div class="chips wrap one" id="objChips">
       <button class="chip" data-v="muscle">Build muscle</button><button class="chip" data-v="strength">Get stronger</button>
       <button class="chip" data-v="fatloss">Lose fat</button><button class="chip" data-v="fitness">Stay fit</button>
     </div>
@@ -451,7 +451,7 @@
     <details class="mefold" id="baseActFold">
       <summary id="baseActSummary">Daily activity</summary>
       <p class="levelcap" id="baseActIntro" style="margin:0 0 10px;">How active is a typical week for you — job, study and getting around — before any training?</p>
-      <div class="chips wrap" id="baseActChips"></div>
+      <div class="chips wrap one" id="baseActChips"></div>
       <div class="otherprev" id="baseActStat" style="display:none;"></div>
       <div class="levelcap" id="baseActHint"></div>
       <div class="actcite" id="baseActCite" style="display:none;"></div>
@@ -481,14 +481,14 @@
 
         <div class="ed-label">Coach tips</div>
         <p class="levelcap" style="margin:0 0 8px;">How often a research-backed tip appears on your overview.</p>
-        <div class="seg appearance" id="tipSeg">
+        <div class="seg appearance" id="tipSeg" aria-label="How often coach tips appear">
           <div class="s" data-te="2">Often</div>
           <div class="s" data-te="3">Normal</div>
           <div class="s" data-te="6">Rarely</div>
           <div class="s" data-te="0">Off</div>
         </div>
         <p class="levelcap" style="margin:8px 0;">Which tips you see. <b>All</b> draws evenly from the whole library; <b>Prefer goal</b> leans toward your main objective; <b>Goal only</b> sticks to it. Either way, a tip you've just seen won't come back up soon.</p>
-        <div class="seg appearance" id="tipModeSeg">
+        <div class="seg appearance" id="tipModeSeg" aria-label="Which coach tips">
           <div class="s" data-tm="all">All</div>
           <div class="s" data-tm="prefer">Prefer goal</div>
           <div class="s" data-tm="focus">Goal only</div>
@@ -507,7 +507,7 @@
         <span class="sctitle">Appearance</span>
       </summary>
       <div class="scbody">
-        <div class="seg appearance" id="appSeg" style="margin-top:0;">
+        <div class="seg appearance" id="appSeg" aria-label="Appearance" style="margin-top:0;">
           <div class="s" data-th="auto">Auto</div>
           <div class="s" data-th="light">Light</div>
           <div class="s" data-th="dark">Dark</div>
@@ -646,7 +646,7 @@
         <span class="codeval" id="myCode">—</span>
         <button class="btn tinted sm" id="copyCode" style="flex:0 0 auto;">Copy</button>
       </div>
-      <p class="levelcap" style="margin:8px 0 0; line-height:1.45;">Give this code to a friend — they enter it above to follow you. <span id="inviteBtn" style="color:var(--tint-ink); cursor:pointer;">Share a link instead<span class="ovchev lnkchev">›</span></span></p>
+      <p class="levelcap" style="margin:8px 0 0; line-height:1.45;">Give this code to a friend — they enter it above to follow you. <span id="inviteBtn" class="inlink">Share a link instead<span class="ovchev lnkchev">›</span></span></p>
       <div id="suggList"></div>
       <!-- settings cluster, grouped at the bottom -->
       <div class="fsettings">
@@ -674,7 +674,7 @@
     <div class="avpreview" id="avPreview"></div>
     <div style="display:flex; justify-content:space-between; align-items:center;">
       <span class="ed-label" style="margin-top:0;">Generated art</span>
-      <span id="avShuffle" style="color:var(--tint-ink); font-weight:600; cursor:pointer; font-size:var(--t-md);">🎲 Shuffle</span>
+      <span id="avShuffle" class="inlink" style="font-weight:600; font-size:var(--t-md);">🎲 Shuffle</span>
     </div>
     <div class="emojigrid" id="avArt"></div>
     <div class="ed-label">Quick characters</div>
@@ -690,7 +690,7 @@
     <div class="swatches" id="avSwatches"></div>
     <div class="ed-label">Symbol</div>
     <div class="emojigrid" id="avEmojis"></div>
-    <p class="levelcap" style="margin:10px 0 0;">Pick an emoji, or choose <b id="avInitials" style="color:var(--tint-ink); cursor:pointer;">your initials</b> instead.</p>
+    <p class="levelcap" style="margin:10px 0 0;">Pick an emoji, or choose <b id="avInitials" class="inlink">your initials</b> instead.</p>
   </div>
 </div>
 
@@ -753,7 +753,7 @@
 
     <div id="otherMuscle">
       <div class="ed-label">What did you train?</div>
-      <div class="chips wrap" id="otherMuscleChips"></div>
+      <div class="chips wrap one" id="otherMuscleChips"></div>
       <div class="ed-label">Intensity <span class="subhint">— relative to your usual</span></div>
       <div class="seg appearance otherint" data-int="m">
         <div class="s" data-i="low">Low</div><div class="s active" data-i="med">Medium</div><div class="s" data-i="high">High</div>
@@ -782,7 +782,7 @@
     </div>
 
     <div class="ed-label">Main objective</div>
-    <div class="chips wrap bchips" data-k="obj">
+    <div class="chips wrap bchips one" data-k="obj">
       <button class="chip on" data-v="muscle">Build muscle</button><button class="chip" data-v="strength">Get stronger</button>
       <button class="chip" data-v="fatloss">Lose fat</button><button class="chip" data-v="fitness">General fitness</button>
     </div>
@@ -804,7 +804,7 @@
     <div class="progverd v-more" id="buildOutlook" style="margin:8px 0 2px;"><span class="pvdot"></span><span>Pick your days and split to project muscle growth.</span></div>
 
     <div class="ed-label">Where will you train?</div>
-    <div class="chips wrap bchips" data-k="access">
+    <div class="chips wrap bchips one" data-k="access">
       <button class="chip on" data-v="gym">Full gym</button><button class="chip" data-v="park">Park</button>
       <button class="chip" data-v="home">Home only</button><button class="chip" data-v="mostly_home">Mostly home</button>
       <button class="chip" data-v="mostly_gym">Mostly gym</button><button class="chip" data-v="kb">Kettlebell only</button>
@@ -821,7 +821,7 @@
     </div>
 
     <div class="ed-label">Split <span class="subhint">— how your week is divided</span></div>
-    <div class="chips wrap" id="buildSplitChips"></div>
+    <div class="chips wrap one" id="buildSplitChips"></div>
 
     <div class="ed-label">Supersets <span class="subhint">— pair moves to save time</span></div>
     <div class="seg appearance bopt" data-k="supersets">
@@ -967,11 +967,11 @@
   <div class="sheethdr"><span class="t" id="swapTitle">Swap</span><button class="btn plain sm" id="swapClose">Done</button></div>
   <div class="sheetbody">
     <p class="sheetintro">Pick any exercise for the same muscle group.</p>
-    <div class="seg appearance" id="swapScope">
+    <div class="seg appearance" id="swapScope" aria-label="Swap for">
       <div class="s active" data-scope="today">Just today</div>
       <div class="s" data-scope="perm">Permanently</div>
     </div>
-    <div class="seg appearance" id="swapLevelSeg">
+    <div class="seg appearance" id="swapLevelSeg" aria-label="Equipment">
       <div class="s active" data-lv="gym">Full gym</div>
       <div class="s" data-lv="park">Park</div>
       <div class="s" data-lv="none">No equipment</div>
@@ -1006,13 +1006,13 @@
   <div class="sheethdr"><span class="t">Add exercise</span><button class="btn plain sm" id="addClose">Done</button></div>
   <div class="sheetbody">
     <input id="addSearch" placeholder="Search, or type a new exercise">
-    <div class="seg appearance" id="addLevelSeg" style="margin-top:12px;">
+    <div class="seg appearance" id="addLevelSeg" aria-label="Equipment" style="margin-top:12px;">
       <div class="s active" data-lv="gym">Full gym</div>
       <div class="s" data-lv="park">Park</div>
       <div class="s" data-lv="none">No equipment</div>
     </div>
     <p class="levelcap">What you can train with right now — full gym, a calisthenics park, or nothing at all.</p>
-    <div class="chips" id="addChips"></div>
+    <div class="chips one" id="addChips"></div>
     <div class="sortbar"><button class="sortbtn" data-sort-btn></button></div>
     <div id="addList" style="margin-top:8px;"></div>
   </div>
@@ -1132,7 +1132,7 @@
   <div class="sheethdr"><span class="t">Travel mode</span><button class="btn plain sm" id="travelClose">Done</button></div>
   <div class="sheetbody">
     <p class="sheetintro">Away from your usual gym? Tag your sessions so you can see how travel shifts your training. An ✈ badge stays pinned to every page while it's on — tap it to come back here.</p>
-    <div class="seg appearance" id="travelSeg">
+    <div class="seg appearance" id="travelSeg" aria-label="Where you are training">
       <div class="s" data-tv="off">Home</div>
       <div class="s" data-tv="gym">Full gym</div>
       <div class="s" data-tv="partial">Partial</div>
@@ -1197,7 +1197,7 @@
     <div class="sheetlead"><div class="lh" id="cdcLead"></div><div class="lc">Your conditioning over time — minutes, how your effort is spread across easy and hard, and how your pace is trending. Tracked on its own, separate from muscle balance.</div></div>
     <div id="cdcSummary"></div>
     <div class="ed-label">Cardio goal <span class="subhint">— sets your weekly target</span></div>
-    <div class="chips wrap" id="cdcGoalChips"></div>
+    <div class="chips wrap one" id="cdcGoalChips"></div>
     <div class="levelcap" id="cdcGoalHint"></div>
     <div class="ed-label">Weekly minutes <span class="subhint">— last 10 weeks vs target</span></div>
     <canvas id="cdcMinsC" class="progchart" width="660" height="180"></canvas>
@@ -1206,7 +1206,7 @@
     <div class="proglegend" id="cdcZoneLegend"></div>
     <div id="cdcPaceWrap">
       <div class="ed-label">Pace trend <span class="subhint">— higher is faster</span></div>
-      <div class="chips wrap" id="cdcPaceChips" style="margin-bottom:6px;"></div>
+      <div class="chips wrap one" id="cdcPaceChips" style="margin-bottom:6px;"></div>
       <canvas id="cdcPaceC" class="progchart" width="660" height="180"></canvas>
       <div class="progcap" id="cdcPaceCap"></div>
     </div>
@@ -1221,7 +1221,7 @@
   <div class="sheetbody">
     <p class="sheetintro">Every piece of coaching advice in Yalla, with the research behind it. Tap any card to open the study.</p>
     <input id="libSearch" type="search" placeholder="Search advice…">
-    <div class="seg wrap" id="libChips" style="flex-wrap:wrap; gap:6px; margin-bottom:14px;"></div>
+    <div class="seg wrap" id="libChips" aria-label="Category" style="margin-bottom:14px;"></div>
     <div id="libList"></div>
   </div>
 </div>
