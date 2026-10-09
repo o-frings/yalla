@@ -213,9 +213,9 @@
      The glow: the accent's first hue upper left, its second hue right of centre, a third pool low on the page. */
   body::before{ content:""; position:fixed; top:0; left:0; right:0; height:100vh; z-index:-1; pointer-events:none;
     background:
-      radial-gradient(120% 52% at 22% 14%, var(--glow-a) 0%, transparent 72%),
-      radial-gradient(110% 50% at 92% 58%, var(--glow-b) 0%, transparent 72%),
-      radial-gradient(100% 40% at 12% 100%, var(--glow-c) 0%, transparent 70%),
+      radial-gradient(95% 48% at 42% 46%, var(--glow-a) 0%, transparent 72%),
+      radial-gradient(85% 42% at 66% 58%, var(--glow-b) 0%, transparent 72%),
+      radial-gradient(90% 34% at 30% 78%, var(--glow-c) 0%, transparent 70%),
       var(--bg);
     transition:background .25s ease; }
 
@@ -223,7 +223,7 @@
   .sheet{ --surface:var(--row); --surface-line:transparent; --surface-shadow:none; --surface-r:var(--r-md); }
   .group,.panel,.profcard,.insight,.setcard,.planrow,.igroup,.pagebody > .stats{ background:var(--surface); border:.5px solid var(--surface-line);
     border-radius:var(--surface-r); box-shadow:var(--surface-shadow); margin-bottom:var(--gap-card); }
-  .group,.setcard,.igroup,.pagebody > .stats{ overflow:hidden; }
+  .group,.setcard,.igroup,.profcard,.pagebody > .stats{ overflow:hidden; }
   .pad,.panel,.profcard,.insight{ padding:var(--pad-card); }
   /* exercise picker / log rows: same cell look, list spacing */
   .planrow.exrow{ --surface-r:var(--r-md); --gap-card:var(--s2); }
@@ -373,9 +373,13 @@
   /* header controls: uniform, quiet icon buttons (no pill, no label) — one visual language */
   .modebtn{ flex:0 0 auto; align-self:center; display:inline-flex; align-items:center; justify-content:center; gap:0; background:none; color:var(--accent); border:none; font-family:inherit; padding:4px; border-radius:var(--r-sm); cursor:pointer; line-height:1; transition:transform .12s; -webkit-tap-highlight-color:transparent; }
   .modebtn:active{ transform:scale(.9); }
-  .modebtn .mic{ width:22px; height:22px; flex:0 0 auto; }
+  .modebtn .mic{ width:18px; height:18px; flex:0 0 auto; }
   #trainModeLbl{ display:none; }
-  .modebtn, .modebtn.travelbtn.on{ background:radial-gradient(circle 15px, var(--disc) 96%, transparent 100%); color:var(--disc-ink); }   /* a tinted disc inside the 44px box */
+  .modebtn, .modebtn.travelbtn.on{ position:relative; isolation:isolate; background:none; color:var(--on-accent); }
+  /* header icon buttons sit on a solid fade disc (like the Settings row tiles), inside the 44px box */
+  .modebtn::before, .largeTitle .ltmain .iconbtn::before{ content:""; position:absolute; left:50%; top:50%; width:32px; height:32px; margin:-16px 0 0 -16px;
+    border-radius:50%; background:var(--grad-fill); box-shadow:0 2px 8px -3px var(--accent-glow); z-index:-1; }
+  .largeTitle .ltmain .iconbtn::before{ width:34px; height:34px; margin:-17px 0 0 -17px; }
   .modebtn .mic-car{ display:none; }
   .modebtn.cardio .mic-str{ display:none; }
   .modebtn.cardio .mic-car{ display:inline; }
@@ -443,7 +447,8 @@
   /* clear this workout — at the foot of the page, shown whenever anything's been entered (updateClearBtn) */
   #abortBtn{ display:block; margin-top:calc(var(--gap-card)*2.5); color:var(--red-page); font-weight:var(--w-semi); }   /* well clear of Finish even before the session card shows */
   #abortBtn[hidden]{ display:none; }
-  .largeTitle .ltmain .iconbtn{ flex:0 0 auto; align-self:center; margin:-9px -12px -9px 0; color:var(--disc-ink); background:radial-gradient(circle 17px, var(--disc) 96%, transparent 100%); }   /* 49px hit box, 31px of layout; a tinted disc behind the glyph */
+  .largeTitle .ltmain .iconbtn{ flex:0 0 auto; align-self:center; margin:-9px -12px -9px 0; position:relative; isolation:isolate; color:var(--on-accent); background:none; }
+  .largeTitle .ltmain .iconbtn svg{ width:20px; height:20px; }   /* 49px hit box, 31px of layout; a tinted disc behind the glyph */
   #pageMe .pagebody{ margin-top:var(--s1); }
   .largeTitle small{ display:block; font-size:var(--t-md); font-weight:var(--w-med); color:var(--l2-page); letter-spacing:0; margin-top:8px; }
   /* a row that navigates somewhere (Friends sheet ⇄ Settings) */
@@ -749,8 +754,7 @@
   .emoji-cell{ background:none; border:none; font-size:var(--t-xl); line-height:1; cursor:pointer; padding:5px 0; border-radius:var(--r-sm); }
   .emoji-cell:active{ background:var(--tint), var(--card); transform:scale(1.2); }
   .sheethdr .t.tappable{ cursor:pointer; }
-  #ovMessages{ position:relative; padding:8px; margin-top:8px; color:var(--ink); }   /* themed like the other header icons; nudged down so its tap target clears the status-bar clock */
-  #ovMessages.has-unread{ color:var(--accent); }                   /* …accent only when there's an unread message */
+  #ovMessages{ position:relative; padding:8px; margin-top:8px; color:var(--on-accent); }   /* a fade disc like the other header icons (unread shows as the count badge); nudged down so its tap target clears the status-bar clock */
   #ovMessages .railnotch{ position:absolute; top:2px; right:2px; min-width:16px; height:16px; padding:0 4px; font-size:var(--t-xs); }
   .msgbadge[hidden]{ display:none; }   /* guard: the .msgbadge display rule otherwise overrides the hidden attribute */
   .msg-compose{ display:flex; gap:8px; align-items:center; padding-top:10px; margin-top:6px; border-top:.5px solid var(--sep); }
