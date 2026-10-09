@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
 
   const payload = JSON.stringify({
     title: "Yalla",
-    body: "No gym access right now? Train at home — a quick bodyweight session keeps your streak alive.",
+    body: "No gym access right now? A quick bodyweight session at home counts too.",
     url: "./",
     tag: "yalla-reminder",
   });

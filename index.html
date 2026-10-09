@@ -271,6 +271,11 @@
       <div class="stat"><div class="n" id="stSince">0</div><div class="k">Since deload</div></div>
       <div class="stat"><div class="n" id="stBeat">0</div><div class="k">Beat last</div></div>
     </div>
+    <!-- week stars, up top: the sky card and this week's line; tap opens the Stars sheet (renderStars). Hidden with stars off -->
+    <div class="mesky" id="meSky">
+      <div id="starSky" role="button" tabindex="0" aria-label="Open your stars"></div>
+      <div class="starweek" id="starWeek"></div>
+    </div>
     <!-- cross-gym proposal: shown only when the detector finds clusters and the split is still off -->
     <div id="gymCard" style="display:none;"></div>
     <div class="mezone rowzone">Your training<span class="tilebtns"><button class="tilereset" id="tileReset" type="button" style="display:none;">Reset</button><button class="tileedit" id="tileEdit" type="button">Edit</button></span></div>
@@ -423,16 +428,21 @@
 
     <div class="mezone">History</div>
     <div class="igroup">
-    <details class="mefold">
-      <summary>Achievements</summary>
-      <div class="achcap">Lifetime volume moved: <b id="achVol">—</b></div>
+    <!-- Stars & achievements: the year row sits above the milestone grid (the sky card is at the top of Me).
+         Built by renderStars() / renderAchievements(); stars switched off hides the top and renames the fold. -->
+    <details class="mefold" id="starFold">
+      <summary id="starFoldT">Stars &amp; achievements</summary>
+      <div id="starTop">
+        <div class="staryear" id="starYear" hidden></div>
+      </div>
+      <button type="button" class="starsoff" id="starOff" hidden>Week stars are off · Show them</button>
       <div class="achgrid" id="achGrid"></div>
     </details>
 
     <details class="mefold">
       <summary>Training calendar</summary>
       <div class="calcap" id="calCap"></div>
-      <div class="caldow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+      <div class="caldow" id="calDow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span><span class="calstar" aria-hidden="true"></span></div>
       <div class="calgrid" id="calGrid"></div>
     </details>
 
@@ -688,9 +698,16 @@
 <div class="scrim" id="scrimShare"></div>
 <div class="sheet" id="sheetShare">
   <div class="grabber"></div>
-  <div class="sheethdr"><span class="t">Workout complete</span><button class="btn plain sm" id="shareClose">Done</button></div>
+  <div class="sheethdr"><span class="t" id="shareT">Workout complete</span><button class="btn plain sm" id="shareClose">Done</button></div>
   <div class="sheetbody" style="text-align:center;">
+    <!-- Workout | Star: shown when the finish also earned this week's star (openShareTile); hidden for a star card alone -->
+    <div class="seg appearance sharekind" id="shareKind" role="radiogroup" aria-label="Card" hidden>
+      <div class="s active" data-k="workout" role="radio" tabindex="0" aria-checked="true">Workout</div>
+      <div class="s" data-k="star" role="radio" tabindex="-1" aria-checked="false">Star</div>
+    </div>
     <div id="sharePreview" class="sharepreview"></div>
+    <!-- the week card's session count is opt-out; nothing else on a star card is about your training -->
+    <label class="swrow sharesess" id="shareSessRow" hidden><span>Show sessions</span><input type="checkbox" class="livesw" id="shareSess" checked role="switch"><span class="liveswui acc" aria-hidden="true"></span></label>
     <div class="row" style="gap:8px; margin-top:16px;">
       <button class="btn wide" id="shareImgBtn">Share image</button>
       <button class="btn tinted wide" id="saveImgBtn">Save image</button>
@@ -1145,6 +1162,30 @@
     <div class="sheetlead"><div class="lh" id="ringsLead"></div><div class="lc">Each ring fills toward a weekly target — close them all to round out a strong week.</div></div>
     <div id="ringsBody"></div>
   </div>
+</div>
+
+<!-- STARS SHEET — your sky, completed figures, the weekly target, light week and the stars switches (openStarsSheet) -->
+<div class="scrim" id="scrimStars"></div>
+<div class="sheet" id="sheetStars">
+  <div class="grabber"></div>
+  <div class="sheethdr"><span class="t">Your stars</span><button class="btn plain sm" id="starsClose">Done</button></div>
+  <div class="sheetbody" id="starsBody"></div>
+</div>
+
+<!-- STARS INTRO — shown once after the first count of your history (maybeStarIntro) -->
+<div class="scrim" id="scrimStarIntro"></div>
+<div class="sheet" id="sheetStarIntro">
+  <div class="grabber"></div>
+  <div class="sheethdr"><span class="t">Week stars</span><button class="btn plain sm" id="starIntroClose">Done</button></div>
+  <div class="sheetbody" id="starIntroBody"></div>
+</div>
+
+<!-- ACHIEVEMENT DETAIL — a tapped milestone tile -->
+<div class="scrim" id="scrimAch"></div>
+<div class="sheet" id="sheetAch">
+  <div class="grabber"></div>
+  <div class="sheethdr"><span class="t">Milestone</span><button class="btn plain sm" id="achClose">Done</button></div>
+  <div class="sheetbody" id="achBody"></div>
 </div>
 
 <!-- CARDIO DETAIL SHEET -->

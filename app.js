@@ -1007,6 +1007,7 @@ async function sget(k){
   return (k in _mem)?_mem[k]:null;
 }
 async function sset(k,v){
+  if(_booting) return ssetQuiet(k,v);   // init's migrations and clocks are bookkeeping, not edits (see ssetQuiet)
   await _localSet(k,v);
   cloudMark(k,v);   // no-op unless signed in and k is a synced key
 }
@@ -1029,6 +1030,12 @@ const SUPA = {
 };
 const CLOUD_KEYS = ["plans","lastsets","bodyweight","history","extlog","settings","predledger","calib"]; // draft stays device-only
 let sb=null, cloudUser=null, _syncMeta={}, _pushTimers={};
+// Before a sign-in's first successful reconcile, no write goes up on its own: a blind push would lay this device's
+// stale row over a newer one (another device's stars, badges, deloads). cloudMark still stamps the key, so the
+// reconcile sees it as local-newer and folds the server row in before it pushes; _held lists the keys to push once
+// it has run. A failed reconcile (offline launch) is retried when the signal or the app comes back (cloudRetry).
+let _syncOwner=false, _authSeen=false, _reconciled=false, _reconcileP=null, _reconcileUid=null, _recTried=0, _retryTimer=null, _booting=true;
+const _held=new Set();
 // True once the friends-only hardening migration (supabase/schema-hardening.sql) is live —
 // detected by probing the `follows` table. Until then the activity table is world-readable, so
 // the client publishes SUMMARY ONLY (never exercises/weights) and hides the friends/visibility UI.
@@ -1071,9 +1078,12 @@ window.__cloudInit = async function(){
 
 async function handleAuth(user){
   const was = cloudUser && cloudUser.id;
-  cloudUser = user || null;
+  cloudUser = user || null; _authSeen=true;
   renderAccount();
   if(cloudUser && cloudUser.id !== was){
+    _reconciled=false; _recTried=0; _held.clear();
+    for(const k in _pushTimers) clearTimeout(_pushTimers[k]);   // a push queued for the previous account never lands in this one
+    try{
     await ensureProfile();
     await detectHardened();        // does this project have the friends-only schema yet?
     renderAccount(); renderFriends(); updateLiveRow();
@@ -1083,10 +1093,12 @@ async function handleAuth(user){
     processPendingAdd();           // act on a tap-to-follow invite link, if any
     if(pendingLiveView && dbHardened){ const id=pendingLiveView; pendingLiveView=null; openLiveView(id); }  // a "watch me live" push
     if(pendingDM && dbHardened){ const id=pendingDM; pendingDM=null; openDMFromLink(id); }                  // a "new message" push
+    }catch(e){}                    // the reconcile must still run: until it does, nothing is pushed
     await cloudReconcile();
     if(!settings.displayName) askDisplayName();   // first thing after signing in: how should I address you?
   } else if(!cloudUser){ dbHardened=false; teardownLive(); teardownMessages(); teardownGym();
     if(_presenceTimer){ clearInterval(_presenceTimer); _presenceTimer=null; }
+    starOwnBackfill();             // signed out after all: no reconcile is coming, so count the history now
     if(pendingAddCode){ toast("Sign in to follow your friend."); goAccount(); }
   }
 }
@@ -1099,7 +1111,7 @@ async function saveDisplayName(){
   settings.displayName=v; if(!settings.name) settings.name=v; await sset("settings",settings);
   if(cloudReady()){ try{ await sb.from("profiles").upsert({ user_id:cloudUser.id, display_name:v||(cloudUser.email||"Lifter").split("@")[0] }); }catch(e){} }
   $("nameWrap").classList.remove("show");
-  if($("ovGreet")) $("ovGreet").textContent=ovGreetWord()+((settings.displayName||settings.name)?", "+(settings.displayName||settings.name):"");
+  if($("ovGreet")) $("ovGreet").textContent=ovGreeting();
   if(typeof renderAccount==="function") renderAccount();
 }
 
@@ -1198,14 +1210,33 @@ async function ensureProfile(){
   }catch(e){}
 }
 
-// Mark a key dirty and debounce-push it to the cloud. Called on every sset.
+// Mark a key dirty and debounce-push it to the cloud. Called on every sset. Before the first reconcile: stamped, held.
 function cloudMark(k,v){
   if(k==="_syncMeta" || k==="__owner" || !cloudReady() || CLOUD_KEYS.indexOf(k)<0) return;
   _syncMeta[k]=Date.now(); _persistMeta();
   clearTimeout(_pushTimers[k]);
+  if(!_reconciled){ _held.add(k); cloudRetry(); return; }
   const ts=_syncMeta[k];
   _pushTimers[k]=setTimeout(()=>cloudPush(k, v, ts), 1200);
 }
+// bookkeeping writes (the star close-out, the tip and travel clocks): before the reconcile they stay local and
+// unstamped, after it they go up one tick past the row, so housekeeping never outranks another device's real edit
+async function ssetQuiet(k,v){
+  await _localSet(k,v);
+  if(!cloudReady() || CLOUD_KEYS.indexOf(k)<0) return;
+  if(!_reconciled){ _held.add(k); return; }
+  const ts=_syncMeta[k]=(_syncMeta[k]||0)+1; _persistMeta();   // one tick past the row: never outranks a real edit elsewhere
+  clearTimeout(_pushTimers[k]); _pushTimers[k]=setTimeout(()=>cloudPush(k, v, ts), 1200);
+}
+// a reconcile that failed (no signal) runs again on 'online', on return to the app, and — throttled — on a held write
+function cloudRetry(now){
+  if(!cloudReady() || _reconciled || !_recTried || _reconcileP) return;
+  const wait=15000-(Date.now()-_recTried);
+  if(now || wait<=0){ clearTimeout(_retryTimer); _retryTimer=null; cloudReconcile(); }
+  else if(!_retryTimer) _retryTimer=setTimeout(()=>{ _retryTimer=null; cloudRetry(true); }, wait);
+}
+window.addEventListener("online", ()=>cloudRetry(true));
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") cloudRetry(true); });
 async function cloudPush(k, v, ts){
   if(!cloudReady()) return;
   try{
@@ -1255,12 +1286,73 @@ function mergeHistory(localH, serverH){
   }
   return out;
 }
+// Stars, badges and deloads only ever grow, so settings' last-write-wins must not drop what the older side
+// earned. sv is the newer (adopted) row: its plain fields win; these are unioned (stars spec §7.5).
+// Every conflict resolves the same way whichever side is local, and keys/arrays keep the newer side's order, so two
+// devices converge on one row instead of pushing their own version back on every launch.
+const STAR_MODE_RANK={ n:3, l:2, bl:1, b:0 }, STAR_LIGHT_ORDER=["injury","deload","travel","busy"];   // injury: the one reason with its own credit rule
+function mergeGrowingSettings(lv, sv){
+  if(!lv || !sv || typeof lv!=="object" || typeof sv!=="object") return sv;
+  const out=Object.assign({}, sv), uni=(a,b)=>[...new Set([...(Array.isArray(a)?a:[]), ...(Array.isArray(b)?b:[])])];
+  const ls=lv.stars, ss=sv.stars;
+  if(ls && ss){
+    const st=Object.assign({}, ss), le=ls.earned||{}, se=ss.earned||{}, e={}, ll=ls.light||{}, sl=ss.light||{}, L={};
+    for(const k in ls) if(!(k in st)) st[k]=ls[k];
+    const pick=(a,b,rank)=> a==null ? b : b==null || a===b ? a : rank(a)!==rank(b) ? (rank(a)>rank(b) ? a : b) : String(a)<String(b) ? a : b;
+    const mr=m=>STAR_MODE_RANK[m]!=null ? STAR_MODE_RANK[m] : -1, lr=x=>{ const i=STAR_LIGHT_ORDER.indexOf(x); return i<0 ? -1 : STAR_LIGHT_ORDER.length-i; };
+    new Set([...Object.keys(se), ...Object.keys(le)]).forEach(k=>{ e[k]=pick(se[k], le[k], mr); });   // conflict: n > l > bl > b
+    new Set([...Object.keys(sl), ...Object.keys(ll)]).forEach(k=>{ L[k]=pick(sl[k], ll[k], lr); });   // injury > deload > travel > busy > others
+    st.earned=e; st.light=L; st.posted=uni(ss.posted, ls.posted);
+    // the Light week switch stamps its week (lightSet): the later stamp's value stands, absence included, so "off" sticks
+    const la=ls.lightSet||{}, sa=ss.lightSet||{}, LS=st.lightSet={};
+    new Set([...Object.keys(la), ...Object.keys(sa)]).forEach(id=>{ const w=(+sa[id]||0)>(+la[id]||0) ? ss : ls; LS[id]=Math.max(+la[id]||0, +sa[id]||0);
+      if(w.light && id in w.light) st.light[id]=w.light[id]; else delete st.light[id]; });
+    if(ls.celWk || ss.celWk) st.celWk=[ls.celWk||"", ss.celWk||""].sort().pop();   // one star moment a week, across devices
+    st.postDue=uni(ss.postDue, ls.postDue).filter(id=>st.posted.indexOf(id)<0);
+    if(!(ls.seededEmpty && ss.seededEmpty)) delete st.seededEmpty;   // the other side counted real history
+    if(ls.liveFrom || ss.liveFrom) st.liveFrom=[ls.liveFrom, ss.liveFrom].filter(Boolean).sort()[0];   // live judging began at the earlier empty seed
+    if(ls.deloadDueWk && ss.deloadDueWk) st.deloadDueWk=[ls.deloadDueWk, ss.deloadDueWk].sort()[0];   // one due deload, one light week
+    const sw=[starSeedWk(ls), starSeedWk(ss)].filter(Boolean).sort()[0]; if(sw) st.seedWk=sw;   // the late back-fill's cut-off: the earliest seed
+    out.stars=st;
+  } else if(ls) out.stars=ls;   // a pre-stars device pushed without them
+  if(lv.achUnlocked || sv.achUnlocked) out.achUnlocked=uni(sv.achUnlocked, lv.achUnlocked);
+  if(lv.achAt || sv.achAt){ const a=Object.assign({}, sv.achAt||{});
+    for(const k in (lv.achAt||{})){ const x=a[k], y=lv.achAt[k];   // the earlier timestamp; a number beats "h"
+      a[k] = x==null ? y : y==null ? x : typeof x!=="number" ? (typeof y==="number" ? y : x) : typeof y!=="number" ? x : Math.min(x,y); }
+    out.achAt=a; }
+  ["deloadAt","deloadsTaken"].forEach(k=>{ if(lv[k]!=null || sv[k]!=null) out[k]=Math.max(+lv[k]||0, +sv[k]||0); });
+  if(lv.consistPostWk || sv.consistPostWk) out.consistPostWk=[lv.consistPostWk||"", sv.consistPostWk||""].sort().pop();
+  return out;
+}
+// settings rows are compared by content, not key order: two devices that build the same record in a different
+// order must not keep pushing it back and forth
+function syncSame(k, a, b){
+  if(k!=="settings") return JSON.stringify(a)===JSON.stringify(b);
+  const canon=v=>Array.isArray(v) ? v.map(canon) : v && typeof v==="object" ? Object.keys(v).sort().reduce((o,x)=>(o[x]=canon(v[x]), o), {}) : v;
+  return JSON.stringify(canon(a))===JSON.stringify(canon(b));
+}
+// fold the server row into a local value that is about to go up (history/extlog: union; settings: growing fields)
+function syncFold(k, lv, sv, tomb){
+  if(sv==null || lv==null) return lv;
+  return k==="history" ? mergeHistory(lv, sv) : k==="extlog" ? mergeExtlog(lv, sv, tomb)
+    : k==="settings" ? mergeGrowingSettings(sv, Object.assign({}, lv, { extlogTomb:[...new Set([...(lv.extlogTomb||[]), ...(sv.extlogTomb||[])])] })) : lv;
+}
 // On login / launch: pull cloud rows, adopt any that are newer than local, push any local that are newer/missing.
-async function cloudReconcile(){
+// One at a time: a retry joins the reconcile already running for this account.
+function cloudReconcile(){
+  if(!cloudReady()) return Promise.resolve();
+  if(_reconcileP && _reconcileUid===cloudUser.id) return _reconcileP;
+  const run=()=>_cloudReconcile().finally(()=>{ if(_reconcileP===p) _reconcileP=null; if(_held.size) cloudRetry(); });
+  const p = _reconcileP ? _reconcileP.then(run) : run();
+  _reconcileP=p; _reconcileUid=cloudUser.id;
+  return p;
+}
+async function _cloudReconcile(){
   if(!cloudReady()) return;
+  _recTried=Date.now();
   let rows=[];
   try{ const { data, error } = await sb.from("user_data").select("key,value,updated_at"); if(error) throw error; rows=data||[]; }
-  catch(e){ return; }
+  catch(e){ cloudRetry(); return; }   // no signal: the held writes wait for the next try
   const server={}; rows.forEach(r=>{ server[r.key]={ v:r.value, ts:Date.parse(r.updated_at) }; });
 
   // A different account signing in on this device must never have the previous owner's data pushed into
@@ -1269,11 +1361,12 @@ async function cloudReconcile(){
   if(foreign){
     try{ const pre=await gatherData(); if(pre) await _localSet("_preSync", {t:Date.now(), owner:prevOwner, data:pre}); }catch(e){}
     for(const k of CLOUD_KEYS) await _localSet(k, null);
+    for(const k of Object.keys(settings)) delete settings[k]; Object.assign(settings, JSON.parse(SETTINGS_DEFAULT));   // the old owner's record stays out of memory too (same object: pending pushes hold it)
     _syncMeta={};
     toast("Signed in as a different account — this device now shows that account's data.", true);
   }
 
-  let adopted=false, snapped=false;
+  let adopted=false, snapped=false; const wrote={};   // wrote: what this pass left in storage per key (a later write differs)
   for(const k of CLOUD_KEYS){
     const localTs=_syncMeta[k]||0, s=server[k];
     if(s && s.ts>localTs){
@@ -1283,30 +1376,50 @@ async function cloudReconcile(){
       let adopt=s.v;
       if(k==="history" || k==="extlog" || k==="settings"){
         const lv=await sget(k);
-        if(k==="history") adopt=mergeHistory(lv, s.v);
+        if(k==="history") adopt=mergeHistory(s.v, lv);   // server first: same key order (and entry) as the row, so an unchanged union is not pushed back
         else if(k==="settings"){
           // settings stays last-write-wins, EXCEPT the tombstone list, which is append-only and must
           // survive from both sides or a delete made on one device comes back from the other
           adopt=s.v;
-          const union=[...new Set([...((lv&&lv.extlogTomb)||[]), ...((s.v&&s.v.extlogTomb)||[])])];
+          const union=[...new Set([...((s.v&&s.v.extlogTomb)||[]), ...((lv&&lv.extlogTomb)||[])])];
           if(union.length) adopt=Object.assign({}, s.v, {extlogTomb:union});
           // a device on a pre-accent build pushes rows with no accent — keep ours rather than drop it
           if(lv && lv.accent && !(adopt && adopt.accent)) adopt=Object.assign({}, adopt, {accent:lv.accent});
+          adopt=mergeGrowingSettings(lv, adopt);   // stars, badges, deloads: union, so a second device never wipes them
         }
         else {
           const tomb=[...new Set([...((settings&&settings.extlogTomb)||[]), ...(((server.settings&&server.settings.v)||{}).extlogTomb||[])])];
           adopt=mergeExtlog(lv, s.v, tomb);
         }
         // the union may be a superset of the server row — push it straight back so both sides agree
-        if(lv && JSON.stringify(adopt)!==JSON.stringify(s.v)) await cloudPush(k, adopt, Date.now());
+        if(lv && !syncSame(k, adopt, s.v)){ await cloudPush(k, adopt, s.ts+1); s.ts=s.ts+1; }
       }
-      await _localSet(k, adopt); _syncMeta[k]=s.ts; adopted=true;
+      await _localSet(k, adopt); _syncMeta[k]=s.ts; adopted=true; wrote[k]=JSON.stringify(adopt);
     }
-    else { const lv=await sget(k); if(lv!=null && (!s || localTs>s.ts)) await cloudPush(k, lv, localTs||Date.now()); }
+    else { let lv=await sget(k);
+      if(lv!=null && (!s || localTs>s.ts)){
+        // local is newer, but the server row may hold what only the other device has: fold it in before pushing
+        if(s && s.v!=null && (k==="history" || k==="extlog" || k==="settings")){
+          const tomb=[...new Set([...((settings&&settings.extlogTomb)||[]), ...(((server.settings&&server.settings.v)||{}).extlogTomb||[])])];
+          const m=syncFold(k, lv, s.v, tomb);
+          if(!syncSame(k, m, lv)){ lv=m; await _localSet(k, lv); adopted=true; }
+        }
+        const pts=localTs||Date.now(); await cloudPush(k, lv, pts); _syncMeta[k]=pts; wrote[k]=JSON.stringify(lv);
+      } }
   }
   _syncMeta.__owner=cloudUser.id;
   await _persistMeta();
+  _reconciled=true;
+  // held writes this pass did not already carry up (a quiet write on an unchanged row, or a write made while it ran):
+  // fold the server row in, as above, then push what storage holds now
+  const held=[..._held]; _held.clear();
+  for(const k of held){ let v=await sget(k); if(v==null || wrote[k]===JSON.stringify(v)) continue;
+    const s=server[k];
+    if(s && s.v!=null){ const m=syncFold(k, v, s.v, [...new Set([...((settings&&settings.extlogTomb)||[]), ...(((server.settings&&server.settings.v)||{}).extlogTomb||[])])]); if(!syncSame(k, m, v)){ v=m; await _localSet(k, v); adopted=true; } }
+    _syncMeta[k]=Math.max(_syncMeta[k]||0, s ? s.ts : 0)+1; await cloudPush(k, v, _syncMeta[k]); }
+  if(held.length) await _persistMeta();
   if(adopted || foreign) await reloadFromStore();
+  else if(settings.stars && settings.stars.seededEmpty){ starLateBackfill(); checkStars({silent:true}); renderStarsEverywhere(); }
 }
 // Re-hydrate the in-memory globals from storage after the sync layer changed them, then repaint.
 async function reloadFromStore(){
@@ -1316,6 +1429,8 @@ async function reloadFromStore(){
   ledger=(await sget("predledger"))||[]; calib=(await sget("calib"))||lgFreshCalib();
   if(!plans.length) plans=DEFAULT_PLANS.map(p=>JSON.parse(JSON.stringify(p)));
   if(!plans.find(p=>p.id===settings.activePlanId)) settings.activePlanId=plans[0].id;
+  starLateBackfill();
+  if(!settings.stars) seedStars(); else checkStars({silent:true});   // re-derive this + last week from the merged logs; a synced star was celebrated where it was earned
   applyTheme(); renderAll();
   // adopted settings can include avatar/display prefs synced from another device — refresh those surfaces
   if(typeof syncSelfAvatar==="function") syncSelfAvatar();
@@ -1369,18 +1484,61 @@ async function cloudPublish(session){
   if(dbHardened) row.level=eff;     // the level column only exists post-migration
   try{ await sb.from("activity").insert(row); }catch(e){}
 }
-// auto-post when all three weekly rings are closed (once per week; needs sign-in + sharing on)
+// auto-post when all three weekly rings are closed (needs sign-in + sharing on). Called from consistPost, i.e. only
+// from action handlers; the caller saves settings and shows the toast (ringsSharedToast).
 function weekKey(d){ d=d?new Date(d):new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-((d.getDay()+6)%7)); return d.toDateString(); }
-async function shareRingsClosed(sets){
-  if(!cloudReady() || (settings.shareLevel||0)<1) return;
-  const wk=weekKey(); if(settings.ringsSharedWk===wk) return;     // once per week
-  settings.ringsSharedWk=wk; await sset("settings",settings);
+function shareRingsClosed(sets){
+  if(!cloudReady() || (settings.shareLevel||0)<1) return false;
+  if(settings.consistPostWk===starWeekId() || settings.ringsSharedWk===weekKey()) return false;   // one consistency post a week
+  settings.consistPostWk=starWeekId(); settings.ringsSharedWk=weekKey();   // ringsSharedWk: still read by older builds
   const row={ user_id:cloudUser.id, kind:"rings",
     summary:{ name:"Closed all 3 rings this week 🎯", sets:Math.round(sets)||0, mins:0, prs:0, mtot:{}, lvl:1 } };
   if(dbHardened) row.level=1;
-  try{ await sb.from("activity").insert(row); }catch(e){}
-  toast("All rings closed — shared with your crew! 🎯", true);
+  activityInsert(row);
+  return true;
 }
+function activityInsert(row){ (async()=>{ try{ await sb.from("activity").insert(row); }catch(e){} })(); }   // best-effort, never awaited by the save flow
+// The friends feed's consistency posts (stars spec §6.5), sent only from action handlers, never from render. Stars
+// post a completed constellation or a star milestone (12/26/52/104), never a plain week, and only when signed in,
+// sharing at level ≥ 1 and "post completed constellations" is on. One consistency post a week (consistPostWk): a
+// star post wins over the closed rings; one that meets an earlier rings post that week waits in stars.postDue for
+// the next week. A completion that can't be posted is marked posted, so switching sharing on later never back-posts.
+// A completion whose moment starMoment held back (sr.quiet, an overreached week) waits in postDue too, and so does
+// everything due for the rest of that week (stars.postHold), so the feed never shows a star the user wasn't shown.
+// Returns { star, rings }: what was posted. The caller saves settings. o.rings:false (a setting, the deload button): no rings post.
+function consistPost(sr, o){
+  const out={ star:false, rings:false }, st=settings.stars, wk=starWeekId();
+  const can = cloudReady() && (settings.shareLevel||0)>=1;
+  if(st){
+    if(sr && sr.quiet) st.postHold=wk;
+    const P=new Set(st.posted||[]), live=[];
+    if(sr && !sr.silent){ if(sr.constellation) live.push("c:"+sr.constellation.id); if(sr.milestone) live.push("m:"+sr.milestone); }
+    const ids=[...new Set([...(st.postDue||[]), ...live])].filter(id=>!P.has(id));
+    if(ids.length){
+      if(!can || st.on===false || st.post===false){ st.posted=[...P, ...ids]; st.postDue=[]; }
+      else if(st.postHold===wk || settings.consistPostWk===wk || settings.ringsSharedWk===weekKey()) st.postDue=ids;
+      else {
+        // the newest figure names the post; its star count is the count at completion (a deferred post keeps it)
+        let at=0; const ends={}; SKY.forEach(f=>{ at+=f.pts.length; ends[f.id]=at; });
+        const figs=ids.filter(id=>id[0]==="c").map(id=>SKY.find(f=>"c:"+f.id===id)).filter(Boolean).sort((a,b)=>ends[a.id]-ends[b.id]);
+        const fig=figs[figs.length-1], m=Math.max(0, ...ids.filter(id=>id[0]==="m").map(id=>+id.slice(2)));
+        const n = fig ? ends[fig.id] : m;
+        const summary={ name: fig ? starCopy("feedConst",{name:fig.name, n}) : starCopy("feedMilestone",{n}), stars:n, mins:0, prs:0, mtot:{}, lvl:1 };
+        if(fig) summary.cst=fig.id;
+        const row={ user_id:cloudUser.id, kind:"stars", summary }; if(dbHardened) row.level=1;
+        activityInsert(row);
+        st.posted=[...P, ...ids]; st.postDue=[]; settings.consistPostWk=wk; settings.ringsSharedWk=weekKey();
+        out.star = live.some(id=>ids.includes(id));   // the toast says "shared" only for what landed just now
+        return out;
+      }
+    }
+  }
+  if(can && !(o && o.rings===false)){ const r=weekRings(); if(r && r.every(x=>x.val>=x.target)) out.rings=shareRingsClosed(r[1].val); }   // rings post: log handlers only
+  return out;
+}
+// the rings post's toast: after the moment's own toast, so a finish still shows one toast at a time
+function ringsSharedToast(cp){ if(!cp || !cp.rings) return;
+  const busy=$("toast").classList.contains("show"); setTimeout(()=>toast("All rings closed — shared with your crew! 🎯", true), busy?3000:0); }
 
 // ---- push reminders (signed-in only; a server cron sends the actual push — see PUSH-SETUP.md) ----
 function urlB64ToUint8(b64){ const pad="=".repeat((4-b64.length%4)%4); const s=(b64+pad).replace(/-/g,"+").replace(/_/g,"/"); const raw=atob(s); const a=new Uint8Array(raw.length); for(let i=0;i<raw.length;i++) a[i]=raw.charCodeAt(i); return a; }
@@ -2364,6 +2522,9 @@ function miniRadar(cv, tot){
   x.clearRect(0,0,W,H);
   drawRose(x, cx, cy, R, roseGroups(), roseTotals(tot), { color:g=>MCOLOR[g]||"#f08020", alpha:.72, rings:[0.5,1], grid:"rgba(127,127,127,.28)" });
 }
+// a stars feed post's picture: a 60px night-sky glyph of the completed figure (or the last one done at a milestone)
+function feedSkyHTML(s){ const f=SKY.find(x=>x.id===s.cst) || skyProgress(Math.max(0,+s.stars||0)).done.slice(-1)[0] || SKY[0];
+  return '<span class="starsky glyph feedsky'+(f.sky===2?' sky2':'')+'" aria-hidden="true">'+drawConstellation(f, f.pts.length, {w:60,h:60,box:[8,8,44,44],r:2.6,halo:false,bg:5})+'</span>'; }
 // Color-dot legend mapping rose wedges → trained muscles (sorted by share). `max` caps the count
 // (feed cards stay to a line; the detail sheet shows them all). Returns "" when nothing was trained.
 function muscleLegend(mt, max){
@@ -2409,20 +2570,23 @@ async function renderFeed(){
     const card=document.createElement("div"); card.style.cssText="padding:12px 4px; border-bottom:.5px solid var(--line);";
     const top=document.createElement("div"); top.style.cssText="display:flex; gap:12px; align-items:center;";
     const txt=document.createElement("div"); txt.style.cssText="flex:1; min-width:0;";
-    const stats=[ s.exN?s.exN+" ex":null, s.sets!=null?s.sets+" sets":null, s.vol?fmtKg(s.vol):null,
+    const isStars=s.stars!=null;   // a completed constellation / star milestone: a mini sky, no stats line
+    const stats=isStars ? "" : [ s.exN?s.exN+" ex":null, s.sets!=null?s.sets+" sets":null, s.vol?fmtKg(s.vol):null,
       s.mins?Math.round(s.mins)+" min":null, s.prs?s.prs+" PR"+(s.prs>1?"s":""):null ].filter(Boolean).join(" · ");
     const t=s.top, topLine = t&&t.name ? ("Top · "+t.name + (viewLvl>=3 && t.w>0 ? " · "+t.w+"kg×"+t.r : "")) : "";
     const mt=s.mtot||{}, hl=muscleLegend(mt, 3);
     const canOpen = viewLvl>=2 && s.ex && s.ex.length;
     txt.innerHTML='<div style="font-weight:600;">'+esc(who)+' · '+esc(s.name||"Workout")+'</div>'+
-      '<div class="levelcap" style="margin:4px 0 0;">'+esc(stats)+'</div>'+
+      (stats?'<div class="levelcap" style="margin:4px 0 0;">'+esc(stats)+'</div>':'')+
       (topLine?'<div class="levelcap" style="margin:2px 0 0;">'+esc(topLine)+'</div>':'')+
       (hl?'<div class="levelcap" style="margin:3px 0 0; opacity:.9;">'+hl+'</div>':'')+
       '<div class="levelcap" style="margin:2px 0 0; opacity:.7;">'+esc(agoStr(Date.parse(r.created_at)))+(canOpen?' · tap for detail<span class="ovchev lnkchev">›</span>':'')+'</div>';
-    const cv=document.createElement("canvas"); cv.width=72; cv.height=72; cv.style.cssText="flex:0 0 auto; width:60px; height:60px;";
+    let cv=null, art;
+    if(isStars){ const w=document.createElement("div"); w.innerHTML=feedSkyHTML(s); art=w.firstChild; }
+    else { cv=art=document.createElement("canvas"); cv.width=72; cv.height=72; cv.style.cssText="flex:0 0 auto; width:60px; height:60px;"; }
     const avt=document.createElement("div"); avt.style.cssText="flex:0 0 auto;"+(mine?"":" cursor:pointer;"); avt.innerHTML=avatarHTML(who,{size:44,uid:r.user_id});
     if(!mine) bindFriendTap(avt, r.user_id, who);   // tap → profile, long-press → chat
-    top.appendChild(avt); top.appendChild(txt); top.appendChild(cv); card.appendChild(top);
+    top.appendChild(avt); top.appendChild(txt); top.appendChild(art); card.appendChild(top);
     if(canOpen){ top.style.cursor="pointer"; top.onclick=()=>openWorkoutDetail(r, who, viewLvl); }
     // social actions (cheer + comment) — own posts can't be cheered
     if(r.id){
@@ -2436,11 +2600,11 @@ async function renderFeed(){
       bar.querySelector(".commbtn").onclick=()=>toggleComments(r, panel, bar.querySelector(".commc"));
     }
     list.appendChild(card);
-    miniRadar(cv, s.mtot||{});
+    if(cv) miniRadar(cv, s.mtot||{});
   });
   // urgency: a friend who trained in the last day gets surfaced at the top of the overview
   const host=$("ovBody"); if(host){ host.querySelectorAll(".ovfriend").forEach(el=>el.remove());
-    const fresh=rows.find(r=> r.user_id!==cloudUser.id && (Date.now()-Date.parse(r.created_at)) < 24*3600*1000);
+    const fresh=rows.find(r=> r.user_id!==cloudUser.id && !(r.summary||{}).stars && (Date.now()-Date.parse(r.created_at)) < 24*3600*1000);   // star posts never nudge: no comparing
     if(fresh){ const who=names[fresh.user_id]||"A friend", s=fresh.summary||{};
       const c=document.createElement("div"); c.className="group ovnudge ovfriend";
       c.innerHTML='<div class="pad"><div class="ovbig sm">'+esc(who)+' just trained 🔥</div><p class="ovp" style="margin-top:8px;">'+esc(s.name||"A workout")+' · '+esc(agoStr(Date.parse(fresh.created_at)))+' — your move?</p></div>';
@@ -2538,6 +2702,7 @@ function swapOptions(e){ const set=[]; const add=n=>{ if(n&&!set.includes(n)) se
   return set; }
 function dispName(e,xi){ return swaps[xi] || (rot[xi]!=null && !rotKeep.has(xi) ? rot[xi] : e.n); }
 let settings={ activePlanId:null, name:"", displayName:"", pointers:{}, sessions:0, sinceDeload:0, beatTotal:0, goalStart:null, goalTarget:null, heightCm:null, bodyfatPct:null, sex:null, age:null, exp:null, sponLen:null, meTileOrder:null, meTileHidden:null, theme:"auto", accent:"orange", restSec:180, shareActivity:false, shareLevel:null, planStartAt:null, discRead:{}, focusAreas:["balanced"], activeInjuries:{}, injurySeverity:2, weakSpots:[], slotDone:{}, baseActivity:null, favEx:[], gyms:[], gymSplit:0, extlogTomb:[] };
+const SETTINGS_DEFAULT=JSON.stringify(settings);   // a different account signing in starts from these (cloudReconcile)
 let curWk=0;            // index into active plan workouts
 let editing=null;       // plan object being edited (working copy)
 
@@ -2828,6 +2993,7 @@ function nextRotateIndex(p){
 
 async function init(){
   settings = Object.assign(settings, (await sget("settings"))||{});
+  _syncOwner = !!(((await sget("_syncMeta"))||{}).__owner);   // this device syncs an account: its first reconcile may bring another device's stars
   applyTheme();
   const stored = await sget("plans");
   plans = stored ? stored : JSON.parse(JSON.stringify(DEFAULT_PLANS));
@@ -2974,7 +3140,8 @@ async function init(){
     await sset("plans",plans); await sset("settings",settings);
   }
   if(!settings.activePlanId) settings.activePlanId = plans[0].id;
-  travelAccrue(); await sset("settings",settings);   // bank time in the current context + start this launch's clock
+  checkStars({silent:true});   // close-out: weeks earned while the app was closed are recorded, never celebrated (no-op before the seed)
+  travelAccrue(); await ssetQuiet("settings",settings);   // bank time in the current context + start this launch's clock
   const ni = nextRotateIndex(activePlan()); curWk = ni>=0?ni:0;
   await loadEvidence(); // load canonical evidence.json → builds the coach-tip pool + Learn library
   decideTip();          // pick this launch's coach tip (if any) before the first render
@@ -2999,9 +3166,13 @@ async function init(){
   renderAll();
   showTab("overview");   // open on the coach home
   hideSplash();          // UI is painted — fade out the launch splash
+  // first run of week stars: count the existing history after first paint, silently (seedStars no-ops once seeded)
+  if(!settings.stars || settings.stars.seededEmpty){ const seed=()=>{ if(settings.stars) return starOwnBackfill(); seedStars(); renderStarsEverywhere(); };
+    if(window.requestIdleCallback) requestIdleCallback(seed, {timeout:2000}); else setTimeout(seed, 300); }
   if(!settings.objective){ const ob=$("onboardWrap"); if(ob) ob.classList.add("show"); }   // ask the objective up front
   try{ if(location.hash && location.hash.indexOf("LIFTLOG1:")>=0){ openImport(decodeURIComponent(location.hash.slice(1))); } }catch(e){}
   maybeBackupNudge();
+  _booting=false;
 }
 // Gentle reminder to export a backup — phone storage can be cleared, so a months-old log shouldn't live only on-device.
 function maybeBackupNudge(){
@@ -3027,7 +3198,9 @@ function renderNav(){
   $("bwGoalTxt").textContent = settings.goalTarget!=null ? settings.goalTarget+" kg" : "—";
 }
 // ================= overview (coach home) =================
-function ovGreetWord(){ const h=new Date().getHours(); return h<5?"Still up?":h<12?"Good morning":h<18?"Good afternoon":"Good evening"; }
+function ovGreetWord(){ const h=new Date().getHours(); return h<5?"Still up":h<12?"Good morning":h<18?"Good afternoon":"Good evening"; }
+// "Good morning, Sam" — the late-night one is a question, so its "?" goes after the name
+function ovGreeting(){ const w=ovGreetWord(), nm=settings.displayName||settings.name; return w+(nm?", "+nm:"")+(w==="Still up"?"?":""); }
 function trainedToday(){ const t=new Date().toDateString(); return Object.keys(hist).some(n=>(hist[n]||[]).some(e=>new Date(e.d).toDateString()===t)); }
 // muscles the active plan actually intends to train (its objective) — so we flag what the plan targets, not what it deliberately skips
 function planScopeMuscles(plan){
@@ -3467,11 +3640,11 @@ function decideTip(){
     currentTip = pool[pick];
     ts.last[currentTip.id] = ts.opens;
   }
-  sset("settings", settings);
+  ssetQuiet("settings", settings);   // launch bookkeeping: never makes this row look newer before the reconcile
 }
 function renderOverview(){
   const host=$("ovBody"); if(!host) return;
-  $("ovGreet").textContent=ovGreetWord()+((settings.displayName||settings.name)?", "+(settings.displayName||settings.name):"");
+  $("ovGreet").textContent=ovGreeting();
   const due=(settings.sinceDeload||0)>=DELOAD_AT, p=activePlan(), w=p&&p.workouts[curWk], did=sessionToday();
   let h="";
   // --- Train-at-home nudge (2+ days since the last workout) ---
@@ -3479,12 +3652,12 @@ function renderOverview(){
   if(off>=2){
     h+='<div class="ed-label">'+off+' days off</div>';
     h+='<div class="group ovnudge"><div class="pad"><div class="ovbig sm">No gym access right now? Train at home!</div>'
-      +'<p class="ovp" style="margin-top:8px;">A quick bodyweight session keeps your streak alive — no equipment needed.</p>'
+      +'<p class="ovp" style="margin-top:8px;">A quick bodyweight session counts too, no equipment needed.</p>'
       +'<button class="btn wide ovhome" style="margin-top:16px;">Start a home workout</button></div></div>';
   }
   // a one-line motivator in the Today card (the full stats live on Me) — session-equivalents, so micro sessions count too
   const f7=sessionCredit(7);
-  const motiv = f7>=4?"Strong week — you’re putting in the work." : f7>=2?"Good momentum — keep it rolling." : f7>=1?"You’ve started — one more session lifts the whole week." : "Fresh week. The first session is the hardest — let’s go.";
+  const motiv = f7>=4?"Strong week — you’re putting in the work." : f7>=2?"Good momentum — keep it rolling." : f7>=1?"You’ve started — every session adds to the week." : "Fresh week. The first session is the hardest — let’s go.";
   // --- Today --- one label per card: the section label is the card's kicker
   h+='<div class="ed-label">'+(due?'Deload week':did?'Today':settings.surprise?'Surprise session':w?'Next session':'Today')+'</div>';
   if(due){
@@ -3499,10 +3672,13 @@ function renderOverview(){
   } else {
     h+='<div class="group ovtap ovstart"><div class="pad ovstartpad"><div class="ovstarttext"><div class="ovbig">Pick a plan to begin</div><div class="ovmeta">'+motiv+'</div></div><span class="ovchev">›</span></div></div>';
   }
+  h+=ovStarsHTML();   // --- Stars --- the sky in progress and this week's line; tap → the Stars sheet
   // --- Spotlight — the single most notable thing right now, with a real graph; celebrate a win or flag a gap ---
   const spot=spotlight();
   if(spot){
-    h+='<div class="ed-label spotlbl '+spot.kind+'"><span class="spotico">'+spot.ico+'</span>'+esc(spot.tag)+'</div>';
+    // the rings card header gets a small star once this week's star is in (nothing before: no partial meter here)
+    h+='<div class="ed-label spotlbl '+spot.kind+'"><span class="spotico">'+spot.ico+'</span>'+esc(spot.tag)
+      +(spot.rings && starWeekIn() ? '<span class="spotstar" role="img" aria-label="'+esc(STAR_COPY.spotlight)+'">'+starIcon()+'</span>' : '')+'</div>';
     h+='<div class="group ovtap ovspot '+spot.kind+'" id="ovSpot"><div class="pad">'
       +'<div class="spotbig">'+esc(spot.title)+'</div>'
       +'<div class="spotcap">'+esc(spot.detail)+'</div>'
@@ -3560,6 +3736,7 @@ function renderOverview(){
   const sp=host.querySelector(".ovspon"); if(sp) sp.onclick=openSpontaneous;
   const ll=host.querySelector("#ovLibLink"); if(ll) ll.onclick=e=>{ e.preventDefault(); e.stopPropagation(); openLibrary(); };   // sits inside the tip card's study link
   host.querySelectorAll(".ovtodo .ovtap").forEach(li=> li.onclick=()=>ovAct(li.dataset.act));
+  const os=$("ovStars"); if(os){ os.onclick=openStarsSheet; os.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); openStarsSheet(); } }; }
   if(spot && $("ovSpot")){
     if(spot.rings) drawSpotRings("ovSpotC", spot.rings);
     else if(spot.unders) drawSpotBalance("ovSpotC", spot.unders);
@@ -3628,6 +3805,7 @@ function renderDash(){
       po.textContent=os.objLabel+": "+(os.pct>=85?"on track":os.pct<50?"behind pace":"on your way")+" — "+os.pct+"% of this week's target."; } }
   renderCardioCard();
   renderMeDiscover();
+  renderStars();
   renderAchievements();
   renderInsight();
   renderObjective();
@@ -3641,6 +3819,9 @@ function renderCalendar(){
   const WEEKS=10, today=new Date(); today.setHours(0,0,0,0);
   const dow=(today.getDay()+6)%7;                       // Monday = 0
   const start=new Date(today); start.setDate(today.getDate()-dow-(WEEKS-1)*7);
+  // 8th column: an accent ✦ on weeks that earned a star, nothing otherwise (never a mark for a week without one)
+  const E = starsOn() && settings.stars ? (settings.stars.earned||{}) : null;
+  grid.classList.toggle("st", !!E); if($("calDow")) $("calDow").classList.toggle("st", !!E);
   let html="";
   for(let i=0;i<WEEKS*7;i++){
     const d=new Date(start); d.setDate(start.getDate()+i);
@@ -3648,6 +3829,7 @@ function renderCalendar(){
     if(d>today) cls.push("future"); else if(trained.has(ds)) cls.push("on");
     if(ds===today.toDateString()) cls.push("today");
     html+='<div class="calcell'+(cls.length?' '+cls.join(' '):'')+'" title="'+ds+'"></div>';
+    if(E && i%7===6){ const on=!!E[starWeekId(d)]; html+='<div class="calwk"'+(on?' role="img" aria-label="'+esc(STAR_COPY.calWeek)+'">✦':'>')+'</div>'; }
   }
   grid.innerHTML=html;
   const f7=trainingDays(7), f21=trainingDays(21);
@@ -3978,7 +4160,10 @@ function fillProgSections(){
 $("bwBtn").onclick=async()=>{ const v=parseFloat($("bwInput").value);
   if(isNaN(v)||v<30||v>250){ toast("Enter a valid weight"); return; }
   bw.push({d:Date.now(),kg:v}); await sset("bodyweight",bw); $("bwInput").value=""; renderDash(); toast("Bodyweight logged — staying consistent."); };
-$("deloadBtn").onclick=async()=>{ settings.sinceDeload=0; await sset("settings",settings); renderDash(); toast("Deload done — fresh and ready. Go again!"); };
+// deloadAt makes this week a light one for stars; deloadsTaken unlocks "Recovered"
+$("deloadBtn").onclick=async()=>{ settings.sinceDeload=0; settings.deloadAt=Date.now(); settings.deloadsTaken=(settings.deloadsTaken||0)+1; if(settings.stars) delete settings.stars.deloadDueWk;
+  const sr=checkStars({silent:false}), sm=starMoment(sr), fresh=checkAchievements(), cp=consistPost(sr, {rings:false}); await sset("settings",settings); renderDash();
+  celebrateMoment(Object.assign({ achIds:fresh, shared:cp.star, logged:"Deload done — fresh and ready. Go again!" }, sm)); };
 
 // ================= workout =================
 function renderSeg(){
@@ -4069,6 +4254,233 @@ function sessionCredit(nDays){ const setM=daySetMap(nDays), volM=dayVolMap(nDays
 // credit for one finished workout (its volume vs your typical session), for the lifetime tally
 function finishCredit(session){ const ref=refSessionVol();
   return ref>0 ? Math.max(0,Math.min(1, (session.totalVol||0)/ref)) : Math.max(0,Math.min(1, (session.sets||0)/QUALIFY_SETS)); }
+// ===== week stars: one star per Monday–Sunday week in which you reach your target (default 2 sessions).
+// Stars measure rhythm, not dose, so day credit is sets/5 (no volume, effort or median ref: deload, easy,
+// injury and bodyweight days count in full, entries without v score, old weeks aren't judged against today)
+// plus cardio at 30 zone-weighted min and other training by intensity, capped at 1.0 a day so a target
+// always needs separate days. Stars are only ever added: settings.stars.earned never loses a key. =====
+const STAR_OTHER={ low:0.34, med:0.67, high:1 }, STAR_MILESTONES=[12,26,52,104], STAR_WK=7*86400000;
+const STAR_LIGHT={ deload:"Deload", injury:"Injury", travel:"Travel", ill:"Ill", busy:"Busy" };
+// fill order by lifetime count: normalised 0–1 star positions (north up, east left) + edges between them
+const SKY=[
+  {id:"cas", name:"Cassiopeia", sky:1, pts:[[0.92,0.56],[0.67,0.73],[0.54,0.46],[0.31,0.49],[0.08,0.27]], edges:[[0,1],[1,2],[2,3],[3,4]]},
+  {id:"uma", name:"The Plough", sky:1, pts:[[0.08,0.72],[0.2,0.52],[0.35,0.48],[0.55,0.45],[0.66,0.57],[0.92,0.47],[0.91,0.28]], edges:[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,3]]},
+  {id:"cyg", name:"Cygnus", sky:1, pts:[[0.33,0.35],[0.45,0.51],[0.62,0.68],[0.78,0.92],[0.69,0.35],[0.79,0.13],[0.87,0.08],[0.3,0.72],[0.13,0.84]], edges:[[0,1],[1,2],[2,3],[1,4],[4,5],[5,6],[1,7],[7,8]]},
+  {id:"leo", name:"Leo", sky:1, pts:[[0.77,0.7],[0.77,0.56],[0.69,0.48],[0.71,0.37],[0.87,0.3],[0.92,0.36],[0.32,0.46],[0.08,0.63],[0.32,0.6]], edges:[[0,1],[1,2],[2,3],[3,4],[4,5],[2,6],[6,7],[7,8],[8,0]]},
+  {id:"ori", name:"Orion", sky:1, pts:[[0.15,0.19],[0.36,0.08],[0.47,0.23],[0.4,0.52],[0.36,0.56],[0.3,0.59],[0.23,0.92],[0.59,0.86],[0.36,0.76],[0.85,0.21]], edges:[[0,1],[1,2],[2,3],[3,4],[4,5],[0,5],[5,6],[3,7],[4,8],[2,9]]},
+  {id:"sco", name:"Scorpius", sky:1, pts:[[0.82,0.08],[0.86,0.18],[0.87,0.31],[0.7,0.29],[0.64,0.32],[0.59,0.38],[0.48,0.6],[0.47,0.73],[0.45,0.89],[0.32,0.92],[0.13,0.91],[0.15,0.7]], edges:[[0,1],[1,2],[1,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11]]},
+  // second sky (stars 53–104), drawn with a cooler tint
+  {id:"and", name:"Andromeda", sky:2, pts:[[0.92,0.74],[0.69,0.67],[0.48,0.5],[0.08,0.26],[0.57,0.4],[0.62,0.31],[0.72,0.57]], edges:[[0,1],[1,2],[2,3],[2,4],[4,5],[1,6]]},
+  {id:"per", name:"Perseus", sky:2, pts:[[0.5,0.29],[0.62,0.16],[0.71,0.08],[0.38,0.36],[0.29,0.64],[0.32,0.92],[0.59,0.47],[0.6,0.6],[0.62,0.68]], edges:[[0,1],[1,2],[0,3],[3,4],[4,5],[0,6],[6,7],[7,8]]},
+  {id:"gem", name:"Gemini", sky:2, pts:[[0.19,0.15],[0.08,0.33],[0.43,0.23],[0.71,0.46],[0.92,0.57],[0.34,0.6],[0.5,0.66],[0.77,0.85]], edges:[[0,1],[0,2],[2,3],[3,4],[1,5],[5,6],[6,7]]},
+  {id:"peg", name:"Pegasus", sky:2, pts:[[0.47,0.57],[0.47,0.27],[0.08,0.57],[0.6,0.68],[0.77,0.79],[0.92,0.7],[0.59,0.21],[0.55,0.35],[0.79,0.33]], edges:[[0,1],[0,2],[0,3],[3,4],[4,5],[1,6],[1,7],[7,8]]},
+  {id:"her", name:"Hercules", sky:2, pts:[[0.58,0.33],[0.44,0.35],[0.33,0.15],[0.57,0.08],[0.67,0.68],[0.33,0.56],[0.34,0.92]], edges:[[0,1],[1,2],[2,3],[3,0],[0,4],[1,5],[5,6]]},
+  {id:"dra", name:"Draco", sky:2, pts:[[0.22,0.64],[0.27,0.63],[0.26,0.58],[0.22,0.56],[0.08,0.39],[0.31,0.42],[0.39,0.49],[0.43,0.53],[0.49,0.53],[0.64,0.44],[0.81,0.36],[0.92,0.37]], edges:[[0,1],[1,2],[2,3],[3,0],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11]]}
+];
+// Every user-facing star string. Gain-framed; the copy test greps these for the banned words (spec §3).
+const STAR_COPY={
+  weekZero:"Any {T} sessions this week earn a star.",
+  weekZeroOne:"One session this week earns a star.",
+  weekZeroLight:"Light week · one session earns this week's star.",
+  weekPart:"{W} of {T} this week",
+  weekIn:"This week's star is in. Anything more is up to you.",
+  weekInRest:"This week's star is in. Rest is part of the plan.",
+  emptyNew:"Your first star comes with your first week of {s}. Short ones count.",
+  emptyHist:"Any week with {s} earns a star.",
+  skyCap:"{name} · {lit} of {total}",
+  skyField:"All-time sky · {n} stars",
+  since:"since {month}",
+  year:"{year} · {stars}",
+  intro:"Your sky so far: {stars} from your history. Each week you reach your target earns one; short sessions count. Stars stay yours.",
+  introAll:"Your sky so far: {stars}. Each week you reach your target earns one; short sessions count. Stars stay yours.",
+  picker:"Pick what fits your life. Two a week keeps most of what you've built.",
+  planCtx:"Your plan has {d} days. Any {T} earn the star; the rings track the full plan.",
+  lightHelp:"Busy, ill or just tired? One session earns this week's star.",
+  how:"One star for each week you reach your target, Monday to Sunday. Short sessions and cardio count in part. Light weeks (deload, injury, travel, illness) need one session. Stars stay yours.",
+  lightWeek:"light week",
+  weekDetail:"Week of {date} · {s}",
+  completedOn:"{name} · {month}",
+  toastStar:"★ Week star · {n} in your sky",
+  toastStarSuffix:"★ Week star",
+  toastConst:"{name} complete ✦ · {n} stars",
+  toastWelcome:"Welcome back · {n} in your sky",
+  toastShared:" · shared with your friends",
+  microWeek:"{W} of {T} this week",
+  spotlight:"This week's star is in",
+  feedConst:"Completed {name} ✦ · {n} weekly stars",
+  feedMilestone:"{n} weekly stars ✦",
+  ach52:"Fifty-two weeks with a star, each one at your own pace.",
+  // Stars & achievements fold, Stars sheet, intro (UI pass)
+  fold:"Stars & achievements", foldOff:"Achievements", off:"Week stars are off · Show them",
+  skyOpen:"Open your stars", ok:"OK", ovLabel:"Stars", ovEmpty:"Week stars",
+  done:"Completed", yourWeek:"Your week", matchPlan:"Match plan", light:"Light week", lightSw:"This week is light",
+  lightAuto:"This week is already light ({why}).", howTitle:"How stars work",
+  showStars:"Show stars", post:"Post completed constellations to friends",
+  postHelp:"Only completed figures and milestones are posted, never a single week.",
+  share:"Share your sky", skyNext:"{name} next",
+  achEarned:"Earned {date}", achHist:"Earned from your history", achLocked:"Not unlocked yet",
+  grpC:"Consistency", grpT:"Training", grpR:"Range", calWeek:"Week star",
+  evWeekend:"Weekly totals count", evMaintain:"Less volume holds muscle", evComeback:"Time away barely dents strength", evDeload:"Easy weeks clear fatigue", evLinked:"linked",
+  // share cards (counts, names and dates only) and the feed row
+  tileWeekT:"Week star", tileConstT:"{name} complete", tileSkyT:"My sky",
+  tileWeek:"Star {n} · since {month}", tileConst:"{n} weekly stars since {date}", tileSky:"{stars} · {c}", tileSess:"{s} this week", tileSessPast:"{s} · week of {date}",
+  shareFig:"Share"
+};
+function starCopy(k, v){ return String(STAR_COPY[k]||"").replace(/\{(\w+)\}/g, (m,x)=> v && v[x]!=null ? v[x] : m); }
+function starDayKey(t){ const d=new Date(t), m=d.getMonth()+1, x=d.getDate(); return d.getFullYear()+"-"+(m<10?"0":"")+m+"-"+(x<10?"0":"")+x; }
+// a week's id is its Monday's LOCAL date "YYYY-MM-DD" (sorts as text, unlike weekKey()'s toDateString)
+function starWeekId(d){ d=d!=null?new Date(d):new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-((d.getDay()+6)%7)); return starDayKey(d); }
+// [Monday 00:00, next Monday 00:00) in local time — Date(y,m,d+7) keeps DST weeks at their real 167/169 h
+function starWeekRange(id){ const p=String(id).split("-").map(Number); return [new Date(p[0],p[1]-1,p[2]).getTime(), new Date(p[0],p[1]-1,p[2]+7).getTime()]; }
+function starWeeksBetween(a,b){ return Math.round((starWeekRange(b)[0]-starWeekRange(a)[0])/STAR_WK); }
+// one pass over hist + extlog → { "YYYY-MM-DD": {s:sets, c:cardio credit, o:other credit, tv:1 if a no/partial-gym travel set} }
+function starDayMap(fromMs, toMs){
+  const m={}; let lo=1/0, hi=-1/0, key="";
+  const day=t=>{ if(t<lo || t>=hi){ const d=new Date(t); d.setHours(0,0,0,0); lo=d.getTime(); hi=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1).getTime(); key=starDayKey(lo); }   // entries arrive date-sorted: reuse the day's bounds
+    return m[key]||(m[key]={s:0,c:0,o:0,tv:0}); };
+  for(const n in hist){ const a=hist[n]; if(!Array.isArray(a)) continue;
+    for(const e of a){ if(!e || !(e.d>=fromMs && e.d<toMs)) continue; const x=day(e.d);
+      x.s += e.n!=null ? (+e.n||0) : 1; if(e.tv===2 || e.tv===3) x.tv=1; } }
+  for(const e of (extlog||[])){ if(!e || !(e.d>=fromMs && e.d<toMs)) continue;
+    if(e.kind==="cardio" || e.kind==="activity") day(e.d).c += (cardioMinsOf(e) || (+e.dist||0)*7)*cardioZoneW(e.zone)*cardioFracOf(e)/30;   // a run logged by distance only: a conservative 7 min/km
+    else if(e.kind==="muscle") day(e.d).o += STAR_OTHER[e.intensity]!=null ? STAR_OTHER[e.intensity] : STAR_OTHER.med; }
+  return m;
+}
+// W = sum of the week's day credits. floor: an injury-light week counts any logged day as at least 0.5
+function weekStarCredit(id, map, floor){
+  const d0=new Date(starWeekRange(id)[0]); let W=0, tv=0, days=0;
+  for(let i=0;i<7;i++){ const x=map[starDayKey(new Date(d0.getFullYear(), d0.getMonth(), d0.getDate()+i))]; if(!x) continue;
+    let c=Math.min(1, x.s/QUALIFY_SETS + x.c + x.o); if(floor) c=Math.max(0.5, c); W+=c; tv|=x.tv; days++; }
+  return { W:Math.round(W*1e6)/1e6, tv, days };
+}
+function starBaseTarget(){ const t=(settings.stars||{}).target;
+  if(t==="plan") return Math.max(2, Math.min(3, Math.round(planSessionsPerWeek(activePlan())*0.66)));
+  const n=Math.round(+t); return n>=1 && n<=4 ? n : 2; }
+// {T, mode:"n"|"l", why}. A light reason seen at ANY check is written to stars.light, so the week stays
+// light after injury/travel mode is switched off. Live modes only speak for the week that is running now.
+function starTargetFor(id, map){
+  const st=settings.stars, L=(st && st.light) || {}, r=starWeekRange(id), cur=id===starWeekId();
+  // injury is the one reason with its own credit rule (the 0.5 floor), so it replaces a weaker one recorded earlier
+  if(cur && st && L[id] && L[id]!=="injury" && activeInjuries().length) (st.light=L)[id]="injury";
+  let why=L[id]||null;
+  if(!why && cur){
+    if(activeInjuries().length) why="injury";
+    else if(settings.travelMode && settings.travelMode!=="off") why="travel";
+    else if(starDeloadWk()===id) why="deload";
+  }
+  if(!why && settings.deloadAt>=r[0] && settings.deloadAt<r[1]) why="deload";
+  if(!why && weekStarCredit(id, map||starDayMap(r[0],r[1])).tv) why="travel";
+  if(why && st && !L[id]) (st.light=L)[id]=why;
+  // a target change applies from the week it was made: a past week keeps the target it was last judged at (stars.tAt),
+  // else the one before the picker changed (stars.tPrev)
+  const T = !cur && st && st.tAt && st.tAt[id]!=null ? st.tAt[id] : st && st.tWk && id<st.tWk ? (st.tPrev||2) : starBaseTarget();
+  return why ? { T:1, mode:"l", why } : { T, mode:"n", why:null };
+}
+// the week a due deload first showed up: that one week is light, not every week until the button is pressed
+function starDeloadWk(){ const st=settings.stars;
+  if((settings.sinceDeload||0)<DELOAD_AT){ if(st && st.deloadDueWk) delete st.deloadDueWk; return null; }
+  return st ? (st.deloadDueWk||(st.deloadDueWk=starWeekId())) : starWeekId(); }
+function starCount(){ const st=settings.stars; return st && st.earned ? Object.keys(st.earned).length : 0; }
+// where lifetime star n sits: the figure being filled, how many of it are lit, and the figures already done
+function skyProgress(n){ n=n==null ? starCount() : n; let at=0;
+  for(let i=0;i<SKY.length;i++){ const f=SKY[i], end=at+f.pts.length;
+    if(n<end) return { fig:f, i, lit:n-at, total:f.pts.length, start:at, done:SKY.slice(0,i) };
+    at=end; }
+  return { fig:null, i:SKY.length, lit:0, total:0, start:at, done:SKY.slice(), field:n-at };   // past 104: the all-time field
+}
+// the figure completed when the count went n0 → n1 (the latest, if a sync crossed two)
+function skyCompleted(n0, n1){ let at=0, hit=null; for(const f of SKY){ at+=f.pts.length; if(at>n0 && at<=n1) hit=f; } return hit; }
+// a star after 4+ weeks without one, anywhere in the earned set (back-fillable)
+function starHasComeback(){ const ks=Object.keys((settings.stars||{}).earned||{}).sort();
+  for(let i=1;i<ks.length;i++) if(starWeeksBetween(ks[i-1],ks[i])-1>=4) return true; return false; }
+// Evaluate the current and previous week (a late Sunday log, or data synced in). Older weeks are frozen.
+// silent (init close-out, after a sync, or stars switched off): record only — star badges unlock quietly,
+// because a synced star was celebrated on the device that earned it.
+function checkStars(opts){
+  opts=opts||{};
+  const out={ star:null, fresh:[], constellation:null, milestone:null, comeback:false, count:starCount() };
+  if(!settings.stars){ if(opts.silent) return out; seedStars(); }
+  const st=settings.stars; st.earned=st.earned||{}; st.light=st.light||{};
+  const silent=out.silent=!!opts.silent || st.on===false;   // callers celebrate only when !out.silent
+  const cur=starWeekId(), prev=starWeekId(starWeekRange(cur)[0]-1), map=starDayMap(starWeekRange(prev)[0], starWeekRange(cur)[1]);
+  const sig=()=>JSON.stringify([st.light, st.deloadDueWk, st.tAt, st.liveFrom]), n0=starCount(), lt0=sig();
+  [prev, cur].forEach(id=>{ const t=starTargetFor(id, map); if(st.earned[id]) return;
+    if(weekStarCredit(id, map, t.why==="injury").W >= t.T-1e-9){ st.earned[id]=t.mode; out.fresh.push(id); } });
+  // the target each week is judged at: a plan switch or a synced target on Monday never re-scores last week
+  const tA=st.tAt||{}; st.tAt={ [cur]:starBaseTarget() }; if(tA[prev]!=null) st.tAt[prev]=tA[prev];
+  if(st.seededEmpty && !st.liveFrom && !opts.silent && weekStarCredit(cur, map).days) st.liveFrom=cur;   // backstop for a record seeded without it
+  const n1=out.count=starCount();
+  if(out.fresh.length){
+    const id=out.star=out.fresh[out.fresh.length-1], before=Object.keys(st.earned).filter(k=>k<out.fresh[0]).sort().pop();
+    out.comeback = !!before && starWeeksBetween(before, out.fresh[0])-1 >= 2;   // "Welcome back" — never names the gap
+    out.constellation=skyCompleted(n0, n1);
+    out.milestone=STAR_MILESTONES.filter(m=>m>n0 && m<=n1).pop()||null;
+  }
+  if(silent) starAchQuiet();
+  if(out.fresh.length || sig()!==lt0) starSave();
+  return out;
+}
+// a star write: local only until this sign-in's first reconcile, then pushed with it (see ssetQuiet)
+function starSave(){ return ssetQuiet("settings", settings); }
+// add every star badge the record already satisfies, with no toast (achAt: now, or "h" for the back-fill)
+function starAchQuiet(at){
+  if(settings.achUnlocked==null) return;
+  const s=achStats(), have=new Set(settings.achUnlocked), when=settings.achAt=settings.achAt||{};
+  ACHIEVEMENTS.forEach(a=>{ if(a.grp==="c" && !have.has(a.id) && a.test(s)){ have.add(a.id); if(when[a.id]==null) when[a.id]=at||Date.now(); } });   // an older build may have pruned the id: keep its first date
+  settings.achUnlocked=[...have];
+}
+// First run of the feature (settings.stars == null): count the existing history, silently. Past weeks use
+// the floor of 2 (a no/partial-gym travel week: 1), since past deload/injury weeks can't be recovered.
+function seedStars(){
+  if(settings.stars) return settings.stars;
+  const cur=starWeekId(), st={ v:1, on:true, post:true, target:2, earned:{}, light:{}, posted:[], introSeen:false, seededAt:Date.now(), seedWk:cur };
+  if((cloudUser || (_syncOwner && !_authSeen)) && !_reconciled) st.seededEmpty=true;   // signed in, first reconcile pending: another device may already judge these weeks live — count history after it (starLateBackfill)
+  else if(!starBackfill(st, cur)){ st.seededEmpty=true; st.liveFrom=cur; }   // nothing logged yet: a sync that brings history in back-fills the weeks before cur (starLateBackfill)
+  settings.stars=st;
+  const r=starWeekRange(cur), map=starDayMap(r[0], r[1]), t=starTargetFor(cur, map);   // this week: live rules
+  if(weekStarCredit(cur, map, t.why==="injury").W >= t.T-1e-9) st.earned[cur]=t.mode;
+  // existing users have a non-null achUnlocked, so the new star badges must be added here or they'd all fire at the next finish
+  if(settings.achUnlocked==null) settings.achUnlocked=unlockedIds();
+  const when=settings.achAt=settings.achAt||{}; settings.achUnlocked.forEach(id=>{ if(when[id]==null) when[id]="h"; });
+  starAchQuiet("h");
+  starPostedUpTo(st);
+  starSave();
+  return st;
+}
+// Count the logged weeks before `upto` that hold no star yet, at the floor of 2 (a no/partial-gym travel week: 1).
+// Only adds. Returns false when there is nothing logged at all.
+function starBackfill(st, upto){
+  let t0=1/0;
+  for(const n in hist){ const a=hist[n]; if(Array.isArray(a)) for(const e of a) if(e && e.d>0 && e.d<t0) t0=e.d; }
+  for(const e of (extlog||[])) if(e && e.d>0 && e.d<t0) t0=e.d;
+  if(!isFinite(t0)) return false;
+  const first=starWeekId(t0), map=starDayMap(starWeekRange(first)[0], starWeekRange(upto)[0]), E=st.earned=st.earned||{}, L=st.light=st.light||{};
+  for(let id=first; id<upto; id=starWeekId(starWeekRange(id)[1])){ if(E[id]) continue; const w=weekStarCredit(id, map);
+    if(w.W>=2-1e-9) E[id]="b";
+    else if(w.tv && w.W>=1-1e-9){ E[id]="bl"; L[id]=L[id]||"travel"; } }
+  return true;
+}
+// History a sync or restore brought in: count it (silent, adds only, floor 2) — but only the weeks before the
+// earliest seed on any device (seedWk) and before an empty seed's live start (liveFrom). Those weeks were only ever
+// judged by this back-fill, never live, so recounting them with more history can't re-score a live-judged week.
+// A seed held back for the first reconcile (seedStars) on a device that turned out signed out: count its history now.
+function starOwnBackfill(){ const st=settings.stars; if(!st || !st.seededEmpty || !_authSeen || cloudUser || _reconciled) return;
+  starLateBackfill(); checkStars({silent:true}); renderStarsEverywhere(); }
+function starSeedWk(st){ return st.seedWk || (st.seededAt ? starWeekId(st.seededAt) : null); }
+function starLateBackfill(){
+  const st=settings.stars;
+  if(!st || !(Object.keys(hist).some(k=>(hist[k]||[]).length) || (extlog||[]).length)) return;
+  const prev=starWeekId(starWeekRange(starWeekId())[0]-1), n0=starCount(), had=!!st.seededEmpty;
+  if(!st.seedWk && st.seededAt) st.seedWk=starSeedWk(st);   // before seededAt moves below: the cut-off stays at the first seed
+  starBackfill(st, [prev, st.liveFrom, st.seedWk].filter(Boolean).sort()[0]); delete st.seededEmpty;
+  if(starCount()>n0){ starPostedUpTo(st, n0); starAchQuiet("h"); st.introSeen=false; st.seededAt=Date.now(); }   // one intro sheet, as after the first seed
+  if(had || starCount()>n0) starSave();
+}
+// the back-fill never posts: mark the figures and milestones it crossed (count n0 → now) as posted
+function starPostedUpTo(st, n0){ const n=starCount(), P=new Set(st.posted||[]), lo=n0||0; let at=0;
+  SKY.forEach(f=>{ at+=f.pts.length; if(at>lo && at<=n) P.add("c:"+f.id); });
+  STAR_MILESTONES.forEach(m=>{ if(m>lo && m<=n) P.add("m:"+m); });
+  st.posted=[...P]; }
 // Progression follows an inverse-U over recent training frequency:
 //  • too sparse (after a layoff) → hold and rebuild   • regular & recovered → push
 //  • very frequent / fatigue stacked up → hold or ease off toward a deload
@@ -4411,7 +4823,7 @@ $("saveBtn").onclick=async()=>{
     settings.slotDone=settings.slotDone||{};                 // advance this slot's variety rotation
     const sk=p.id+"|"+w.name; settings.slotDone[sk]=(settings.slotDone[sk]||0)+1;
   }
-  const fresh=checkAchievements();
+  const sr=checkStars(), sm=starMoment(sr), fresh=checkAchievements(), cp=consistPost(sr);   // cp: the feed's consistency post, if any
   await sset("settings",settings);
   delete draft[savedSig]; await sset("draft", draft); sessGym=null;
   swaps={};
@@ -4420,36 +4832,66 @@ $("saveBtn").onclick=async()=>{
   // one burst, one toast, one haptic for the whole finish (PR, finish, unlocks). A micro session counts in
   // proportion to the work done (see finishCredit) and says so in the toast.
   _finLock=Date.now()+450;
-  celebrateMoment({ pr:beaten, qualifies, achIds:fresh,
-    micro: (!qualifies && beaten===0) ? { sets:session.sets, pct:Math.round(cred*100) } : null });
+  celebrateMoment(Object.assign({ pr:beaten, qualifies, achIds:fresh, shared:cp.star,
+    micro: (!qualifies && beaten===0) ? { sets:session.sets, pct:Math.round(cred*100) } : null }, sm));
   if(qualifies){
-    setTimeout(()=>openShareTile(session), 400);   // after the burst's first frames: the 1080×1350 tile paint is heavy
+    const sk=starShareOf(sr);   // a week star adds a Star card to the sheet (it leads when a figure or milestone landed)
+    setTimeout(()=>openShareTile(session, sk), 400);   // after the burst's first frames: the 1080×1350 tile paint is heavy
     cloudPublish(session);   // post a summary to the friends feed (no raw weights), if signed in + sharing on
   }
-  cloudTouchWorkout();     // reset the 2-day "train at home" reminder timer (any movement keeps the streak alive)
+  else logStarShare(sr);   // a short finish that completes a figure offers its Star card, like the cardio/other logs
+  ringsSharedToast(cp);
+  cloudTouchWorkout();     // reset the 2-day "train at home" reminder timer (any movement counts)
 };
 
 // ================= celebrations =================
 // One moment → one burst, one toast, one haptic. outcome = { pr: lifts beaten, qualifies, micro: {sets, pct}
-// for a sub-qualifying finish, achIds: fresh unlocks }. Star fields (star, constellation) slot in with the stars feature.
-// Tiers: 1 small (a qualifying finish), 2 medium (a PR), 3 big (an achievement). The toast leads with the PR,
-// then the achievement, and takes at most one suffix.
+// for a sub-qualifying finish, achIds: fresh unlocks, star/constellation/milestone/comeback: the star part (from
+// starMoment), shared: a completion went to the feed, logged: the plain toast for a log with nothing to celebrate }.
+// Tiers (stars spec §5.2): 1 any finish, or a week star from a micro session or a cardio/other log; 2 a PR, or a
+// week star on a qualifying finish; 3 a constellation, any achievement, star 52 or 104. The toast leads
+// PR > constellation > star > achievement, with one detail and at most one suffix.
 const CEL_HAPTIC={ 1:10, 2:[10,60,14], 3:[12,50,12,50,18] };
 function celebrateMoment(o){
   o=o||{};
-  const ach=(o.achIds||[]).map(id=>ACHIEVEMENTS.find(a=>a.id===id)).filter(Boolean);
-  const tier = ach.length ? 3 : o.pr>0 ? 2 : (o.qualifies || o.micro) ? 1 : 0;   // every finish sparks, short sessions too
-  if(tier) celebrate(tier, { stars:!!o.star, pr:o.pr>0 });
+  const ach=(o.achIds||[]).map(id=>ACHIEVEMENTS.find(a=>a.id===id)).filter(Boolean), cst=o.constellation, n=starCount();
+  const tier = (ach.length || cst || o.milestone>=52) ? 3 : (o.pr>0 || (o.star && o.qualifies)) ? 2 : (o.star || o.qualifies || o.micro) ? 1 : 0;   // every finish sparks, short sessions too
+  if(tier) celebrate(tier, { stars:!!(o.star || cst || o.milestone), pr:o.pr>0 });
+  const achT = ach.length ? ach[0].t+" unlocked" : "", starT = o.comeback ? "Welcome back" : STAR_COPY.toastStarSuffix;
   let msg="";
-  if(o.pr>0) msg="New best! You beat "+o.pr+" lift"+(o.pr>1?"s":"")+(ach.length ? " · "+ach[0].t+" unlocked" : " — keep climbing.");
+  if(o.pr>0) msg="New best! You beat "+o.pr+" lift"+(o.pr>1?"s":"")+(cst ? " · "+cst.name+" complete ✦" : o.star ? " · "+starT : achT ? " · "+achT : " — keep climbing.");
+  else if(cst) msg=starCopy("toastConst",{name:cst.name, n})+(achT && !o.shared ? " · "+achT : "");
+  else if(o.star) msg = achT ? starT+" · "+achT : starCopy(o.comeback ? "toastWelcome" : "toastStar", {n});
   else if(ach.length) msg="Achievement unlocked  "+ach[0].icon+"  "+ach[0].t+(ach.length>1?"  +"+(ach.length-1)+" more":"");
+  if(msg && o.shared && (cst || o.milestone)) msg+=STAR_COPY.toastShared;
   if(msg) toast(msg, true, true);
-  else if(o.micro) toast("Logged "+o.micro.sets+" set"+(o.micro.sets===1?"":"s")+" — counts as "+o.micro.pct+"% of a session toward your week. Every bit adds up.");
+  else if(o.micro){ const wc=starWeekClause();   // neutral star clause: "62% of a session · 1.6 of 2 this week"
+    toast("Logged "+o.micro.sets+" set"+(o.micro.sets===1?"":"s")+" — counts as "+o.micro.pct+"% of a session"+(wc ? " · "+wc : " toward your week. Every bit adds up.")); }
+  else if(o.logged) toast(o.logged);
   if(tier) haptic(CEL_HAPTIC[tier]);
   return tier;
 }
+// The star part of a moment, after the spam guards (stars spec §5.2, §8): a silent check (or stars switched off)
+// never celebrates; a week star celebrates at most once a week (stars.celWk); and once this week's star is in, an
+// overreached week gets no star-flavoured moment: sr.quiet then also holds its feed post for a later week (consistPost)
+// and keeps the Star card out of the share sheet (starShareOf). Call it before consistPost and before the handler saves.
+function starMoment(sr){
+  const st=settings.stars; if(!st || !sr || sr.silent || !(sr.fresh||[]).length) return {};
+  const cur=starWeekId(), o={ star:sr.star, constellation:sr.constellation, milestone:sr.milestone, comeback:sr.comeback };
+  if(st.earned[cur] && sr.fresh.indexOf(cur)<0 && readiness(0)==="overreached"){ sr.quiet=true; return {}; }
+  if(st.celWk===cur){ o.star=null; o.comeback=false; if(!o.constellation && !o.milestone) return {}; }
+  st.celWk=cur;
+  return o;
+}
+// what a fresh star offers to share (from the raw check, so a quiet celebration can still be shared): the week card,
+// or the completed figure. lead: the Star card opens first (a constellation or milestone just landed).
+function starShareOf(sr){
+  if(!sr || sr.silent || sr.quiet || !sr.star) return null;
+  return sr.constellation ? { kind:"const", fig:sr.constellation, lead:true } : { kind:"week", week:sr.star, lead:!!sr.milestone };
+}
 // The single burst entry point. Old callers map: celebrate(true) → 2, celebrate(false) → 1, celebrate() → 3.
-// Every accent bursts glitter sparks; PRs and unlocks add confetti cannons. opts.stars is the hook for star moments (white/gold sparkles, later).
+// Every accent bursts glitter sparks; PRs and unlocks add confetti cannons. opts.stars (a star moment) turns a
+// quarter of the pieces into white/gold 4-point sparkles, so stars look the same on every accent.
 // A new burst replaces one on screen; it is removed at its end + 150ms or when the app is hidden.
 let _burstEnd=null;
 // where the last tap landed, so a burst starts at the button that earned it (a tap within 3s; else near the centre)
@@ -4498,8 +4940,9 @@ function confetti(tier, opts, low){
   const dk=document.documentElement.classList.contains("dark"), sparks=dk ? ["#ffd60a","#fff3c4","#ffffff"] : ["#f5b400","#ffd60a","#f0a020"];
   const rnd=(a,b)=>a+Math.random()*(b-a), vw=innerWidth, vh=innerHeight;
   const f=document.createDocumentFragment(); let ms=0;
+  const sp=opts.stars ? .4 : .25;   // a star moment: more white/gold sparks in the volleys
   for(let side=0; side<2; side++) for(let i=0;i<P;i++){ const s=document.createElement("i");
-    if(Math.random()<.25){ s.className="spk can"; s.style.setProperty("--s",rnd(10,20).toFixed(1)+"px"); s.style.background=sparks[Math.floor(Math.random()*sparks.length)]; }
+    if(Math.random()<sp){ s.className="spk can"; s.style.setProperty("--s",rnd(10,20).toFixed(1)+"px"); s.style.background=sparks[Math.floor(Math.random()*sparks.length)]; }
     else { s.className="can"; s.style.background=colors[Math.floor(Math.random()*colors.length)]; if(Math.random()>.5) s.style.borderRadius="50%"; }
     const wave = tier===3 && i>=P*.6 ? .35 : 0;   // an unlock fires a second, smaller volley
     const dl=wave+Math.random()*.12, life=rnd(2.8,3.8); ms=Math.max(ms,(dl+life)*1000);
@@ -4526,6 +4969,8 @@ function glitter(tier, opts, low){
   const c=document.createElement("div"); c.className="glitter"+(fx?"":" fb");
   const f=document.createDocumentFragment(), n2=tier>=2?Math.round(N*.3):0, n3=tier===3?Math.round(N*.2):0; let ms=0;
   const o=opts.from||{x:vw*.5, y:vh*.42}, up=o.y>vh*.45;
+  // a star moment: a quarter of the pieces are white/gold 4-point star sparkles (gold and champagne on light, where white vanishes)
+  const stc = opts.stars ? (document.documentElement.classList.contains("dark") ? ["#ffffff","#ffffff","#ffd60a","#f6d38a"] : ["#f5b400","#e0a800","#d9a94a"]) : null;
   if(fx){ const fl=document.createElement("b"); fl.className="flash"; fl.style.cssText="left:"+o.x.toFixed(0)+"px;top:"+o.y.toFixed(0)+"px"; f.appendChild(fl); }
   for(let i=0;i<N;i++){
     const w2=i<n2, w3=!w2 && i<n2+n3;   // second emitter pair at 30% / 70% x; third volley from the centre
@@ -4534,7 +4979,8 @@ function glitter(tier, opts, low){
     const life = rnd(L[0],L[1]), dl=(w2?.16:w3?.42:0)+Math.random()*.15;
     ms=Math.max(ms,(life+dl)*1000);
     const C=pick(), k=Math.random(); let cls, sz, bg, r0="0deg", rot="0deg";
-    if(k<.5){ cls="sp"; sz = Math.random()<.08 ? rnd(24,32) : rnd(10,22); bg = Math.random()<.3 ? cols[3] : C; rot=((Math.random()<.5?-1:1)*rnd(90,220)).toFixed(0)+"deg"; }
+    if(stc && i%4===1){ cls="sp star"; sz = Math.random()<.2 ? rnd(24,34) : rnd(12,22); bg=stc[Math.floor(Math.random()*stc.length)]; rot=((Math.random()<.5?-1:1)*rnd(45,120)).toFixed(0)+"deg"; }
+    else if(k<.5){ cls="sp"; sz = Math.random()<.08 ? rnd(24,32) : rnd(10,22); bg = Math.random()<.3 ? cols[3] : C; rot=((Math.random()<.5?-1:1)*rnd(90,220)).toFixed(0)+"deg"; }
     else if(k<.8){ cls="sq"; sz=rnd(3,7); bg="radial-gradient(circle at 35% 35%,#fff 0 18%,"+C+" 45%,"+mixHex(C,"#000000",.3)+" 100%)"; }
     else { cls="fl"; sz=rnd(3,6); bg="linear-gradient(135deg,"+C+",#fff 50%,"+C+")"; r0="45deg"; }
     const p=document.createElement("i"); p.className=cls+" t"+(i%3);
@@ -4638,12 +5084,14 @@ function showTab(name){
     $("goalStart").value=settings.goalStart||""; $("goalTarget").value=settings.goalTarget||"";
     $("heightIn").value=settings.heightCm||""; $("bfIn").value=settings.bodyfatPct||""; $("nameIn").value=settings.name||""; if($("ageIn")) $("ageIn").value=settings.age||"";
     renderDash(); renderAccount(); animateProgBars();
+    const t=Date.now(); setTimeout(()=>maybeStarIntro(t), 450);   // once, after the first count of your history
   } else if(name==="workout"){
     if(settings.surprise && !sessionUnderway() && !(draft["free"]&&draft["free"].spon)) loadSurprise();
     coach("workout","Tap a set to log your weight × reps. The coach tracks each exercise across all your plans, so progress carries over.");
   } else if(name==="overview"){
     _spotSeed=Math.random();   // fresh spotlight pick each time you land on the home
     renderOverview(); renderAccount();
+    const t=Date.now(); setTimeout(()=>maybeStarIntro(t), 450);
   }
 }
 document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.dataset.tab));
@@ -5463,8 +5911,7 @@ function weekRings(){
                 {label:"Sets", val:setsWk, target:_gt.sets, color:"#4dabf7"},
                 {label:"Muscles", val:musWk.size, target:12, color:"#51cf66"} ];
   const cTgt=cardioTargetMins(); if(cTgt>0) rings.push({label:"Cardio", val:cardioDoseWeek(7), target:cTgt, color:"#9775fa", unit:"min"});
-  if(rings.every(r=>r.val>=r.target)) shareRingsClosed(setsWk);   // all closed → auto-share (gated inside)
-  return rings;
+  return rings;   // (the closed-rings feed post is sent from the log handlers via consistPost, never from render)
 }
 // the week's rings drawn in a row (fits the wide spotlight canvas): progress arc + value + label under each
 function drawSpotRings(id, rings){
@@ -5518,7 +5965,7 @@ function spotlight(){
     if(all) c.push({ kind:"win", score:2.4, ico:"✅", tag:"Week done",
       title:"You closed every ring this week", detail:"Sessions, sets and muscles all hit their target — a complete week. Enjoy it.", rings, act:"rings" });
     else c.push({ kind:"watch", score:1.3+dow*0.18, ico:"◎", tag:"This week",
-      title:closed+" of "+rings.length+" rings closed", detail:"Close the rest before the week resets — tap to see what's left.", rings, act:"rings" });
+      title:closed+" of "+rings.length+" rings closed", detail:"Rings fill as you go. Tap to see where you are.", rings, act:"rings" });
   }
   // always-on trend graphs: keep a chart on the home even on a calm week, and give it variety to rotate through
   if(si && si.series.length>=2){ const ser=si.series.map(s=>Math.round(s.idx)), p=si.series[si.series.length-1].idx-100;
@@ -6969,10 +7416,11 @@ $("otherLog").onclick=()=>{
   const pv=updateOtherPreview(); if(!pv.ok){ toast("Pick a muscle group and an intensity first"); return; }
   const entry={d:Date.now(), kind:"muscle", name:otherMuscleSel, intensity:curInt(), vol:pv.vol, muscles:MUSCLE_TARGETS[otherMuscleSel].slice()};
   extlog.push(entry); sset("extlog",extlog);
-  const fresh=checkAchievements(); sset("settings",settings);
+  const sr=checkStars(), sm=starMoment(sr), fresh=checkAchievements(), cp=consistPost(sr); sset("settings",settings);
   renderOtherLog(); updateOtherPreview(); renderDash(); if($("sheetMus").classList.contains("show")) renderMuscles();
-  if(fresh.length) celebrateMoment({ achIds:fresh });   // one toast: the unlock stands in for "Logged"
-  else toast("Logged "+entry.name+" — "+entry.vol.toLocaleString()+" kg");
+  // one toast: a star or an unlock stands in for "Logged"; a completed figure opens the Star card (a plain week star opens nothing)
+  celebrateMoment(Object.assign({ achIds:fresh, shared:cp.star, logged:"Logged "+entry.name+" — "+entry.vol.toLocaleString()+" kg" }, sm));
+  logStarShare(sr); ringsSharedToast(cp);
 };
 
 // ================= cardio (Workout tab → Cardio) =================
@@ -7096,13 +7544,14 @@ $("cdLog").onclick=()=>{
   const hr=parseFloat($("cdHr").value)||0; if(hr) entry.avgHr=Math.round(hr);
   const rpe=parseFloat($("cdRpe").value)||0; if(rpe) entry.rpe=Math.min(10,Math.max(1,Math.round(rpe)));
   extlog.push(entry); sset("extlog",extlog);
-  const fresh=checkAchievements(); sset("settings",settings);
+  const sr=checkStars(), sm=starMoment(sr), fresh=checkAchievements(), cp=consistPost(sr); sset("settings",settings);
   ["cdDist","cdTime","cdPace","cdMin","cdHr","cdRpe"].forEach(id=>{ $(id).value=""; });
   clearCardioRoute();
   renderCardioLog(); updateCardioPreview(); renderDash();
   cloudTouchWorkout();
-  if(fresh.length) celebrateMoment({ achIds:fresh });   // one toast: the unlock stands in for "Logged"
-  else toast("Logged "+(entry.routeName||entry.name)+(mins?" — "+mins+" min":"")+(dist?" · "+round1(dist)+" km":""));
+  // one toast: a star or an unlock stands in for "Logged"; a completed figure opens the Star card (a plain week star opens nothing)
+  celebrateMoment(Object.assign({ achIds:fresh, shared:cp.star, logged:"Logged "+(entry.routeName||entry.name)+(mins?" — "+mins+" min":"")+(dist?" · "+round1(dist)+" km":"") }, sm));
+  logStarShare(sr); ringsSharedToast(cp);
 };
 
 // ===== GPX route import — free, fully client-side. Works with exports from Strava, Komoot, Garmin,
@@ -7385,39 +7834,313 @@ function achStats(){
   const muscles=new Set(); Object.keys(hist).forEach(n=> muscleFor(n).forEach(m=>{ if(m!=="Other") muscles.add(m); }));
   const acts=new Set(); (extlog||[]).forEach(e=>{ if(e.kind==="activity") acts.add(e.name); });
   return { sessions:settings.sessions||0, prs:settings.beatTotal||0, hours:(settings.timeTotal||0)/60,
-           vol:lifetimeVolume(), muscles:muscles.size, activities:acts.size, external:(extlog||[]).length };
+           vol:lifetimeVolume(), muscles:muscles.size, activities:acts.size, external:(extlog||[]).length,
+           stars:starCount(), comeback:starHasComeback(), deloads:settings.deloadsTaken||0 };
 }
 const ACHIEVEMENTS=[
-  {id:"first",   icon:"🌱", t:"First Steps",        d:"Log your first workout",      test:s=>s.sessions>0},
-  {id:"ten",     icon:"🔥", t:"Getting Consistent", d:"10 workouts logged",          test:s=>s.sessions>=10},
-  {id:"fifty",   icon:"💪", t:"Committed",          d:"50 workouts logged",          test:s=>s.sessions>=50},
-  {id:"hundred", icon:"🏆", t:"Centurion",          d:"100 workouts logged",         test:s=>s.sessions>=100},
-  {id:"pr10",    icon:"⚡", t:"Record Breaker",     d:"Beat your best 10 times",     test:s=>s.prs>=10},
-  {id:"vol100k", icon:"🏋️", t:"Heavy Lifter",       d:"100,000 kg moved",            test:s=>s.vol>=100000},
-  {id:"vol1m",   icon:"🗻", t:"Mountain Mover",     d:"1,000,000 kg moved",          test:s=>s.vol>=1000000},
-  {id:"time10",  icon:"⏱️", t:"Time Under Tension", d:"10 hours trained",            test:s=>s.hours>=10},
-  {id:"rounded", icon:"🎯", t:"Well Rounded",       d:"Trained every muscle group",  test:s=>s.muscles>=8},
-  {id:"cross",   icon:"🤸", t:"Cross-Trainer",      d:"Log other training",          test:s=>s.external>=1},
-  {id:"explorer",icon:"🧭", t:"Explorer",           d:"Try 3 different activities",  test:s=>s.activities>=3}
+  {id:"first",   icon:"🌱", grp:"t", p:["sessions",1],   t:"First Steps",        d:"Log your first workout",      test:s=>s.sessions>0},
+  {id:"ten",     icon:"👟", grp:"t", p:["sessions",10],  t:"Ten Sessions",       d:"10 workouts logged",          test:s=>s.sessions>=10},
+  {id:"fifty",   icon:"💪", grp:"t", p:["sessions",50],  t:"Committed",          d:"50 workouts logged",          test:s=>s.sessions>=50},
+  {id:"hundred", icon:"🏆", grp:"t", p:["sessions",100], t:"Centurion",          d:"100 workouts logged",         test:s=>s.sessions>=100},
+  {id:"pr10",    icon:"⚡", grp:"t", p:["prs",10],       t:"Record Breaker",     d:"Beat your best 10 times",     test:s=>s.prs>=10},
+  {id:"vol100k", icon:"🏋️", grp:"t", p:["vol",1e5],      t:"Heavy Lifter",       d:"100,000 kg moved",            test:s=>s.vol>=100000},
+  {id:"vol1m",   icon:"🗻", grp:"t", p:["vol",1e6],      t:"Mountain Mover",     d:"1,000,000 kg moved",          test:s=>s.vol>=1000000},
+  {id:"time10",  icon:"⏱️", grp:"t", p:["hours",10],     t:"Time Under Tension", d:"10 hours trained",            test:s=>s.hours>=10},
+  {id:"rounded", icon:"🎯", grp:"r", p:["muscles",8],    t:"Well Rounded",       d:"Trained every muscle group",  test:s=>s.muscles>=8},
+  {id:"cross",   icon:"🤸", grp:"r",                  t:"Cross-Trainer",      d:"Log other training",          test:s=>s.external>=1},
+  {id:"explorer",icon:"🧭", grp:"r", p:["activities",3], t:"Explorer",           d:"Try 3 different activities",  test:s=>s.activities>=3},
+  // consistency (grp "c"): week stars. Hidden with stars switched off; drawn as an accent star, not an emoji
+  {id:"star1",    icon:"✦", grp:"c", star:1,  p:["stars",1],  t:"First Star",           d:"Your first week star",      test:s=>s.stars>=1},
+  {id:"star12",   icon:"✦", grp:"c", star:12, p:["stars",12], t:"Twelve Weeks",         d:"12 week stars, any order",  test:s=>s.stars>=12},
+  {id:"star26",   icon:"✦", grp:"c", star:26, p:["stars",26], t:"Half a Year of Weeks", d:"26 week stars",             test:s=>s.stars>=26},
+  {id:"star52",   icon:"✦", grp:"c", star:52, p:["stars",52], t:"A Year of Weeks",      d:"52 week stars",             test:s=>s.stars>=52, dd:STAR_COPY.ach52},
+  {id:"comeback", icon:"✦", grp:"c", star:0,  t:"Back at It",           d:"A star after time away",    test:s=>!!s.comeback},
+  {id:"recovered",icon:"✦", grp:"c", star:0,  t:"Recovered",            d:"Take a deload when it's due", test:s=>s.deloads>=1}
 ];
 function unlockedIds(){ const s=achStats(); return ACHIEVEMENTS.filter(a=>a.test(s)).map(a=>a.id); }
+// stored ids only grow: a counter that lost an increment to last-write-wins sync can't re-lock (or re-fire) a badge
 function checkAchievements(){
-  const have=new Set(settings.achUnlocked||[]);
-  const now=unlockedIds(), fresh=now.filter(id=>!have.has(id));
-  settings.achUnlocked=now; return fresh;
+  const have=new Set(settings.achUnlocked||[]), at=settings.achAt=settings.achAt||{};
+  const fresh=unlockedIds().filter(id=>!have.has(id));
+  fresh.forEach(id=>{ have.add(id); if(at[id]==null) at[id]=Date.now(); });
+  settings.achUnlocked=[...have]; return fresh;
 }
+// 4-point accent star for the consistency tiles, with the count inside
+// the waist is wide enough for a 2-digit count (12, 26, 52) to sit inside the fill
+function achStarGlyph(n){ return '<span class="achstar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 0 16.5 7.5 24 12 16.5 16.5 12 24 7.5 16.5 0 12 7.5 7.5Z"/></svg>'+(n?'<b>'+n+'</b>':'')+'</span>'; }
+// p: [achStats key, goal] — a locked tile with a count rule shows "7 / 12" over a bar instead of the lock
+function achProg(a, s){ if(!a.p) return null; const cur=Math.max(0, +s[a.p[0]]||0), goal=a.p[1]; return { k:a.p[0], cur, goal, f:Math.min(1, cur/goal) }; }
+function achNum(k, x){ return k==="vol" ? (x>=1e6 ? round1(x/1e6)+"M" : x>=1000 ? Math.floor(x/1000)+"k" : Math.floor(x)+"")
+  : k==="hours" && x<10 ? round1(Math.floor(x*10)/10)+"" : Math.floor(x)+""; }
+function achIcon(a, on, pr){ return on ? (a.grp==="c" ? achStarGlyph(a.star) : a.icon)
+  : pr ? '<span class="achp">'+achNum(pr.k,pr.cur)+' / '+achNum(pr.k,pr.goal)+'</span><div class="achbar"><i style="width:'+Math.round(pr.f*100)+'%"></i></div>'
+  : '<span class="achlock">'+ICON.lock+'</span>'; }
+// grouped (Consistency · Training · Range), unlocked first in each; rendered from union(stored, live) so a badge never re-locks
 function renderAchievements(){
   const wrap=$("achGrid"); if(!wrap) return;
-  const have=new Set(unlockedIds());
-  wrap.innerHTML=ACHIEVEMENTS.map(a=>{ const on=have.has(a.id);
-    return '<div class="ach'+(on?' on':'')+'"><div class="achi">'+(on?a.icon:'<span class="achlock">'+ICON.lock+'</span>')+'</div><div class="acht">'+esc(a.t)+'</div><div class="achd">'+esc(a.d)+'</div></div>';
-  }).join('');
-  const v=lifetimeVolume();
-  const lf=lifetimeVolume("lifted");
-  $("achVol").textContent = fmtBigKg(lf)+" lifted"+(v>lf?" · "+fmtBigKg(v)+" incl. bodyweight":"");
+  const s=achStats(), have=new Set([...(settings.achUnlocked||[]), ...ACHIEVEMENTS.filter(a=>a.test(s)).map(a=>a.id)]), on=starsOn();
+  const v=lifetimeVolume(), lf=lifetimeVolume("lifted");
+  let h="";
+  [["c",STAR_COPY.grpC],["t",STAR_COPY.grpT],["r",STAR_COPY.grpR]].forEach(([g,lbl])=>{
+    if(g==="c" && !on) return;
+    const list=ACHIEVEMENTS.filter(a=>(a.grp||"t")===g), lit=list.filter(a=>have.has(a.id)).concat(list.filter(a=>!have.has(a.id)));
+    h+='<div class="ed-label">'+esc(lbl)+'</div>'+lit.map(a=>{ const u=have.has(a.id), pr=!u && achProg(a,s);
+      return '<div class="ach'+(u?' on':'')+'" data-id="'+a.id+'" role="button" tabindex="0"><div class="achi">'+achIcon(a,u,pr)+'</div><div class="acht">'+esc(a.t)+'</div><div class="achd">'+esc(a.d)+'</div></div>'; }).join('');
+    if(g==="t") h+='<div class="achcap">Lifetime volume moved: <b id="achVol">'+esc(fmtBigKg(lf)+" lifted"+(v>lf?" · "+fmtBigKg(v)+" incl. bodyweight":""))+'</b></div>';
+  });
+  wrap.innerHTML=h;
+}
+function fmtStarDate(t, yr){ return new Date(t).toLocaleDateString(undefined, yr ? {day:"numeric",month:"short",year:"numeric"} : {day:"numeric",month:"short"}); }
+// a tapped tile: title, description, and when it was earned (or how far along it is)
+function openAchDetail(id){
+  const a=ACHIEVEMENTS.find(x=>x.id===id); if(!a) return;
+  const s=achStats(), on=(settings.achUnlocked||[]).includes(id) || a.test(s), at=(settings.achAt||{})[id], pr=!on && achProg(a,s);
+  const st = on ? (typeof at==="number" ? starCopy("achEarned",{date:fmtStarDate(at,true)}) : STAR_COPY.achHist)
+    : pr ? achNum(pr.k,pr.cur)+" / "+achNum(pr.k,pr.goal) : STAR_COPY.achLocked;
+  $("achBody").innerHTML='<div class="sheetlead achd-sheet"><div class="achi">'+(on ? (a.grp==="c" ? achStarGlyph(a.star) : a.icon) : '<span class="achlock">'+ICON.lock+'</span>')+'</div>'
+    +'<div class="lh">'+esc(a.t)+'</div><div class="lc">'+esc(a.d)+'</div></div>'
+    +(a.dd ? '<p class="sheetintro">'+esc(a.dd)+'</p>' : '')
+    +'<p class="sheetintro">'+esc(st)+'</p>'+(pr ? '<div class="achbar"><i style="width:'+Math.round(pr.f*100)+'%"></i></div>' : '');
+  $("achBody").classList.add("achd-sheet");
+  openSheet("Ach");
 }
 // kept for any caller outside the three log handlers
 function celebrateAch(ids){ if(ids && ids.length) celebrateMoment({ achIds:ids }); }
+
+// ================= week stars: UI =================
+// The "Stars & achievements" fold (sky card, this week, this year), the Stars sheet, the one-time intro, the
+// calendar column and the Overview star. Earned stars only: no surface draws a slot for a week without one.
+function starsOn(){ return !(settings.stars && settings.stars.on===false); }
+function starsN(n){ return n+" star"+(n===1?"":"s"); }
+function starWeekIn(){ const st=settings.stars; return !!(st && st.on!==false && st.earned && st.earned[starWeekId()]); }
+// a 4-point sparkle centred on (x,y), half-size r, with concave sides (like ✦)
+function sparkPath(x,y,r){ const k=r*.2, f=n=>Math.round(n*100)/100, q=(cx,cy,ex,ey)=>"Q"+f(cx)+" "+f(cy)+" "+f(ex)+" "+f(ey);
+  return "M"+f(x)+" "+f(y-r)+q(x+k,y-k,x+r,y)+q(x+k,y+k,x,y+r)+q(x-k,y+k,x-r,y)+q(x-k,y-k,x,y-r)+"Z"; }
+function starIcon(){ return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="'+sparkPath(12,12,12)+'"/></svg>'; }
+// seeded PRNG, so a figure's background dots sit in the same place on every render
+function starRng(seed){ let h=2166136261; for(const c of String(seed)) h=Math.imul(h^c.charCodeAt(0),16777619);
+  return ()=>{ h=(h+0x6D2B79F5)|0; let t=Math.imul(h^h>>>15,1|h); t=(t+Math.imul(t^t>>>7,61|t))^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+// One figure as inline SVG. lit = stars earned in figure order; lines join lit stars only; the rest are faint dots
+// (stars to come, never dated). o: {w,h, box:[x,y,w,h], r, bg: background dots, bgH: their band's height, dots:false,
+// halo:false, newest, anim, field}
+let _skyUid=0;
+function drawConstellation(fig, lit, o){
+  o=o||{}; const W=o.w||340, H=o.h||200, b=o.box||[24,56,W-48,H-72], r=o.r||7, uid="sky"+(++_skyUid), rnd=starRng(fig?fig.id:"field");
+  const f=n=>n.toFixed(1);
+  let h='<svg class="skyc'+(o.anim?' anim':'')+'" viewBox="0 0 '+W+' '+H+'" aria-hidden="true">'
+    +(o.halo===false?'':'<defs><radialGradient id="'+uid+'"><stop offset="0" class="h0"/><stop offset="1" class="h1"/></radialGradient></defs>');
+  for(let i=0;i<(o.bg||0);i++) h+='<circle class="bg" cx="'+f(rnd()*W)+'" cy="'+f(rnd()*(o.bgH||H))+'" r="'+(.5+rnd()*.3).toFixed(2)+'" opacity="'+(.15+rnd()*.2).toFixed(2)+'"/>';
+  let P;
+  if(fig){ const xs=fig.pts.map(p=>p[0]), ys=fig.pts.map(p=>p[1]), x0=Math.min(...xs), y0=Math.min(...ys);
+    const bw=Math.max(.05,Math.max(...xs)-x0), bh=Math.max(.05,Math.max(...ys)-y0), k=Math.min(b[2]/bw, b[3]/bh);
+    const ox=b[0]+(b[2]-bw*k)/2, oy=b[1]+(b[3]-bh*k)/2;
+    P=fig.pts.map(p=>[ox+(p[0]-x0)*k, oy+(p[1]-y0)*k]);
+    fig.edges.forEach(([a,c])=>{ if(a<lit && c<lit) h+='<path class="ln" pathLength="1" d="M'+f(P[a][0])+' '+f(P[a][1])+'L'+f(P[c][0])+' '+f(P[c][1])+'"/>'; });
+  } else { P=[]; for(let i=0;i<Math.min(o.field||0,160);i++) P.push([b[0]+rnd()*b[2], b[1]+rnd()*b[3]]); lit=P.length; }   // past 104: the all-time field
+  const step = fig ? 60 : Math.min(60, 900/Math.max(1,lit));   // the field's pop-in is done in about a second, however many stars
+  P.forEach((p,i)=>{
+    if(i>=lit){ if(o.dots!==false) h+='<circle class="dot" cx="'+f(p[0])+'" cy="'+f(p[1])+'" r="2"/>'; return; }
+    const R = fig ? r*(o.newest && i===lit-1 ? 1.4 : .88+(i%3)*.08) : r*(.35+rnd()*.35);
+    h+='<g class="stg"'+(o.anim?' style="animation-delay:'+Math.round(i*step)+'ms"':'')+(fig?'':' opacity="'+(.45+rnd()*.55).toFixed(2)+'"')+'>'   // the field: no halos, varied brightness
+      +(o.halo===false || !fig ?'':'<circle cx="'+f(p[0])+'" cy="'+f(p[1])+'" r="'+f(R*2.2)+'" fill="url(#'+uid+')"/>')
+      +'<path class="st" d="'+sparkPath(p[0],p[1],R)+'"/></g>';
+  });
+  return h+'</svg>';
+}
+// sorted earned week ids — the lifetime order the figures fill in
+function starKeys(){ return Object.keys(((settings.stars||{}).earned)||{}).sort(); }
+function starMonth(id, long){ const p=String(id).split("-").map(Number); return new Date(p[0],p[1]-1,p[2]).toLocaleDateString(undefined,{month:long?"long":"short",year:"numeric"}); }
+// the sky panel. kind: card (Me) · sheet · intro · done (a completed figure, o.fig). [viewBox w, h, figure box, star r,
+// background dots]. The captions sit in flow above the SVG, so no star can land under them at any width.
+const SKY_SIZE={ card:[340,146,[28,14,284,112],7,22], sheet:[340,186,[28,16,284,148],8,30],
+  intro:[340,140,[28,14,284,108],7,20], done:[340,170,[28,14,284,136],8,24] };
+function skyBox(kind, o){
+  o=o||{}; const n=starCount(), pg=skyProgress(n), ks=starKeys(), Z=SKY_SIZE[kind];
+  let fig, lit, name, count=n, sub="", note="";
+  if(o.fig){ fig=o.fig; lit=fig.pts.length; name=fig.name; count=0; sub=o.sub||""; }
+  else if(!pg.fig){ fig=null; lit=0; name="All-time sky"; }
+  else if(!pg.lit && pg.done.length){ fig=pg.done[pg.done.length-1]; lit=fig.pts.length;   // just finished: keep it lit until the next figure's first star
+    name=starCopy("skyCap",{name:fig.name, lit, total:lit}); sub=starCopy("skyNext",{name:pg.fig.name}); }
+  else { fig=pg.fig; lit=pg.lit; name = n ? starCopy("skyCap",{name:fig.name, lit, total:pg.total}) : fig.name; }
+  if(kind==="sheet" && n) sub=(sub?sub+" · ":"")+starCopy("since",{month:starMonth(ks[0],true)});
+  const empty = !o.fig && n===0;
+  if(empty && kind==="card"){ const any=Object.keys(hist).some(k=>(hist[k]||[]).length) || (extlog||[]).length;
+    const T=starBaseTarget(); note=starCopy(any?"emptyHist":"emptyNew",{s: T===1 ? "one session" : T+" sessions"}); }
+  const box = note ? [Z[2][0], Z[2][1]-8, Z[2][2], Z[2][3]-28] : Z[2];
+  return '<div class="starsky sk-'+kind+(fig && fig.sky===2?' sky2':'')+'">'
+    +'<div class="skycap"><span class="skyname">'+esc(name)+(sub?'<small>'+esc(sub)+'</small>':'')+'</span>'
+      +(count ? '<span class="skyn"><b>'+count+'</b>'+(count===1?'star':'stars')+'</span>' : '')+'</div>'
+    +drawConstellation(fig, lit, { w:Z[0], h:Z[1], box, r:Z[3], bg:Z[4], bgH: note ? box[1]+box[3] : 0, field:fig?0:n, newest:!o.fig, anim:o.anim })   // no texture under the note
+    +(note ? '<div class="skynote">'+esc(note)+'</div>' : '')+'</div>';
+}
+// this week as the fold reads it: credit W toward target T (light weeks: 1), and whether its star is in
+function starWeekNow(){ const id=starWeekId(), r=starWeekRange(id), map=starDayMap(r[0],r[1]), t=starTargetFor(id,map), w=weekStarCredit(id,map,t.why==="injury");
+  return { id, T:t.T, light:t.mode==="l", W:w.W, earned:!!(((settings.stars||{}).earned||{})[id]) }; }
+// the micro-session toast's neutral clause: "1.6 of 2 this week" (nothing once the star is in, or with stars off)
+function starWeekClause(){ if(!starsOn()) return ""; const w=starWeekNow(); return w.earned || !(w.W>0) ? "" : starCopy("microWeek",{W:starW1(w.W), T:w.T}); }
+// W for display, floored to a tenth: 1.97 reads "1.9 of 2", never "2 of 2" without the star
+function starW1(W){ return Math.floor(W*10+1e-6)/10; }
+// this week's line (Me sky card, Overview stars card). short: the Overview's one-line form once the star is in
+function starWeekHTML(short){ const w=starWeekNow();
+  if(w.earned){ const rest = readiness(0)==="overreached" || (settings.sinceDeload||0)>=DELOAD_AT;
+    return '<span class="stglyph">'+starIcon()+'</span><span>'+esc(short ? STAR_COPY.spotlight : STAR_COPY[rest?"weekInRest":"weekIn"])+'</span>'; }
+  if(w.W>0) return '<span class="swbar"><i style="width:'+Math.round(Math.min(1,w.W/w.T)*100)+'%"></i></span><span><b>'+esc(starCopy("weekPart",{W:starW1(w.W), T:w.T}))+'</b></span>';
+  return '<span>'+esc(w.light ? STAR_COPY.weekZeroLight : w.T===1 ? STAR_COPY.weekZeroOne : starCopy("weekZero",{T:w.T}))+'</span>';
+}
+function renderStarWeek(){ const el=$("starWeek"); if(el) el.innerHTML=starWeekHTML(); }
+// the Overview's compact stars card, right after Today: the figure being filled, the count, and this week's line
+function ovStarsHTML(){
+  if(!starsOn()) return "";
+  const n=starCount(), pg=skyProgress(n), just=pg.fig && !pg.lit && pg.done.length;   // just finished: keep it lit until the next figure starts
+  const fig = just ? pg.done[pg.done.length-1] : pg.fig, lit = just ? fig.pts.length : pg.lit;
+  const cap = !fig ? starCopy("skyField",{n}) : !n ? fig.name : starCopy("skyCap",{name:fig.name, lit, total:fig.pts.length});
+  return '<div class="ed-label">'+esc(STAR_COPY.ovLabel)+'</div><div class="group ovtap" id="ovStars" role="button" tabindex="0" aria-label="'+esc(STAR_COPY.skyOpen)+'"><div class="pad ovstars">'
+    +'<span class="starsky glyph'+(fig && fig.sky===2?' sky2':'')+'">'+drawConstellation(fig, lit, {w:72,h:56,box:[8,8,56,40],r:2.6,halo:false,bg:5,field:fig?0:n})+'</span>'
+    +'<div class="tsum-main"><div class="tsum-stat">'+(n ? n+'<span class="u">'+(n===1?'star':'stars')+'</span>' : esc(STAR_COPY.ovEmpty))+'</div>'
+    +'<div class="tsum-cap">'+esc(cap)+'</div><div class="starweek">'+starWeekHTML(true)+'</div></div><span class="tsum-chev"></span></div></div>';
+}
+// "2026 · 38 stars" + one small star per earned week of that year; earlier years behind "‹ 2025" (only if they have stars)
+let _starYr=null;
+function renderStarYear(){
+  const el=$("starYear"); if(!el) return; const by={};
+  starKeys().forEach(k=>{ (by[k.slice(0,4)]=by[k.slice(0,4)]||[]).push(k); });
+  const ys=Object.keys(by).sort(), cy=String(new Date().getFullYear());
+  if(!ys.length){ el.hidden=true; return; }
+  const y = _starYr && by[_starYr] ? _starYr : by[cy] ? cy : ys[ys.length-1], i=ys.indexOf(y), prev=ys[i-1], next=ys[i+1];
+  el.hidden=false;
+  el.innerHTML='<div class="syhd">'+(prev?'<button type="button" class="synav" data-y="'+prev+'">‹ '+prev+'</button>':'')
+    +'<span class="syl">'+esc(starCopy("year",{year:y, stars:starsN(by[y].length)}))+'</span>'
+    +(next?'<button type="button" class="synav" data-y="'+next+'">'+next+' ›</button>':'')+'</div>'
+    +'<div class="syrow">'+by[y].map(()=>starIcon()).join('')+'</div>';
+  el.querySelectorAll(".synav").forEach(b=> b.onclick=e=>{ e.stopPropagation(); _starYr=b.dataset.y; renderStarYear(); });
+}
+function renderStars(){
+  const top=$("starTop"); if(!top) return; const on=starsOn();
+  const t=$("starFoldT"); if(t) t.textContent=on?STAR_COPY.fold:STAR_COPY.foldOff;
+  top.hidden=!on; const off=$("starOff"); if(off) off.hidden=on; const me=$("meSky"); if(me) me.hidden=!on;
+  if(!on) return;
+  $("starSky").innerHTML=skyBox("card");
+  renderStarWeek(); renderStarYear(); top.hidden=$("starYear").hidden;
+}
+function renderStarsEverywhere(){
+  renderStars(); renderAchievements(); renderCalendar();
+  if($("sheetStars") && $("sheetStars").classList.contains("show")) renderStarsSheet();
+  const pg=document.querySelector(".page.active"); if(pg && pg.dataset.tab==="overview") renderOverview();
+}
+// a settings change from the Stars sheet: re-check this + last week (it's a user action, so it may celebrate).
+// quiet (the intro sheet, which has no particles): record a star the change earns, with no burst, toast or post
+function starsChanged(quiet){
+  if(quiet){ checkStars({silent:true}); sset("settings",settings); renderStarsEverywhere(); return; }
+  const sr=checkStars(), sm=starMoment(sr), fresh=checkAchievements(), cp=consistPost(sr, {rings:false}); sset("settings",settings);
+  if(fresh.length || sm.star || sm.constellation) celebrateMoment(Object.assign({ achIds:fresh, shared:cp.star }, sm));
+  renderStarsEverywhere();
+}
+// 1 · 2 · 3 · 4 · Match plan; a change applies from this week (earned stars are never re-scored)
+function starTargetHTML(){
+  const st=settings.stars||{}, cur = st.target==="plan" ? "plan" : String(starBaseTarget()), p=activePlan(), d=p ? Math.round(planSessionsPerWeek(p)) : 0, T=starBaseTarget();
+  return '<div class="seg appearance sttarget" role="radiogroup" aria-label="'+esc(STAR_COPY.yourWeek)+'">'+["1","2","3","4","plan"].map(v=>
+      '<div class="s'+(v===cur?' active':'')+'" data-t="'+v+'" role="radio" tabindex="0" aria-checked="'+(v===cur)+'">'+(v==="plan"?esc(STAR_COPY.matchPlan):v)+'</div>').join('')+'</div>'
+    +'<p class="levelcap">'+esc(STAR_COPY.picker)+'</p>'
+    +(d>T && T>=2 ? '<p class="levelcap">'+esc(starCopy("planCtx",{d, T}))+'</p>' : '');
+}
+function wireStarTarget(host, after, quiet){
+  host.querySelectorAll(".sttarget .s").forEach(el=> el.onclick=()=>{ if(!settings.stars) seedStars(); const st=settings.stars, wk=starWeekId();
+    if(st.tWk!==wk){ st.tPrev=starBaseTarget(); st.tWk=wk; }   // last week keeps the target it ended under
+    st.target = el.dataset.t==="plan" ? "plan" : +el.dataset.t; haptic(8); starsChanged(quiet); if(after) after(); });
+}
+// the light reason a mode or the log sets for this week right now (the manual switch can't clear these)
+function starLiveWhy(id){ const r=starWeekRange(id);
+  if(id===starWeekId()){ if(activeInjuries().length) return "injury"; if(settings.travelMode && settings.travelMode!=="off") return "travel"; if(starDeloadWk()===id) return "deload"; }
+  if(settings.deloadAt>=r[0] && settings.deloadAt<r[1]) return "deload";
+  return weekStarCredit(id, starDayMap(r[0],r[1])).tv ? "travel" : null; }
+function swRow(id, label, on, dis){ return '<label class="swrow'+(dis?' dis':'')+'"><span>'+esc(label)+'</span><input type="checkbox" class="livesw" id="'+id+'"'+(on?' checked':'')+(dis?' disabled':'')+' role="switch"><span class="liveswui acc" aria-hidden="true"></span></label>'; }
+const STAR_EV=[["weekendwarrior","evWeekend"],["maintain","evMaintain"],["comeback","evComeback"],["deload","evDeload"]];
+let _stDone=null;   // the completed figure opened in the sheet
+function skyAnimDue(n){ let seen=-1; try{ seen=+(localStorage.getItem("yallaSkyDrawn")||-1); }catch(e){} return n>seen; }
+function skyAnimSeen(n){ try{ localStorage.setItem("yallaSkyDrawn", String(n)); }catch(e){} }
+function openStarsSheet(){
+  const pg=skyProgress(), done=pg.done;
+  _stDone=null;
+  // first open after a completion: draw the newest finished figure in, once — at the top while it's still the one
+  // shown there (no star of the next figure yet), otherwise opened from the Completed row
+  const anim = starsOn() && done.length && skyAnimDue(done.length);
+  if(anim){ if(pg.lit) _stDone=done[done.length-1].id; skyAnimSeen(done.length); }
+  renderStarsSheet(anim); openSheet("Stars"); requestAnimationFrame(stDoneInView);   // laid out only once the sheet shows
+}
+function renderStarsSheet(anim){
+  const body=$("starsBody"); if(!body) return;
+  body.classList.add("stsheet");
+  const st=settings.stars||{}, on=starsOn(), pg=skyProgress(), ks=starKeys();
+  let h="";
+  if(on){
+    h+=skyBox("sheet",{anim: anim && !_stDone});
+    if(pg.done.length){
+      let at=0; const done=pg.done.map(f=>{ const s0=at; at+=f.pts.length; return { f, s0, wk:ks.slice(s0, at) }; });
+      h+='<div class="ed-label">'+esc(STAR_COPY.done)+'</div><div class="stdone">'+done.map(d=>'<button type="button" data-f="'+d.f.id+'"'+(_stDone===d.f.id?' class="on"':'')+'>'
+        +'<span class="starsky glyph'+(d.f.sky===2?' sky2':'')+'">'+drawConstellation(d.f, d.f.pts.length, {w:72,h:56,box:[8,8,56,40],r:2.6,halo:false,bg:5})+'</span>'
+        +'<span class="nm">'+esc(d.f.name)+'</span><span class="mo">'+esc(starMonth(d.wk[d.wk.length-1]))+'</span></button>').join('')+'</div>';
+      const d=done.find(x=>x.f.id===_stDone);
+      if(d){ const r0=starWeekRange(d.wk[0])[0], r1=starWeekRange(d.wk[d.wk.length-1])[1], map=starDayMap(r0,r1), E=st.earned||{};
+        h+='<div class="stwks">'+skyBox("done",{fig:d.f, sub:starMonth(d.wk[d.wk.length-1]), anim})
+          +'<div class="group" style="margin-top:var(--gap-card);"><div class="pad">'+d.wk.map(id=>{ const n=weekStarCredit(id,map).days, p=id.split("-").map(Number);
+            return '<div class="stwk"><span>'+esc(starCopy("weekDetail",{date:fmtStarDate(new Date(p[0],p[1]-1,p[2])), s:n+" session"+(n===1?"":"s")}))+'</span>'
+              +(/l/.test(E[id]||"")?'<span>'+esc(STAR_COPY.lightWeek)+'</span>':'')+'</div>'; }).join('')+'</div></div>'
+          +'<button type="button" class="btn tinted wide" id="stShareFig" style="margin-top:var(--gap-card);">'+esc(STAR_COPY.shareFig)+'</button></div>'; }
+    }
+    h+='<div class="ed-label">'+esc(STAR_COPY.yourWeek)+'</div>'+starTargetHTML();
+    const cur=starWeekId(), why=(st.light||{})[cur], live=starLiveWhy(cur);
+    h+='<div class="ed-label">'+esc(STAR_COPY.light)+'</div><div class="group"><div class="pad">'+swRow("stLight", STAR_COPY.lightSw, !!why || !!live, !!live)
+      +((why||live) ? '<div class="chips wrap">'+Object.keys(STAR_LIGHT).map(k=>'<button type="button" class="chip'+(k===(live||why)?' on':'')+'" data-why="'+k+'"'+(live?' disabled':'')+'>'+esc(STAR_LIGHT[k])+'</button>').join('')+'</div>' : '')
+      +'<p class="levelcap">'+esc(live ? starCopy("lightAuto",{why:STAR_LIGHT[live].toLowerCase()}) : STAR_COPY.lightHelp)+'</p></div></div>';
+  }
+  h+='<div class="ed-label">'+esc(STAR_COPY.howTitle)+'</div><div class="group"><div class="pad"><p class="ovp">'+esc(STAR_COPY.how)+'</p><div class="chips wrap">'
+    +STAR_EV.map(([id,k])=>{ const a=(EVIDENCE.advice||[]).find(x=>x.id===id); if(!a) return "";
+      const u=TIP_DOI[id], inner=esc(STAR_COPY[k])+' <small>'+(a.tone==="linked"?esc(STAR_COPY.evLinked)+' · ':'')+esc(shortCite(a.study))+'</small>';
+      return u ? '<a class="chip evc" href="'+esc(u)+'" target="_blank" rel="noopener">'+inner+' <span class="srcarrow">↗</span></a>' : '<span class="chip evc">'+inner+'</span>'; }).join('')
+    +'</div></div></div>';
+  const canPost = on && cloudReady() && (settings.shareLevel||0)>=1;
+  h+='<div class="group"><div class="pad">'+swRow("stOn", STAR_COPY.showStars, on)
+    +(canPost ? swRow("stPost", STAR_COPY.post, st.post!==false)+'<p class="levelcap">'+esc(STAR_COPY.postHelp)+'</p>' : '')+'</div></div>';
+  // "Share your sky": the sky card (renderStarTile), once there is a star to show
+  if(on && ks.length) h+='<button type="button" class="btn tinted wide" id="stShare">'+esc(STAR_COPY.share)+'</button>';
+  body.innerHTML=h;
+  wireStarTarget(body);
+  body.querySelectorAll(".stdone button").forEach(b=> b.onclick=()=>{ _stDone = _stDone===b.dataset.f ? null : b.dataset.f; renderStarsSheet(); });
+  // a manual change stamps the week (stars.lightSet), so switching it off survives a sync with a device that still has it on
+  const lightSet=()=>{ const st=settings.stars, cur=starWeekId(), prev=starWeekId(starWeekRange(cur)[0]-1), S={};
+    Object.keys(st.lightSet||{}).forEach(k=>{ if(k>=prev) S[k]=st.lightSet[k]; }); S[cur]=Date.now(); st.lightSet=S; };
+  const lt=$("stLight"); if(lt) lt.onchange=()=>{ if(!settings.stars) seedStars(); const L=settings.stars.light=settings.stars.light||{}, cur=starWeekId();
+    if(lt.checked) L[cur]=L[cur]||"busy"; else delete L[cur]; lightSet(); starsChanged(); };
+  body.querySelectorAll(".chip[data-why]").forEach(c=> c.onclick=()=>{ if(c.disabled) return; settings.stars.light=settings.stars.light||{}; settings.stars.light[starWeekId()]=c.dataset.why; lightSet(); starsChanged(); });
+  $("stOn").onchange=e=>{ if(!settings.stars) seedStars(); settings.stars.on=e.target.checked; starsChanged(); };
+  const sp=$("stPost"); if(sp) sp.onchange=e=>{ settings.stars.post=e.target.checked; sset("settings",settings); };
+  const sh=$("stShare"); if(sh) sh.onclick=()=>shareStarCard("sky");
+  const sf=$("stShareFig"); if(sf) sf.onclick=()=>{ const f=SKY.find(x=>x.id===_stDone); if(f) shareStarCard("const", f); };
+  stDoneInView();
+}
+// the open figure's tile in view: the Completed row scrolls sideways only, never the sheet
+function stDoneInView(){ const row=document.querySelector("#starsBody .stdone"), sel=row && row.querySelector("button.on"); if(!sel) return;
+  const a=row.getBoundingClientRect(), b=sel.getBoundingClientRect(); if(b.right>a.right || b.left<a.left) row.scrollLeft += b.right>a.right ? b.right-a.right : b.left-a.left; }
+// shown once, on the next open of Overview or Me after the first count of your history (no particles)
+// openedAt: when the tab was opened — the count must predate it, so the launch that seeds never pops the sheet
+function maybeStarIntro(openedAt){
+  const st=settings.stars; if(!st || st.introSeen!==false || !starsOn() || !(st.seededAt<openedAt) || (cloudUser && !_reconciled)) return;   // a sync may still bring the sky in
+  if(!starCount()){ st.introSeen=true; starSave(); return; }   // nothing counted yet: the empty sky explains itself
+  if(document.querySelector(".sheet.show") || document.querySelector("#onboardWrap.show") || sessionUnderway()) return;
+  const pg=document.querySelector(".page.active"); if(!pg || (pg.dataset.tab!=="overview" && pg.dataset.tab!=="me")) return;
+  st.introSeen=true; starSave();
+  const render=()=>{ const b=$("starIntroBody"); b.classList.add("stsheet");
+    const n=starCount(), nb=Object.values(settings.stars.earned||{}).filter(m=>String(m).charAt(0)==="b").length;   // "from your history" only when every star is back-filled
+    b.innerHTML='<p class="sheetintro">'+esc(starCopy(nb===n ? "intro" : "introAll",{stars:starsN(n)}))+'</p>'+skyBox("intro")+'<div class="ed-label">'+esc(STAR_COPY.yourWeek)+'</div>'+starTargetHTML()
+      +'<button type="button" class="btn wide" id="starIntroOk" style="margin-top:var(--gap-section);">'+esc(STAR_COPY.ok)+'</button>';
+    wireStarTarget(b, render, true); $("starIntroOk").onclick=()=>closeSheet("StarIntro"); };
+  render(); openSheet("StarIntro");
+}
+if($("meSky")){ const o=()=>openStarsSheet(); $("meSky").onclick=o; $("starSky").onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); o(); } }; }
+if($("starOff")) $("starOff").onclick=()=>openStarsSheet();
+if($("achGrid")){ const go=e=>{ const t=e.target.closest(".ach[data-id]"); if(t) openAchDetail(t.dataset.id); };
+  $("achGrid").onclick=go; $("achGrid").onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); go(e); } }; }
+[["Stars","starsClose"],["StarIntro","starIntroClose"],["Ach","achClose"]].forEach(([s,b])=>{ if($(b)) $(b).onclick=()=>closeSheet(s); if($("scrim"+s)) $("scrim"+s).onclick=()=>closeSheet(s); });
 
 // ================= progress diagnostic (nutrition vs training) =================
 function bwSlopePctWk(days){
@@ -8903,15 +9626,23 @@ async function applyRestore(obj){
   confirmAsk(reach,"Restore",async()=>{
     // keep an escape hatch: nothing else snapshots the pre-restore state, and there is no undo
     try{ const pre=await gatherData(); if(pre) await _localSet("_preRestore", {t:Date.now(), data:pre}); }catch(e){}
-    const prevAccent=isAccent(settings.accent) ? settings.accent : null;
+    const prevAccent=isAccent(settings.accent) ? settings.accent : null, preS=settings;
+    // the restored target is a target change made now: last week keeps the target it was judged at (stars spec 2.3)
+    const wk=starWeekId(), pwk=starWeekId(starWeekRange(wk)[0]-1), pst=preS.stars, preT=pst ? starBaseTarget() : null,
+      preTP = !pst ? null : pst.tAt && pst.tAt[pwk]!=null ? pst.tAt[pwk] : pst.tWk && pwk<pst.tWk ? (pst.tPrev||2) : preT;
     for(const k of CLOUD_KEYS){ if(data[k]!=null) await sset(k,data[k]); }
-    settings=Object.assign({}, (await sget("settings"))||{});
+    // stars, badges and deloads only grow: an older backup keeps what was earned since; every other field is the backup's
+    settings=mergeGrowingSettings(preS, Object.assign({}, (await sget("settings"))||{}));
+    if(pst && settings.stars){ const st=settings.stars=Object.assign({}, settings.stars);
+      st.tAt=Object.assign({}, st.tAt, { [pwk]:preTP }); st.tWk=wk; st.tPrev=preT; }
     // a backup from before the accent picker has no accent: keep this device's, as cloud adopt does
-    if(prevAccent && !isAccent(settings.accent)){ settings.accent=prevAccent; await sset("settings",settings); }
+    if(prevAccent && !isAccent(settings.accent)) settings.accent=prevAccent;
     plans=(await sget("plans"))||[]; last=(await sget("lastsets"))||{}; bw=(await sget("bodyweight"))||[]; hist=(await sget("history"))||{}; extlog=(await sget("extlog"))||[];
     ledger=(await sget("predledger"))||[]; calib=(await sget("calib"))||lgFreshCalib();
     if(!plans.length) plans=DEFAULT_PLANS.map(p=>JSON.parse(JSON.stringify(p)));
     if(!plans.find(p=>p.id===settings.activePlanId)) settings.activePlanId=plans[0].id;
+    starLateBackfill(); if(!settings.stars) seedStars(); else checkStars({silent:true});   // count the restored history; adds only
+    await sset("settings",settings);
     curWk=0; freeMode=false; swaps={}; draft={}; await sset("draft", draft);
     applyTheme(); renderAll();
     toast("Backup restored — welcome back.",true);
@@ -8925,7 +9656,7 @@ if($("acctLogoutBtn")) $("acctLogoutBtn").onclick=cloudLogout;
 if($("acctName")) $("acctName").onchange=async()=>{ const v=$("acctName").value.trim().slice(0,24);
   settings.displayName=v; if(!settings.name) settings.name=v; await sset("settings",settings);
   if(cloudReady()){ try{ await sb.from("profiles").upsert({ user_id:cloudUser.id, display_name:v||cloudUser.email.split("@")[0] }); }catch(e){} }
-  if($("ovGreet")) $("ovGreet").textContent=ovGreetWord()+((settings.displayName||settings.name)?", "+(settings.displayName||settings.name):""); toast("I'll call you "+(v||"by your email")+"."); };
+  if($("ovGreet")) $("ovGreet").textContent=ovGreeting(); toast("I'll call you "+(v||"by your email")+"."); };
 if($("acctPush")) $("acctPush").onclick=cloudForcePush;
 if($("nameSave")) $("nameSave").onclick=saveDisplayName;
 if($("acctDelete")) $("acctDelete").onclick=cloudDeleteData;
@@ -9142,6 +9873,8 @@ async function openProfile(uid, name){
   try{ const { data } = await sb.from("activity").select("id,user_id,created_at,summary").eq("user_id",uid).order("created_at",{ascending:false}).limit(6); rows=data||[]; }catch(e){}
   if(!rows.length){ av.innerHTML='<div class="ed-label">Recent workouts</div><p class="levelcap" style="margin:0;">Nothing shared yet.</p>'; return; }
   av.innerHTML='<div class="ed-label">Recent workouts</div>'+rows.map(r=>{ const s=r.summary||{}, lvl=s.lvl||1, can=(lvl>=2&&s.ex&&s.ex.length);
+    if(s.stars!=null) return '<div class="profwo profstar" data-id="'+esc(r.id)+'"><div><div style="font-weight:600;">'+esc(s.name||"")+'</div>'
+      +'<div class="levelcap" style="margin-top:3px;">'+esc(agoStr(Date.parse(r.created_at)))+'</div></div>'+feedSkyHTML(s)+'</div>';
     const stats=[ s.exN?s.exN+" ex":null, s.sets!=null?s.sets+" sets":null, s.vol?fmtKg(s.vol):null, s.mins?Math.round(s.mins)+" min":null ].filter(Boolean).join(" · ");
     return '<div class="profwo" data-id="'+esc(r.id)+'" style="padding:10px 4px; border-bottom:.5px solid var(--line); cursor:'+(can?"pointer":"default")+';">'
       +'<div style="font-weight:600;">'+esc(s.name||"Workout")+(can?' <span class="levelcap" style="font-weight:500;">· tap<span class="ovchev lnkchev">›</span></span>':'')+'</div>'
@@ -9403,22 +10136,122 @@ function renderShareTile(s){
     x.font="700 23px -apple-system,system-ui,sans-serif"; x.fillStyle="rgba(255,255,255,.85)"; x.fillText(st[0], bx+bw/2, by+118); });
   if(s.top && s.top.w>0){ x.textAlign="center"; x.fillStyle="rgba(255,255,255,.96)"; x.font="700 33px -apple-system,system-ui,sans-serif";
     let t="Top set · "+s.top.name+" · "+s.top.w+"kg × "+s.top.r; if(t.length>46) t="Top · "+s.top.name; x.fillText(t, W/2, 1205); }
-  // footer: a join call-to-action + the app URL drawn as a pill, so anyone who sees the shared image can grab the app
+  tileFooter(x, W);
+  return c;
+}
+// footer: a join call-to-action + the app URL drawn as a pill, so anyone who sees the shared image can grab the app
+function tileFooter(x, W){
   x.textAlign="center"; x.fillStyle="rgba(255,255,255,.82)"; x.font="600 26px -apple-system,system-ui,sans-serif"; x.fillText("Tracked with yalla — join me 💪", W/2, 1262);
   const url=SHARE_URL; x.font="700 28px -apple-system,system-ui,sans-serif"; const uw=x.measureText(url).width, pw=uw+56, ph=56, px=(W-pw)/2, py=1284;
   rrect(x,px,py,pw,ph,28); x.fillStyle="rgba(255,255,255,.18)"; x.fill();
   x.fillStyle="#fff"; x.textBaseline="middle"; x.fillText(url, W/2, py+ph/2+1); x.textBaseline="alphabetic";
+}
+// ===== star share cards (stars spec §6.3–6.4), 1080×1350 like the workout tile. Counts, figure names, weeks/months and
+// "since" dates only: never weights, volume, body data, exercise names, gym, time of day, target, a light week's reason
+// or your name. kind: "week" (this week's star on the figure in progress), "const" (o.fig, a completed figure) or "sky"
+// (the collection). o.week: the star's week id; o.sessions: the week card's session count (the sheet's switch). The
+// accent comes from --accent-hi (the accent tuned for dark surfaces); a PRNG seeded by the week or figure id keeps a
+// re-render identical. =====
+function canvasSpark(x, X, Y, r){ const k=r*.2; x.beginPath(); x.moveTo(X,Y-r); x.quadraticCurveTo(X+k,Y-k,X+r,Y); x.quadraticCurveTo(X+k,Y+k,X,Y+r);
+  x.quadraticCurveTo(X-k,Y+k,X-r,Y); x.quadraticCurveTo(X-k,Y-k,X,Y-r); x.closePath(); }
+// one figure fitted into box [x,y,w,h] (aspect kept): lines join lit stars, the rest are faint dots when o.dots
+function canvasFigure(x, fig, lit, box, o){
+  const xs=fig.pts.map(p=>p[0]), ys=fig.pts.map(p=>p[1]), x0=Math.min(...xs), y0=Math.min(...ys);
+  const bw=Math.max(.05,Math.max(...xs)-x0), bh=Math.max(.05,Math.max(...ys)-y0), k=Math.min(box[2]/bw, box[3]/bh);
+  const ox=box[0]+(box[2]-bw*k)/2, oy=box[1]+(box[3]-bh*k)/2, P=fig.pts.map(p=>[ox+(p[0]-x0)*k, oy+(p[1]-y0)*k]);
+  x.strokeStyle="rgba(255,255,255,.35)"; x.lineWidth=o.lw; x.lineCap="round";
+  fig.edges.forEach(([a,b])=>{ if(a<lit && b<lit){ x.beginPath(); x.moveTo(P[a][0],P[a][1]); x.lineTo(P[b][0],P[b][1]); x.stroke(); } });
+  P.forEach((p,i)=>{
+    if(i>=lit){ if(o.dots){ x.fillStyle="rgba(255,255,255,.2)"; x.beginPath(); x.arc(p[0],p[1],4,0,Math.PI*2); x.fill(); } return; }
+    const nw = o.newest && i===lit-1, R = nw ? o.r*1.7 : o.r*(.88+(i%3)*.12);
+    if(nw){ const g=x.createRadialGradient(p[0],p[1],0,p[0],p[1],R*3.4); g.addColorStop(0,hexAlpha(o.acc,.55)); g.addColorStop(1,hexAlpha(o.acc,0));
+      x.fillStyle=g; x.beginPath(); x.arc(p[0],p[1],R*3.4,0,Math.PI*2); x.fill(); }
+    x.save(); x.shadowColor=o.acc; x.shadowBlur=o.blur; x.fillStyle="#fff"; canvasSpark(x,p[0],p[1],R); x.fill(); x.restore();
+  });
+}
+function renderStarTile(kind, o){
+  o=o||{};
+  const W=1080, H=1350, c=document.createElement("canvas"); c.width=W; c.height=H; const x=c.getContext("2d");
+  const cs=getComputedStyle(document.documentElement), hi=cs.getPropertyValue("--accent-hi").trim();
+  const acc=/^#[0-9a-f]{6}$/i.test(hi) ? hi : accentHex();
+  const ks=starKeys(), n=ks.length, pg=skyProgress(n), ends={}; let at=0; SKY.forEach(f=>{ at+=f.pts.length; ends[f.id]=at; });
+  const week=o.week||starWeekId(), F="-apple-system,system-ui,sans-serif";
+  let fig=null, lit=0, dots=false, newest=false, title, sub, seed;
+  if(kind==="const" && o.fig){ fig=o.fig; lit=fig.pts.length; seed="c:"+fig.id;
+    const first=ks[ends[fig.id]-fig.pts.length];
+    title=starCopy("tileConstT",{name:fig.name}); sub=starCopy("tileConst",{n:fig.pts.length, date:first ? fmtStarDate(starWeekRange(first)[0]) : ""}); }
+  else if(kind==="week"){ seed=week; newest=true; title=STAR_COPY.tileWeekT;
+    if(pg.fig && pg.lit){ fig=pg.fig; lit=pg.lit; dots=true; } else if(pg.done.length && !pg.field){ fig=pg.done[pg.done.length-1]; lit=fig.pts.length; }   // this star finished a figure
+    sub=starCopy("tileWeek",{n, month:ks.length ? starMonth(ks[0], true) : ""}); }
+  else { seed="sky"; title=STAR_COPY.tileSkyT; sub=starCopy("tileSky",{stars:starsN(n), c:pg.done.length+" constellation"+(pg.done.length===1?"":"s")});
+    // the newest completed figure, large (a partial one reads as loose stars without its dots); none yet: the one being filled
+    if(pg.done.length && !pg.field){ fig=pg.done[pg.done.length-1]; lit=fig.pts.length; } else if(pg.fig && pg.lit){ fig=pg.fig; lit=pg.lit; } }
+  const rnd=starRng(seed), glow = fig && fig.sky===2 ? mixHex(acc,"#8ab4ff",.55) : acc;   // the second sky: cooler, as in the app
+  // night sky: accent-tinted ink fading to near-black, an accent glow behind the figure, seeded background dots
+  const g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,mixHex(acc,"#0a0a12",.78)); g.addColorStop(1,"#07070c"); x.fillStyle=g; x.fillRect(0,0,W,H);
+  const gl=x.createRadialGradient(540,560,0,540,560,520); gl.addColorStop(0,hexAlpha(glow,.22)); gl.addColorStop(1,hexAlpha(glow,0)); x.fillStyle=gl; x.fillRect(0,0,W,H);
+  for(let i=0;i<120;i++){ x.fillStyle="rgba(255,255,255,"+(.15+rnd()*.3).toFixed(2)+")"; x.beginPath(); x.arc(rnd()*W, rnd()*H, .5+rnd()*.75, 0, Math.PI*2); x.fill(); }
+  // Pink: static glitter flecks (seeded hexagons in --glit-*) in the lower third
+  if(accentId()==="pink"){ const gc=[1,2,3,4,5,6].map(i=>cs.getPropertyValue("--glit-"+i).trim()).filter(v=>/^#[0-9a-f]{6}$/i.test(v)).concat(/^#[0-9a-f]{6}$/i.test(acc)?[acc]:[]);
+    const gb = kind==="sky" ? 1048+Math.ceil(pg.done.length/6)*90 : 0;   // the sky card's row(s) of figures
+    const clear=(X,Y)=>(X>190 && X<890 && Y<1100) || (X>310 && X<770 && Y>1222) || (X>90 && X<990 && Y<gb);   // keep text, figures and the footer readable
+    for(let i=0, k=0;i<40 && gc.length && k<400;k++){ const X=rnd()*W, Y=900+rnd()*(H-900), r=3+rnd()*3, rot=rnd()*Math.PI; if(clear(X,Y)) continue; i++;
+      x.fillStyle=hexAlpha(gc[Math.floor(rnd()*gc.length)], (.5+rnd()*.4).toFixed(2)); x.beginPath();
+      for(let j=0;j<6;j++){ const a=rot+j*Math.PI/3; j ? x.lineTo(X+Math.cos(a)*r, Y+Math.sin(a)*r) : x.moveTo(X+Math.cos(a)*r, Y+Math.sin(a)*r); }
+      x.closePath(); x.fill(); } }
+  // top row: the wordmark (as on the workout tile) and the date
+  x.fillStyle="#fff"; x.font="800 50px "+F; x.textAlign="left"; x.textBaseline="alphabetic";
+  x.fillText("yalla", 70, 122); const ww=x.measureText("yalla").width; x.fillStyle="rgba(255,255,255,.7)"; x.fillText(".", 72+ww, 122);
+  x.font="600 34px "+F; x.textAlign="right"; x.fillStyle="rgba(255,255,255,.8)"; x.fillText(fmtStarDate(Date.now(), true), W-70, 122);
+  // the figure (y 260–860, 760 wide); past 104 stars, the all-time field
+  if(fig) canvasFigure(x, fig, lit, [160,260,760,600], { r:16, lw:3, blur:24, acc:glow, dots, newest });
+  else { const fr=starRng("field"); for(let i=0;i<Math.min(n-ends[SKY[SKY.length-1].id],160);i++){ const X=160+fr()*760, Y=260+fr()*600;
+    x.save(); x.globalAlpha=.45+fr()*.55; x.shadowColor=acc; x.shadowBlur=12; x.fillStyle="#fff"; canvasSpark(x,X,Y,4+fr()*6); x.fill(); x.restore(); } }
+  x.textAlign="center"; x.fillStyle="#fff"; x.font="800 72px "+F; x.fillText(title, W/2, 950);
+  x.font="500 40px "+F; x.fillStyle="rgba(255,255,255,.75)"; x.fillText(sub, W/2, 1012);
+  if(kind==="week" && o.sessions){ const r=starWeekRange(week), d=weekStarCredit(week, starDayMap(r[0],r[1])).days;
+    const s=d+" session"+(d===1?"":"s"), now=week===starWeekId();   // last week's star, earned late: name its week
+    if(d){ x.font="600 32px "+F; x.fillStyle="rgba(255,255,255,.6)"; x.fillText(now ? starCopy("tileSess",{s}) : starCopy("tileSessPast",{s, date:fmtStarDate(r[0])}), W/2, 1066); } }
+  // the sky card: a row of the completed figures (two rows past six)
+  if(kind==="sky" && pg.done.length){ const D=pg.done, per=6, gw=128, gh=78, gap=16;
+    D.forEach((f,i)=>{ const row=Math.floor(i/per), cnt=Math.min(per, D.length-row*per), col=i%per, x0=(W-(cnt*gw+(cnt-1)*gap))/2;
+      canvasFigure(x, f, f.pts.length, [x0+col*(gw+gap)+10, 1048+row*(gh+12)+8, gw-20, gh-16], { r:5, lw:1.5, blur:8, acc: f.sky===2 ? mixHex(acc,"#8ab4ff",.55) : acc }); }); }
+  tileFooter(x, W);
   return c;
 }
-let _shareCanvas=null;
-function openShareTile(session){
-  try{ const c=renderShareTile(session); _shareCanvas=c; const box=$("sharePreview"); box.innerHTML=""; box.appendChild(c); openSheet("Share"); }
+// The share sheet holds one card at a time. A finish that also earned the week's star gets a Workout | Star segment
+// (Star leads when a figure or milestone landed); a star card on its own hides it. Each card renders when first shown.
+let _shareCanvas=null, _shareName="", _shareSt=null;
+function openShareTile(session, star){
+  try{ _shareSt={ session, star:star||null, k: star && star.lead ? "star" : "workout", sess:true, tiles:{} }; showShareCard(); openSheet("Share"); }
   catch(e){ /* never block the save flow on a render hiccup */ }
 }
+// star: {kind:"week"|"const"|"sky", fig, week}
+function openStarShare(star){
+  try{ _shareSt={ session:null, star, k:"star", sess:true, tiles:{} }; showShareCard(); openSheet("Share"); }catch(e){}
+}
+function shareStarCard(kind, fig){ if(!starCount()) return; openStarShare(kind==="const" ? {kind, fig} : kind==="week" ? {kind, week:starWeekId()} : {kind:"sky"}); }
+// a cardio or other log that completed a figure opens its card; a plain week star from a log opens nothing
+function logStarShare(sr){ const sk=starShareOf(sr); if(sk && sk.kind==="const") setTimeout(()=>openStarShare(sk), 400); }
+function showShareCard(){
+  const S=_shareSt; if(!S) return; const star=S.k==="star" && S.star, key=star ? "s"+(S.star.kind==="week" && S.sess ? "+" : "") : "w";
+  const c=S.tiles[key]||(S.tiles[key] = star ? renderStarTile(S.star.kind, {fig:S.star.fig, week:S.star.week, sessions:S.sess}) : renderShareTile(S.session));
+  _shareCanvas=c; _shareName=(star ? (S.star.kind==="sky" ? "yalla-sky-" : "yalla-star-") : "yalla-")+starDayKey(Date.now())+".png";
+  const box=$("sharePreview"); box.innerHTML=""; box.appendChild(c);
+  const seg=$("shareKind"), sr=$("shareSessRow"), t=$("shareT"); if(!seg || !sr || !t) return;   // a stale cached index.html
+  seg.hidden=!(S.session && S.star);
+  seg.querySelectorAll(".s").forEach(el=>{ const on=el.dataset.k===S.k; el.classList.toggle("active",on); el.setAttribute("aria-checked",String(on)); el.tabIndex=on?0:-1; });
+  sr.hidden=!(star && S.star.kind==="week"); $("shareSess").checked=S.sess;
+  t.textContent = star ? (S.star.kind==="sky" ? STAR_COPY.tileSkyT : S.star.kind==="const" ? starCopy("tileConstT",{name:S.star.fig.name}) : STAR_COPY.tileWeekT)
+    : S.session ? "Workout complete" : "";   // the title names the card being shown
+}
+if($("shareKind")) $("shareKind").querySelectorAll(".s").forEach(el=>{ const go=()=>{ if(!_shareSt || _shareSt.k===el.dataset.k) return; _shareSt.k=el.dataset.k; haptic(8); showShareCard(); };
+  el.onclick=go; el.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); go(); } }; });
+if($("shareSess")) $("shareSess").onchange=e=>{ if(_shareSt){ _shareSt.sess=e.target.checked; showShareCard(); } };
 function shareImage(save){
   if(!_shareCanvas) return;
   _shareCanvas.toBlob(async(blob)=>{ if(!blob){ toast("Couldn't render the image."); return; }
-    const fname="yalla-"+new Date().toISOString().slice(0,10)+".png";
+    const fname=_shareName||"yalla-"+starDayKey(Date.now())+".png";
     if(save){ const url=URL.createObjectURL(blob),a=document.createElement("a"); a.href=url; a.download=fname; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1500); toast("Image saved."); }
     else await shareOrDownload(blob,fname);
   }, "image/png");
@@ -9429,7 +10262,9 @@ $("shareClose").onclick=()=>closeSheet("Share");
 $("scrimShare").onclick=()=>closeSheet("Share");
 
 // cel = a celebration toast (gets the static ✦ under reduced motion). Re-adding .big restarts its pop (and Pink's sheen).
-let tT; function toast(m,big,cel){ const t=$("toast"); t.textContent=m;
+let tT; function toast(m,big,cel){ const t=$("toast");
+  if(cel && /^★ /.test(m) && window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) m=m.slice(2);   // the static ✦ prefix stands in for it
+  t.textContent=m;
   t.classList.remove("big"); if(big){ void t.offsetWidth; t.classList.add("big"); }
   t.classList.toggle("cel",!!cel); t.classList.add("show"); clearTimeout(tT); tT=setTimeout(()=>t.classList.remove("show"), big?2800:2300); }
 // first-open coachmark: show a hint once per id (spreads the "how to use" across the app over time)
