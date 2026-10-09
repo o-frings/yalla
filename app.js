@@ -4924,7 +4924,7 @@ function celebrate(tier, opts){
 function mixHex(a,b,t){ const p=h=>/^#[0-9a-f]{6}$/i.test(h)?[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)):null, x=p(a), y=p(b);
   if(!x||!y) return a; return "#"+x.map((v,i)=>Math.round(v+(y[i]-v)*t).toString(16).padStart(2,"0")).join(""); }
 // Confetti cannons for PRs and unlocks: volleys shot up from both bottom corners that fall back, in the accent's
-// colours (Orange keeps its own gold-leaning palette) with gold/white sparks mixed in. The main sparks come from
+// two hues (--cel-1…6; Orange keeps its own gold-leaning palette, rose included) with gold/white sparks mixed in. The main sparks come from
 // glitter(), which every accent bursts.
 function confetti(tier, opts, low){
   let P=[0,0,40,55][tier]; if(low) P=Math.round(P/2);   // pieces per cannon
@@ -4932,7 +4932,8 @@ function confetti(tier, opts, low){
   const c=document.createElement("div"); c.className="confetti";
   if(!fx || !P) return { el:c, ms:0 };   // the arcs need individual transform properties
   let colors;
-  if(accentId()==="orange") colors=["#ffd60a","#fbbf24","#f5a040","#fff3c4","#ff9f1c","#ff375f","#e8820c"];
+  if(accentId()==="orange") colors=["#ffd60a","#fbbf24","#f5a040","#fff3c4","#ff9f1c","#ff375f","#e8820c",
+    document.documentElement.classList.contains("dark") ? "#ff4d5e" : "#ff2f3d"];   // gold-led, with its red end
   else { const cs=getComputedStyle(document.documentElement);
     colors=[1,2,3,4,5,6].map(i=>cs.getPropertyValue("--cel-"+i).trim()).filter(Boolean);
     if(colors.length<4){ const a=accentHex(), dk=document.documentElement.classList.contains("dark");
@@ -6083,13 +6084,15 @@ function applyTheme(){
   applyAccent();
 }
 // accent picker. Orange is the default and sets no attribute; the <head> script applies the localStorage
-// mirror before first paint. tile = the light --grad stops, used by the share tile in either theme.
+// mirror before first paint. tile = the share tile's fade as [a, b, hold, mid] in either theme: the light --grad-fill
+// (--grad-a, --grad-hold, --grad-mid) with Pink/Blue/Teal ending on --grad-read-b, which keeps the stat boxes' white
+// text at 3:1 (their --grad-b is the lighter end).
 const ACCENTS={
-  orange:{ name:"Orange", tile:["#ff7a18","#ff2f3d"] },
-  pink:{ name:"Pink", tile:["#f2569c","#ce3aa0"] },
-  blue:{ name:"Blue", tile:["#2a8adf","#3d66df"] },
-  teal:{ name:"Teal", tile:["#00a199","#007d8f"] },
-  graphite:{ name:"Graphite", tile:["#5c5c60","#2c2c2e"] }
+  orange:{ name:"Orange", tile:["#ee6010","#ff2f3d",0,.56] },
+  pink:{ name:"Pink", tile:["#e0409a","#d0480f",.2,.7] },
+  blue:{ name:"Blue", tile:["#2f6de0","#097a99",0,.5] },
+  teal:{ name:"Teal", tile:["#0a8a96","#0a7f60",0,.5] },
+  graphite:{ name:"Graphite", tile:["#5a5a5f","#3a4658",0,.5] }
 };
 const isAccent=id=>typeof id==="string" && Object.prototype.hasOwnProperty.call(ACCENTS, id);
 function accentId(){ return isAccent(settings.accent) ? settings.accent : "orange"; }
@@ -6670,9 +6673,10 @@ function prCelebrate(r){
   if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const vEl=r.querySelector(".vol"); if(!vEl) return;
   const rect=vEl.getBoundingClientRect(), cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
-  // Orange keeps its original dots; Pink takes glitter tokens, the other accents their confetti tokens
+  // Orange keeps its own dots (with its rose end); Pink takes glitter tokens, the other accents their confetti tokens,
+  // so every burst carries both of the accent's hues
   const id=accentId(), cs=getComputedStyle(document.documentElement);
-  let colors = id==="orange" ? ["#f5a040","#ffd60a","#fb923c","#f08020"]
+  let colors = id==="orange" ? ["#f5a040","#ffd60a","#ff4d5e","#f08020"]
     : (id==="pink" ? [1,2,5,3].map(i=>cs.getPropertyValue("--glit-"+i).trim()) : [1,2,4,5].map(i=>cs.getPropertyValue("--cel-"+i).trim())).filter(Boolean);
   if(!colors.length) colors=[accentHex()];
   const wrap=document.createElement("div"); wrap.className="prspark";
@@ -7867,7 +7871,7 @@ function checkAchievements(){
 }
 // 4-point accent star for the consistency tiles, with the count inside
 // the waist is wide enough for a 2-digit count (12, 26, 52) to sit inside the fill
-function achStarGlyph(n){ return '<span class="achstar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 0 16.5 7.5 24 12 16.5 16.5 12 24 7.5 16.5 0 12 7.5 7.5Z"/></svg>'+(n?'<b>'+n+'</b>':'')+'</span>'; }
+function achStarGlyph(n){ return '<span class="achstar">'+(n?'<b>'+n+'</b>':'')+'</span>'; }   // the star itself is CSS (.achstar::before)
 // p: [achStats key, goal] — a locked tile with a count rule shows "7 / 12" over a bar instead of the lock
 function achProg(a, s){ if(!a.p) return null; const cur=Math.max(0, +s[a.p[0]]||0), goal=a.p[1]; return { k:a.p[0], cur, goal, f:Math.min(1, cur/goal) }; }
 function achNum(k, x){ return k==="vol" ? (x>=1e6 ? round1(x/1e6)+"M" : x>=1000 ? Math.floor(x/1000)+"k" : Math.floor(x)+"")
@@ -7928,7 +7932,7 @@ function drawConstellation(fig, lit, o){
   o=o||{}; const W=o.w||340, H=o.h||200, b=o.box||[24,56,W-48,H-72], r=o.r||7, uid="sky"+(++_skyUid), rnd=starRng(fig?fig.id:"field");
   const f=n=>n.toFixed(1);
   let h='<svg class="skyc'+(o.anim?' anim':'')+'" viewBox="0 0 '+W+' '+H+'" aria-hidden="true">'
-    +(o.halo===false?'':'<defs><radialGradient id="'+uid+'"><stop offset="0" class="h0"/><stop offset="1" class="h1"/></radialGradient></defs>');
+    +(o.halo===false?'':'<defs><radialGradient id="'+uid+'"><stop offset="0" class="h0"/><stop offset=".45" class="hm"/><stop offset="1" class="h1"/></radialGradient></defs>');
   for(let i=0;i<(o.bg||0);i++) h+='<circle class="bg" cx="'+f(rnd()*W)+'" cy="'+f(rnd()*(o.bgH||H))+'" r="'+(.5+rnd()*.3).toFixed(2)+'" opacity="'+(.15+rnd()*.2).toFixed(2)+'"/>';
   let P;
   if(fig){ const xs=fig.pts.map(p=>p[0]), ys=fig.pts.map(p=>p[1]), x0=Math.min(...xs), y0=Math.min(...ys);
@@ -10120,8 +10124,10 @@ function tileRadar(x,cx,cy,R,tot){
 const SHARE_URL=(()=>{ try{ const p=location.pathname.replace(/\/[^/]*\.[^/]*$/,"/").replace(/\/$/,""); return (location.host+p)||"o-frings.github.io/yalla"; }catch(_){ return "o-frings.github.io/yalla"; } })();
 function renderShareTile(s){
   const W=1080,H=1350,c=document.createElement("canvas"); c.width=W; c.height=H; const x=c.getContext("2d");
-  // the accent's light-theme --grad (Orange: #ff7a18 → #ff2f3d), diagonal top-left → bottom-right
-  const ts=ACCENTS[accentId()].tile, g=x.createLinearGradient(0,0,W,H); g.addColorStop(0,ts[0]); g.addColorStop(1,ts[1]); x.fillStyle=g; x.fillRect(0,0,W,H);
+  // the accent's tile fade (ACCENTS tile; Orange: #ee6010 → #ff2f3d), diagonal top-left → bottom-right; canvas has no
+  // colour hint, so the 50/50 blend is a stop at the hint
+  const ts=ACCENTS[accentId()].tile, g=x.createLinearGradient(0,0,W,H); g.addColorStop(0,ts[0]); g.addColorStop(ts[2],ts[0]);
+  g.addColorStop(ts[3],mixHex(ts[0],ts[1],.5)); g.addColorStop(1,ts[1]); x.fillStyle=g; x.fillRect(0,0,W,H);
   x.fillStyle="#fff"; x.font="800 50px -apple-system,system-ui,sans-serif"; x.textAlign="left"; x.textBaseline="alphabetic";
   x.fillText("yalla", 70, 122); const ww=x.measureText("yalla").width; x.fillStyle="rgba(255,255,255,.7)"; x.fillText(".", 72+ww, 122);
   x.font="600 32px -apple-system,system-ui,sans-serif"; x.textAlign="right"; x.fillStyle="rgba(255,255,255,.82)";
@@ -10133,7 +10139,7 @@ function renderShareTile(s){
   const n=stats.length, pad=70, gap=20, bw=(W-2*pad-(n-1)*gap)/n, by=968, bh=150;
   stats.forEach((st,i)=>{ const bx=pad+i*(bw+gap); rrect(x,bx,by,bw,bh,22); x.fillStyle="rgba(255,255,255,.16)"; x.fill();
     x.textAlign="center"; x.fillStyle="#fff"; x.font="800 46px -apple-system,system-ui,sans-serif"; x.fillText(st[1], bx+bw/2, by+74);
-    x.font="700 23px -apple-system,system-ui,sans-serif"; x.fillStyle="rgba(255,255,255,.85)"; x.fillText(st[0], bx+bw/2, by+118); });
+    x.font="700 23px -apple-system,system-ui,sans-serif"; x.fillStyle="rgba(255,255,255,.95)"; x.fillText(st[0], bx+bw/2, by+118); });
   if(s.top && s.top.w>0){ x.textAlign="center"; x.fillStyle="rgba(255,255,255,.96)"; x.font="700 33px -apple-system,system-ui,sans-serif";
     let t="Top set · "+s.top.name+" · "+s.top.w+"kg × "+s.top.r; if(t.length>46) t="Top · "+s.top.name; x.fillText(t, W/2, 1205); }
   tileFooter(x, W);
@@ -10164,7 +10170,7 @@ function canvasFigure(x, fig, lit, box, o){
   P.forEach((p,i)=>{
     if(i>=lit){ if(o.dots){ x.fillStyle="rgba(255,255,255,.2)"; x.beginPath(); x.arc(p[0],p[1],4,0,Math.PI*2); x.fill(); } return; }
     const nw = o.newest && i===lit-1, R = nw ? o.r*1.7 : o.r*(.88+(i%3)*.12);
-    if(nw){ const g=x.createRadialGradient(p[0],p[1],0,p[0],p[1],R*3.4); g.addColorStop(0,hexAlpha(o.acc,.55)); g.addColorStop(1,hexAlpha(o.acc,0));
+    if(nw){ const g=x.createRadialGradient(p[0],p[1],0,p[0],p[1],R*3.4); g.addColorStop(0,hexAlpha(o.acc,.55)); g.addColorStop(.45,hexAlpha(mixHex(o.acc,o.acc2||o.acc,.45),.26)); g.addColorStop(1,hexAlpha(o.acc,0));
       x.fillStyle=g; x.beginPath(); x.arc(p[0],p[1],R*3.4,0,Math.PI*2); x.fill(); }
     x.save(); x.shadowColor=o.acc; x.shadowBlur=o.blur; x.fillStyle="#fff"; canvasSpark(x,p[0],p[1],R); x.fill(); x.restore();
   });
@@ -10172,8 +10178,8 @@ function canvasFigure(x, fig, lit, box, o){
 function renderStarTile(kind, o){
   o=o||{};
   const W=1080, H=1350, c=document.createElement("canvas"); c.width=W; c.height=H; const x=c.getContext("2d");
-  const cs=getComputedStyle(document.documentElement), hi=cs.getPropertyValue("--accent-hi").trim();
-  const acc=/^#[0-9a-f]{6}$/i.test(hi) ? hi : accentHex();
+  const cs=getComputedStyle(document.documentElement), hi=cs.getPropertyValue("--accent-hi").trim(), hib=cs.getPropertyValue("--accent-hi-b").trim();
+  const acc=/^#[0-9a-f]{6}$/i.test(hi) ? hi : accentHex(), acc2=/^#[0-9a-f]{6}$/i.test(hib) ? hib : acc;
   const ks=starKeys(), n=ks.length, pg=skyProgress(n), ends={}; let at=0; SKY.forEach(f=>{ at+=f.pts.length; ends[f.id]=at; });
   const week=o.week||starWeekId(), F="-apple-system,system-ui,sans-serif";
   let fig=null, lit=0, dots=false, newest=false, title, sub, seed;
@@ -10186,10 +10192,11 @@ function renderStarTile(kind, o){
   else { seed="sky"; title=STAR_COPY.tileSkyT; sub=starCopy("tileSky",{stars:starsN(n), c:pg.done.length+" constellation"+(pg.done.length===1?"":"s")});
     // the newest completed figure, large (a partial one reads as loose stars without its dots); none yet: the one being filled
     if(pg.done.length && !pg.field){ fig=pg.done[pg.done.length-1]; lit=fig.pts.length; } else if(pg.fig && pg.lit){ fig=pg.fig; lit=pg.lit; } }
-  const rnd=starRng(seed), glow = fig && fig.sky===2 ? mixHex(acc,"#8ab4ff",.55) : acc;   // the second sky: cooler, as in the app
-  // night sky: accent-tinted ink fading to near-black, an accent glow behind the figure, seeded background dots
+  const sky2=fig && fig.sky===2, rnd=starRng(seed), glow = sky2 ? mixHex(acc,"#8ab4ff",.55) : acc, glow2 = sky2 ? mixHex(acc2,"#8ab4ff",.55) : acc2;   // the second sky: cooler, as in the app
+  // night sky: accent-tinted ink fading to near-black, an accent glow behind the figure and a fainter one in the second hue, seeded background dots
   const g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,mixHex(acc,"#0a0a12",.78)); g.addColorStop(1,"#07070c"); x.fillStyle=g; x.fillRect(0,0,W,H);
   const gl=x.createRadialGradient(540,560,0,540,560,520); gl.addColorStop(0,hexAlpha(glow,.22)); gl.addColorStop(1,hexAlpha(glow,0)); x.fillStyle=gl; x.fillRect(0,0,W,H);
+  const gl2=x.createRadialGradient(230,330,0,230,330,460); gl2.addColorStop(0,hexAlpha(glow2,.2)); gl2.addColorStop(1,hexAlpha(glow2,0)); x.fillStyle=gl2; x.fillRect(0,0,W,H);
   for(let i=0;i<120;i++){ x.fillStyle="rgba(255,255,255,"+(.15+rnd()*.3).toFixed(2)+")"; x.beginPath(); x.arc(rnd()*W, rnd()*H, .5+rnd()*.75, 0, Math.PI*2); x.fill(); }
   // Pink: static glitter flecks (seeded hexagons in --glit-*) in the lower third
   if(accentId()==="pink"){ const gc=[1,2,3,4,5,6].map(i=>cs.getPropertyValue("--glit-"+i).trim()).filter(v=>/^#[0-9a-f]{6}$/i.test(v)).concat(/^#[0-9a-f]{6}$/i.test(acc)?[acc]:[]);
@@ -10204,7 +10211,7 @@ function renderStarTile(kind, o){
   x.fillText("yalla", 70, 122); const ww=x.measureText("yalla").width; x.fillStyle="rgba(255,255,255,.7)"; x.fillText(".", 72+ww, 122);
   x.font="600 34px "+F; x.textAlign="right"; x.fillStyle="rgba(255,255,255,.8)"; x.fillText(fmtStarDate(Date.now(), true), W-70, 122);
   // the figure (y 260–860, 760 wide); past 104 stars, the all-time field
-  if(fig) canvasFigure(x, fig, lit, [160,260,760,600], { r:16, lw:3, blur:24, acc:glow, dots, newest });
+  if(fig) canvasFigure(x, fig, lit, [160,260,760,600], { r:16, lw:3, blur:24, acc:glow, acc2:glow2, dots, newest });
   else { const fr=starRng("field"); for(let i=0;i<Math.min(n-ends[SKY[SKY.length-1].id],160);i++){ const X=160+fr()*760, Y=260+fr()*600;
     x.save(); x.globalAlpha=.45+fr()*.55; x.shadowColor=acc; x.shadowBlur=12; x.fillStyle="#fff"; canvasSpark(x,X,Y,4+fr()*6); x.fill(); x.restore(); } }
   x.textAlign="center"; x.fillStyle="#fff"; x.font="800 72px "+F; x.fillText(title, W/2, 950);

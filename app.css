@@ -5,16 +5,30 @@
     --ink:#1c1c1e; --l2:#6e6e73; --l3:#a6a6ac;
     --sep:rgba(60,60,67,.11);
     --accent:#e8551c; --accent-soft:rgba(232,85,28,.10);
-    --accent-fill:#e8551c;   /* solid fill under --on-accent text (dark mode's --accent is too light for that) */
-    --on-accent:#ffffff;     /* label on --accent-fill and on --grad */
+    --accent-fill:#e8551c;   /* --grad-fill as one solid colour, for anything that can't take a gradient (no rule needs it today) */
+    --on-accent:#ffffff;     /* label on --accent-fill and on --grad-fill */
+    /* every accent is a fade of two hues: --grad-a (dominant) → --grad-b. --grad-hold keeps --grad-a solid that far,
+       --grad-mid is where the 50/50 blend sits (Pink holds its pink and pushes the blend past the middle). Fill stops
+       are contrast-tuned: --on-accent is ≥3:1 on both. Text and icons stay one solid --accent. */
+    --grad-a:#ee6010; --grad-b:#ff2f3d; --grad-hold:0%; --grad-mid:56%;
+    --grad-fill:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-a) var(--grad-hold),var(--grad-mid),var(--grad-b) 100%);
+    --grad:var(--grad-fill);   /* primary buttons */
+    /* my chat bubbles carry reading text, so their fade keeps white at ≥4.5:1 (light Pink/Blue/Teal deepen it) */
+    --grad-read-a:#e8551c; --grad-read-b:#e0303c;   /* chat bubbles carry body text: deeper stops (3.65–4.5:1) */
+    --grad-read:linear-gradient(135deg,var(--grad-read-a) 0%,var(--grad-read-a) var(--grad-hold),var(--grad-mid),var(--grad-read-b) 100%);
+    /* thin fills with no label (progress bars, the tab underline, dots): --accent → its second hue at text strength */
+    --accent-b:#f0313f;
+    --grad-line:linear-gradient(90deg,var(--accent) 0%,var(--accent) var(--grad-hold),var(--grad-mid),var(--accent-b) 100%);
+    --accent-soft-b:rgba(255,47,61,.035);   /* the page glow's second tint */
     --accent-hi:#ff7a3a;     /* accent on the always-dark toast (the reduced-motion ✦) */
+    --accent-hi-b:#ff5a68;   /* its second hue: the star sky and the coach card */
+    --grad-hi:linear-gradient(135deg,var(--accent-hi) 0%,var(--accent-hi) var(--grad-hold),var(--grad-mid),var(--accent-hi-b) 100%);
     --series2:#4dabf7;       /* forecast "current pace" companion series */
     /* brand never follows the accent picker */
     --brand:#e8551c; --brand-grad:linear-gradient(135deg,#ff7a18 0%,#ff2f3d 100%);
-    /* glitter sparks (every accent): accent, amber, gold, pearl, champagne, rose — pearl, not white, on light */
-    --glit-1:var(--accent); --glit-2:#ff9f1c; --glit-3:#f5b400; --glit-4:#f2c49b; --glit-5:#d9a94a; --glit-6:#ff5a6e;
+    /* glitter sparks (every accent): accent, rose (the red end), gold, pearl, champagne, amber — pearl, not white, on light */
+    --glit-1:var(--accent); --glit-2:#ff2f3d; --glit-3:#f5b400; --glit-4:#f2c49b; --glit-5:#d9a94a; --glit-6:#ff9f1c;
     --pop:#ffffff; --pop-shadow:0 14px 38px rgba(0,0,0,.24);   /* floating menus */
-    --grad:linear-gradient(135deg,#ff7a18 0%,#ff2f3d 100%);
     --segtrack:#e8e8ee; --segthumb:#ffffff;
     --fill:rgba(118,118,128,.12);   /* neutral fill for secondary buttons (iOS tertiary fill) */
     --track:#e6e6eb; --grabber:#c7c7cc; --sheetbg:#ffffff; --chartbg:#f4f4f8;
@@ -56,9 +70,8 @@
     --ink:#ffffff; --l2:#98989e; --l3:#636366;
     --sep:rgba(84,84,88,.45);
     --accent:#ff7a3a; --accent-soft:rgba(255,122,58,.16);
-    --accent-fill:#e8551c;
+    --accent-fill:#e8551c; --grad-b:#ff3450; --accent-b:#ff4d5e; --accent-soft-b:rgba(255,52,80,.06);
     --pop:#2c2c2e; --pop-shadow:0 14px 38px rgba(0,0,0,.6);
-    --grad:linear-gradient(135deg,#ff7a18 0%,#ff3450 100%);
     --segtrack:#0e0e10; --segthumb:#3a3a3c;
     --fill:rgba(118,118,128,.24);
     --track:#0e0e10; --grabber:#48484a; --sheetbg:#1c1c1e; --chartbg:#222226;
@@ -70,55 +83,67 @@
     --warntx:#ffc566;
     --goodtx:#69db7c; --holdtx:#ffc078; --badtx:#ff8787;
     --brand:#ff7a3a; --brand-grad:linear-gradient(135deg,#ff7a18 0%,#ff3450 100%);
-    --glit-1:var(--accent); --glit-2:#ffb347; --glit-3:#ffd60a; --glit-4:#ffffff; --glit-5:#f6d38a; --glit-6:#ff6b81;
+    --glit-1:var(--accent); --glit-2:#ff4d5e; --glit-3:#ffd60a; --glit-4:#ffffff; --glit-5:#f6d38a; --glit-6:#ffb347;
   }
   /* accent picker (Settings → Appearance). Orange is the default above, with no attribute.
      Light blocks are html[data-accent] (0,1,1); dark blocks html.dark[data-accent] (0,2,1) and restate every token. */
-  /* celebrations: every accent bursts glitter sparks in --glit-1…6; PRs and unlocks add confetti cannons in --cel-1…6 =
-     accent, accent + 35% white, + 65% white, + 20% black, gold, cream (no cream on light). Orange's cannons use JS palettes,
-     Pink's derive from the accent. */
+  /* celebrations: every accent bursts glitter sparks in --glit-1…6; PRs and unlocks add confetti cannons in --cel-1…6.
+     Both mix the accent's two hues: glitter = accent, second hue, a light tint, pearl, champagne, a light second hue;
+     cannons = accent, second hue, accent + white, second hue + white, gold, cream (no cream on light). Pink leans pink
+     about 60/40 (its cannons drop the gold for a third pink). Orange's cannons use JS palettes. */
   html[data-accent="pink"]{
     --accent:#c02c85; --accent-soft:rgba(212,80,181,.09); --accent-glow:rgba(242,86,156,.38); --accent-fill:#c02c85;
-    --grad:linear-gradient(135deg,#f2569c 0%,#ce3aa0 100%); --accent-hi:#fc68c5;
-    /* glitter: accent, rose, blush, pearl, champagne, lilac (on light: pearl, not white, and both deepened to show on the page) */
-    --glit-1:var(--accent); --glit-2:#f06aa8; --glit-3:#f08cbc; --glit-4:#e09cbf; --glit-5:#d9a94a; --glit-6:#a77be8; }
+    --grad-a:#e0409a; --grad-b:#ee5a1e; --grad-hold:18%; --grad-mid:66%;   /* pink → orange, pink held and leading */
+    --accent-b:#e05419; --accent-soft-b:rgba(238,90,30,.015);
+    --grad-read-a:#c02c85; --grad-read-b:#d0480f; --accent-hi:#fc68c5; --accent-hi-b:#ff9a52;
+    /* glitter: accent, orange, peach, pearl, champagne, apricot (on light the pearl is pink, not white, and both deepened
+       to show on the page; peach stands in for dark's blush so the mix stays about 60/40 pink) */
+    --glit-1:var(--accent); --glit-2:#ee5a1e; --glit-3:#f7a072; --glit-4:#e09cbf; --glit-5:#d9a94a; --glit-6:#f5893a;
+    --cel-1:#c02c85; --cel-2:#ee5a1e; --cel-3:#f08cbc; --cel-4:#e0409a; --cel-5:#f5893a; }
   html.dark[data-accent="pink"]{
     --accent:#fc68c5; --accent-soft:rgba(212,80,181,.15); --accent-glow:rgba(252,104,197,.36); --accent-fill:#de4caa;
-    --grad:linear-gradient(135deg,#f2569c 0%,#ce3aa0 100%);
-    --glit-1:var(--accent); --glit-2:#ff8cc3; --glit-3:#ffc2df; --glit-4:#ffffff; --glit-5:#f6d38a; --glit-6:#c8a2ff; }
+    --accent-b:#ff8a4c; --accent-soft-b:rgba(255,138,76,.06); --grad-read-a:var(--grad-a); --grad-read-b:var(--grad-b);
+    --glit-1:var(--accent); --glit-2:#ff8a4c; --glit-3:#ffc2df; --glit-4:#ffffff; --glit-5:#f6d38a; --glit-6:#f79ad3;
+    --cel-1:#fc68c5; --cel-2:#ff8a4c; --cel-3:#ffc2df; --cel-4:#e0409a; --cel-5:#f79ad3; --cel-6:#fff8e7; }
   html[data-accent="blue"]{
-    --glit-1:var(--accent); --glit-2:#3d8fe0; --glit-3:#7fb6ee; --glit-4:#b9d3ef; --glit-5:#d9a94a; --glit-6:#5f7f9f;
+    --glit-1:var(--accent); --glit-2:#0b97bd; --glit-3:#7fb6ee; --glit-4:#b9d3ef; --glit-5:#d9a94a; --glit-6:#5cc0dc;
     --accent:#016ccc; --accent-soft:rgba(54,133,234,.11); --accent-glow:rgba(42,138,223,.40); --accent-fill:#016ccc;
-    --grad:linear-gradient(135deg,#2a8adf 0%,#3d66df 100%); --accent-hi:#53a1fc;
-    --cel-1:#016ccc; --cel-2:#5a9fde; --cel-3:#a6cced; --cel-4:#0156a3; --cel-5:#e0a800;
+    --grad-a:#2f6de0; --grad-b:#0b97bd; --grad-hold:0%; --grad-mid:50%;   /* blue → cyan */
+    --accent-b:#088eae; --accent-soft-b:rgba(11,151,189,.035);
+    --grad-read-a:#2f6de0; --grad-read-b:#097a99; --accent-hi:#53a1fc; --accent-hi-b:#3cc4e6;
+    --cel-1:#016ccc; --cel-2:#0b97bd; --cel-3:#a6cced; --cel-4:#5cc0dc; --cel-5:#e0a800;
     --series2:#6e6e73; }   /* = --l2: "current pace" goes neutral next to a blue plan line */
   html.dark[data-accent="blue"]{
-    --glit-1:var(--accent); --glit-2:#8fc2fd; --glit-3:#c3defe; --glit-4:#ffffff; --glit-5:#f6d38a; --glit-6:#a8c8ff;
+    --glit-1:var(--accent); --glit-2:#3cc4e6; --glit-3:#c3defe; --glit-4:#ffffff; --glit-5:#f6d38a; --glit-6:#9fe6f6;
     --accent:#53a1fc; --accent-soft:rgba(54,133,234,.18); --accent-glow:rgba(83,161,252,.38); --accent-fill:#3886df;
-    --grad:linear-gradient(135deg,#2a8adf 0%,#3d66df 100%);
-    --cel-1:#53a1fc; --cel-2:#8fc2fd; --cel-3:#c3defe; --cel-4:#4281ca; --cel-5:#ffd60a; --cel-6:#fff8e7;
+    --accent-b:#3cc4e6; --accent-soft-b:rgba(60,196,230,.06); --grad-read-a:var(--grad-a); --grad-read-b:var(--grad-b);
+    --cel-1:#53a1fc; --cel-2:#3cc4e6; --cel-3:#c3defe; --cel-4:#9fe6f6; --cel-5:#ffd60a; --cel-6:#fff8e7;
     --series2:#98989e; }
   html[data-accent="teal"]{
-    --glit-1:var(--accent); --glit-2:#1aa39b; --glit-3:#5ec4bd; --glit-4:#a6d8d3; --glit-5:#d9a94a; --glit-6:#2b8fb0;
+    --glit-1:var(--accent); --glit-2:#0e9e78; --glit-3:#5ec4bd; --glit-4:#a6d8d3; --glit-5:#d9a94a; --glit-6:#5fcca4;
     --accent:#087a7c; --accent-soft:rgba(0,160,153,.09); --accent-glow:rgba(0,150,145,.34); --accent-fill:#087a7c;
-    --grad:linear-gradient(135deg,#00a199 0%,#007d8f 100%); --accent-hi:#15b1b0;
-    --cel-1:#087a7c; --cel-2:#5ea9aa; --cel-3:#a9d0d1; --cel-4:#066263; --cel-5:#e0a800; }
+    --grad-a:#0a8a96; --grad-b:#0e9e78; --grad-hold:0%; --grad-mid:50%;   /* teal → mint (bluer than the success greens) */
+    --accent-b:#0d9571; --accent-soft-b:rgba(14,158,120,.035);
+    --grad-read-a:#0a7f8a; --grad-read-b:#0a7f60; --accent-hi:#15b1b0; --accent-hi-b:#7adcb0;
+    --cel-1:#087a7c; --cel-2:#0e9e78; --cel-3:#a9d0d1; --cel-4:#5fcca4; --cel-5:#e0a800; }
   html.dark[data-accent="teal"]{
-    --glit-1:var(--accent); --glit-2:#67cccc; --glit-3:#ade4e3; --glit-4:#ffffff; --glit-5:#f6d38a; --glit-6:#7fe0d8;
+    --glit-1:var(--accent); --glit-2:#7adcb0; --glit-3:#ade4e3; --glit-4:#ffffff; --glit-5:#f6d38a; --glit-6:#3ccf98;
     --accent:#15b1b0; --accent-soft:rgba(21,177,176,.15); --accent-glow:rgba(21,177,176,.34); --accent-fill:#029494;
-    --grad:linear-gradient(135deg,#00a199 0%,#007d8f 100%);
-    --cel-1:#15b1b0; --cel-2:#67cccc; --cel-3:#ade4e3; --cel-4:#118e8d; --cel-5:#ffd60a; --cel-6:#fff8e7; }
+    --accent-b:#7adcb0; --accent-soft-b:rgba(122,220,176,.05); --grad-read-a:var(--grad-a); --grad-read-b:var(--grad-b);
+    --cel-1:#15b1b0; --cel-2:#7adcb0; --cel-3:#ade4e3; --cel-4:#3ccf98; --cel-5:#ffd60a; --cel-6:#fff8e7; }
   html[data-accent="graphite"]{
-    --glit-1:var(--accent); --glit-2:#636366; --glit-3:#8e8e93; --glit-4:#c7c7cc; --glit-5:#d9a94a; --glit-6:#48484a;
+    --glit-1:var(--accent); --glit-2:#3e4c60; --glit-3:#8e8e93; --glit-4:#c7c7cc; --glit-5:#d9a94a; --glit-6:#7d8aa0;
     --accent:#3a3a3c; --accent-soft:rgba(60,60,67,.07); --accent-glow:rgba(28,28,30,.28); --accent-fill:#3a3a3c;
-    --grad:linear-gradient(135deg,#5c5c60 0%,#2c2c2e 100%); --accent-hi:#d1d1d6;
-    --cel-1:#3a3a3c; --cel-2:#7f7f80; --cel-3:#bababb; --cel-4:#2e2e30; --cel-5:#e0a800; }
+    --grad-a:#5a5a5f; --grad-b:#3a4658; --grad-hold:0%; --grad-mid:50%;   /* graphite → cool slate */
+    --accent-b:#3e4c60; --accent-soft-b:rgba(58,70,88,.03); --accent-hi:#d1d1d6; --accent-hi-b:#b8c4d6;
+    --cel-1:#3a3a3c; --cel-2:#3e4c60; --cel-3:#bababb; --cel-4:#7d8aa0; --cel-5:#e0a800; }
   html.dark[data-accent="graphite"]{
-    --glit-1:var(--accent); --glit-2:#ffffff; --glit-3:#e5e5ea; --glit-4:#ffffff; --glit-5:#f6d38a; --glit-6:#aeaeb2;
+    --glit-1:var(--accent); --glit-2:#ffffff; --glit-3:#b4c0d0; --glit-4:#ffffff; --glit-5:#f6d38a; --glit-6:#8e9bb0;
     --accent:#d1d1d6; --accent-soft:rgba(235,235,245,.08); --accent-glow:rgba(255,255,255,.14); --accent-fill:#d1d1d6;
-    --grad:linear-gradient(135deg,#f2f2f7 0%,#c7c7cc 100%);
-    --on-accent:#1c1c1e;     /* light button, dark label */
-    --cel-1:#d1d1d6; --cel-2:#e1e1e4; --cel-3:#efeff1; --cel-4:#a7a7ab; --cel-5:#ffd60a; --cel-6:#fff8e7; }
+    --grad-a:#f2f2f7; --grad-b:#c4ccd8;   /* light button, dark label */
+    --accent-b:#b4c0d0; --accent-soft-b:rgba(180,192,208,.05);
+    --on-accent:#1c1c1e;
+    --cel-1:#d1d1d6; --cel-2:#b4c0d0; --cel-3:#efeff1; --cel-4:#8e9bb0; --cel-5:#ffd60a; --cel-6:#fff8e7; }
   *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; -webkit-font-smoothing:antialiased; -webkit-text-size-adjust:100%; text-size-adjust:100%;}
   html,body{ touch-action:manipulation; }
   html,body{ color:var(--ink); font-size:var(--t-md);
@@ -137,6 +162,7 @@
   body::before{ content:""; position:fixed; top:0; left:0; right:0; height:100vh; z-index:-1; pointer-events:none;
     background:
       radial-gradient(140% 60% at 50% 42%, var(--accent-soft) 0%, transparent 68%),
+      radial-gradient(100% 44% at 86% 80%, var(--accent-soft-b) 0%, transparent 70%),
       var(--bg);
     transition:background .25s ease; }
 
@@ -192,7 +218,7 @@
   .caldow span{ text-align:center; font-size:var(--t-xs); font-weight:var(--w-bold); color:var(--l3); }
   .calgrid{ display:grid; grid-template-columns:repeat(7,30px); gap:6px; justify-content:center; }
   .calcell{ width:30px; height:30px; border-radius:var(--r-sm); background:var(--row); }
-  .calcell.on{ background:var(--accent); }
+  .calcell.on{ background:var(--grad-line); }
   .calcell.today{ box-shadow:0 0 0 2px var(--accent) inset; }
   .calcell.future{ opacity:.3; }
   .calcrow{ display:flex; align-items:baseline; justify-content:space-between; padding:12px 0; border-top:.5px solid var(--sep); }
@@ -226,7 +252,7 @@
   .restbar.show{ display:flex; }
   .restbar.done{ animation:restpulse .6s ease; }
   @keyframes restpulse{ 0%,100%{ background:var(--accent-soft);} 50%{ background:var(--accent); } }
-  .restprog{ position:absolute; left:0; top:0; bottom:0; width:100%; background:var(--accent); opacity:.16; transition:width 1s linear; }
+  .restprog{ position:absolute; left:0; top:0; bottom:0; width:100%; background:var(--grad-line); opacity:.16; transition:width 1s linear; }
   .restbar > *{ position:relative; z-index:1; }
   .restx{ width:36px; height:36px; flex:0 0 auto; border-radius:50%; border:none; background:transparent; color:var(--accent); font-size:var(--t-lg); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; margin:-8px -4px -8px -8px; }
   .restlbl{ font-size:var(--t-sm); font-weight:var(--w-semi); color:var(--accent); }
@@ -372,8 +398,8 @@
   .utab{ flex:0 0 auto; position:relative; padding:1px 0 6px; background:none; border:0; border-radius:0; font:inherit; font-size:var(--t-sm); font-weight:var(--w-semi); color:var(--l2); white-space:nowrap; cursor:pointer; -webkit-appearance:none; appearance:none; -webkit-tap-highlight-color:transparent; transition:color .15s; }
   .utab::before{ content:""; position:absolute; inset:-11px -8px; }   /* 44px tap box around 23px of text; ::after is the underline */
   .utab.active{ color:var(--ink); }
-  .utab.active::after{ content:""; position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:2px; background:var(--accent); }
-  .utab .ndot{ width:6px; height:6px; border-radius:50%; background:var(--grad); display:inline-block; margin-right:8px; vertical-align:middle; }
+  .utab.active::after{ content:""; position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:2px; background:var(--grad-line); }
+  .utab .ndot{ width:6px; height:6px; border-radius:50%; background:var(--grad-line); display:inline-block; margin-right:8px; vertical-align:middle; }
   #seg{ flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; padding:11px 0; }   /* day tabs scroll rather than wrap */
   #seg::-webkit-scrollbar{ display:none; }
   #seg .segabout{ font-size:0; margin-left:auto; padding-left:8px; } #seg .segabout::before{ left:-20px; right:0; }   /* 44px wide tap box that grows left, into the gap, not past the scroller's edge */ #seg .segabout svg{ width:16px; height:16px; margin-right:0; vertical-align:-3px; }
@@ -426,7 +452,7 @@
   .fitem .factions{ flex:0 0 auto; display:flex; align-items:center; gap:8px; }
   .fitem.tap{ cursor:pointer; -webkit-tap-highlight-color:transparent; transition:background .12s; }
   .fitem.tap:active{ background:var(--field); }
-  .btn.pill{ padding:7px 15px; font-size:var(--t-md); border-radius:var(--r-pill); background:var(--accent-fill); box-shadow:none; }
+  .btn.pill{ padding:7px 15px; font-size:var(--t-md); border-radius:var(--r-pill); background:var(--grad-fill); box-shadow:none; }
   .fsettings{ margin-top:26px; display:flex; flex-direction:column; gap:8px; }
   /* Me profile card */
   .profcard{ display:flex; flex-wrap:wrap; align-items:center; gap:var(--pad-card) 14px; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:opacity .12s; }
@@ -449,7 +475,7 @@
   .codeval{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:var(--t-xl); font-weight:var(--w-bold); letter-spacing:4px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; }
   /* editable own-avatar: a little pencil overlay */
   .avwrap{ position:relative; flex:0 0 auto; cursor:pointer; -webkit-tap-highlight-color:transparent; }
-  .avwrap .avedit{ position:absolute; right:-2px; bottom:-2px; width:20px; height:20px; border-radius:50%; background:var(--accent-fill); color:var(--on-accent); display:flex; align-items:center; justify-content:center; box-shadow:0 0 0 2px var(--card); }
+  .avwrap .avedit{ position:absolute; right:-2px; bottom:-2px; width:20px; height:20px; border-radius:50%; background:var(--grad-fill); color:var(--on-accent); display:flex; align-items:center; justify-content:center; box-shadow:0 0 0 2px var(--card); }
   .avwrap .avedit svg{ width:11px; height:11px; }
   /* avatar editor */
   .avpreview{ display:flex; justify-content:center; padding:6px 0 14px; }
@@ -604,7 +630,7 @@
   .ovgoaltop{ display:flex; justify-content:space-between; align-items:baseline; font-size:var(--t-sm); color:var(--l2); margin-bottom:8px; }
   .ovgoaltop b{ font-size:var(--t-lg); color:var(--ink); font-weight:var(--w-bold); }
   .ovgoalbar{ height:10px; border-radius:6px; background:var(--track); overflow:hidden; }
-  .ovgoalbar i{ display:block; height:100%; border-radius:6px; background:var(--accent); transition:width .45s ease; }
+  .ovgoalbar i{ display:block; height:100%; border-radius:6px; background:var(--grad-line); transition:width .45s ease; }
   /* muscle-balance coach suggestions: a plain card; the options are secondary buttons */
   .sgopts{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
   .sgbtn{ background:var(--fill); border:0; color:var(--accent); border-radius:var(--r-md); min-height:44px; padding:12px 16px; font:inherit; font-size:var(--t-md); font-weight:var(--w-semi); cursor:pointer; transition:transform .1s; }
@@ -613,7 +639,7 @@
   .ovweek{ display:grid; grid-template-columns:repeat(7,1fr); gap:7px; }
   .ovd{ text-align:center; font-size:var(--t-xs); font-weight:var(--w-bold); color:var(--l3); }
   .ovd i{ display:block; height:28px; border-radius:var(--r-sm); background:var(--row); margin-top:8px; }
-  .ovd.on i{ background:var(--accent); }
+  .ovd.on i{ background:var(--grad-line); }
   .ovd.today i{ box-shadow:0 0 0 2px var(--accent) inset; }
   /* friends feed — cheer + comment */
   .feedbar{ display:flex; gap:8px; margin-top:12px; }
@@ -637,7 +663,7 @@
   .msg-convo-time{ font-size:var(--t-xs); color:var(--l3); flex:0 0 auto; }
   .msg-convo-prev{ font-size:var(--t-sm); color:var(--l2); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .msg-convo-prev.unread{ color:var(--ink); font-weight:var(--w-semi); }
-  .msg-dot{ width:9px; height:9px; border-radius:50%; background:var(--accent); flex:0 0 auto; }
+  .msg-dot{ width:9px; height:9px; border-radius:50%; background:var(--grad-line); flex:0 0 auto; }
   /* thread: a scrollable bubble list above a fixed compose row */
   .msg-thread{ display:flex; flex-direction:column; gap:7px; max-height:56vh; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:4px 2px 8px; animation:threadIn .3s cubic-bezier(.2,.8,.2,1) both; }
   @keyframes threadIn{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:none; } }
@@ -645,10 +671,11 @@
   .msg-row.mine{ align-items:flex-end; }
   .msg-row.theirs{ align-items:flex-start; }
   .msg-bubble{ max-width:78%; padding:9px 13px; border-radius:18px; font-size:var(--t-md); line-height:1.4; word-wrap:break-word; position:relative; user-select:none; -webkit-user-select:none; touch-action:manipulation; }
-  .msg-row.mine .msg-bubble{ background:var(--accent-fill); color:var(--on-accent); border-bottom-right-radius:5px; }
+  .msg-row.mine .msg-bubble{ background:var(--grad-read); color:var(--on-accent); border-bottom-right-radius:5px; }
   .msg-row.theirs .msg-bubble{ background:var(--row); color:var(--ink); border-bottom-left-radius:5px; }
   .msg-time{ display:block; font-size:var(--t-xs); margin-top:3px; opacity:.65; text-align:right; }
   .msg-row.theirs .msg-time{ text-align:left; }
+  .msg-row.mine .msg-time{ opacity:1; }   /* on the fade, a dimmed label drops under 3:1 */
   .msg-locked{ font-style:italic; opacity:.75; }
   /* emoji reactions: chips under a bubble + the long-press picker bar */
   .react-chips{ display:flex; flex-wrap:wrap; gap:4px; margin:3px 3px 0; }
@@ -699,7 +726,7 @@
   .discx:active{ transform:scale(.85); }
   .discdots{ display:flex; gap:6px; justify-content:center; margin-top:4px; }
   .discdot{ width:6px; height:6px; border-radius:50%; background:var(--l3); opacity:.35; transition:opacity .2s, transform .2s, background .2s; }
-  .discdot.on{ opacity:1; background:var(--accent); transform:scale(1.25); }
+  .discdot.on{ opacity:1; background:var(--grad-line); transform:scale(1.25); }
   /* onboarding objective picker */
   #onboardWrap, #nameWrap{ position:fixed; inset:0; z-index:320; display:none; align-items:center; justify-content:center; padding:24px;
     background:rgba(0,0,0,.5); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
@@ -753,7 +780,7 @@
   .bwgoal{ text-align:right; font-size:var(--t-md); color:var(--l2); line-height:1.55; }
   .bwgoal b{ color:var(--ink); }
   .bar{ height:6px; background:var(--track); border-radius:3px; overflow:hidden; margin:12px 0 2px; }
-  .bar > i{ display:block; height:100%; background:var(--accent); border-radius:3px; transition:width .6s cubic-bezier(.2,.8,.2,1); }
+  .bar > i{ display:block; height:100%; background:var(--grad-line); border-radius:3px; transition:width .6s cubic-bezier(.2,.8,.2,1); }
   canvas{ width:100%; height:46px; display:block; margin-top:12px; }
   #spark{ height:auto; aspect-ratio:500/48; }   /* keep the 500×48 bitmap's ratio, so the end dot stays round */
 
@@ -769,7 +796,7 @@
     font-size:var(--t-lg); font-weight:var(--w-semi); cursor:pointer; font-family:inherit;
     box-shadow:0 6px 18px -6px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,.22); }
   /* gradient + glow are for a screen's one primary CTA; small and secondary buttons stay flat */
-  .btn.sm{ min-height:44px; padding:12px 16px; font-size:var(--t-md); background:var(--accent-fill); box-shadow:none; }
+  .btn.sm{ min-height:44px; padding:12px 16px; font-size:var(--t-md); background:var(--grad-fill); box-shadow:none; }
   .btn.tinted{ background:var(--fill); color:var(--accent); box-shadow:none; }
   .btn.plain{ background:transparent; color:var(--l2); font-weight:var(--w-med); box-shadow:none; }
   .btn.red{ background:transparent; color:var(--red); box-shadow:none; }
@@ -839,8 +866,12 @@
   .ach .achlock{ display:inline-flex; color:var(--l3); }
   .ach .achlock svg{ width:22px; height:22px; }
   .ach .achstar{ position:relative; display:inline-grid; place-items:center; width:var(--s6); height:var(--s6); margin:calc((var(--t-xl) - var(--s6))/2) 0; vertical-align:top; }
-  .ach .achstar svg{ grid-area:1/1; width:100%; height:100%; fill:var(--accent-fill); }
-  .ach .achstar b{ grid-area:1/1; font-size:var(--t-xs); font-weight:var(--w-bold); color:var(--on-accent); letter-spacing:-.3px; }
+  /* the badge star is --grad-fill cut to a four-point star (a mask, so it takes the same fade as every other fill);
+     the mask makes it a stacking context, so the number is positioned to paint above it */
+  .ach .achstar::before, .achd-sheet .achstar::before{ content:""; grid-area:1/1; width:100%; height:100%; background:var(--grad-fill);
+    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 0 16.5 7.5 24 12 16.5 16.5 12 24 7.5 16.5 0 12 7.5 7.5Z'/%3E%3C/svg%3E") center/100% 100% no-repeat; mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 0 16.5 7.5 24 12 16.5 16.5 12 24 7.5 16.5 0 12 7.5 7.5Z'/%3E%3C/svg%3E") center/100% 100% no-repeat; }
+  @media (forced-colors: active){ .ach .achstar::before, .achd-sheet .achstar::before{ forced-color-adjust:none; } }
+  .ach .achstar b{ grid-area:1/1; position:relative; font-size:var(--t-xs); font-weight:var(--w-bold); color:var(--on-accent); letter-spacing:-.3px; }
   .ach .acht{ font-size:var(--t-sm); font-weight:var(--w-bold); margin-top:8px; letter-spacing:-.1px; }
   .ach .achd{ font-size:var(--t-xs); color:var(--l2); margin-top:4px; line-height:1.3; }
   /* milestone grid: group captions span the grid; locked count tiles show "7 / 12" over a 2px accent bar */
@@ -850,20 +881,20 @@
   .ach{ cursor:pointer; }
   .ach .achp{ display:block; white-space:nowrap; font-size:var(--t-sm); font-weight:var(--w-bold); color:var(--l2); line-height:var(--t-xl); font-variant-numeric:tabular-nums; }
   .achbar{ height:2px; border-radius:var(--r-pill); background:var(--track); margin:var(--s2) var(--s2) 0; overflow:hidden; }
-  .achbar i{ display:block; height:100%; background:var(--accent); border-radius:inherit; }
+  .achbar i{ display:block; height:100%; background:var(--grad-line); border-radius:inherit; }
   .achd-sheet .achi{ font-size:var(--t-xxl); line-height:1; margin-bottom:var(--s2); }
   .achd-sheet .achstar{ display:inline-grid; place-items:center; width:calc(var(--s6) + var(--s3)); height:calc(var(--s6) + var(--s3)); }
-  .achd-sheet .achstar svg{ grid-area:1/1; width:100%; height:100%; fill:var(--accent-fill); }
-  .achd-sheet .achstar b{ grid-area:1/1; font-size:var(--t-sm); font-weight:var(--w-bold); color:var(--on-accent); }
+  .achd-sheet .achstar b{ grid-area:1/1; position:relative; font-size:var(--t-sm); font-weight:var(--w-bold); color:var(--on-accent); }
   .achd-sheet .achbar{ height:3px; margin:var(--s2) 0 0; }
   .achd-sheet .achlock{ display:inline-flex; color:var(--l3); }
   .achd-sheet .achlock svg{ width:var(--s6); height:var(--s6); }
 
   /* week stars. The sky is a night sky in both themes: deep ink with an accent glow; --accent-hi is the accent
      tuned for always-dark surfaces. Earned stars only — positions still to come are faint dots with no dates. */
-  .starsky{ --star-glow:var(--accent-hi); position:relative; overflow:hidden; border-radius:var(--r-lg); border:.5px solid var(--line); cursor:pointer;
-    background:radial-gradient(120% 95% at 72% 62%, color-mix(in srgb, var(--accent-hi) 14%, transparent) 0%, transparent 70%), var(--sky-ink); color:#fff; }
-  .starsky.sky2{ --star-glow:color-mix(in srgb, var(--accent-hi) 45%, #8ab4ff); }
+  .starsky{ --star-glow:var(--accent-hi); --star-glow2:var(--accent-hi-b); position:relative; overflow:hidden; border-radius:var(--r-lg); border:.5px solid var(--line); cursor:pointer;
+    background:radial-gradient(120% 95% at 72% 62%, color-mix(in srgb, var(--accent-hi) 14%, transparent) 0%, transparent 70%),
+      radial-gradient(70% 60% at 24% 34%, color-mix(in srgb, var(--accent-hi-b) 8%, transparent) 0%, transparent 70%), var(--sky-ink); color:#fff; }
+  .starsky.sky2{ --star-glow:color-mix(in srgb, var(--accent-hi) 45%, #8ab4ff); --star-glow2:color-mix(in srgb, var(--accent-hi-b) 45%, #8ab4ff); }
   .starsky:active{ opacity:.92; }
   .starsky .skyc{ display:block; width:100%; height:auto; overflow:visible; }   /* halos may glow up into the caption band */
   .skyc .ln{ stroke:rgba(255,255,255,.35); stroke-width:1; stroke-linecap:round; fill:none; }
@@ -871,6 +902,7 @@
   .skyc .bg{ fill:#fff; }
   .skyc .st{ fill:#fff; }
   .skyc .h0{ stop-color:var(--star-glow); stop-opacity:.7; }
+  .skyc .hm{ stop-color:color-mix(in srgb, var(--star-glow) 70%, var(--star-glow2)); stop-opacity:.36; }   /* the halo stays the accent with a hint of its second hue */
   .skyc .h1{ stop-color:var(--star-glow); stop-opacity:0; }
   .skycap{ position:relative; display:flex; align-items:flex-start; justify-content:space-between; gap:var(--s3); padding:var(--s3) var(--pad-card) 0; pointer-events:none; }
   .skycap .skyname{ font-size:var(--t-sm); font-weight:var(--w-semi); color:rgba(255,255,255,.8); padding-top:var(--s1); }
@@ -891,7 +923,7 @@
   /* this week + this year, under the sky card */
   .starweek{ display:flex; align-items:center; gap:var(--s2); margin:var(--s3) 0 0; font-size:var(--t-sm); color:var(--l2); line-height:1.4; }
   .starweek .swbar{ flex:0 0 var(--sky-glyph); height:3px; border-radius:var(--r-pill); background:var(--track); overflow:hidden; }
-  .starweek .swbar i{ display:block; height:100%; background:var(--accent); border-radius:inherit; }
+  .starweek .swbar i{ display:block; height:100%; background:var(--grad-line); border-radius:inherit; }
   .starweek b{ color:var(--ink); font-weight:var(--w-semi); }
   .stglyph{ flex:0 0 auto; display:inline-flex; color:var(--accent); }
   .stglyph svg{ width:var(--icon-sm); height:var(--icon-sm); fill:currentColor; }
@@ -934,7 +966,7 @@
   .swrow + .swrow, .swrow + .levelcap + .swrow{ margin-top:var(--s4); }
   .swrow.dis{ cursor:default; opacity:.55; }
   .liveswui.acc{ background:var(--fill); }
-  .livesw:checked + .liveswui.acc{ background:var(--accent-fill); }
+  .livesw:checked + .liveswui.acc{ background:var(--grad-fill); }
   .livesw:checked + .liveswui.acc::after{ background:var(--on-accent); }
   .livesw:focus-visible + .liveswui{ box-shadow:0 0 0 2px var(--accent); }
   .stsheet .chips.wrap .chip{ padding:var(--s2) var(--s3); }
@@ -987,16 +1019,16 @@
   .accsw::before{ content:""; width:30px; height:30px; border-radius:50%; background:var(--sw); transition:box-shadow .15s, transform .12s; }
   .accsw:active::before{ transform:scale(.9); }
   .accsw[aria-checked="true"]::before{ box-shadow:0 0 0 2px var(--surface), 0 0 0 4px var(--swr); }
-  .accsw[data-acc="orange"]{ --sw:linear-gradient(135deg,#ff7a18 0%,#ff2f3d 100%); --swr:#e8551c; }
-  .accsw[data-acc="pink"]{ --sw:linear-gradient(135deg,#f2569c 0%,#ce3aa0 100%); --swr:#c02c85; }
-  .accsw[data-acc="blue"]{ --sw:linear-gradient(135deg,#2a8adf 0%,#3d66df 100%); --swr:#016ccc; }
-  .accsw[data-acc="teal"]{ --sw:linear-gradient(135deg,#00a199 0%,#007d8f 100%); --swr:#087a7c; }
-  .accsw[data-acc="graphite"]{ --sw:linear-gradient(135deg,#5c5c60 0%,#2c2c2e 100%); --swr:#3a3a3c; }
-  html.dark .accsw[data-acc="orange"]{ --sw:linear-gradient(135deg,#ff7a18 0%,#ff3450 100%); --swr:#ff7a3a; }
+  .accsw[data-acc="orange"]{ --sw:linear-gradient(135deg,#ee6010 0%,56%,#ff2f3d 100%); --swr:#e8551c; }
+  .accsw[data-acc="pink"]{ --sw:linear-gradient(135deg,#e0409a 0%,#e0409a 18%,66%,#ee5a1e 100%); --swr:#c02c85; }
+  .accsw[data-acc="blue"]{ --sw:linear-gradient(135deg,#2f6de0 0%,#0b97bd 100%); --swr:#016ccc; }
+  .accsw[data-acc="teal"]{ --sw:linear-gradient(135deg,#0a8a96 0%,#0e9e78 100%); --swr:#087a7c; }
+  .accsw[data-acc="graphite"]{ --sw:linear-gradient(135deg,#5a5a5f 0%,#3a4658 100%); --swr:#3a3a3c; }
+  html.dark .accsw[data-acc="orange"]{ --sw:linear-gradient(135deg,#ee6010 0%,56%,#ff3450 100%); --swr:#ff7a3a; }
   html.dark .accsw[data-acc="pink"]{ --swr:#fc68c5; }
   html.dark .accsw[data-acc="blue"]{ --swr:#53a1fc; }
   html.dark .accsw[data-acc="teal"]{ --swr:#15b1b0; }
-  html.dark .accsw[data-acc="graphite"]{ --sw:linear-gradient(135deg,#f2f2f7 0%,#c7c7cc 100%); --swr:#d1d1d6; }
+  html.dark .accsw[data-acc="graphite"]{ --sw:linear-gradient(135deg,#f2f2f7 0%,#c4ccd8 100%); --swr:#d1d1d6; }
 
   .exhead{ display:flex; align-items:center; gap:8px; padding:2px 0 8px; }
   .exhead .nm{ font-size:var(--t-lg); font-weight:var(--w-bold); letter-spacing:-.3px; flex:1; min-width:0; }
@@ -1067,7 +1099,7 @@
     background:var(--row); color:var(--ink); border:.5px solid var(--line); cursor:pointer; white-space:nowrap;
     transition:transform .12s cubic-bezier(.34,1.4,.6,1), background .15s, color .15s, border-color .15s; }
   .chip:active{ transform:scale(.94); }
-  .chip.on{ background:var(--accent-fill); color:var(--on-accent); border-color:var(--accent-fill); }
+  .chip.on{ background:var(--grad-fill) border-box; color:var(--on-accent); border-color:transparent; }
   .cdot{ width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
   .exrow .eqic.sm{ color:var(--l3); display:inline-flex; align-items:center; flex:0 0 auto; }
   .exrow .eqic.sm svg{ width:17px; height:17px; }
@@ -1105,7 +1137,7 @@
   .cbox .cancel{ background:var(--row); color:var(--ink); }
   .cbox .danger{ background:var(--red); color:#fff; }
   /* affirmative confirm — finishing a workout isn't destructive, so it must not render red */
-  .cbox .go{ background:var(--accent-fill); color:var(--on-accent); }
+  .cbox .go{ background:var(--grad-fill); color:var(--on-accent); }
   .cue{ font-size:var(--t-md); color:var(--accent); font-weight:var(--w-med); padding:0 0 16px; line-height:1.45; }
   .cue.soft{ color:var(--l2); font-weight:var(--w-reg); }
   .sessrose-pad{ text-align:center; }
@@ -1132,7 +1164,7 @@
   .infodiff .dlabel{ color:var(--l2); font-weight:var(--w-semi); }
   .infodiff .ddots{ display:inline-flex; gap:3px; }
   .infodiff .ddot{ width:8px; height:8px; border-radius:50%; background:var(--line); border:.5px solid var(--sep); }
-  .infodiff .ddot.on{ background:var(--accent); border-color:var(--accent); }
+  .infodiff .ddot.on{ background:var(--grad-line) border-box; border-color:transparent; }
   .infodiff .dtxt{ color:var(--l2); font-weight:var(--w-semi); }
   .infocues.donts li::before{ content:"✕"; color:var(--red); font-size:var(--t-xs); top:9px; }
   .infowhy{ font-size:var(--t-md); color:var(--ink); line-height:1.5; padding:0 0 2px; }
@@ -1231,7 +1263,7 @@
     display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:transform .12s; }
   .setrow .holdbtn svg{ width:16px; height:16px; }
   .setrow .holdbtn:active{ transform:scale(.9); }
-  .setrow .holdbtn.running{ background:var(--accent-fill); color:var(--on-accent); box-shadow:0 0 0 4px var(--accent-soft); }
+  .setrow .holdbtn.running{ background:var(--grad-fill); color:var(--on-accent); box-shadow:0 0 0 4px var(--accent-soft); }
   .setrow.timed .w{ max-width:66px; }
   .setrow .eq{ color:var(--l3); flex:0 0 auto; font-weight:var(--w-semi); font-size:var(--t-sm); }
   .setrow .vol{ font-size:var(--t-md); color:var(--l2); font-weight:var(--w-bold); min-width:56px; flex:0 0 auto; text-align:right; line-height:1; font-variant-numeric:tabular-nums; }
@@ -1239,7 +1271,7 @@
   /* A logged set shows ONE signal: its set number becomes a filled accent disc with a drawn check (a mask,
      not the ✓ glyph, so it doesn't depend on the device font). Boxes, values and the card stay as they are;
      a finished exercise is simply a column of filled discs. Warm-ups are never done, so they keep their W. */
-  .setrow.done .sn{ background:var(--accent-fill); color:var(--on-accent); font-size:0; }
+  .setrow.done .sn{ background:var(--grad-fill); color:var(--on-accent); font-size:0; }
   .setrow.done .sn::after{ content:""; position:absolute; inset:0; background:currentColor;
     -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6.8 12.4l3.4 3.4 7-7' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% 100% no-repeat;
             mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6.8 12.4l3.4 3.4 7-7' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% 100% no-repeat; }
@@ -1267,7 +1299,7 @@
     cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; border-radius:50%; transition:color .15s, background .15s; }
   .setrow .setdel svg{ width:19px; height:19px; }
   .setrow .setdel:active{ color:var(--red); background:var(--fill); }
-  .setrow .prtag{ display:none; flex:0 0 auto; font-size:var(--t-xs); font-weight:var(--w-bold); letter-spacing:.4px; color:var(--on-accent); background:var(--accent-fill); padding:2px 8px; border-radius:var(--r-sm); line-height:1; }
+  .setrow .prtag{ display:none; flex:0 0 auto; font-size:var(--t-xs); font-weight:var(--w-bold); letter-spacing:.4px; color:var(--on-accent); background:var(--grad-fill); padding:2px 8px; border-radius:var(--r-sm); line-height:1; }
   /* the tag rides above the volume, out of the flex row, so a PR row's inputs keep the same width as every other row */
   .setrow.pr .prtag{ display:inline-flex; position:absolute; top:4px; right:calc(var(--pad-card) + 32px); font-size:10px; padding:2px 6px; animation:prpop .5s cubic-bezier(.2,1.3,.5,1) both; }
   /* narrow phones: give the width back to the inputs, so a 5-digit weight like 142.5 fits */
@@ -1326,10 +1358,10 @@
     padding:12px 12px 12px 16px; border-radius:var(--r-md); box-shadow:0 10px 36px rgba(0,0,0,.4); opacity:0; transition:opacity .3s, transform .3s; }
   .coach.show{ display:flex; opacity:1; transform:translate(-50%,0); }
   .coachbody{ flex:1; font-size:var(--t-md); line-height:1.4; }
-  .coachx{ flex:0 0 auto; background:var(--accent-fill); color:var(--on-accent); border:none; border-radius:var(--r-sm); padding:8px 12px; font-size:var(--t-sm); font-weight:var(--w-bold); cursor:pointer; }
+  .coachx{ flex:0 0 auto; background:var(--grad-fill); color:var(--on-accent); border:none; border-radius:var(--r-sm); padding:8px 12px; font-size:var(--t-sm); font-weight:var(--w-bold); cursor:pointer; }
   /* the coach card is always dark: in light mode the darker accent fills lose their edge on it, so use the
      on-dark accent with a dark label (Orange keeps its fill) */
-  html[data-accent]:not(.dark) .coachx{ background:var(--accent-hi); color:#1c1c1e; }
+  html[data-accent]:not(.dark) .coachx{ background:var(--grad-hi); color:#1c1c1e; }
   /* inline confirm — appears right under the control you edited; commits only on Confirm */
   .inlineconfirm{ display:none; align-items:center; gap:8px; margin:12px 0 0;
     background:var(--accent-soft); border-radius:var(--r-md); padding:12px 12px 12px 16px;
@@ -1338,7 +1370,7 @@
   .icmsg{ flex:1; font-size:var(--t-md); color:var(--ink); line-height:1.35; }
   .icbtns{ flex:0 0 auto; display:flex; align-items:center; gap:4px; }
   .iccancel{ background:none; border:none; color:var(--l2); font-size:var(--t-sm); font-weight:var(--w-semi); padding:8px 8px; cursor:pointer; }
-  .icok{ background:var(--accent-fill); color:var(--on-accent); border:none; border-radius:var(--r-sm); padding:8px 16px; font-size:var(--t-sm); font-weight:var(--w-bold); cursor:pointer; }
+  .icok{ background:var(--grad-fill); color:var(--on-accent); border:none; border-radius:var(--r-sm); padding:8px 16px; font-size:var(--t-sm); font-weight:var(--w-bold); cursor:pointer; }
   .icok:active,.iccancel:active{ opacity:.7; }
   .chip.pending{ box-shadow:0 0 0 2px var(--accent); }
 
