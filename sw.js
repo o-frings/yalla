@@ -9,7 +9,7 @@
  * new service worker; the new SW then re-fetches the shell with cache:"reload" (bypassing the HTTP
  * cache) and deletes the old cache on activate, so friends get the update on next open.
  */
-const CACHE = "yalla-v225";
+const CACHE = "yalla-v226";
 // Split so one optional asset can't take the install down. addAll is all-or-nothing, so a single 404 or
 // a flaky 750 KB icon used to leave the worker "installed" with an EMPTY cache — the trailing catch made
 // the failure invisible, and skipWaiting was chained after addAll so it was skipped too.

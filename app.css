@@ -294,8 +294,8 @@
   html.dark .timerbar.run .tmrlbl{ color:var(--l2-tint); }
   .timerbar.idle .tmrlbl{ font-size:var(--t-sm); font-weight:var(--w-med); color:var(--l2-page); }
   .tmrreset{ background:none; border:none; color:var(--ink); font-size:var(--t-sm); font-weight:var(--w-semi); cursor:pointer; padding:12px 8px; margin:-4px -4px; }
-  .tmrrepeat{ background:var(--tint), var(--surface); border:none; color:var(--ink); font-size:var(--t-sm); font-weight:var(--w-semi); cursor:pointer; padding:8px 12px; border-radius:var(--r-pill); flex:0 0 auto; }
-  .tmrrepeat:active{ opacity:.6; }
+  .tmrrepeat, .surpnew{ background:var(--tint), var(--surface); border:none; color:var(--ink); font-size:var(--t-sm); font-weight:var(--w-semi); cursor:pointer; padding:8px 12px; border-radius:var(--r-pill); flex:0 0 auto; }
+  .tmrrepeat:active, .surpnew:active{ opacity:.6; }
   .restbar{ display:none; position:relative; align-items:center; gap:9px; padding:12px 16px; margin:6px 0 0; border-radius:var(--r-md); overflow:hidden;
     background:linear-gradient(var(--accent-soft),var(--accent-soft)), var(--surface); border:.5px solid var(--accent-soft); }   /* opaque under the tint: its label never depends on the glow */
   .restbar.show{ display:flex; }
@@ -369,23 +369,11 @@
   .gymnew{ flex:0 0 auto; width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; border-radius:var(--r-sm); border:none; background:var(--tint), var(--surface); color:var(--ink); cursor:pointer; }
   .gymnew svg{ width:18px; height:18px; }
   .gymnew:active{ transform:scale(.92); }
-  /* compact training-mode toggle in the title (replaces the full-width Strength/Cardio segment) */
-  /* header controls: uniform, quiet icon buttons (no pill, no label) — one visual language */
-  .modebtn{ flex:0 0 auto; align-self:center; display:inline-flex; align-items:center; justify-content:center; gap:0; background:none; color:var(--accent); border:none; font-family:inherit; padding:4px; border-radius:var(--r-sm); cursor:pointer; line-height:1; transition:transform .12s; -webkit-tap-highlight-color:transparent; }
-  .modebtn:active{ transform:scale(.9); }
-  .modebtn .mic{ width:18px; height:18px; flex:0 0 auto; }
-  #trainModeLbl{ display:none; }
-  .modebtn, .modebtn.travelbtn.on{ position:relative; isolation:isolate; background:none; color:var(--on-accent); }
-  /* header icon buttons sit on a solid fade disc (like the Settings row tiles), inside the 44px box */
-  .modebtn::before, .largeTitle .ltmain .iconbtn::before{ content:""; position:absolute; left:50%; top:50%; width:32px; height:32px; margin:-16px 0 0 -16px;
-    border-radius:50%; background:var(--grad-fill); box-shadow:0 2px 8px -3px var(--accent-glow); z-index:-1; }
-  .largeTitle .ltmain .iconbtn::before{ width:34px; height:34px; margin:-17px 0 0 -17px; }
-  .modebtn .mic-car{ display:none; }
-  .modebtn.cardio .mic-str{ display:none; }
-  .modebtn.cardio .mic-car{ display:inline; }
-  .modebtn .mic-act{ display:none; }
-  .modebtn.activity .mic-str{ display:none; }
-  .modebtn.activity .mic-act{ display:inline; }
+  /* header controls: plain accent glyphs, no disc or pill (iOS nav-bar style); 44px hit boxes */
+  .modebtn{ flex:0 0 auto; align-self:center; display:inline-flex; align-items:center; justify-content:center; gap:0; background:none; color:var(--disc-ink); border:none; font-family:inherit; padding:4px; border-radius:var(--r-sm); cursor:pointer; line-height:1; transition:transform .12s, opacity .12s; -webkit-tap-highlight-color:transparent; }
+  .modebtn:active{ transform:scale(.86); opacity:.7; }
+  .modebtn .mic{ width:23px; height:23px; flex:0 0 auto; }
+  .travelbtn.on .mic{ fill:currentColor; }   /* travel mode on: the plane fills in */
   .ic{ width:16px; height:16px; vertical-align:-3px; }
   .btn .ic{ margin-right:8px; }
   .swapnote .ic{ width:13px; height:13px; vertical-align:-2px; margin-right:4px; }
@@ -404,6 +392,18 @@
   #largeTitle .wktitle{ display:block; font-weight:var(--w-bold); color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #largeTitle small{ display:block; font-size:var(--t-sm); margin-top:4px; }
   #largeTitle .ltmain{ gap:12px; align-items:center; }
+  /* Plan mode: the plan's name opens the Plans sheet (ink name + accent chevron; 44px tap box around the line) */
+  .plansw{ position:relative; display:inline-flex; align-items:center; gap:3px; max-width:100%; vertical-align:bottom; background:none; border:0; padding:0; font:inherit; font-weight:var(--w-semi); color:var(--ink); cursor:pointer; -webkit-appearance:none; appearance:none; -webkit-tap-highlight-color:transparent; }
+  .plansw::before{ content:""; position:absolute; inset:-18px -8px -10px; }   /* grows up into the title's gap, clear of the tab row below */
+  .plansw:active{ opacity:.55; }
+  .plansw-nm{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .plansw-chev{ width:14px; height:14px; flex:0 0 auto; color:var(--disc-ink); }
+  .plansw:disabled{ cursor:default; opacity:1; color:inherit; font-weight:inherit; }   /* mid-session it's plain text */
+  .plansw:disabled .plansw-chev{ display:none; }
+  /* Strength · Cardio · Activity: the page's top tabs, on a hairline so they read apart from the day tabs below */
+  #trainTabs{ flex-wrap:nowrap; gap:var(--s5); margin:0 0 var(--s4); border-bottom:.5px solid var(--sep); }
+  #trainTabs .utab{ font-size:var(--t-md); padding-bottom:8px; }
+  #trainTabs .utab::before{ top:-6px; }   /* still a 44px+ box; leaves room for the plan name's tap box above */
   /* 44px hit boxes, same glyph spacing; the last glyph lands on the 16px gutter */
   #largeTitle .modebtn{ padding:11px; margin:-7px; } #largeTitle .ltmain > .modebtn:last-child{ margin-right:-11px; }
   .largeTitle .ltmain .wktitle{ flex:1; min-width:0; line-height:1.12; }
@@ -417,6 +417,7 @@
   body.training #largeTitle{ padding-bottom:0; }
   body.training #largeTitle .ltmain{ display:none; }
   body.training #pageWorkout .startrow,
+  body.training #pageWorkout #trainTabs,
   body.training #pageWorkout #wkMode,
   body.training #pageWorkout #startAction,
   body.training #pageWorkout #seg{ display:none; }
@@ -426,6 +427,13 @@
   #startAction .btn{ display:flex; align-items:center; justify-content:center; gap:8px; font-weight:var(--w-semi); margin:2px 0 14px; }
   #startAction .btn svg{ width:18px; height:18px; flex:0 0 auto; }
   #sponLen2{ margin:2px 0 14px; }
+  /* Surprise mode: length tabs on the left, New surprise on the right (wraps under them when narrow) */
+  .surprow{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--s2) var(--s4); margin:2px 0 14px; }
+  #pageWorkout .surprow #sponLen2{ margin:0; }
+  .surpnew{ position:relative; font-family:inherit; -webkit-tap-highlight-color:transparent; }
+  .plansw-part{ white-space:nowrap; } .plansw-part::before{ content:" · "; }   /* "3 days" never splits; the separator rides with its part */
+  .surpnew::before{ content:""; position:absolute; inset:-6px 0; }   /* 44px tap box */
+  .surpnew{ display:inline-flex; align-items:center; gap:6px; } .surpnew svg{ width:15px; height:15px; flex:0 0 auto; }
   /* plan mode's secondary action, kept as light as surprise mode's controls */
   .planlink{ display:inline-flex; align-items:center; gap:7px; background:none; border:none; font:inherit; font-size:var(--t-md); font-weight:var(--w-semi); color:var(--ink); padding:10px 2px 4px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
   .planlink svg{ width:16px; height:16px; flex:0 0 auto; }
@@ -447,8 +455,8 @@
   /* clear this workout — at the foot of the page, shown whenever anything's been entered (updateClearBtn) */
   #abortBtn{ display:block; margin-top:calc(var(--gap-card)*2.5); color:var(--red-page); font-weight:var(--w-semi); }   /* well clear of Finish even before the session card shows */
   #abortBtn[hidden]{ display:none; }
-  .largeTitle .ltmain .iconbtn{ flex:0 0 auto; align-self:center; margin:-9px -12px -9px 0; position:relative; isolation:isolate; color:var(--on-accent); background:none; }
-  .largeTitle .ltmain .iconbtn svg{ width:20px; height:20px; }   /* 49px hit box, 31px of layout; a tinted disc behind the glyph */
+  .largeTitle .ltmain .iconbtn{ flex:0 0 auto; align-self:center; margin:-9px -12px -9px 0; color:var(--disc-ink); }   /* 48px hit box, 30px of layout; a plain accent glyph */
+  .largeTitle .ltmain .iconbtn svg{ width:24px; height:24px; }
   #pageMe .pagebody{ margin-top:var(--s1); }
   .largeTitle small{ display:block; font-size:var(--t-md); font-weight:var(--w-med); color:var(--l2-page); letter-spacing:0; margin-top:8px; }
   /* a row that navigates somewhere (Friends sheet ⇄ Settings) */
@@ -754,7 +762,7 @@
   .emoji-cell{ background:none; border:none; font-size:var(--t-xl); line-height:1; cursor:pointer; padding:5px 0; border-radius:var(--r-sm); }
   .emoji-cell:active{ background:var(--tint), var(--card); transform:scale(1.2); }
   .sheethdr .t.tappable{ cursor:pointer; }
-  #ovMessages{ position:relative; padding:8px; margin-top:8px; color:var(--on-accent); }   /* a fade disc like the other header icons (unread shows as the count badge); nudged down so its tap target clears the status-bar clock */
+  #ovMessages{ position:relative; padding:12px; }   /* a plain accent glyph in the gear's 48px box, centred on the greeting like the other header icons (unread shows as the count badge) */
   #ovMessages .railnotch{ position:absolute; top:2px; right:2px; min-width:16px; height:16px; padding:0 4px; font-size:var(--t-xs); }
   .msgbadge[hidden]{ display:none; }   /* guard: the .msgbadge display rule otherwise overrides the hidden attribute */
   .msg-compose{ display:flex; gap:8px; align-items:center; padding-top:10px; margin-top:6px; border-top:.5px solid var(--sep); }

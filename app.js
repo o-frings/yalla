@@ -2077,7 +2077,7 @@ function teardownMessages(){
 function setMsgBadge(n){
   const b=$("msgRailBadge"); if(b){ b.textContent=n>9?"9+":String(n); b.style.display=n>0?"":"none"; }
   const fb=$("friendsMsgBadge"); if(fb){ fb.textContent=n>9?"9+":String(n); fb.style.display=n>0?"":"none"; }
-  const ic=$("ovMessages"); if(ic) ic.classList.toggle("has-unread", n>0);   // accent only when there's something unread
+  const ic=$("ovMessages"); if(ic) ic.classList.toggle("has-unread", n>0);   // a hook for unread styling; the count badge is the cue today
 }
 async function refreshUnread(){
   if(!cloudReady()){ setMsgBadge(0); return; }
@@ -2800,7 +2800,9 @@ function maybeAskFinish(){
   confirmAsk("No sets for "+ago+" minutes. Finish this workout? Your time counts up to your last set.",
              "Finish", ()=>{ try{ Promise.resolve($("saveBtn").onclick()).catch(()=>toast("Couldn't save — your sets are still here.")); }catch(e){} }, "go");
 }
-function updateTrainingState(){ document.body.classList.toggle("training", sessionUnderway()); updateClearBtn(); }
+function updateTrainingState(){ const on=sessionUnderway(); document.body.classList.toggle("training", on);
+  const ps=$("planSwitch"); if(ps) ps.disabled=on;   // no plan switching mid-session
+  updateClearBtn(); }
 // Pin the session + rest timers to the top while a workout's underway (active timer OR a running
 // rest). .stick enables position:sticky; an IntersectionObserver adds .stuck (the backdrop) only once
 // the bar actually reaches the top, so nothing changes visually until you scroll.
@@ -3197,7 +3199,7 @@ function renderAll(){ renderNav(); renderDash(); renderSeg(); if(freeMode) rende
 // ================= dashboard =================
 function renderNav(){
   $("ltName").textContent = freeMode ? "Free workout" : ((activePlan().workouts[curWk]||{}).name || "Workout");
-  $("planSub").textContent = planMeta(activePlan());
+  if(startMode()==="plan") renderPlanSub(); else $("planSub").textContent = planMeta(activePlan());
   $("bwGoalTxt").textContent = settings.goalTarget!=null ? settings.goalTarget+" kg" : "—";
 }
 // ================= overview (coach home) =================
@@ -4598,7 +4600,7 @@ function renderWorkout(){
   // swap or "keep" re-render doesn't reshuffle the variety or wipe the user's pins.
   const rsig=p.id+"#"+curWk+"#"+((settings.slotDone&&settings.slotDone[p.id+"|"+w.name])||0);
   if(rsig!==_rotSig){ _rotSig=rsig; applyRotation(); }
-  $("ltName").textContent = w.name; $("planSub").textContent = planMeta(p);
+  $("ltName").textContent = w.name; renderPlanSub();
   renderInjuryBanner();
   const injRes=resolveInjuryNames(w); let shown=0;
   w.ex.forEach((e,xi)=>{
@@ -5686,7 +5688,7 @@ const _editing=()=> $("meTiles")&&$("meTiles").classList.contains("editing");
 $("meBalance").onclick=()=>{ if(_meSwiped){ _meSwiped=false; return; } if(_editing()) return; openMuscles(); };
 if($("slCard")) $("slCard").onclick=()=>{ if(_editing()) return; openSheet("Strength"); };
 if($("progPanel")) $("progPanel").onclick=()=>{ if(_editing()) return; openSheet("Vol"); };
-if($("cardioCard")) $("cardioCard").onclick=()=>{ if(_editing()) return; if(cardioList().length) openCardioDetail(); else { showTab("workout"); setTrainMode("cardio"); } };
+if($("cardioCard")) $("cardioCard").onclick=()=>{ if(_editing()) return; if(cardioList().length) openCardioDetail(); else { showTab("workout"); if(!sessionUnderway()) setTrainMode("cardio"); } };
 if($("strengthClose")) $("strengthClose").onclick=()=>closeSheet("Strength");
 if($("scrimStrength")) $("scrimStrength").onclick=()=>closeSheet("Strength");
 if($("volClose")) $("volClose").onclick=()=>closeSheet("Vol");
@@ -5754,6 +5756,17 @@ function planMeta(plan){
   const mins=(main.length?main:plan.workouts).map(workoutMinutes).filter(x=>x>0);
   const t=mins.length ? "~"+(Math.round(mins.reduce((a,b)=>a+b,0)/mins.length/5)*5)+" min" : "";
   return [days+" day"+(days===1?"":"s")+(hasHome?" + home":""), t, plan.level||""].filter(Boolean).join(" · ");
+}
+// Plan mode's subtitle leads with the active plan's name, which is how you switch plans:
+// "Short & Intense ⌄ · 3 days + home · ~35 min". Mid-session it's plain text (the header controls hide then too).
+function renderPlanSub(){
+  const el=$("planSub"); if(!el) return;
+  const p=activePlan(), meta=planMeta(p);
+  el.innerHTML='<button class="plansw" id="planSwitch" type="button" aria-label="Change plan"><span class="plansw-nm">'+esc((p&&p.name)||"Plan")+'</span>'
+    +'<svg class="plansw-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>'
+    +(meta?'<span class="plansw-meta">'+meta.split(" · ").map(t=>'<span class="plansw-part">'+esc(t)+'</span>').join("")+'</span>':'');
+  const b=$("planSwitch"); b.disabled=sessionUnderway() || trainMode!=="strength";   // cardio/activity logs don't use the plan
+  b.onclick=()=>{ renderPlanList(); openSheet("Plans"); };
 }
 function splitType(plan){
   const names=plan.workouts.map(w=>(w.name||"").toLowerCase()).join(" ");
@@ -6370,25 +6383,20 @@ function renderStartMode(){
   document.querySelectorAll("#wkMode .s").forEach(t=> t.classList.toggle("active", t.dataset.wm===mode));
   const seg=$("seg"); if(seg) seg.style.display = mode==="plan" ? "" : "none";   // plan-day tabs only mean something in Plan mode
   const act=$("startAction"); if(!act) return;
-  const refresh='<svg class="mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v4h-4"/></svg>';
-  const plans='<svg class="mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h12M9 12h12M9 18h12"/><circle cx="4" cy="6" r="1.2"/><circle cx="4" cy="12" r="1.2"/><circle cx="4" cy="18" r="1.2"/></svg>';
-  // the mode's action is a header icon beside the travel button: New surprise (Surprise) / Change plan (Plan) / hidden (Free)
-  const sh=$("headerShuf");
-  if(sh){ const on=mode==="surprise";
-    sh.style.display = mode==="free" ? "none" : ""; sh.innerHTML = on ? refresh : plans;
-    sh.setAttribute("aria-label", on ? "New surprise" : "Change plan"); sh.setAttribute("title", on ? "New surprise" : "Change plan");
-    sh.onclick = on ? surpriseShuffle : (()=>{ renderPlanList(); openSheet("Plans"); }); }
   if(mode==="surprise"){
     const fd=draft["free"]||{}, nm=fd.name||"Surprise session", nEx=fd.s?Object.keys(fd.s).length:0, L=settings.sponLen||"standard";
     // the session IS the title (fills the top-left); its shape is the subtitle
     if($("ltName")) $("ltName").textContent=nm;
     if($("planSub")) $("planSub").textContent=(nEx?'~'+sponMins(nEx)+' min · '+nEx+' move'+(nEx>1?'s':''):'picked for you')+(nEx?' · picked for you':'');
-    act.innerHTML='<div class="utabs paneltabs" id="sponLen2">'
-      +[["quick","Quick"],["standard","Standard"],["full","Full"]].map(([v,l])=>'<button class="utab'+(L===v?" active":"")+'" data-sl="'+v+'" type="button" aria-pressed="'+(L===v)+'">'+l+'</button>').join('')+'</div>';
+    // the session's own controls: its length, and a fresh pick
+    act.innerHTML='<div class="surprow"><div class="utabs paneltabs" id="sponLen2">'
+      +[["quick","Quick"],["standard","Standard"],["full","Full"]].map(([v,l])=>'<button class="utab'+(L===v?" active":"")+'" data-sl="'+v+'" type="button" aria-pressed="'+(L===v)+'">'+l+'</button>').join('')+'</div>'
+      +'<button class="surpnew" id="surpNew" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/><circle cx="15" cy="15" r="1.2" fill="currentColor"/><circle cx="15" cy="9" r="1.2" fill="currentColor"/><circle cx="9" cy="15" r="1.2" fill="currentColor"/></svg>New surprise</button></div>';
     act.querySelectorAll("#sponLen2 .utab").forEach(b=> b.onclick=()=>{ settings.sponLen=b.dataset.sl; sset("settings",settings); relenSurprise(); });
+    $("surpNew").onclick=surpriseShuffle;
   } else if(mode==="plan"){
     if($("ltName")) $("ltName").textContent="Workout";
-    if($("planSub")) $("planSub").textContent = (typeof planMeta==="function") ? planMeta(activePlan()) : "";
+    renderPlanSub();
     act.innerHTML="";
   } else {
     // Free: renderFree() owns the title/subtitle (it knows suggested-session names) — don't clobber it here
@@ -6412,7 +6420,6 @@ document.querySelectorAll("#wkMode .s").forEach(t=> t.onclick=()=>{
   if(sessionUnderway()) confirmAsk("Switch mode? Your current sets will be discarded.", "Switch", apply, "danger");
   else apply();
 });
-if($("headerShuf")) $("headerShuf").onclick=surpriseShuffle;
 document.querySelectorAll("#travelSeg .s").forEach(s=>{
   s.onclick=async()=>{ if(s.dataset.tv===(settings.travelMode||"off")) return;   // no change → don't reset the clock
     travelAccrue();                       // bank the time spent in the context you're leaving
@@ -7692,20 +7699,20 @@ function renderCardioLog(){
   });
 }
 function renderCardio(){ renderCardioChips(); updateCardioPreview(); renderActCite(); renderCardioLog(); }
-const TRAIN_MODES=["strength","cardio","activity"], TRAIN_LBL={strength:"Strength", cardio:"Cardio", activity:"Activity"};
+const TRAIN_MODES=["strength","cardio","activity"];
 function setTrainMode(m){ trainMode=m;
-  const b=$("trainModeBtn"); if(b){ b.classList.toggle("cardio", m==="cardio"); b.classList.toggle("activity", m==="activity"); }
-  const l=$("trainModeLbl"); if(l) l.textContent = TRAIN_LBL[m] || "Strength";
+  document.querySelectorAll("#trainTabs .utab").forEach(t=>{ const on=t.dataset.tm===m; t.classList.toggle("active", on); t.setAttribute("aria-pressed", on); });
   const strength = m==="strength";
   $("strengthWrap").style.display = strength ? "" : "none";
   $("cardioPanel").style.display  = strength ? "none" : "";
+  if(startMode()==="plan") renderPlanSub();
   if(!strength){ cdCat = (m==="activity") ? "activity" : "cardio";
     if(!actsInCat(cdCat).some(a=>a.n===cdActSel)) cdActSel=actsInCat(cdCat)[0].n;   // keep the picked activity valid for the category
     renderCardio();
   }
 }
-// one compact button, tap cycles Strength → Cardio → Activity → Strength
-if($("trainModeBtn")) $("trainModeBtn").onclick=()=>{ const i=TRAIN_MODES.indexOf(trainMode); setTrainMode(TRAIN_MODES[(i+1)%TRAIN_MODES.length]); };
+// the tab row under the title: Strength · Cardio · Activity
+document.querySelectorAll("#trainTabs .utab").forEach(t=> t.onclick=()=>{ if(TRAIN_MODES.includes(t.dataset.tm) && t.dataset.tm!==trainMode) setTrainMode(t.dataset.tm); });
 ["cdDist","cdTime","cdPace"].forEach(id=> $(id).addEventListener("input", cdRunCalc));
 $("cdMin").addEventListener("input", updateCardioPreview);
 $("cdLog").onclick=()=>{
