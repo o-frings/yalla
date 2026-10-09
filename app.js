@@ -804,6 +804,8 @@ function sectionOrder(){ return MGROUPS.concat(["Other"]); }
 // equipment availability: full gym → workout park (bars + bodyweight) → no equipment (bodyweight only)
 const LEVELS=[["gym","Full gym"],["park","Park"],["none","No equipment"]];
 let equipLevel="gym";
+let _noRise=false;     // the next #exlist render skips the cards' rise entrance (the post-Finish re-render, under the burst)
+let _finPadDrop=null;  // drops the post-Finish page spacer (see finishPad)
 let exSort="az";   // "az" | "score" — how exercise lists are ranked (shared by Add & Swap)
 function exLevel(name){ const v=venueFor(name); return v==="Gym"?"gym":(v==="Park"?"park":"none"); }
 function levelAllows(name){ const l=exLevel(name);
@@ -4588,7 +4590,7 @@ function renderWorkout(){
   // Surprise mode: propose a random data-picked session instead of the plan day (once, unless one's already loaded)
   if(settings.surprise && !freeMode && !sessionUnderway() && !(draft["free"]&&draft["free"].spon)){ loadSurprise(); return; }
   if(typeof renderTravelBanner==="function") renderTravelBanner();
-  const p=activePlan(), w=p.workouts[curWk], list=$("exlist"); list.innerHTML="";
+  const p=activePlan(), w=p.workouts[curWk], list=$("exlist"); list.innerHTML=""; list.classList.toggle("norise", _noRise); _noRise=false;
   // recompute the auto-rotation pick only when the slot (or its completion count) changes, so a manual
   // swap or "keep" re-render doesn't reshuffle the variety or wipe the user's pins.
   const rsig=p.id+"#"+curWk+"#"+((settings.slotDone&&settings.slotDone[p.id+"|"+w.name])||0);
@@ -4753,7 +4755,24 @@ function askClearWorkout(){
   confirmAsk("Clear "+nm+"? This "+what+". Your plan and saved workouts stay.", "Clear", abortSession, "danger");
 }
 if($("abortBtn")) $("abortBtn").onclick=askClearWorkout;
-let _finLock=0;   // swallow a double tap on Finish while the share sheet is still 400ms away
+let _finLock=0;   // swallow a double tap on Finish while the share sheet is still away
+// A short finish bursts from the Finish button, scrolled back under the finger. The re-render can shorten the page
+// (the session card and Clear workout go), leaving no room for that scroll; a spacer at the page's end gives it.
+// It shrinks only from below the viewport as you scroll up, so nothing visible moves, and goes on a tab change.
+function finishPad(pg, need){
+  const old=pg.querySelector(":scope > .finpad"), prev=old ? old.offsetHeight : 0;   // a second short finish adds to it
+  if(_finPadDrop) _finPadDrop();
+  const sp=document.createElement("div"); sp.className="finpad"; sp.setAttribute("aria-hidden","true");
+  let h=Math.ceil(need)+prev; sp.style.height=h+"px"; pg.appendChild(sp);
+  const pad=parseFloat(getComputedStyle(pg).paddingBottom)||0;
+  const shrink=()=>{ if(!sp.isConnected) return done();
+    const cut=Math.min(h, Math.max(0, pg.scrollHeight-(pg.scrollTop+pg.clientHeight)-pad));   // spacer below the viewport
+    if(cut>0){ h-=cut; sp.style.height=h+"px"; }
+    if(h<=0) done(); };
+  const done=()=>{ pg.removeEventListener("scroll", shrink); sp.remove(); if(_finPadDrop===done) _finPadDrop=null; };
+  pg.addEventListener("scroll", shrink, { passive:true });
+  _finPadDrop=done;
+}
 $("saveBtn").onclick=async()=>{
   if(Date.now()<_finLock) return;
   const savedSig=draftSig();
@@ -4827,16 +4846,28 @@ $("saveBtn").onclick=async()=>{
   await sset("settings",settings);
   delete draft[savedSig]; await sset("draft", draft); sessGym=null;
   swaps={};
+  const fy0=qualifies ? null : $("saveBtn").getBoundingClientRect().top;   // where the finger is
+  _noRise=!qualifies;   // the cards around the bursting Finish button stay put, not fade in under it
   if(freeMode){ renderSeg(); renderFree(); renderDash(); }
   else { const ni=nextRotateIndex(p); if(w.rotate!==false && ni>=0) curWk=ni; renderSeg(); renderWorkout(); renderDash(); }
+  // a short finish bursts from the Finish button: scroll so it stays under the finger after the re-render moved it
+  if(fy0!=null){ const sb=$("saveBtn"), pg=sb && sb.closest(".page");
+    if(pg && sb.getClientRects().length){ const dy=sb.getBoundingClientRect().top-fy0;
+      if(Math.abs(dy)>4){ const room=pg.scrollHeight-pg.clientHeight-pg.scrollTop; if(dy>room) finishPad(pg, dy-room); pg.scrollTop+=dy; } } }
   // one burst, one toast, one haptic for the whole finish (PR, finish, unlocks). A micro session counts in
   // proportion to the work done (see finishCredit) and says so in the toast.
+  // The tile that earned it explodes: a qualifying finish's share card, as its sheet lands (opened after the re-render
+  // has painted, since the 1080×1350 tile paint is heavy; the burst fires as the sheet settles); a short finish's
+  // Finish button where it now sits, else the first exercise card on screen.
   _finLock=Date.now()+450;
+  const SHARE_AT=200, SHARE_LAND=300;
   celebrateMoment(Object.assign({ pr:beaten, qualifies, achIds:fresh, shared:cp.star,
-    micro: (!qualifies && beaten===0) ? { sets:session.sets, pct:Math.round(cred*100) } : null }, sm));
+    micro: (!qualifies && beaten===0) ? { sets:session.sets, pct:Math.round(cred*100) } : null,
+    tile: qualifies ? "#sheetShare.show #sharePreview canvas" : ()=>[$("saveBtn")].concat([...document.querySelectorAll("#exlist .group")]),
+    at: qualifies ? SHARE_AT+SHARE_LAND : 0, toastTop: true }, sm));   // the toast goes up top: clear of the share sheet, or of the Finish button bursting at the bottom
   if(qualifies){
     const sk=starShareOf(sr);   // a week star adds a Star card to the sheet (it leads when a figure or milestone landed)
-    setTimeout(()=>openShareTile(session, sk), 400);   // after the burst's first frames: the 1080×1350 tile paint is heavy
+    setTimeout(()=>openShareTile(session, sk), SHARE_AT);
     cloudPublish(session);   // post a summary to the friends feed (no raw weights), if signed in + sharing on
   }
   else logStarShare(sr);   // a short finish that completes a figure offers its Star card, like the cardio/other logs
@@ -4847,7 +4878,11 @@ $("saveBtn").onclick=async()=>{
 // ================= celebrations =================
 // One moment → one burst, one toast, one haptic. outcome = { pr: lifts beaten, qualifies, micro: {sets, pct}
 // for a sub-qualifying finish, achIds: fresh unlocks, star/constellation/milestone/comeback: the star part (from
-// starMoment), shared: a completion went to the feed, logged: the plain toast for a log with nothing to celebrate }.
+// starMoment), shared: a completion went to the feed, logged: the plain toast for a log with nothing to celebrate,
+// tile/at: the tile that explodes and when (see celebrate); without one, lead (the log row that earned it, then its
+// button) or the moment's own tile when it is on screen
+// (the sky card for a star, the unlocked achievement's tile), else the toast that names it; toastTop: the toast shows
+// at the top of the screen, clear of a sheet that is about to open }.
 // Tiers (stars spec §5.2): 1 any finish, or a week star from a micro session or a cardio/other log; 2 a PR, or a
 // week star on a qualifying finish; 3 a constellation, any achievement, star 52 or 104. The toast leads
 // PR > constellation > star > achievement, with one detail and at most one suffix.
@@ -4856,7 +4891,6 @@ function celebrateMoment(o){
   o=o||{};
   const ach=(o.achIds||[]).map(id=>ACHIEVEMENTS.find(a=>a.id===id)).filter(Boolean), cst=o.constellation, n=starCount();
   const tier = (ach.length || cst || o.milestone>=52) ? 3 : (o.pr>0 || (o.star && o.qualifies)) ? 2 : (o.star || o.qualifies || o.micro) ? 1 : 0;   // every finish sparks, short sessions too
-  if(tier) celebrate(tier, { stars:!!(o.star || cst || o.milestone), pr:o.pr>0 });
   const achT = ach.length ? ach[0].t+" unlocked" : "", starT = o.comeback ? "Welcome back" : STAR_COPY.toastStarSuffix;
   let msg="";
   if(o.pr>0) msg="New best! You beat "+o.pr+" lift"+(o.pr>1?"s":"")+(cst ? " · "+cst.name+" complete ✦" : o.star ? " · "+starT : achT ? " · "+achT : " — keep climbing.");
@@ -4864,11 +4898,15 @@ function celebrateMoment(o){
   else if(o.star) msg = achT ? starT+" · "+achT : starCopy(o.comeback ? "toastWelcome" : "toastStar", {n});
   else if(ach.length) msg="Achievement unlocked  "+ach[0].icon+"  "+ach[0].t+(ach.length>1?"  +"+(ach.length-1)+" more":"");
   if(msg && o.shared && (cst || o.milestone)) msg+=STAR_COPY.toastShared;
-  if(msg) toast(msg, true, true);
+  if(msg) toast(msg, true, true, o.toastTop);
   else if(o.micro){ const wc=starWeekClause();   // neutral star clause: "62% of a session · 1.6 of 2 this week"
-    toast("Logged "+o.micro.sets+" set"+(o.micro.sets===1?"":"s")+" — counts as "+o.micro.pct+"% of a session"+(wc ? " · "+wc : " toward your week. Every bit adds up.")); }
-  else if(o.logged) toast(o.logged);
-  if(tier) haptic(CEL_HAPTIC[tier]);
+    toast("Logged "+o.micro.sets+" set"+(o.micro.sets===1?"":"s")+" — counts as "+o.micro.pct+"% of a session"+(wc ? " · "+wc : " toward your week. Every bit adds up."), false, false, o.toastTop); }
+  else if(o.logged) toast(o.logged, false, false, o.toastTop);
+  if(tier){ let tile=o.tile, at=o.at||0;
+    if(!tile){ tile=[].concat(o.lead||[]); if(o.star || cst || o.milestone) tile.push("#sheetStars.show #starsBody > :first-child", "#meSky");
+      ach.forEach(a=>tile.push('#achGrid .ach[data-id="'+a.id+'"]'));
+      tile.push("#toast"); at=at||120; }   // the toast slides in first
+    celebrate(tier, { stars:!!(o.star || cst || o.milestone), pr:o.pr>0, tile, at, haptic:CEL_HAPTIC[tier] }); }
   return tier;
 }
 // The star part of a moment, after the spam guards (stars spec §5.2, §8): a silent check (or stars switched off)
@@ -4890,19 +4928,53 @@ function starShareOf(sr){
   return sr.constellation ? { kind:"const", fig:sr.constellation, lead:true } : { kind:"week", week:sr.star, lead:!!sr.milestone };
 }
 // The single burst entry point. Old callers map: celebrate(true) → 2, celebrate(false) → 1, celebrate() → 3.
-// Every accent bursts glitter sparks; PRs and unlocks add confetti cannons. opts.stars (a star moment) turns a
-// quarter of the pieces into white/gold 4-point sparkles, so stars look the same on every accent.
+// The tile that earned the moment explodes into glitter: sparks start all over its rounded rect (mostly on its
+// edges) and fly out from its centre, then drift down; the tile flashes and pops. PRs and unlocks add a shock-wave
+// ring and confetti cannons; unlocks a second ring and a second wave. opts.tile: an element, a selector, a list of
+// them or a function returning one; the first that is on screen (and not under an open sheet) is the tile, else the
+// glitter breaks off the screen edges. opts.at: fire that many ms later (the target is resolved then, so a sheet
+// can slide in first). opts.haptic buzzes with the bang. opts.stars (a star moment) turns a quarter of the pieces
+// into white/gold 4-point sparkles, so stars look the same on every accent.
 // A new burst replaces one on screen; it is removed at its end + 150ms or when the app is hidden.
-let _burstEnd=null;
-// where the last tap landed, so a burst starts at the button that earned it (a tap within 3s; else near the centre)
-let _lastTap=null;
-document.addEventListener("pointerdown", e=>{ _lastTap={x:e.clientX, y:e.clientY, t:Date.now()}; }, {capture:true, passive:true});
-function burstOrigin(){ const vw=innerWidth, vh=innerHeight, t=_lastTap;
-  if(t && Date.now()-t.t<3000) return {x:Math.min(vw-40,Math.max(40,t.x)), y:Math.min(vh-90,Math.max(90,t.y))};
-  return {x:vw*.5, y:vh*.42}; }
+let _burstEnd=null, _burstArm=0;
+// where el sits once the sheet it is in has landed (a sheet slides up from translateY(102%))
+function landedRect(el){
+  const r=el.getBoundingClientRect(), sh=el.closest(".sheet"); let dy=0;
+  if(sh){ const m=getComputedStyle(sh).transform, v=m && /^matrix(3d)?\(([^)]+)\)/.exec(m);
+    if(v){ const a=v[2].split(",").map(parseFloat); dy=(v[1] ? a[13] : a[5])||0; } }
+  return { x:r.left, y:r.top-dy, w:r.width, h:r.height };
+}
+// the first candidate that is mostly on screen: {el, x, y, w, h, rad}, or null
+function boomTarget(t){
+  if(typeof t==="function") t=t();
+  const open=document.querySelector(".sheet.show"), vw=innerWidth, vh=innerHeight;
+  for(let el of [].concat(t||[])){
+    if(typeof el==="string") el=document.querySelector(el);
+    if(!el || !el.isConnected || !el.getClientRects().length) continue;
+    if(open && !open.contains(el) && el.id!=="toast") continue;   // a tile under an open sheet can't be seen
+    const r=landedRect(el);
+    // a tile mid-animation (the toast's popin overshoot) is measured without its own transform: its settled box
+    if(el.offsetWidth && getComputedStyle(el).transform!=="none"){ const cx=r.x+r.w/2, cy=r.y+r.h/2;
+      r.w=el.offsetWidth; r.h=el.offsetHeight; r.x=cx-r.w/2; r.y=cy-r.h/2; }
+    if(r.w<24 || r.h<16) continue;
+    const vis=Math.max(0,Math.min(r.x+r.w,vw)-Math.max(r.x,0))*Math.max(0,Math.min(r.y+r.h,vh)-Math.max(r.y,0));
+    if(vis < .6*r.w*r.h) continue;
+    r.el=el; r.rad=Math.min(r.w/2, r.h/2, parseFloat(getComputedStyle(el).borderTopLeftRadius)||0);
+    return r;
+  }
+  return null;
+}
 function celebrate(tier, opts){
   tier = tier===true ? 2 : tier===false ? 1 : tier==null ? 3 : tier;
   if(!(tier>=1)) return;
+  const o=Object.assign({}, opts||{});
+  clearTimeout(_burstArm);
+  if(o.at>0){ const at=o.at; o.at=0;
+    // the buzz lands with the bang where the Vibration API exists (Android); iOS only buzzes inside the tap's gesture
+    // (haptic() toggles a switch), so there it fires now rather than be dropped 500ms later
+    if(o.haptic && !navigator.vibrate){ haptic(o.haptic); o.haptic=0; }
+    _burstArm=setTimeout(()=>celebrate(tier, o), at); return; }
+  if(o.haptic) haptic(o.haptic);
   if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;   // the toast's ✦ carries it
   if(document.hidden) return;
   if(_burstEnd) _burstEnd();
@@ -4910,7 +4982,8 @@ function celebrate(tier, opts){
   // low-end hint: half the pieces. WebKit buckets hardwareConcurrency to 4 or 8, so every iPhone says 4 — only
   // fewer than 4 counts.
   const low=(navigator.hardwareConcurrency||8)<4 || (navigator.deviceMemory||8)<=4;
-  const o=Object.assign({}, opts||{}); if(!o.from) o.from=burstOrigin();
+  const vw=innerWidth, vh=innerHeight, tg=boomTarget(o.tile);
+  o.box = tg || { x:0, y:0, w:vw, h:vh, rad:0, screen:true };   // no tile on screen: the screen's edges break off, with fewer cannon pieces
   const t=Math.min(tier,3), parts=[glitter(t, o, low)]; if(t>=2) parts.push(confetti(t, o, low));
   const b={ el:document.createElement("div"), ms:Math.max(...parts.map(p=>p.ms)) }; b.el.className="burst";
   parts.forEach(p=>b.el.appendChild(p.el));
@@ -4918,16 +4991,31 @@ function celebrate(tier, opts){
   const onVis=()=>{ if(document.hidden) end(); };
   const end=()=>{ clearTimeout(timer); b.el.remove(); document.removeEventListener("visibilitychange", onVis); if(_burstEnd===end) _burstEnd=null; };
   _burstEnd=end; document.addEventListener("visibilitychange", onVis);
-  requestAnimationFrame(()=>{ if(_burstEnd!==end) return; document.body.appendChild(b.el); timer=setTimeout(end, b.ms+150); });
+  requestAnimationFrame(()=>{ if(_burstEnd!==end) return; document.body.appendChild(b.el); timer=setTimeout(end, b.ms+150);
+    if(tg) boomPop(tg.el, t); });
+}
+// the tile itself: a squeeze, then a pop past full size and a short shake (Web Animations, so it never restarts
+// the tile's own CSS animations)
+const _pops=new WeakMap();
+function boomPop(el, t){
+  if(!el.animate) return; const k=[0,.035,.05,.065][t], s=[0,3,4,5][t];
+  const prev=_pops.get(el); if(prev) try{ prev.cancel(); }catch(e){}   // a new pop replaces one still running
+  try{ _pops.set(el, el.animate([{ scale:"1", translate:"0 0" }, { scale:String(1-k*.9), translate:"0 0", offset:.12 },
+    { scale:String(1+k), translate:-s+"px 0", offset:.32 }, { scale:String(1-k*.25), translate:s+"px 0", offset:.5 },
+    { scale:String(1+k*.15), translate:-(s/2)+"px 0", offset:.68 }, { scale:"1", translate:"0 0" }],
+    { duration:560, easing:"ease-out" })); }catch(e){}
 }
 // "#rrggbb" mixed toward "#rrggbb" by t (0…1); anything else comes back unchanged
 function mixHex(a,b,t){ const p=h=>/^#[0-9a-f]{6}$/i.test(h)?[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)):null, x=p(a), y=p(b);
   if(!x||!y) return a; return "#"+x.map((v,i)=>Math.round(v+(y[i]-v)*t).toString(16).padStart(2,"0")).join(""); }
 // Confetti cannons for PRs and unlocks: volleys shot up from both bottom corners that fall back, in the accent's
-// two hues (--cel-1…6; Orange keeps its own gold-leaning palette, rose included) with gold/white sparks mixed in. The main sparks come from
-// glitter(), which every accent bursts.
+// two hues (--cel-1…6; Orange keeps its own gold-leaning palette, rose included) with sparks mixed in: gold/white, or
+// the accent's --spark-1…3 when it sets them (Pink: rose gold, champagne, pearl). A third of Pink's pieces are candy
+// hearts. The main sparks come from glitter(), the exploding tile, which every accent bursts. Everything has
+// landed and faded by about 2.2s, so a share sheet under it is readable again.
 function confetti(tier, opts, low){
-  let P=[0,0,40,55][tier]; if(low) P=Math.round(P/2);   // pieces per cannon
+  let P=[0,0,20,24][tier]; if(low) P=Math.round(P/2);   // pieces per cannon
+  if(opts.box && opts.box.screen) P=Math.round(P*.5);   // no tile: the cannons stay light so they don't bury the page
   const fx=!!(window.CSS && CSS.supports && CSS.supports("translate","1px"));
   const c=document.createElement("div"); c.className="confetti";
   if(!fx || !P) return { el:c, ms:0 };   // the arcs need individual transform properties
@@ -4938,59 +5026,110 @@ function confetti(tier, opts, low){
     colors=[1,2,3,4,5,6].map(i=>cs.getPropertyValue("--cel-"+i).trim()).filter(Boolean);
     if(colors.length<4){ const a=accentHex(), dk=document.documentElement.classList.contains("dark");
       colors=[a, mixHex(a,"#ffffff",.35), mixHex(a,"#ffffff",.65), mixHex(a,"#000000",.2), dk?"#ffd60a":"#e0a800"].concat(dk?["#fff8e7"]:[]); } }
-  const dk=document.documentElement.classList.contains("dark"), sparks=dk ? ["#ffd60a","#fff3c4","#ffffff"] : ["#f5b400","#ffd60a","#f0a020"];
-  const rnd=(a,b)=>a+Math.random()*(b-a), vw=innerWidth, vh=innerHeight;
-  const f=document.createDocumentFragment(); let ms=0;
+  const dk=document.documentElement.classList.contains("dark"), csx=getComputedStyle(document.documentElement),
+    tsp=[1,2,3].map(i=>csx.getPropertyValue("--spark-"+i).trim()).filter(Boolean),
+    sparks=tsp.length ? tsp : dk ? ["#ffd60a","#fff3c4","#ffffff"] : ["#f5b400","#ffd60a","#f0a020"];
+  const hearts=accentId()==="pink", rnd=(a,b)=>a+Math.random()*(b-a), vw=innerWidth, vh=innerHeight;
+  let ms=0;
   const sp=opts.stars ? .4 : .25;   // a star moment: more white/gold sparks in the volleys
-  for(let side=0; side<2; side++) for(let i=0;i<P;i++){ const s=document.createElement("i");
-    if(Math.random()<sp){ s.className="spk can"; s.style.setProperty("--s",rnd(10,20).toFixed(1)+"px"); s.style.background=sparks[Math.floor(Math.random()*sparks.length)]; }
-    else { s.className="can"; s.style.background=colors[Math.floor(Math.random()*colors.length)]; if(Math.random()>.5) s.style.borderRadius="50%"; }
+  const htBg={}, html=[];   // one gradient string per colour; every piece goes in with one innerHTML parse
+  for(let side=0; side<2; side++) for(let i=0;i<P;i++){ let cls, st;
+    if(Math.random()<sp){ cls="spk can"; st="--s:"+rnd(10,20).toFixed(1)+"px;background:"+sparks[Math.floor(Math.random()*sparks.length)]; }
+    else { const col=colors[Math.floor(Math.random()*colors.length)];
+      if(hearts && Math.random()<.33){ cls="can ht"; st="--s:"+rnd(10,17).toFixed(1)+"px;background:"
+        +(htBg[col]||(htBg[col]="radial-gradient(circle at 32% 28%,#fff 0 9%,"+col+" 36%,"+mixHex(col,"#000000",.15)+" 100%)")); }
+      else { cls="can"; st="background:"+col+(Math.random()>.5 ? ";border-radius:50%" : ""); } }
     const wave = tier===3 && i>=P*.6 ? .35 : 0;   // an unlock fires a second, smaller volley
-    const dl=wave+Math.random()*.12, life=rnd(2.8,3.8); ms=Math.max(ms,(dl+life)*1000);
-    s.style.cssText+=";left:"+(side? vw+6 : -6)+"px;top:"+(vh+8)+"px;--bx:"+((side?-1:1)*rnd(.12,.62)*vw).toFixed(0)+"px;--by:"+(-rnd(.48,.9)*vh).toFixed(0)
-      +"px;--dy:"+(rnd(.3,.55)*vh).toFixed(0)+"px;--sw:"+rnd(-30,30).toFixed(0)+"px;--life:"+life.toFixed(2)+"s;--dl:"+dl.toFixed(3)+"s;--sz:"+(0.7+Math.random()*1.2).toFixed(2)
-      +";--r0:"+rnd(0,360).toFixed(0)+"deg;--rot:"+((Math.random()<.5?-1:1)*rnd(360,900)).toFixed(0)+"deg";
-    f.appendChild(s);
+    const dl=.06+wave+Math.random()*.12, life=rnd(1.95,2.15)-wave; ms=Math.max(ms,(dl+life)*1000);
+    html.push('<i class="'+cls+'" style="'+st+";left:"+(side? vw+6 : -6)+"px;top:"+(vh+8)+"px;--bx:"+((side?-1:1)*rnd(.12,.62)*vw).toFixed(0)+"px;--by:"+(-rnd(.48,.9)*vh).toFixed(0)
+      +"px;--dy:"+(rnd(.25,.45)*vh).toFixed(0)+"px;--sw:"+rnd(-30,30).toFixed(0)+"px;--life:"+life.toFixed(2)+"s;--dl:"+dl.toFixed(3)+"s;--sz:"+(0.7+Math.random()*1.2).toFixed(2)
+      +";--r0:"+rnd(0,360).toFixed(0)+"deg;--rot:"+((Math.random()<.5?-1:1)*rnd(360,900)).toFixed(0)+'deg"></i>');
   }
-  c.appendChild(f);
+  c.innerHTML=html.join("");
   return { el:c, ms };
 }
-// Glitter, every accent: half 4-point sparks (a few large ones), then sequins and holographic flakes, in --glit-1…6.
-// A soft flash and a burst from the button that earned it (opts.from: upward like a fountain when it sits low on
-// the screen), then a slow drift down with sway. PRs add a second pair of emitters either side; unlocks a third volley.
+// The exploding tile, every accent: half 4-point sparks (a few large ones), then sequins and holographic flakes, in
+// --glit-1…6. opts.box is the tile ({x,y,w,h,rad}, or the whole screen with screen:true). Each piece starts on the
+// tile (two thirds on its rounded edge, the rest across its face) and flies out from the tile's centre, further the
+// further out it sat, then drifts down with sway; it has faded by about 2.2s. A small tile (an achievement) still
+// throws across about a card's width, and pieces that would leave the screen bounce back in, so the burst stays
+// centred on the tile. Over the tile: a short accent sheen (.tflash) with a light sweep; PRs add a shock-wave ring
+// the tile's shape, unlocks a second ring and a second, smaller wave. Off-target (screen), the pieces break off the
+// screen edges and fall inward behind a soft edge glow. Pink adds candy hearts (glossy, they flutter rather than
+// spin), a few small 5-point stars and --holo foil flakes; a star moment keeps its white/gold sparkles.
 const GLIT_SHARE=[30,15,10,25,12,8];
 function glitter(tier, opts, low){
   const cs=getComputedStyle(document.documentElement), a=accentHex(), dflt=[a, mixHex(a,"#ffffff",.35), mixHex(a,"#ffffff",.6), "#ffffff", "#f6d38a", mixHex(a,"#000000",.2)];
   const cols=GLIT_SHARE.map((_,i)=>cs.getPropertyValue("--glit-"+(i+1)).trim()||dflt[i]);
-  let N=[0,72,110,150][tier]; if(low) N=Math.round(N/2);
-  const R=[0,[100,240],[120,320],[150,400]][tier], L=[0,[2.8,3.6],[3.2,4.2],[3.6,4.6]][tier];
+  const pinkish=accentId()==="pink", holo=pinkish ? cs.getPropertyValue("--holo").trim().replace(/"/g,"'") : "", gloss=cs.getPropertyValue("--heart-gloss").trim()||"#fff";
+  let N=[0,140,168,172][tier]; if(low) N=Math.round(N/2);
+  const K=[0,.5,.62,.72][tier], V=[0,[40,130],[60,170],[70,200]][tier];
   const rnd=(a,b)=>a+Math.random()*(b-a), vw=innerWidth, vh=innerHeight;
   const pick=()=>{ let r=Math.random()*100; for(let i=0;i<cols.length;i++){ r-=GLIT_SHARE[i]; if(r<0) return cols[i]; } return cols[0]; };
   const fx=!!(window.CSS && CSS.supports && CSS.supports("translate","1px"));
-  const c=document.createElement("div"); c.className="glitter"+(fx?"":" fb");
-  const f=document.createDocumentFragment(), n2=tier>=2?Math.round(N*.3):0, n3=tier===3?Math.round(N*.2):0; let ms=0;
-  const o=opts.from||{x:vw*.5, y:vh*.42}, up=o.y>vh*.45;
+  const B=opts.box, scr=!!B.screen, cx=B.x+B.w/2, cy=B.y+B.h/2, hw=B.w/2, hh=B.h/2, rad=B.rad||0;
+  const reach=scr ? 0 : Math.max(0, Math.min(vw*.46, 180)-Math.max(hw,hh));   // a small tile still throws ~a card's width
+  const lift=scr ? 0 : Math.max(0, Math.min(1, (cy/vh-.5)/.35))*[0,150,190,210][tier];   // a tile low on the screen throws upward, like a fountain
+  const c=document.createElement("div"); c.className="glitter boom"+(fx?"":" fb");
+  const f=document.createDocumentFragment(), n2=tier===3?Math.round(N*.22):0; let ms=0;
   // a star moment: a quarter of the pieces are white/gold 4-point star sparkles (gold and champagne on light, where white vanishes)
   const stc = opts.stars ? (document.documentElement.classList.contains("dark") ? ["#ffffff","#ffffff","#ffd60a","#f6d38a"] : ["#f5b400","#e0a800","#d9a94a"]) : null;
-  if(fx){ const fl=document.createElement("b"); fl.className="flash"; fl.style.cssText="left:"+o.x.toFixed(0)+"px;top:"+o.y.toFixed(0)+"px"; f.appendChild(fl); }
+  const box=(cls, x, y, w, h, r, extra)=>{ const e=document.createElement("b"); e.className=cls;
+    e.style.cssText="left:"+x.toFixed(1)+"px;top:"+y.toFixed(1)+"px;width:"+w.toFixed(1)+"px;height:"+h.toFixed(1)+"px;border-radius:"+r.toFixed(1)+"px"+(extra||""); return e; };
+  if(fx){
+    if(scr) f.appendChild(box("tflash scr", 0, 0, vw, vh, 0));
+    else { const fl=box("tflash", B.x, B.y, B.w, B.h, rad); fl.appendChild(document.createElement("u")); f.appendChild(fl);
+      for(let k=0;k<(tier===3?2:tier===2?1:0);k++) f.appendChild(box("tring", B.x, B.y, B.w, B.h, rad,
+        ";--rs:"+[B.w,B.h].map(d=>(1+Math.min(1.2, 110/Math.max(40,d))*(k?1.3:1)).toFixed(2)).join(" ")+";--dl:"+(.05+k*.2).toFixed(2)+"s")); }   // grows ~110px each way, whatever its shape
+  }
+  // a point on the tile's rounded edge, u in 0…1 around it (corners follow the radius), pulled in by j px
+  // segments clockwise from the top-left: top, TR corner, right, BR corner, bottom, BL corner, left, TL corner
+  const SX=B.w-2*rad, SY=B.h-2*rad, Q=Math.PI*rad/2, SEG=[SX,Q,SY,Q,SX,Q,SY,Q], per=2*(SX+SY)+4*Q,
+    X0=B.x+rad, X1=B.x+B.w-rad, Y0=B.y+rad, Y1=B.y+B.h-rad;
+  let ex=cx, ey=cy;
+  const sqBg={}, htBg={}, flBg={};   // one gradient string per colour, per burst
+  const html=new Array(N);
+  const edge=(u, j)=>{ let d=u*per, k=0, kl=-1;
+    for(;k<8;k++){ const L=SEG[k]; if(!(L>0)) continue; kl=k; if(d<=L) break; d-=L; }
+    if(k===8){ if(kl<0){ ex=cx; ey=cy; return; } k=kl; d=SEG[k]; }
+    if(k&1){ const rj=Math.max(0,rad-j), t=(k-1)*Math.PI/4-Math.PI/2+d/rad, ox=k===1||k===3 ? X1 : X0, oy=k===3||k===5 ? Y1 : Y0;
+      ex=ox+Math.cos(t)*rj; ey=oy+Math.sin(t)*rj; }
+    else if(k===0){ ex=X0+d; ey=B.y+j; } else if(k===2){ ex=B.x+B.w-j; ey=Y0+d; }
+    else if(k===4){ ex=X1-d; ey=B.y+B.h-j; } else { ex=B.x+j; ey=Y1-d; } };
   for(let i=0;i<N;i++){
-    const w2=i<n2, w3=!w2 && i<n2+n3;   // second emitter pair at 30% / 70% x; third volley from the centre
-    const ox = Math.min(vw-30, Math.max(30, o.x + (w2 ? (i%2 ? 1 : -1)*vw*.22 : rnd(-12,12)))), oy = o.y + (w2 ? rnd(-10,10) : rnd(-8,8));
-    const ang = up && Math.random()<.85 ? rnd(-Math.PI*.95,-Math.PI*.05) : Math.random()*Math.PI*2, rad=rnd(R[0],R[1])*(w3?1.15:1)*(up?1.25:1);
-    const life = rnd(L[0],L[1]), dl=(w2?.16:w3?.42:0)+Math.random()*.15;
+    const w2=i>=N-n2;   // an unlock's second wave, from the face of the tile
+    const onEdge = scr || (!w2 && Math.random()<.56);
+    let px, py;
+    if(onEdge){ edge(Math.random(), scr ? -6 : rnd(0,5)); px=ex; py=ey; }
+    else { px=B.x+B.w*(.5+(Math.random()-.5)*.92); py=B.y+B.h*(.5+(Math.random()-.5)*.92); }
+    const nx=(px-cx)/Math.max(hw,1), ny=(py-cy)/Math.max(hh,1), dn=Math.min(1.5,Math.hypot(nx,ny)), dist=Math.hypot(px-cx,py-cy);
+    // out from the centre (direction taken on the tile's own proportions, so a wide button still throws up and down)
+    let ang=Math.atan2(ny,nx)+rnd(-.38,.38), push;
+    if(scr){ ang+=Math.PI; push=rnd(30,140); }                     // the screen edges throw inward, a little
+    else push=(onEdge ? .45+.75*Math.pow(Math.random(),1.2) : .1+.6*Math.pow(Math.random(),1.5))*(K*dist*(w2?.55:1)+rnd(V[0],V[1])*(.45+.55*Math.min(1,dn))
+      +reach*(onEdge ? rnd(.45,1) : rnd(.1,.6)));   // the face crumbles, the edge flies
+    let bx=Math.cos(ang)*push, by=Math.sin(ang)*push-(scr?0:rnd(0,40)+lift*rnd(.4,1));
+    if(!scr && (px+bx<10 || px+bx>vw-10)) bx=-bx*.8;   // bounce back in off the screen's side, so a tile by the edge still bursts both ways
+    const dl=(w2?.36:.04)+Math.random()*(w2?.12:.06), life=rnd(1.75,2.15)-(w2?dl-.04:0);
     ms=Math.max(ms,(life+dl)*1000);
     const C=pick(), k=Math.random(); let cls, sz, bg, r0="0deg", rot="0deg";
     if(stc && i%4===1){ cls="sp star"; sz = Math.random()<.2 ? rnd(24,34) : rnd(12,22); bg=stc[Math.floor(Math.random()*stc.length)]; rot=((Math.random()<.5?-1:1)*rnd(45,120)).toFixed(0)+"deg"; }
-    else if(k<.5){ cls="sp"; sz = Math.random()<.08 ? rnd(24,32) : rnd(10,22); bg = Math.random()<.3 ? cols[3] : C; rot=((Math.random()<.5?-1:1)*rnd(90,220)).toFixed(0)+"deg"; }
-    else if(k<.8){ cls="sq"; sz=rnd(3,7); bg="radial-gradient(circle at 35% 35%,#fff 0 18%,"+C+" 45%,"+mixHex(C,"#000000",.3)+" 100%)"; }
-    else { cls="fl"; sz=rnd(3,6); bg="linear-gradient(135deg,"+C+",#fff 50%,"+C+")"; r0="45deg"; }
-    const p=document.createElement("i"); p.className=cls+" t"+(i%3);
-    p.style.cssText="left:"+ox.toFixed(1)+"px;top:"+oy.toFixed(1)+"px;--s:"+sz.toFixed(1)+"px;background:"+bg
-      +";--bx:"+(Math.cos(ang)*rad).toFixed(1)+"px;--by:"+(Math.sin(ang)*rad).toFixed(1)+"px;--dy:"+rnd(220,380).toFixed(0)
-      +"px;--sw:"+rnd(-22,22).toFixed(1)+"px;--life:"+life.toFixed(2)+"s;--dl:"+dl.toFixed(3)+"s;--r0:"+r0+";--rot:"+rot;
-    f.appendChild(p);
+    else if(pinkish && k<.16){ const H=onEdge||Math.random()<.5 ? C : cols[3];   // candy hearts; on the face, pearl-pink
+      cls="ht"; sz = Math.random()<.15 ? rnd(16,22) : rnd(9,15);
+      bg=htBg[H]||(htBg[H]="radial-gradient(circle at 32% 28%,"+gloss+" 0 9%,"+H+" 36%,"+mixHex(H,"#000000",.15)+" 100%)");
+      r0=rnd(-25,25).toFixed(0)+"deg"; rot=rnd(-30,30).toFixed(0)+"deg"; }
+    else if(pinkish && k<.2){ cls="st5"; sz=rnd(8,13); bg = Math.random()<.5 ? cols[4] : cols[3]; rot=((Math.random()<.5?-1:1)*rnd(60,140)).toFixed(0)+"deg"; }
+    else if(k<.5){ cls="sp"; sz = Math.random()<.08 ? rnd(22,30) : onEdge ? rnd(12,22) : rnd(10,20); bg = Math.random()<(onEdge||scr?.3:.55) ? cols[3] : C;   // the face glints whiter, so it shows on the tile's own colour
+    rot=((Math.random()<.5?-1:1)*rnd(90,220)).toFixed(0)+"deg"; }
+    else if(k<.8){ cls="sq"; sz=rnd(4,8);   // edge sequins are domed; the face's crumbs stay flat (cheaper to paint)
+      bg = onEdge ? sqBg[C]||(sqBg[C]="radial-gradient(circle at 35% 35%,#fff 0 18%,"+C+" 45%,"+mixHex(C,"#000000",.3)+" 100%)") : C; }
+    else { cls="fl"; sz=rnd(4,7); bg = holo || flBg[C]||(flBg[C]="linear-gradient(135deg,"+C+",#fff 50%,"+C+")"); r0="45deg"; }
+    html[i]='<i class="'+cls+' t'+(i%3)+'" style="left:'+px.toFixed(1)+'px;top:'+py.toFixed(1)+'px;--s:'+sz.toFixed(1)+'px;background:'+bg
+      +';--bx:'+bx.toFixed(1)+'px;--by:'+by.toFixed(1)+'px;--dy:'+rnd(110,230).toFixed(0)
+      +'px;--sw:'+rnd(-20,20).toFixed(1)+'px;--life:'+life.toFixed(2)+'s;--dl:'+dl.toFixed(3)+'s;--r0:'+r0+';--rot:'+rot+'"></i>';
   }
-  c.appendChild(f);
+  c.innerHTML=html.join("");   // one parse for all the pieces (much cheaper than ~170 cssText sets)
+  c.prepend(f);   // the sheen and rings sit under the pieces
   return { el:c, ms };
 }
 
@@ -5008,7 +5147,7 @@ function animateFig(id){
 function openSheet(s){ $("scrim"+s).classList.add("show"); const sh=$("sheet"+s); if(sh) sh.classList.add("show");
   if(sh && sh.classList.contains("detailsheet")) setTimeout(()=>{ sh.querySelectorAll(".sheetbody canvas").forEach(cv=>{ if(cv.id) animateFig(cv.id); }); }, 170);
 }
-function closeSheet(s){ $("scrim"+s).classList.remove("show"); $("sheet"+s).classList.remove("show"); }
+function closeSheet(s){ $("scrim"+s).classList.remove("show"); $("sheet"+s).classList.remove("show"); if(s==="Share"){ clearTimeout(_burstArm); _burstArm=0; } }
 if($("planPick")) $("planPick").onclick=()=>{ renderPlanList(); openSheet("Plans"); };
 $("closePlans").onclick=()=>closeSheet("Plans");
 $("scrimPlans").onclick=()=>closeSheet("Plans");
@@ -5076,8 +5215,10 @@ document.querySelectorAll("#onboardWrap .obopt").forEach(b=> b.onclick=()=> setO
 
 // ================= pages / bottom tab bar =================
 function showTab(name){
+  clearTimeout(_burstArm); _burstArm=0;   // a burst waiting for the share card has nothing to land on now
   if(typeof cancelPending==="function") cancelPending();   // drop any unconfirmed objective/focus change on navigation
   if(window.__revealBar) window.__revealBar();             // always show the tab bar when switching tabs
+  if(_finPadDrop) _finPadDrop();                           // a post-Finish spacer goes with the page change
   document.querySelectorAll(".page").forEach(p=> p.classList.toggle("active", p.dataset.tab===name));
   document.querySelectorAll(".tabitem").forEach(t=> t.classList.toggle("active", t.dataset.tab===name));
   if(window.__pageGo) window.__pageGo(name); else { try{ window.scrollTo(0,0); }catch(e){} }
@@ -6423,7 +6564,7 @@ function renderFree(){
   const _fd=draft["free"], spon=!!(_fd && _fd.spon);
   if(spon){ $("ltName").textContent=_fd.name||"Suggested session"; $("planSub").textContent="Suggested session"; }
   else { $("ltName").textContent="Free workout"; $("planSub").textContent="Free workout — choose your exercises"; }
-  const list=$("exlist"); list.innerHTML="";
+  const list=$("exlist"); list.innerHTML=""; list.classList.toggle("norise", _noRise); _noRise=false;
   const hint=document.createElement("p"); hint.className="freehint";
   hint.textContent = spon
     ? "Suggested session — picked from your recent training. Tweak anything, then log your sets."
@@ -6669,23 +6810,11 @@ function setRowPR(r, on){
   r.classList.toggle("pr", on);
   if(on && !was){ if(navigator.vibrate) try{ navigator.vibrate([0,55,45,90]); }catch(e){} prCelebrate(r); }
 }
+// A set that beats the best: the PR pill marks the row and its volume cell pops (no particles: the one burst is the
+// tile explosion at Finish, never a small bang inside a row while the weight is still being typed)
 function prCelebrate(r){
   if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const vEl=r.querySelector(".vol"); if(!vEl) return;
-  const rect=vEl.getBoundingClientRect(), cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
-  // Orange keeps its own dots (with its rose end); Pink takes glitter tokens, the other accents their confetti tokens,
-  // so every burst carries both of the accent's hues
-  const id=accentId(), cs=getComputedStyle(document.documentElement);
-  let colors = id==="orange" ? ["#f5a040","#ffd60a","#ff4d5e","#f08020"]
-    : (id==="pink" ? [1,2,5,3].map(i=>cs.getPropertyValue("--glit-"+i).trim()) : [1,2,4,5].map(i=>cs.getPropertyValue("--cel-"+i).trim())).filter(Boolean);
-  if(!colors.length) colors=[accentHex()];
-  const wrap=document.createElement("div"); wrap.className="prspark";
-  for(let i=0;i<7;i++){ const s=document.createElement("i");
-    s.style.left=cx+"px"; s.style.top=cy+"px"; s.style.background=colors[i%colors.length];
-    const ang=(i/7)*Math.PI*2, dist=18+Math.random()*16;
-    s.style.setProperty("--dx",Math.cos(ang)*dist+"px"); s.style.setProperty("--dy",Math.sin(ang)*dist+"px");
-    wrap.appendChild(s); }
-  document.body.appendChild(wrap); setTimeout(()=>wrap.remove(),750);
+  const vEl=r.querySelector(".vol"); if(vEl) boomPop(vEl, 1);
 }
 // Inline editor for an exercise's sets + target rep range, straight from the workout screen.
 // Writes back to the active plan so the change sticks across sessions.
@@ -7423,7 +7552,8 @@ $("otherLog").onclick=()=>{
   const sr=checkStars(), sm=starMoment(sr), fresh=checkAchievements(), cp=consistPost(sr); sset("settings",settings);
   renderOtherLog(); updateOtherPreview(); renderDash(); if($("sheetMus").classList.contains("show")) renderMuscles();
   // one toast: a star or an unlock stands in for "Logged"; a completed figure opens the Star card (a plain week star opens nothing)
-  celebrateMoment(Object.assign({ achIds:fresh, shared:cp.star, logged:"Logged "+entry.name+" — "+entry.vol.toLocaleString()+" kg" }, sm));
+  celebrateMoment(Object.assign({ achIds:fresh, shared:cp.star, logged:"Logged "+entry.name+" — "+entry.vol.toLocaleString()+" kg",
+    lead:[$("otherLogList").firstElementChild, $("otherLog")] }, sm));   // the new entry's row bursts, where you just tapped
   logStarShare(sr); ringsSharedToast(cp);
 };
 
@@ -7554,7 +7684,8 @@ $("cdLog").onclick=()=>{
   renderCardioLog(); updateCardioPreview(); renderDash();
   cloudTouchWorkout();
   // one toast: a star or an unlock stands in for "Logged"; a completed figure opens the Star card (a plain week star opens nothing)
-  celebrateMoment(Object.assign({ achIds:fresh, shared:cp.star, logged:"Logged "+(entry.routeName||entry.name)+(mins?" — "+mins+" min":"")+(dist?" · "+round1(dist)+" km":"") }, sm));
+  celebrateMoment(Object.assign({ achIds:fresh, shared:cp.star, logged:"Logged "+(entry.routeName||entry.name)+(mins?" — "+mins+" min":"")+(dist?" · "+round1(dist)+" km":""),
+    lead:[$("cdLogList") && $("cdLogList").firstElementChild, $("cdLog")] }, sm));   // the new entry's row bursts, where you just tapped
   logStarShare(sr); ringsSharedToast(cp);
 };
 
@@ -10269,11 +10400,12 @@ $("shareClose").onclick=()=>closeSheet("Share");
 $("scrimShare").onclick=()=>closeSheet("Share");
 
 // cel = a celebration toast (gets the static ✦ under reduced motion). Re-adding .big restarts its pop (and Pink's sheen).
-let tT; function toast(m,big,cel){ const t=$("toast");
+// top: show it at the top of the screen (a sheet is opening over its usual spot)
+let tT; function toast(m,big,cel,top){ const t=$("toast");
   if(cel && /^★ /.test(m) && window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) m=m.slice(2);   // the static ✦ prefix stands in for it
   t.textContent=m;
   t.classList.remove("big"); if(big){ void t.offsetWidth; t.classList.add("big"); }
-  t.classList.toggle("cel",!!cel); t.classList.add("show"); clearTimeout(tT); tT=setTimeout(()=>t.classList.remove("show"), big?2800:2300); }
+  t.classList.toggle("cel",!!cel); t.classList.toggle("top",!!top); t.classList.add("show"); clearTimeout(tT); tT=setTimeout(()=>t.classList.remove("show"), big?2800:2300); }
 // first-open coachmark: show a hint once per id (spreads the "how to use" across the app over time)
 function coach(id, msg){
   if(!settings.seenTips) settings.seenTips={};
