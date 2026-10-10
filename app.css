@@ -46,13 +46,15 @@
     --l2-tint:#55555a;   /* secondary text on a tinted button or option card (--l2 drops under 4.5:1 there) */
     /* the frosted bars (status, sticky timers, tab bar): the page background, translucent and blurred, fading into the
        page at their inner edge instead of ending in a line */
-    /* the page glow: a loose scatter of soft patches in the accent's two hues, faint, behind everything. The head
-       script draws a fresh scatter on each launch (--glow); this is the fallback. --glow-k scales it per theme.
-       The status and tab bars paint the same scatter, sized to the viewport, so they blend into the page. */
+    /* the page glow: a loose scatter of soft patches in the accent's two hues, the hue drifting smoothly across the
+       screen (first hue top-left, second hue bottom-right) instead of switching patch by patch. Each fades out along a
+       gentle bell-shaped falloff so neighbours melt together. The head script draws a fresh scatter on each launch
+       (--glow); this is the fallback. --glow-k scales it per theme. The status and tab bars paint the same scatter,
+       sized to the viewport, so they blend into the page. */
     --glow-k:1;
-    --glow:radial-gradient(60% 34% at 18% 22%, color-mix(in srgb, var(--grad-a) calc(18% * var(--glow-k)), transparent), transparent 70%),
-      radial-gradient(52% 30% at 84% 46%, color-mix(in srgb, var(--grad-b) calc(16% * var(--glow-k)), transparent), transparent 70%),
-      radial-gradient(64% 32% at 30% 80%, color-mix(in srgb, var(--grad-b) calc(15% * var(--glow-k)), transparent), transparent 70%);
+    --glow:radial-gradient(70% 38% at 22% 24%, color-mix(in srgb, color-mix(in srgb, var(--grad-a) 85%, var(--grad-b)) calc(18% * var(--glow-k)), transparent) 0%, transparent 100%),
+      radial-gradient(64% 34% at 80% 52%, color-mix(in srgb, color-mix(in srgb, var(--grad-a) 45%, var(--grad-b)) calc(18% * var(--glow-k)), transparent) 0%, transparent 100%),
+      radial-gradient(76% 36% at 34% 84%, color-mix(in srgb, color-mix(in srgb, var(--grad-a) 25%, var(--grad-b)) calc(18% * var(--glow-k)), transparent) 0%, transparent 100%);
     --bar-base:color-mix(in srgb, var(--bg) 86%, transparent);
     --bar-top:var(--glow), var(--bar-base); --bar-bottom:var(--glow), var(--bar-base);
     --bar-fade:16px;
@@ -103,7 +105,7 @@
   html.dark{
     color-scheme: dark;
     --bg:#121214; --bg2:#0e0e10; --card:#1f1f22; --row:#2b2b2f; --field:#2e2e32;   /* soft charcoal page, not black; cards a step lighter */
-    --glow-k:.75;   /* a quieter glow on charcoal */
+    --glow-k:.95;
     --ink:#ffffff; --l2:#98989e; --l3:#636366;
     --sep:rgba(84,84,88,.45);
     --accent:#ff7a3a; --accent-soft:rgba(255,122,58,.16);
