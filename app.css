@@ -44,9 +44,11 @@
     --track-tint:color-mix(in srgb, var(--grad-a) 16%, var(--track));   /* progress tracks carry a little of the accent */
     --grad-bar:linear-gradient(90deg, var(--grad-a), var(--grad-b));   /* progress fills, day dots, the tab underline: the fill's two hues */
     --l2-tint:#55555a;   /* secondary text on a tinted button or option card (--l2 drops under 4.5:1 there) */
-    /* the frosted bars (status, sticky timers, tab bar) pick up the glow's hue, so they don't read as a grey band (neutral in dark) */
-    --bar-top:color-mix(in srgb, color-mix(in srgb, var(--grad-a) 8%, var(--bg)) 88%, transparent);
-    --bar-bottom:color-mix(in srgb, color-mix(in srgb, var(--grad-b) 5%, var(--bg)) 88%, transparent);
+    /* the frosted bars (status, sticky timers, tab bar) are one colour in every scheme: the page background, translucent
+       and blurred, fading into the page at their inner edge instead of ending in a line */
+    --bar:color-mix(in srgb, var(--bg) 86%, transparent);
+    --bar-top:var(--bar); --bar-bottom:var(--bar);
+    --bar-fade:16px;
     --accent-hi:#ff7a3a;     /* accent on the always-dark toast (the reduced-motion ✦) */
     --accent-hi-b:#ff5a68;   /* its second hue: the star sky and the coach card */
     --grad-hi:linear-gradient(135deg,var(--accent-hi) 0%,var(--accent-hi) var(--grad-hold),var(--grad-mid),var(--accent-hi-b) 100%);
@@ -103,8 +105,6 @@
        and the status, sticky timer and tab bars stay neutral */
     --hdr-a:color-mix(in srgb, var(--grad-a) 13%, transparent);
     --hdr-b:color-mix(in srgb, var(--grad-b) 10%, transparent);
-    --bar-top:color-mix(in srgb, var(--bg) 88%, transparent);
-    --bar-bottom:color-mix(in srgb, var(--bg) 88%, transparent);
     --tint-p:30%; --disc-p:22%;   /* a lighter disc in dark, so it reads as a glow, not a brown dot */
     --seg-line:color-mix(in srgb, var(--grad-a) 30%, transparent);
     --track-tint:color-mix(in srgb, var(--grad-a) 22%, var(--track)); --l2-tint:#b8b8bd;   /* 4.7:1 or more on the 30% tint over --row and --card */
@@ -555,8 +555,9 @@
   .artbtn .avatar{ box-shadow:none; }
   .artbtn.sel{ border-radius:50%; box-shadow:0 0 0 2.5px var(--card), 0 0 0 5px var(--accent); }
   /* backdrop behind the status-bar clock — slightly translucent (no blur, to match the tab bar and avoid scroll flicker) */
- .statusbar-bg{ position:fixed; top:0; left:0; right:0; height:env(safe-area-inset-top); z-index:40; pointer-events:none;
-    background:var(--bar-top); }
+ .statusbar-bg{ position:fixed; top:0; left:0; right:0; height:calc(env(safe-area-inset-top) + var(--bar-fade)); z-index:40; pointer-events:none;
+    background:var(--bar); backdrop-filter:blur(24px) saturate(1.4); -webkit-backdrop-filter:blur(24px) saturate(1.4);
+    -webkit-mask-image:linear-gradient(#000 calc(100% - var(--bar-fade)), transparent); mask-image:linear-gradient(#000 calc(100% - var(--bar-fade)), transparent); }
   /* ===== pages + bottom tab bar ===== */
   .page{ display:none; }
   .page.active{ display:block; animation:pagein .26s ease; }
@@ -574,7 +575,7 @@
   #track{ display:flex; height:100%; }
   #track.anim{ transition:transform .3s cubic-bezier(.22,.61,.36,1); }
   #pager .page, #pager .page.active{ display:block; animation:none; flex:0 0 100%; width:100%; height:100%;
- overflow-y:auto; overflow-x:hidden; overscroll-behavior-y:contain; padding:0 16px calc(72px + env(safe-area-inset-bottom)); }
+ overflow-y:auto; overflow-x:hidden; overscroll-behavior-y:contain; padding:0 16px calc(72px + var(--bar-fade) + env(safe-area-inset-bottom)); }
   /* hide the scrollbar (still scrollable) */
   #pager .page, .sheetbody{ scrollbar-width:none; -ms-overflow-style:none; }
   #pager .page::-webkit-scrollbar, .sheetbody::-webkit-scrollbar{ width:0; height:0; display:none; }
@@ -588,8 +589,9 @@
     /* ~56px content row (12 + 32px icon + 12, centered) + the home-indicator safe area reserved BELOW it
        (iOS HIG pattern). Pre-cold-launch-fix the shell didn't reach the screen bottom so the inset read 0;
        now it reports the real ~34px and the icons clear the home indicator instead of crowding it. */
-    padding:12px 8px calc(12px + env(safe-area-inset-bottom)); border-top:.5px solid var(--sep);
-    background:var(--bar-bottom);
+    padding:calc(12px + var(--bar-fade)) 8px calc(12px + env(safe-area-inset-bottom));
+    background:var(--bar); backdrop-filter:blur(24px) saturate(1.4); -webkit-backdrop-filter:blur(24px) saturate(1.4);
+    -webkit-mask-image:linear-gradient(transparent, #000 var(--bar-fade)); mask-image:linear-gradient(transparent, #000 var(--bar-fade));
     transition:transform .3s cubic-bezier(.4,0,.2,1); will-change:transform; }
   /* hide/show is scroll-linked from JS (inline transform); see the scroll-linked tab bar IIFE */
   .tabitem{ position:relative; flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;
