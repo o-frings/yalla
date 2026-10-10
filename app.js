@@ -2785,7 +2785,7 @@ function tmrRender(){
   $("timerBar").classList.toggle("run", timer.running);
   $("timerBar").classList.toggle("idle", idle);
   $("tmrToggle").innerHTML = timer.running ? ICON.pause : ICON.play;
-  $("tmrLbl").textContent = timer.running ? "running" : (timer.elapsed>0?"paused":"Start session timer");
+  $("tmrLbl").textContent = !timer.running && timer.elapsed>0 ? "paused" : "";
   $("tmrReset").style.visibility = (timer.elapsed>0||timer.running) ? "visible" : "hidden";
   updateTimerStick();
   updateTrainingState();
@@ -2807,7 +2807,7 @@ function maybeAskFinish(){
              "Finish", ()=>{ try{ Promise.resolve($("saveBtn").onclick()).catch(()=>toast("Couldn't save — your sets are still here.")); }catch(e){} }, "go");
 }
 function updateTrainingState(){ const on=sessionUnderway(); document.body.classList.toggle("training", on);
-  const tb=$("timersBar"); if(tb) tb.classList.toggle("idle", !on);   // before a session the header's ▶ Start chip stands in for the timer row
+  const tb=$("timersBar"); if(tb) tb.classList.toggle("idle", !on);   // no timer row before a session: the first logged set starts it
   const ps=$("planSwitch"); if(ps) ps.disabled=on;   // no plan switching mid-session
   updateClearBtn(); }
 // Pin the session + rest timers to the top while a workout's underway (active timer OR a running
@@ -2827,7 +2827,6 @@ function tmrReset(){ timer.elapsed=0; timer.running=false; timer.startedAt=null;
   if(typeof _prCelebrated!=="undefined") _prCelebrated.clear();   // a new session celebrates its own PR sets
   if(timer.iv){clearInterval(timer.iv);timer.iv=null;} tmrRender(); if(!(rest.iv&&rest.startedAt)) releaseWake(); }
 $("tmrToggle").onclick=()=> timer.running ? tmrPause() : tmrStart();
-if($("tmrChip")) $("tmrChip").onclick=()=>{ tmrStart(); haptic(8); };
 $("tmrReset").onclick=tmrReset;
 tmrRender();
 // ---- rest timer between sets ----
@@ -6547,7 +6546,7 @@ function exerciseLibrary(){
 // seconds instead of reps; weighted moves keep weight × reps. Used by both the plan and free workout views.
 function buildSetRow(i, pv, name, tg){
   const timed=isTimed(name), t=tg||pv;   // t: today's target for this set (falls back to last time)
-  const pvVol = (pv && name) ? setVol(name, pv.w, pv.r) : 0;
+  const pvVol = (t && name) ? setVol(name, t.w, t.r) : 0;
   const pw = t&&t.w!=null?esc(t.w):'', pr = t&&t.r!=null?esc(t.r):'';
   const wPh = t&&t.w ? esc(t.w)+(tg&&tg.uw?' ↑':'') : (timed ? '+kg' : (isBW(name)?'BW':'kg'));   // weight is optional — blank logs as no extra weight
   const rPh = t&&t.r ? esc(t.r)+(tg&&tg.ur?' ↑':'') : (timed ? 'sec' : 'reps');
@@ -10701,11 +10700,13 @@ document.addEventListener("keydown", e=>{
 
 // Offline support: register the service worker when served over HTTPS (e.g. GitHub Pages).
 // Skipped silently on file:// so opening the raw file still works.
-// Footer build label = the version of the CODE THAT IS RUNNING (not the service-worker cache), so the
-// number is trustworthy: if it doesn't change after an update, the page hasn't reloaded the new code yet.
-// Bump APP_VER and the SW CACHE together on every deploy.
-const APP_VER="v181";
-(function(){ const el=document.getElementById("appVer"); if(el) el.textContent=APP_VER; })();
+// Footer build label = the service worker's cache name (yalla-vNNN), bumped on every deploy, so the label can never
+// go stale (a hand-kept constant sat at v181 for weeks). Old caches are deleted when a new worker activates, so the
+// highest one is the build in use. No cache yet (first visit, or plain http) → no label.
+(async function(){ const el=document.getElementById("appVer"); if(!el) return;
+  try{ const ks=(await caches.keys()).map(k=>(/^yalla-v(\d+)$/.exec(k)||[])[1]).filter(Boolean).map(Number);
+    el.textContent = ks.length ? "v"+Math.max(...ks) : ""; }catch(e){ el.textContent=""; }
+  const w=document.getElementById("appVerWrap"); if(w) w.style.display = el.textContent ? "" : "none"; })();
 if("serviceWorker" in navigator && location.protocol==="https:"){
   // Reload once when a new worker takes over so the new code actually runs. We listen on BOTH
   // controllerchange AND the new worker reaching "activated" — iOS standalone PWAs don't always fire
