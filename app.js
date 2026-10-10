@@ -4540,8 +4540,11 @@ function overloadPlan(name, t, prev){
   if(s.regime==="return") return { sets:P, chip:null, note:"Back after "+s.days+" days: match last time first." };
   if(s.regime==="undertrained") return { sets:P, chip:null, note:"Light weeks lately: repeat last time." };
   if(s.regime==="overreached") return { sets:P, chip:null, note:"Hard weeks lately: hold last time's numbers." };
-  const lw=parseFloat(s.last.w)||0, lr=parseInt(s.last.r)||0, topped=!!rng && lr>=rng.high;
-  if(lw>0 && (topped || (s.over && s.over.w))){
+  // double progression: add weight only once EVERY working set reached the top of the range last time (the best set
+  // alone isn't enough); until then, add reps
+  const lw=parseFloat(s.last.w)||0, lr=parseInt(s.last.r)||0, done=P.filter(p=>parseInt(p.r)>0);
+  const topped = !!rng && (done.length ? done.every(p=>parseInt(p.r)>=rng.high) : lr>=rng.high);
+  if(lw>0 && topped){
     const nw=(s.over && s.over.w) || nextLoad(name, lw), inc=Math.round((nw-lw)*100)/100;
     if(inc>0) return { sets:P.map(p=>({w:String(nw), r:rng?String(rng.low):p.r, uw:true})), chip:{label:"+"+inc+" kg", w:nw}, note:null };
   }
@@ -4901,7 +4904,7 @@ $("saveBtn").onclick=async()=>{
   celebrateMoment(Object.assign({ pr:beaten, qualifies, achIds:fresh, shared:cp.star,
     micro: (!qualifies && beaten===0) ? { sets:session.sets, pct:Math.round(cred*100) } : null,
     tile: qualifies ? "#sheetShare.show #sharePreview canvas" : ()=>[$("saveBtn")].concat([...document.querySelectorAll("#exlist .group")]),
-    at: qualifies ? SHARE_AT+SHARE_LAND : 0, toastTop: true }, sm));   // the toast goes up top: clear of the share sheet, or of the Finish button bursting at the bottom
+    at: qualifies ? SHARE_AT+SHARE_LAND : 0, toastTop: true, finale: true }, sm));   // the toast goes up top: clear of the share sheet, or of the Finish button bursting at the bottom
   if(qualifies){
     const sk=starShareOf(sr);   // a week star adds a Star card to the sheet (it leads when a figure or milestone landed)
     setTimeout(()=>openShareTile(session, sk), SHARE_AT);
@@ -4919,7 +4922,8 @@ $("saveBtn").onclick=async()=>{
 // tile/at: the tile that explodes and when (see celebrate); without one, lead (the log row that earned it, then its
 // button) or the moment's own tile when it is on screen
 // (the sky card for a star, the unlocked achievement's tile), else the toast that names it; toastTop: the toast shows
-// at the top of the screen, clear of a sheet that is about to open }.
+// at the top of the screen, clear of a sheet that is about to open; finale: the Finish button's moment, which adds
+// fireworks and more cannon volleys the more lifts were beaten }.
 // Tiers (stars spec §5.2): 1 any finish, or a week star from a micro session or a cardio/other log; 2 a PR, or a
 // week star on a qualifying finish; 3 a constellation, any achievement, star 52 or 104. The toast leads
 // PR > constellation > star > achievement, with one detail and at most one suffix.
@@ -4943,7 +4947,8 @@ function celebrateMoment(o){
     if(!tile){ tile=[].concat(o.lead||[]); if(o.star || cst || o.milestone) tile.push("#sheetStars.show #starsBody > :first-child", "#meSky");
       ach.forEach(a=>tile.push('#achGrid .ach[data-id="'+a.id+'"]'));
       tile.push("#toast"); at=at||120; }   // the toast slides in first
-    celebrate(tier, { stars:!!(o.star || cst || o.milestone), pr:o.pr>0, tile, at, haptic:CEL_HAPTIC[tier] }); }
+    celebrate(tier, { stars:!!(o.star || cst || o.milestone), pr:o.pr>0, tile, at, haptic:CEL_HAPTIC[tier],
+      finale: o.finale ? { prs:o.pr||0 } : null }); }
   return tier;
 }
 // The star part of a moment, after the spam guards (stars spec §5.2, §8): a silent check (or stars switched off)
@@ -4974,7 +4979,10 @@ function starShareOf(sr){
 // pieces, and opts.up throws the glitter up and sideways instead of down; opts.minor
 // (a PR set) never interrupts a burst that isn't minor. opts.haptic buzzes with the bang. opts.stars (a star moment)
 // turns a quarter of the pieces into white/gold 4-point sparkles, so stars look the same on every accent.
-// A new burst replaces one on screen; it is removed at its end + 150ms or when the app is hidden.
+// opts.finale ({prs}: the lifts beaten) is the Finish moment: fireworks over the exploding tile and more cannon volleys,
+// both growing with the PR count (see fireworks, confetti).
+// Nothing fades: every piece falls until it has left the bottom of the screen. A new burst replaces one on screen; it
+// is removed once its last piece is off screen (+150ms) or when the app is hidden.
 let _burstEnd=null, _burstArm=0, _burstArmed=false, _burstMajor=0;   // _burstMajor: when a non-minor burst ends
 // where el sits once the sheet it is in has landed (a sheet slides up from translateY(102%))
 function landedRect(el){
@@ -5014,7 +5022,7 @@ function celebrate(tier, opts){
     // (haptic() toggles a switch), so there it fires now rather than be dropped 500ms later
     if(o.haptic && !navigator.vibrate){ haptic(o.haptic); o.haptic=0; }
     _burstArm=setTimeout(()=>{ _burstArmed=false; celebrate(tier, o); }, at); return; }
-  if(o.haptic) haptic(o.haptic);
+  if(o.haptic) haptic(o.finale && navigator.vibrate ? fwBuzz(o.haptic, o.finale) : o.haptic);
   if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;   // the toast's ✦ carries it
   if(document.hidden) return;
   if(_burstEnd) _burstEnd();
@@ -5024,7 +5032,7 @@ function celebrate(tier, opts){
   const low=(navigator.hardwareConcurrency||8)<4 || (navigator.deviceMemory||8)<=4;
   const vw=innerWidth, vh=innerHeight, tg=boomTarget(o.tile);
   o.box = tg || { x:0, y:0, w:vw, h:vh, rad:0, screen:true };   // no tile on screen: the screen's edges break off, with fewer cannon pieces
-  const t=Math.min(tier,3), parts=[glitter(t, o, low)]; if(t>=2 || o.cannon) parts.push(confetti(t, o, low));
+  const t=Math.min(tier,3), parts=[glitter(t, o, low)]; if(t>=2 || o.cannon || o.finale) parts.push(confetti(t, o, low));
   const b={ el:document.createElement("div"), ms:Math.max(...parts.map(p=>p.ms)) }; b.el.className="burst";
   _burstMajor = o.minor ? 0 : Date.now()+b.ms;
   parts.forEach(p=>b.el.appendChild(p.el));
@@ -5049,13 +5057,62 @@ function boomPop(el, t){
 // "#rrggbb" mixed toward "#rrggbb" by t (0…1); anything else comes back unchanged
 function mixHex(a,b,t){ const p=h=>/^#[0-9a-f]{6}$/i.test(h)?[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)):null, x=p(a), y=p(b);
   if(!x||!y) return a; return "#"+x.map((v,i)=>Math.round(v+(y[i]-v)*t).toString(16).padStart(2,"0")).join(""); }
+// Gravity: a piece that comes to rest at y (after its burst) falls by dy, far enough to leave the bottom of the screen;
+// t is how long the fall takes: √distance, as under gravity, with ±12% for each piece's own drag (jit:0 for none).
+// ~1.2s for a piece by the bottom, ~2.4s from the top of a phone screen.
+function fallOut(y, s, jit){ const dy=Math.max(60, innerHeight+24+(s||0)-y);
+  return { dy, t:.085*Math.sqrt(dy)*(1+(jit==null ? .12 : jit)*(Math.random()*2-1)) }; }
+// The Finish moment's fireworks: 2 shells, +1 for each lift beaten, up to 6; from the third PR the last one is a big one
+// that lights the screen edges. Each shell climbs from below the screen with a trail in one of the accent's hues
+// (FW_UP), FW_GAP after the one before, and bursts at its point: a flash, then its sparks fly out in a ring (on Pink
+// every other shell is a heart, of hearts) with champagne tips, and fall out of the screen together, keeping the shape.
+const FW_T0=.12, FW_GAP=.32, FW_UP=.55;
+function fwShells(fin){ return Math.min(6, 2+(fin.prs||0)); }
+// Android: a tick as each shell bursts, after the moment's own buzz (iOS only buzzes inside the tap's gesture)
+function fwBuzz(base, fin){ const p=[].concat(base); let at=p.reduce((a,b)=>a+b,0);
+  for(let k=0;k<fwShells(fin);k++){ const b=Math.round((FW_T0+k*FW_GAP+FW_UP)*1000); if(b>at+20){ p.push(b-at, 9); at=b+9; } }
+  return p; }
+function fireworks(opts, low, cols, stc){
+  const fin=opts.finale, S=fwShells(fin), big=(fin.prs||0)>=3, vw=innerWidth, vh=innerHeight, rnd=(a,b)=>a+Math.random()*(b-a);
+  const pinkish=accentId()==="pink", gloss=getComputedStyle(document.documentElement).getPropertyValue("--heart-gloss").trim()||"#fff";
+  const hues=[cols[0], cols[1], cols[5], cols[2]], tip=cols[4], html=[], bg={}; let ms=0;
+  const slot=[...Array(S).keys()].sort(()=>Math.random()-.5);   // burst points spread across the width, in a random order
+  for(let k=0;k<S;k++){
+    const last=big && k===S-1, x=vw*(.14+.72*(slot[k]+.5)/S)+rnd(-12,12), y=vh*(last ? rnd(.26,.32) : rnd(.2,.44));
+    const t0=FW_T0+k*FW_GAP, at=t0+FW_UP, c=hues[k%hues.length], heart=pinkish && k%2===1;
+    const R=(last?1.45:1)*Math.min(115, vw*.27)*rnd(.88,1.08), N=Math.round((last?46:30)*(low?.55:1));
+    html.push('<em class="shell" style="left:'+x.toFixed(1)+'px;top:'+y.toFixed(1)+'px;--c:'+c+';--rise:'+(vh+40-y).toFixed(0)+'px;--wx:'+rnd(-24,24).toFixed(0)
+      +'px;--up:'+FW_UP+'s;--dl:'+t0.toFixed(2)+'s"></em>');
+    html.push('<b class="fwfl" style="left:'+x.toFixed(1)+'px;top:'+y.toFixed(1)+'px;--c:'+c+';--d:'+(last?320:220)+'px;--dl:'+at.toFixed(2)+'s"></b>');
+    if(last) html.push('<b class="tflash scr" style="left:0;top:0;width:'+vw+'px;height:'+vh+'px;--dl:'+at.toFixed(2)+'s"></b>');
+    // one fall for the whole shell, far enough for its top spark to leave the screen, so the ring drops as a ring
+    const f=fallOut(y-R, 24, 0), life=f.t/.84;
+    for(let i=0;i<N;i++){ let ax, ay;
+      if(heart){ const u=2*Math.PI*i/N; ax=Math.pow(Math.sin(u),3); ay=-(13*Math.cos(u)-5*Math.cos(2*u)-2*Math.cos(3*u)-Math.cos(4*u))/16; }
+      else { const a=2*Math.PI*i/N+rnd(-.1,.1), r=Math.random()<.72 ? rnd(.86,1.04) : rnd(.25,.7); ax=Math.cos(a)*r; ay=Math.sin(a)*r; }
+      const q=Math.random(); let cls, sz, b, rot="0deg";
+      if(stc && q<.2){ cls="sp star"; sz=rnd(12,20); b=stc[Math.floor(Math.random()*stc.length)]; }
+      else if(pinkish && (heart ? q<.6 : q<.14)){ const H = Math.random()<.8 ? c : tip; cls="ht"; sz = heart ? rnd(10,15) : rnd(9,14);
+        b=bg["h"+H]||(bg["h"+H]="radial-gradient(circle at 32% 28%,"+gloss+" 0 9%,"+H+" 36%,"+mixHex(H,"#000000",.15)+" 100%)"); rot=rnd(-30,30).toFixed(0)+"deg"; }
+      else if(q<.62){ cls="sp"; sz = Math.random()<.1 ? rnd(18,24) : rnd(9,16); b = Math.random()<.28 ? tip : c; rot=((Math.random()<.5?-1:1)*rnd(90,200)).toFixed(0)+"deg"; }
+      else { cls="sq"; sz=rnd(4,7); b=bg["s"+c]||(bg["s"+c]="radial-gradient(circle at 35% 35%,#fff 0 18%,"+c+" 45%,"+mixHex(c,"#000000",.3)+" 100%)"); }
+      const dl=at+Math.random()*.03;
+      ms=Math.max(ms, (dl+life)*1000);
+      html.push('<i class="'+cls+' t'+(i%2)+'" style="left:'+x.toFixed(1)+'px;top:'+y.toFixed(1)+'px;--s:'+sz.toFixed(1)+'px;background:'+b
+        +';--bx:'+(ax*R).toFixed(1)+'px;--by:'+(ay*R).toFixed(1)+'px;--dy:'+(f.dy*rnd(1,1.08)).toFixed(0)+'px;--sw:'+rnd(-10,10).toFixed(1)
+        +'px;--life:'+life.toFixed(2)+'s;--dl:'+dl.toFixed(3)+'s;--r0:0deg;--rot:'+rot+'"></i>'); }
+  }
+  return { html, ms };
+}
 // Confetti cannons for PRs and unlocks: volleys shot up from both bottom corners that fall back, in the accent's
 // two hues (--cel-1…6; Orange keeps its own gold-leaning palette, rose included) with sparks mixed in: gold/white, or
 // the accent's --spark-1…3 when it sets them (Pink: rose gold, champagne, pearl). A third of Pink's pieces are candy
-// hearts. The main sparks come from glitter(), the exploding tile, which every accent bursts. Everything has
-// landed and faded by about 2.2s, so a share sheet under it is readable again.
+// hearts. The main sparks come from glitter(), the exploding tile, which every accent bursts. Paper pieces flip as they
+// fall, and every piece falls out of the bottom of the screen (fallOut). Finish fires one volley, two from the first PR
+// and three from the third, half a second apart (about 120 pieces at most).
 function confetti(tier, opts, low){
-  let P=opts.cannon||[0,0,20,24][tier]; if(low) P=Math.round(P/2);   // pieces per cannon (opts.cannon: a PR set's small volley)
+  const fin=opts.finale, np=fin ? Math.min(4, fin.prs||0) : 0, W = fin ? (np===0 ? 1 : np<3 ? 2 : 3) : 1;
+  let P = fin ? [20,22,24,20,20][np] : opts.cannon||[0,0,20,24][tier]; if(low) P=Math.round(P/2);   // pieces per cannon per volley (opts.cannon: a PR set's small volley)
   if(opts.box && opts.box.screen) P=Math.round(P*.5);   // no tile: the cannons stay light so they don't bury the page
   const fx=!!(window.CSS && CSS.supports && CSS.supports("translate","1px"));
   const c=document.createElement("div"); c.className="confetti";
@@ -5074,16 +5131,16 @@ function confetti(tier, opts, low){
   let ms=0;
   const sp=opts.stars ? .4 : .25;   // a star moment: more white/gold sparks in the volleys
   const htBg={}, html=[];   // one gradient string per colour; every piece goes in with one innerHTML parse
-  for(let side=0; side<2; side++) for(let i=0;i<P;i++){ let cls, st;
+  for(let w=0; w<W; w++) for(let side=0; side<2; side++) for(let i=0;i<P;i++){ let cls, st;
     if(Math.random()<sp){ cls="spk can"; st="--s:"+rnd(10,20).toFixed(1)+"px;background:"+sparks[Math.floor(Math.random()*sparks.length)]; }
     else { const col=colors[Math.floor(Math.random()*colors.length)];
       if(hearts && Math.random()<.33){ cls="can ht"; st="--s:"+rnd(10,17).toFixed(1)+"px;background:"
         +(htBg[col]||(htBg[col]="radial-gradient(circle at 32% 28%,#fff 0 9%,"+col+" 36%,"+mixHex(col,"#000000",.15)+" 100%)")); }
-      else { cls="can"; st="background:"+col+(Math.random()>.5 ? ";border-radius:50%" : ""); } }
-    const wave = tier===3 && i>=P*.6 ? .35 : 0;   // an unlock fires a second, smaller volley
-    const dl=.06+wave+Math.random()*.12, life=rnd(1.95,2.15)-wave; ms=Math.max(ms,(dl+life)*1000);
-    html.push('<i class="'+cls+'" style="'+st+";left:"+(side? vw+6 : -6)+"px;top:"+(vh+8)+"px;--bx:"+((side?-1:1)*rnd(.12,.62)*vw).toFixed(0)+"px;--by:"+(-rnd(.48,.9)*vh).toFixed(0)
-      +"px;--dy:"+(rnd(.25,.45)*vh).toFixed(0)+"px;--sw:"+rnd(-30,30).toFixed(0)+"px;--life:"+life.toFixed(2)+"s;--dl:"+dl.toFixed(3)+"s;--sz:"+(0.7+Math.random()*1.2).toFixed(2)
+      else { cls="can fp"; st="background:"+col+(Math.random()>.5 ? ";border-radius:50%" : "")+";--fl:"+rnd(.22,.55).toFixed(2)+"s"; } }
+    const wave = fin ? w*.5+(w ? rnd(0,.08) : 0) : tier===3 && i>=P*.6 ? .35 : 0;   // an unlock fires a second, smaller volley; Finish 1–3 full ones
+    const by=-rnd(.48, w===1 ? .95 : .9)*vh, f=fallOut(vh+8+by, 16), dl=.06+wave+Math.random()*.12, life=f.t/.72; ms=Math.max(ms,(dl+life)*1000);
+    html.push('<i class="'+cls+'" style="'+st+";left:"+(side? vw+6 : -6)+"px;top:"+(vh+8)+"px;--bx:"+((side?-1:1)*rnd(.12,.62)*vw).toFixed(0)+"px;--by:"+by.toFixed(0)
+      +"px;--dy:"+f.dy.toFixed(0)+"px;--sw:"+rnd(-30,30).toFixed(0)+"px;--life:"+life.toFixed(2)+"s;--dl:"+dl.toFixed(3)+"s;--sz:"+(0.7+Math.random()*1.2).toFixed(2)
       +";--r0:"+rnd(0,360).toFixed(0)+"deg;--rot:"+((Math.random()<.5?-1:1)*rnd(360,900)).toFixed(0)+'deg"></i>');
   }
   c.innerHTML=html.join("");
@@ -5092,7 +5149,7 @@ function confetti(tier, opts, low){
 // The exploding tile, every accent: half 4-point sparks (a few large ones), then sequins and holographic flakes, in
 // --glit-1…6. opts.box is the tile ({x,y,w,h,rad}, or the whole screen with screen:true). Each piece starts on the
 // tile (two thirds on its rounded edge, the rest across its face) and flies out from the tile's centre, further the
-// further out it sat, then drifts down with sway; it has faded by about 2.2s. A small tile (an achievement) still
+// further out it sat, then falls with sway until it has left the bottom of the screen (fallOut). A small tile (an achievement) still
 // throws across about a card's width, and pieces that would leave the screen bounce back in, so the burst stays
 // centred on the tile. Over the tile: a short accent sheen (.tflash) with a light sweep; PRs add a shock-wave ring
 // the tile's shape, unlocks a second ring and a second, smaller wave. Off-target (screen), the pieces break off the
@@ -5103,7 +5160,7 @@ function glitter(tier, opts, low){
   const cs=getComputedStyle(document.documentElement), a=accentHex(), dflt=[a, mixHex(a,"#ffffff",.35), mixHex(a,"#ffffff",.6), "#ffffff", "#f6d38a", mixHex(a,"#000000",.2)];
   const cols=GLIT_SHARE.map((_,i)=>cs.getPropertyValue("--glit-"+(i+1)).trim()||dflt[i]);
   const pinkish=accentId()==="pink", holo=pinkish ? cs.getPropertyValue("--holo").trim().replace(/"/g,"'") : "", gloss=cs.getPropertyValue("--heart-gloss").trim()||"#fff";
-  let N=opts.pieces||[0,140,168,172][tier]; if(low) N=Math.round(N/2);
+  let N=opts.pieces||[0,140,168,172][tier]; if(opts.finale && opts.finale.prs>=2) N=Math.min(N,150); if(low) N=Math.round(N/2);
   const K=[0,.5,.62,.72][tier], V=[0,[40,130],[60,170],[70,200]][tier];
   const rnd=(a,b)=>a+Math.random()*(b-a), vw=innerWidth, vh=innerHeight;
   const pick=()=>{ let r=Math.random()*100; for(let i=0;i<cols.length;i++){ r-=GLIT_SHARE[i]; if(r<0) return cols[i]; } return cols[0]; };
@@ -5120,7 +5177,8 @@ function glitter(tier, opts, low){
   if(fx){
     if(scr) f.appendChild(box("tflash scr", 0, 0, vw, vh, 0));
     else { const fl=box("tflash", B.x, B.y, B.w, B.h, rad); fl.appendChild(document.createElement("u")); f.appendChild(fl);
-      for(let k=0;k<(opts.rings!=null ? opts.rings : tier===3?2:tier===2?1:0);k++) f.appendChild(box("tring", B.x, B.y, B.w, B.h, rad,
+      const rings = opts.rings!=null ? opts.rings : opts.finale ? Math.min(3, 1+(opts.finale.prs||0)) : tier===3?2:tier===2?1:0;   // Finish: one ring, +1 a PR, up to 3
+      for(let k=0;k<rings;k++) f.appendChild(box("tring", B.x, B.y, B.w, B.h, rad,
         ";--rs:"+[B.w,B.h].map(d=>(1+Math.min(1.2, 110/Math.max(40,d))*(k?1.3:1)).toFixed(2)).join(" ")+";--dl:"+(.05+k*.2).toFixed(2)+"s")); }   // grows ~110px each way, whatever its shape
   }
   // a point on the tile's rounded edge, u in 0…1 around it (corners follow the radius), pulled in by j px
@@ -5153,8 +5211,6 @@ function glitter(tier, opts, low){
     let bx=Math.cos(ang)*push, by=Math.sin(ang)*push-(scr?0:rnd(0,40)+lift*rnd(.4,1));
     if(opts.up && by>0){ bx*=1.25; by*=.3; }   // opts.up (a PR set): what flies down goes sideways, off the fields below
     if(!scr && (px+bx<10 || px+bx>vw-10)) bx=-bx*.8;   // bounce back in off the screen's side, so a tile by the edge still bursts both ways
-    const dl=(w2?.36:.04)+Math.random()*(w2?.12:.06), life=rnd(1.75,2.15)-(w2?dl-.04:0);
-    ms=Math.max(ms,(life+dl)*1000);
     const C=pick(), k=Math.random(); let cls, sz, bg, r0="0deg", rot="0deg";
     if(stc && i%4===1){ cls="sp star"; sz = Math.random()<.2 ? rnd(24,34) : rnd(12,22); bg=stc[Math.floor(Math.random()*stc.length)]; rot=((Math.random()<.5?-1:1)*rnd(45,120)).toFixed(0)+"deg"; }
     else if(pinkish && k<.16){ const H=onEdge||Math.random()<.5 ? C : cols[3];   // candy hearts; on the face, pearl-pink
@@ -5167,10 +5223,13 @@ function glitter(tier, opts, low){
     else if(k<.8){ cls="sq"; sz=rnd(4,8);   // edge sequins are domed; the face's crumbs stay flat (cheaper to paint)
       bg = onEdge ? sqBg[C]||(sqBg[C]="radial-gradient(circle at 35% 35%,#fff 0 18%,"+C+" 45%,"+mixHex(C,"#000000",.3)+" 100%)") : C; }
     else { cls="fl"; sz=rnd(4,7); bg = holo || flBg[C]||(flBg[C]="linear-gradient(135deg,"+C+",#fff 50%,"+C+")"); r0="45deg"; }
-    html[i]='<i class="'+cls+' t'+(i%3)+'" style="left:'+px.toFixed(1)+'px;top:'+py.toFixed(1)+'px;--s:'+sz.toFixed(1)+'px;background:'+bg
-      +';--bx:'+bx.toFixed(1)+'px;--by:'+by.toFixed(1)+'px;--dy:'+(opts.up ? rnd(30,70) : rnd(110,230)).toFixed(0)
+    const fo=fallOut(py+by, sz), dl=(w2?.36:.04)+Math.random()*(w2?.12:.06), life=fo.t/.84;   // the burst is the first 16% of its life
+    ms=Math.max(ms,(life+dl)*1000);
+    html[i]='<i class="'+cls+' t'+(i%2)+'" style="left:'+px.toFixed(1)+'px;top:'+py.toFixed(1)+'px;--s:'+sz.toFixed(1)+'px;background:'+bg
+      +';--bx:'+bx.toFixed(1)+'px;--by:'+by.toFixed(1)+'px;--dy:'+fo.dy.toFixed(0)
       +'px;--sw:'+rnd(-20,20).toFixed(1)+'px;--life:'+life.toFixed(2)+'s;--dl:'+dl.toFixed(3)+'s;--r0:'+r0+';--rot:'+rot+'"></i>';
   }
+  if(opts.finale && fx){ const fw=fireworks(opts, low, cols, stc); html.push(...fw.html); ms=Math.max(ms, fw.ms); }
   c.innerHTML=html.join("");   // one parse for all the pieces (much cheaper than ~170 cssText sets)
   c.prepend(f);   // the sheen and rings sit under the pieces
   return { el:c, ms };
@@ -10613,7 +10672,8 @@ try{ if(screen.orientation && screen.orientation.lock) screen.orientation.lock("
 // iOS Safari can't be locked, so show the rotate guard only when actually landscape on a phone-sized
 // screen. JS-driven (sets inline display) so it's robust against a stale stylesheet and never lingers.
 function updateRotateGuard(){ const g=$("rotateGuard"); if(!g) return;
-  const land = !!(window.matchMedia && matchMedia("(orientation:landscape)").matches) && window.innerHeight<=540 && window.innerWidth<=900;
+  // a phone is whatever has a short side ≤ 540px — a Pro Max in landscape is 932px wide, which the old width cap missed
+  const land = !!(window.matchMedia && matchMedia("(orientation:landscape)").matches) && Math.min(window.innerWidth, window.innerHeight)<=540;
   g.style.display = land ? "flex" : "none"; }
 window.addEventListener("resize", updateRotateGuard);
 window.addEventListener("orientationchange", updateRotateGuard);
