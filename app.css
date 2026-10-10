@@ -50,9 +50,9 @@
        script draws a fresh scatter on each launch (--glow); this is the fallback. --glow-k scales it per theme.
        The status and tab bars paint the same scatter, sized to the viewport, so they blend into the page. */
     --glow-k:1;
-    --glow:radial-gradient(60% 34% at 18% 22%, color-mix(in srgb, var(--grad-a) calc(10% * var(--glow-k)), transparent), transparent 70%),
-      radial-gradient(52% 30% at 84% 46%, color-mix(in srgb, var(--grad-b) calc(9% * var(--glow-k)), transparent), transparent 70%),
-      radial-gradient(64% 32% at 30% 80%, color-mix(in srgb, var(--grad-b) calc(8% * var(--glow-k)), transparent), transparent 70%);
+    --glow:radial-gradient(60% 34% at 18% 22%, color-mix(in srgb, var(--grad-a) calc(18% * var(--glow-k)), transparent), transparent 70%),
+      radial-gradient(52% 30% at 84% 46%, color-mix(in srgb, var(--grad-b) calc(16% * var(--glow-k)), transparent), transparent 70%),
+      radial-gradient(64% 32% at 30% 80%, color-mix(in srgb, var(--grad-b) calc(15% * var(--glow-k)), transparent), transparent 70%);
     --bar-base:color-mix(in srgb, var(--bg) 86%, transparent);
     --bar-top:var(--glow), var(--bar-base); --bar-bottom:var(--glow), var(--bar-base);
     --bar-fade:16px;
