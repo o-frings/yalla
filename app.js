@@ -2273,7 +2273,13 @@ let _threadReactions={}, _threadMids=[], _threadMsgs={};
 const QUICK_REACT=["👍","❤️","😂","😮","😢","🙏"];
 function haptic(ms){
   try{ if(navigator.vibrate){ navigator.vibrate(ms||8); return; } }catch(_){}
-  try{ const l=document.getElementById("hapticL"); if(l) l.click(); }catch(_){}   // iOS best-effort: toggling an <input switch> buzzes (only in a gesture context)
+  // iOS best-effort: toggling an <input switch> buzzes (only in a gesture context). Toggling it also focuses it, which
+  // used to steal the keyboard from the set field being tapped (a PR buzz fires as you leave the last field), so while
+  // a field has or is getting the keyboard, buzz once the focus has landed and hand it straight back.
+  const l=document.getElementById("hapticL"); if(!l) return;
+  const a=document.activeElement, typing = a && (a.matches("input,textarea,select") || (a===document.body && document.body.classList.contains("kb")));
+  if(!typing){ try{ l.click(); }catch(_){} return; }
+  setTimeout(()=>{ const f=document.activeElement; try{ l.click(); }catch(_){} if(f && f!==document.body && f.focus) f.focus({preventScroll:true}); }, 0);
 }
 async function renderThread(uid){
   const box=$("msgThread"); if(!box) return;
@@ -2801,6 +2807,7 @@ function maybeAskFinish(){
              "Finish", ()=>{ try{ Promise.resolve($("saveBtn").onclick()).catch(()=>toast("Couldn't save — your sets are still here.")); }catch(e){} }, "go");
 }
 function updateTrainingState(){ const on=sessionUnderway(); document.body.classList.toggle("training", on);
+  const tb=$("timersBar"); if(tb) tb.classList.toggle("idle", !on);   // before a session the header's ▶ Start chip stands in for the timer row
   const ps=$("planSwitch"); if(ps) ps.disabled=on;   // no plan switching mid-session
   updateClearBtn(); }
 // Pin the session + rest timers to the top while a workout's underway (active timer OR a running
@@ -2820,6 +2827,7 @@ function tmrReset(){ timer.elapsed=0; timer.running=false; timer.startedAt=null;
   if(typeof _prCelebrated!=="undefined") _prCelebrated.clear();   // a new session celebrates its own PR sets
   if(timer.iv){clearInterval(timer.iv);timer.iv=null;} tmrRender(); if(!(rest.iv&&rest.startedAt)) releaseWake(); }
 $("tmrToggle").onclick=()=> timer.running ? tmrPause() : tmrStart();
+if($("tmrChip")) $("tmrChip").onclick=()=>{ tmrStart(); haptic(8); };
 $("tmrReset").onclick=tmrReset;
 tmrRender();
 // ---- rest timer between sets ----
@@ -4523,6 +4531,34 @@ function suggestion(name, t){
   else { cue="Beat last time: "+fmtSet(lt)+"."; }
   return { last:lt, days, regime, cue, soft, show, over };
 }
+// Today's numbers for each set, shown as the grey values in the set rows: last time plus the next step of
+// progressive overload, so "last time" and "what next" live in one place. chip = that step in two words
+// (a load step is tappable and fills the weights); note = one short line, only when context changes the advice.
+function overloadPlan(name, t, prev){
+  const s=suggestion(name,t), rng=parseReps(t), timed=isTimed(name);
+  const P=(prev||[]).map(p=>({w:p&&p.w!=null?String(p.w):"", r:p&&p.r!=null?String(p.r):""}));
+  if(!s.last) return { sets:P, chip:null, note:"First time: pick a weight you could do 1–2 more reps with." };
+  if(s.regime==="return") return { sets:P, chip:null, note:"Back after "+s.days+" days: match last time first." };
+  if(s.regime==="undertrained") return { sets:P, chip:null, note:"Light weeks lately: repeat last time." };
+  if(s.regime==="overreached") return { sets:P, chip:null, note:"Hard weeks lately: hold last time's numbers." };
+  const lw=parseFloat(s.last.w)||0, lr=parseInt(s.last.r)||0, topped=!!rng && lr>=rng.high;
+  if(lw>0 && (topped || (s.over && s.over.w))){
+    const nw=(s.over && s.over.w) || nextLoad(name, lw), inc=Math.round((nw-lw)*100)/100;
+    if(inc>0) return { sets:P.map(p=>({w:String(nw), r:rng?String(rng.low):p.r, uw:true})), chip:{label:"+"+inc+" kg", w:nw}, note:null };
+  }
+  if(topped) return { sets:P, chip:{label:"make it harder"}, note:null };   // bodyweight, top of the range
+  const step=timed?5:1;
+  let up=false;
+  const sets=P.map(p=>{ const r=parseInt(p.r)||0; if(!r) return p;
+    const nr = (rng && !timed) ? Math.min(r+step, rng.high) : r+step; if(nr>r) up=true; return { w:p.w, r:String(nr), ur:nr>r }; });
+  return { sets, chip: up ? {label:"+"+step+(timed?" s":" rep")} : null, note:null };
+}
+function ovChipHTML(ov){
+  if(!ov.chip) return "";
+  const lbl='<span class="ovup" aria-hidden="true">↑</span>'+esc(ov.chip.label);
+  return ov.chip.w ? '<button type="button" class="ovchip cuebtn addw" data-w="'+ov.chip.w+'" aria-label="Load '+ov.chip.w+' kg">'+lbl+'</button>'
+                   : '<span class="ovchip">'+lbl+'</span>';
+}
 function metaHTML(name, t, xi){
   const s=suggestion(name,t);
   const lastText = s.last ? 'Last '+fmtSet(s.last)+' · '+s.days+'d ago' : '';
@@ -4616,12 +4652,12 @@ function renderWorkout(){
     const swapped=swaps[xi] && swaps[xi]!==e.n;
     const rotKept = rot[xi]!=null && rotKeep.has(xi);   // a variety pick is available but pinned back to the base
     const g=document.createElement("div"); g.className="group"+(inSS?" ss":"")+(inSS && e.ss===ssPrev?" ss-cont":""); g.dataset.ex=name; g.style.animationDelay=(xi*0.05)+"s";
-    const meta=metaHTML(name, e.t, xi), eq=equipFor(name);
+    const ov=overloadPlan(name, e.t, prev), eq=equipFor(name);
     const linksHTML='<button class="lnkic menubtn" data-i="'+xi+'" data-ex="'+esc(name)+'" data-swap="'+(canSwap?1:0)+'" aria-label="More actions">'+ICON.more+'</button>';
     const mcol=MCOLOR[muscleFor(name)[0]]||"#888888";
     const mp=[];
     if(e.t) mp.push('<button type="button" class="tg tgedit" data-i="'+xi+'" title="Edit sets &amp; reps">'+esc(e.t)+' '+ICON.pencil+'</button>');
-    if(meta.lastText) mp.push('<button type="button" class="fillast" data-ex="'+esc(name)+'">↻ '+esc(meta.lastText)+'</button>');
+    if(ov.chip) mp.push(ovChipHTML(ov));
     mp.push(scoreTag(name));
     const metaLine = '<div class="exmeta">'+mp.join('<span class="dot">·</span>')+'</div>';
     let head=`<div class="pad" style="padding-bottom:0">
@@ -4631,9 +4667,9 @@ function renderWorkout(){
          : r.rotated ? '<div class="swapnote rot">'+ICON.swap+'Variety · was '+esc(r.was)+' <button class="rotlnk rotkeep" data-i="'+xi+'">keep '+esc(r.was)+'</button></div>'
          : rotKept ? '<div class="swapnote rot muted">'+ICON.swap+'<button class="rotlnk rotuse" data-i="'+xi+'">try '+esc(rot[xi])+'</button> for variety</div>'
          : blocker ? '<div class="swapnote warn">'+ICON.warn+'tough on your '+esc(INJ_LABEL[blocker]||'injury')+' — ease off or swap</div>' : '' }
-      ${metaLine}${meta.show?meta.cue:''}</div>`;
+      ${metaLine}${ov.note?'<div class="ovnote">'+esc(ov.note)+'</div>':''}</div>`;
     let rows="";
-    for(let i=0;i<e.s;i++){ rows+=buildSetRow(i+1, prev[i], name); }
+    for(let i=0;i<e.s;i++){ rows+=buildSetRow(i+1, prev[i], name, ov.sets[i]); }
     g.innerHTML=head+rows+cardFoot(name); list.appendChild(g);
     wireEffortBar(g);
     g.querySelector(".addset").onclick=()=>{ const n=g.querySelectorAll(".setrow").length+1;
@@ -4697,10 +4733,8 @@ function repeatLastWorkout(){
   if(filled){ captureDraft(); toast("Filled in last time — tweak any, then Finish"); }
   else toast("No previous numbers to copy yet");
 }
-function updateRepeatBtn(){ const btn=$("repeatBtn"); if(!btn) return;
-  const any=[...document.querySelectorAll("#exlist .group")].some(g=> g.dataset.ex && last[g.dataset.ex] && last[g.dataset.ex].length);
-  btn.style.display = any ? "" : "none";
-}
+// the whole-workout "Last time" button is retired: last time now shows once, as the grey values in each set row
+function updateRepeatBtn(){ const btn=$("repeatBtn"); if(btn) btn.style.display="none"; }
 $("repeatBtn").onclick=repeatLastWorkout;
 // fill ONE exercise from its own last session (tap the "↻ Last …" chip on that exercise)
 function fillExerciseLast(name){
@@ -5294,6 +5328,9 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
   shell.appendChild(pager);
   pages.forEach(p=> track.appendChild(p));               // all three pages move into the swipe track, in tab order
   const tabbar=document.querySelector(".tabbar"); if(tabbar) shell.appendChild(tabbar);  // overlay tab bar, painted last
+  // the rest timer floats just above the tab bar (outside the page flow), so starting it never pushes the page
+  // down under a finger that's on its way to the next set
+  const rb=$("restBar"); if(rb) shell.insertBefore(rb, tabbar||null);
   // Shell height is pure CSS 100vh — NO JS height-setting (see the #shell rule). On the installed iOS PWA,
   // reading visualViewport.height/innerHeight at launch returns a stale/short value (the DYNAMIC viewport
   // isn't initialized until a geometry change), which is exactly the cold-launch blank-strip bug; 100dvh has
@@ -5318,11 +5355,11 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
     if(n.matches && n.matches('input,textarea,select,canvas,button,[data-act="grip"],.seg,.sexseg,.appearance,.chips,.tabbar,.sheet,.meRing,.progswipe')) return true;
     const ox=getComputedStyle(n).overflowX; if((ox==="auto"||ox==="scroll") && n.scrollWidth>n.clientWidth+4) return true;
   } return false; };
-  let x0=0, y0=0, armed=false, locked=false, dragging=false, lastX=0, lastT=0, vx=0;
+  let x0=0, y0=0, armed=false, locked=false, dragging=false, lastX=0, lastT=0, vx=0, fromRow=null;
   pager.addEventListener("touchstart",e=>{
     if(e.touches.length!==1 || document.querySelector(".sheet.show, #onboardWrap.show") || blocked(e.target)){ armed=false; return; }
     cancelAnimationFrame(raf);
-    x0=lastX=e.touches[0].clientX; y0=e.touches[0].clientY; lastT=Date.now(); vx=0;
+    x0=lastX=e.touches[0].clientX; y0=e.touches[0].clientY; lastT=Date.now(); vx=0; fromRow=e.target.closest(".setrow");
     armed=true; locked=false; dragging=false; track.style.transition="none";
   },{passive:true});
   pager.addEventListener("touchmove",e=>{
@@ -5332,6 +5369,7 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
       const adx=Math.abs(dx), ady=Math.abs(dy);
       if(adx<6 && ady<6) return;                                   // tiny deadzone, then decide quickly
       if(adx <= ady*1.2){ armed=false; return; }                   // vertical OR diagonal → let the page scroll (the common intent)
+      if(fromRow && (dx<0 || fromRow.classList.contains("swiped"))){ armed=false; return; }   // a set row's swipe-to-delete
       locked=true; dragging=true;                                  // only a clearly horizontal drag pages between tabs
     }
     e.preventDefault();                                            // own the horizontal gesture
@@ -6240,7 +6278,7 @@ function applyTheme(){
   const mode = settings.theme || "auto";
   const dark = mode==="dark" || (mode==="auto" && systemDark());
   document.documentElement.classList.toggle("dark", dark);
-  document.documentElement.style.background = dark ? "#000000" : "#f2f2f7";
+  document.documentElement.style.background = dark ? "#121214" : "#f2f2f7";
   try{ localStorage.setItem("yallaTheme", mode); }catch(e){}
   document.querySelectorAll("#appSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.th===mode));
   applyAccent();
@@ -6507,12 +6545,12 @@ function exerciseLibrary(){
 }
 // one set row. Timed/hold moves (plank, wall sit, dead hang…) swap the × for a hold-timer button and log
 // seconds instead of reps; weighted moves keep weight × reps. Used by both the plan and free workout views.
-function buildSetRow(i, pv, name){
-  const timed=isTimed(name);
+function buildSetRow(i, pv, name, tg){
+  const timed=isTimed(name), t=tg||pv;   // t: today's target for this set (falls back to last time)
   const pvVol = (pv && name) ? setVol(name, pv.w, pv.r) : 0;
-  const pw = pv&&pv.w!=null?esc(pv.w):'', pr = pv&&pv.r!=null?esc(pv.r):'';
-  const wPh = timed ? '+kg' : (pv&&pv.w?esc(pv.w):(isBW(name)?'BW':'kg'));   // weight is optional — blank logs as no extra weight
-  const rPh = timed ? 'sec' : (pv&&pv.r?esc(pv.r):'reps');
+  const pw = t&&t.w!=null?esc(t.w):'', pr = t&&t.r!=null?esc(t.r):'';
+  const wPh = t&&t.w ? esc(t.w)+(tg&&tg.uw?' ↑':'') : (timed ? '+kg' : (isBW(name)?'BW':'kg'));   // weight is optional — blank logs as no extra weight
+  const rPh = t&&t.r ? esc(t.r)+(tg&&tg.ur?' ↑':'') : (timed ? 'sec' : 'reps');
   const sep = timed
     ? '<button class="holdbtn" type="button" aria-label="Hold timer — tap to start, tap to stop">'+ICON.play+'</button>'
     : '<span class="x">×</span>';
@@ -6521,7 +6559,7 @@ function buildSetRow(i, pv, name){
     +'<input class="w" type="text" inputmode="decimal" autocomplete="off" placeholder="'+wPh+'">'
     +sep
     +'<input class="r" type="number" inputmode="numeric" placeholder="'+rPh+'">'
-    +'<span class="prtag">PR</span><span class="eq">=</span><span class="vol'+fill+'" title="'+(fill?'Tap to fill last time':'')+'">'+(pvVol?fmtVol(pvVol):'')+'</span><button class="setdel" aria-label="Remove set">'+ICON.minus+'</button></div>';
+    +'<span class="prtag">PR</span><span class="eq">=</span><span class="vol'+fill+'" title="'+(fill?'Tap to fill last time':'')+'">'+(pvVol?fmtVol(pvVol):'')+'</span><button class="setdel" type="button" aria-label="Delete set">Delete</button></div>';
 }
 function freeSetRow(i, pv, name){ return buildSetRow(i, pv, name); }
 // Self-calibrated Epley rep denominator. The load–rep relationship w(1+r/K) uses K=30 by default, but K
@@ -6580,11 +6618,30 @@ function inferEffort(name, g){
 function cardFoot(name){
   const add='<a class="demo addset" role="button">'+ICON.plus+'add set</a>';
   if(isTimed(name)) return '<div class="cardfoot freeadd">'+add+'</div>';
-  return '<div class="cardfoot efbar" data-ef="1" data-auto="1">'+add+'<span class="efsegs" role="group" aria-label="How hard?">'
-    + EFFORT_OPTS.map((o,ix)=>'<button type="button" class="efseg'+(ix===1?' on':'')+'" data-ef="'+ix+'" title="'+esc(o.tip)+'">'+esc(o.lbl)+'</button>').join('')
-    + '</span></div>';
+  return '<div class="cardfoot efbar" data-ef="1" data-auto="1">'+add
+    + '<button type="button" class="efchip" aria-haspopup="menu" aria-label="How hard: Hard"><span class="eflbl">Hard</span>'
+    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>';
 }
-function setEffortSel(bar, ef){ bar.dataset.ef=ef; bar.querySelectorAll(".efseg").forEach(s=> s.classList.toggle("on", +s.dataset.ef===ef)); }
+let _efPop=null;
+function openEffortMenu(anchor, cur, onPick){
+  if(!_efPop){ _efPop=document.createElement("div"); _efPop.className="exmenu-pop wkmenu efmenu"; _efPop.setAttribute("role","menu"); _efPop.setAttribute("aria-label","How hard?"); document.body.appendChild(_efPop);
+    const close=()=>{ _efPop.classList.remove("show"); _efPop.innerHTML=""; };
+    _efPop.close=close;
+    document.addEventListener("click", e=>{ if(_efPop.classList.contains("show") && !e.target.closest(".efmenu")) close(); });
+    document.addEventListener("keydown", e=>{ if(_efPop.classList.contains("show") && e.key==="Escape"){ close(); if(_efPop._anchor) _efPop._anchor.focus({preventScroll:true}); } });
+    document.addEventListener("scroll", ()=>{ if(_efPop.classList.contains("show") && Date.now()-_efPop._at>150) close(); }, true); }
+  const ck='<svg class="mck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+  _efPop.innerHTML=EFFORT_OPTS.map((o,i)=>'<button type="button" class="mi" role="menuitemradio" aria-checked="'+(i===cur)+'" data-ef="'+i+'"><span>'+esc(o.lbl)+'<small>'+esc(o.tip.split(".")[0])+'</small></span>'+(i===cur?ck:'')+'</button>').join("");
+  _efPop.querySelectorAll(".mi").forEach(b=> b.onclick=e=>{ e.stopPropagation(); _efPop.close(); onPick(+b.dataset.ef); anchor.focus({preventScroll:true}); });
+  _efPop._anchor=anchor; _efPop._at=Date.now();
+  _efPop.style.visibility="hidden"; _efPop.classList.add("show");
+  const r=anchor.getBoundingClientRect(), mw=_efPop.offsetWidth, mh=_efPop.offsetHeight;
+  let top=r.bottom+6; if(top+mh > window.innerHeight-8) top=Math.max(8, r.top-mh-6);
+  _efPop.style.left=Math.max(8, Math.min(window.innerWidth-mw-8, r.right-mw))+"px"; _efPop.style.top=top+"px"; _efPop.style.visibility="";
+  (_efPop.querySelector('.mi[aria-checked="true"]')||_efPop.querySelector(".mi")).focus({preventScroll:true});
+}
+function setEffortSel(bar, ef){ bar.dataset.ef=ef; const o=EFFORT_OPTS[ef]||EFFORT_OPTS[1], c=bar.querySelector(".efchip");
+  if(c){ c.querySelector(".eflbl").textContent=o.lbl; c.setAttribute("aria-label","How hard: "+o.lbl); } }
 // re-estimate an auto pill from the group's current set inputs; no-op once the user has tapped (manual)
 function refreshAutoEffort(g){
   const bar=g&&g.querySelector(".efbar"); if(!bar || bar.dataset.auto!=="1") return;
@@ -6594,11 +6651,10 @@ function refreshAutoEffort(g){
 function wireEffortBar(g){
   const bar=g.querySelector(".efbar"); if(!bar) return;
   refreshAutoEffort(g);   // seed from any prefilled values
-  bar.querySelectorAll(".efseg").forEach(b=> b.onclick=()=>{
+  const chip=bar.querySelector(".efchip"); if(!chip) return;
+  chip.onclick=e=>{ e.stopPropagation(); openEffortMenu(chip, +bar.dataset.ef, ef=>{
     bar.dataset.auto="0";   // user took control — stop auto-estimating for this log
-    setEffortSel(bar, +b.dataset.ef);
-    captureDraft();
-  });
+    setEffortSel(bar, ef); captureDraft(); }); };
 }
 // Rep/set target for a free or suggested-session move, from the user's GOAL: strength → low reps & more
 // sets, hypertrophy → moderate, fat-loss/fitness → higher reps. Compound anchors get the lower bracket,
@@ -6614,21 +6670,21 @@ function buildFreeGroup(name){
   const prev=last[name]||[];
   const g=document.createElement("div"); g.className="group"; g.dataset.ex=name;
   const nSets=objSets(name);
-  let rows=""; for(let i=0;i<nSets;i++) rows+=freeSetRow(i+1, prev[i], name);
-  // rep target from the user's objective so the range AND the progressive-overload cues (topped-the-range,
-  // add-a-rep…) match the goal — a strength session nudges toward load, a hypertrophy one toward reps.
+  // rep target from the user's objective so the range AND the progressive-overload step (load, or a rep) match
+  // the goal — a strength session nudges toward load, a hypertrophy one toward reps.
   const tgt=isTimed(name)?"":objTarget(name);
-  const meta=metaHTML(name, tgt, "free"), eq=equipFor(name);
+  const ov=overloadPlan(name, tgt, prev), eq=equipFor(name);
+  let rows=""; for(let i=0;i<nSets;i++) rows+=buildSetRow(i+1, prev[i], name, ov.sets[i]);
   const mcol=MCOLOR[muscleFor(name)[0]]||"#888888";
   const mp=[];
   if(tgt) mp.push('<span class="tg">'+esc(tgt)+'</span>');
-  if(meta.lastText) mp.push('<button type="button" class="fillast" data-ex="'+esc(name)+'">↻ '+esc(meta.lastText)+'</button>');
+  if(ov.chip) mp.push(ovChipHTML(ov));
   mp.push(scoreTag(name));
   const metaLine='<div class="exmeta">'+mp.join('<span class="dot">·</span>')+'</div>';
   g.innerHTML='<div class="pad" style="padding-bottom:0">'
     +'<div class="exhead"><span class="eqic tinted" style="background:'+hexAlpha(mcol,.15)+';color:'+mcol+'" title="'+esc(eq.label)+'">'+EQUIP[eq.key]+'</span><span class="nm">'+esc(name)+'</span>'
     +'<button class="lnkic menubtn" data-free="1" data-ex="'+esc(name)+'" aria-label="More actions">'+ICON.more+'</button></div>'
-    +metaLine+(meta.show?meta.cue:'')+'</div>'
+    +metaLine+(ov.note?'<div class="ovnote">'+esc(ov.note)+'</div>':'')+'</div>'
     +rows+cardFoot(name);
   wireEffortBar(g);
   g.querySelector(".addset").onclick=()=>{ const n=g.querySelectorAll(".setrow").length+1;
@@ -6850,6 +6906,34 @@ $("exlist").addEventListener("click", e=>{ const v=e.target.closest(".vol"); if(
     if(prSetDone(next)) return;   // its burst carries the buzz
   }
   if(navigator.vibrate) try{ navigator.vibrate(15); }catch(e){} });
+// Tap a grey value to take it: an empty set row fills with today's numbers and the tapped field is selected,
+// so typing replaces it. Leaving the row then counts as completing the set (rest clock, PR check), the same
+// as typing it would, since a filled-in value never fires "change" by itself.
+$("exlist").addEventListener("focusin", e=>{ const t=e.target; if(!t.classList||(!t.classList.contains("w")&&!t.classList.contains("r"))) return;
+  const r=t.closest(".setrow"), g=t.closest(".group"); if(!r||!g) return;
+  const wEl=r.querySelector(".w"), rEl=r.querySelector(".r");
+  if(!r.classList.contains("warm") && !wEl.value.trim() && !rEl.value.trim() && (r.dataset.pw||r.dataset.pr)){
+    wEl.value=r.dataset.pw||""; rEl.value=r.dataset.pr||""; r.dataset.af="1";
+    if(!timer.running && timer.elapsed===0) tmrStart();
+    updateSetVol(r, g.dataset.ex); refreshAutoEffort(g); refreshSetFocus(g); captureDraft(); }
+  if(t.value) setTimeout(()=>{ try{ t.select(); }catch(_){} }, 0); });
+$("exlist").addEventListener("focusout", e=>{ const r=e.target.closest && e.target.closest(".setrow"); if(!r || r.dataset.af!=="1" || r.contains(e.relatedTarget)) return;
+  delete r.dataset.af; const rEl=r.querySelector(".r"); if(rEl) rEl.dispatchEvent(new Event("change", {bubbles:true})); });
+// Swipe a set row left to show Delete (there's no delete button on every row); swipe back or tap elsewhere to close
+(function(){ const list=$("exlist"); let row=null, x0=0, y0=0, dx=0, lock=0;
+  const closeAll=keep=>list.querySelectorAll(".setrow.swiped").forEach(r=>{ if(r!==keep) r.classList.remove("swiped"); });
+  list.addEventListener("touchstart", e=>{ row = e.touches.length===1 ? e.target.closest(".setrow") : null;
+    if(row){ x0=e.touches[0].clientX; y0=e.touches[0].clientY; dx=0; lock=0; } }, {passive:true});
+  list.addEventListener("touchmove", e=>{ if(!row) return; const x=e.touches[0].clientX-x0, y=e.touches[0].clientY-y0;
+    if(!lock){ if(Math.abs(x)<8 && Math.abs(y)<8) return; lock = Math.abs(x)>Math.abs(y)*1.2 ? 1 : -1; }
+    if(lock===1) dx=x; }, {passive:true});
+  list.addEventListener("touchend", ()=>{ if(!row) return;
+    if(lock===1){ if(dx<-40){ closeAll(row); row.classList.add("swiped"); haptic(8); } else if(dx>30) row.classList.remove("swiped"); }
+    row=null; });
+  document.addEventListener("touchstart", e=>{ if(!e.target.closest(".setrow.swiped")) closeAll(); }, {passive:true, capture:true});
+  list.addEventListener("focusin", e=>{ if(!e.target.classList.contains("setdel")) return; const r=e.target.closest(".setrow"); closeAll(r); r.classList.add("swiped"); });
+  list.addEventListener("focusout", e=>{ if(e.target.classList.contains("setdel")) e.target.closest(".setrow").classList.remove("swiped"); });
+})();
 function removeSetRow(r){
   if(!r) return;
   if(hold.row===r) holdStop(false);   // deleting the row mid-hold: kill the timer, don't write a partial time
@@ -7215,7 +7299,7 @@ $("exlist").addEventListener("click", e=>{ const b=e.target.closest(".cuebtn.add
   const g=b.closest(".group"), wv=b.dataset.w; if(!g||!wv) return; let any=false;
   const filled=[];
   g.querySelectorAll(".setrow").forEach(r=>{ const wEl=r.querySelector(".w"); if(wEl && !wEl.value.trim()){ wEl.value=wv; updateSetVol(r, g.dataset.ex); any=true; filled.push(r); } });
-  if(any){ if(!timer.running && timer.elapsed===0) tmrStart(); captureDraft(); toast("Loaded "+wv+"kg — chase the lower end of your range.");
+  if(any){ if(!timer.running && timer.elapsed===0) tmrStart(); captureDraft(); toast("Loaded "+wv+" kg");
     filled.some(r=>prSetDone(r)); } });   // a row that already had its reps is now a completed set: the first PR among them bursts
 // over-rep nudge: bump this exercise's target range up one bracket, saved to the plan
 $("exlist").addEventListener("click", async e=>{ const b=e.target.closest(".cuebtn.raise"); if(!b) return; e.preventDefault();

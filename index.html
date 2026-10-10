@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f2f7">
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121214">
 <link rel="apple-touch-icon" href="icon-1024.png">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%221024%22%20height%3D%221024%22%20viewBox%3D%220%200%201024%201024%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23FF7A18%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23FF1F3D%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%221024%22%20height%3D%221024%22%20rx%3D%22230%22%20ry%3D%22230%22%20fill%3D%22url%28%23g%29%22/%3E%3Cpath%20d%3D%22M512%20150%20C%20470%20330%20360%20372%20360%20556%20A%20152%20152%200%200%200%20664%20556%20C%20664%20446%20612%20404%20566%20360%20C%20560%20470%20470%20470%20470%20360%20C%20470%20300%20490%20230%20512%20150%20Z%22%20fill%3D%22%23fff%22/%3E%3C/svg%3E">
 <script>
@@ -19,7 +19,7 @@
   var dark = m==='dark' || (m!=='light' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
   var de=document.documentElement;
   if(dark) de.classList.add('dark');
-  de.style.background = dark ? '#000000' : '#f2f2f7';
+  de.style.background = dark ? '#121214' : '#f2f2f7';
   var a=localStorage.getItem('yallaAccent');   // accent picker: set before first paint so there is no orange flash
   if(a==='pink'||a==='blue'||a==='teal'||a==='graphite') de.setAttribute('data-accent', a);
   // status-bar colour is handled by the media-query theme-color metas above (iOS reads those at launch)
@@ -63,6 +63,8 @@
     <span class="wktitle"><span id="ltName">Workout</span></span>
     <!-- one mode button: shows what you're doing (Plan · Free · Surprise · Cardio · Activity) and opens the mode menu,
          which also holds Travel mode. A small ✈ rides on it while travel mode is on. -->
+    <!-- session timer before a session starts; once it runs, the sticky timer row takes over -->
+    <button class="tmrchip" id="tmrChip" type="button" aria-label="Start session timer"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z"/></svg>Start</button>
     <button class="wkmodebtn" id="wkModeBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="wkMenu">
       <svg class="wkm-tv" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l5.2 4.2-2 4-2-1-1 1 3 2 2 3 1-1-1-2 4-2 4.2 5.2a.5.5 0 0 0 .8-.4z"/></svg>
       <span id="wkModeLbl">Plan</span>
