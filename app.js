@@ -3198,8 +3198,7 @@ function renderAll(){ renderNav(); renderDash(); renderSeg(); if(freeMode) rende
 
 // ================= dashboard =================
 function renderNav(){
-  $("ltName").textContent = freeMode ? "Free workout" : ((activePlan().workouts[curWk]||{}).name || "Workout");
-  if(startMode()==="plan") renderPlanSub(); else $("planSub").textContent = planMeta(activePlan());
+  renderWkHeader();
   $("bwGoalTxt").textContent = settings.goalTarget!=null ? settings.goalTarget+" kg" : "—";
 }
 // ================= overview (coach home) =================
@@ -4600,7 +4599,7 @@ function renderWorkout(){
   // swap or "keep" re-render doesn't reshuffle the variety or wipe the user's pins.
   const rsig=p.id+"#"+curWk+"#"+((settings.slotDone&&settings.slotDone[p.id+"|"+w.name])||0);
   if(rsig!==_rotSig){ _rotSig=rsig; applyRotation(); }
-  $("ltName").textContent = w.name; renderPlanSub();
+  renderWkHeader();
   renderInjuryBanner();
   const injRes=resolveInjuryNames(w); let shown=0;
   w.ex.forEach((e,xi)=>{
@@ -5230,6 +5229,7 @@ function showTab(name){
   if(typeof cancelPending==="function") cancelPending();   // drop any unconfirmed objective/focus change on navigation
   if(window.__revealBar) window.__revealBar();             // always show the tab bar when switching tabs
   if(_finPadDrop) _finPadDrop();                           // a post-Finish spacer goes with the page change
+  if(window.closeWkMenu) window.closeWkMenu(false);        // the Workout mode menu stays with its page
   document.querySelectorAll(".page").forEach(p=> p.classList.toggle("active", p.dataset.tab===name));
   document.querySelectorAll(".tabitem").forEach(t=> t.classList.toggle("active", t.dataset.tab===name));
   if(window.__pageGo) window.__pageGo(name); else { try{ window.scrollTo(0,0); }catch(e){} }
@@ -5757,14 +5757,13 @@ function planMeta(plan){
   const t=mins.length ? "~"+(Math.round(mins.reduce((a,b)=>a+b,0)/mins.length/5)*5)+" min" : "";
   return [days+" day"+(days===1?"":"s")+(hasHome?" + home":""), t, plan.level||""].filter(Boolean).join(" · ");
 }
-// Plan mode's subtitle leads with the active plan's name, which is how you switch plans:
-// "Short & Intense ⌄ · 3 days + home · ~35 min". Mid-session it's plain text (the header controls hide then too).
+// Plan mode's subtitle is the active plan's name, which is how you switch plans: "Short & Intense ⌄".
+// Its days · minutes · level live in the plan picker. Mid-session it's plain text (the header controls hide then too).
 function renderPlanSub(){
   const el=$("planSub"); if(!el) return;
-  const p=activePlan(), meta=planMeta(p);
+  const p=activePlan();
   el.innerHTML='<button class="plansw" id="planSwitch" type="button" aria-label="Change plan"><span class="plansw-nm">'+esc((p&&p.name)||"Plan")+'</span>'
-    +'<svg class="plansw-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>'
-    +(meta?'<span class="plansw-meta">'+meta.split(" · ").map(t=>'<span class="plansw-part">'+esc(t)+'</span>').join("")+'</span>':'');
+    +'<svg class="plansw-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>';
   const b=$("planSwitch"); b.disabled=sessionUnderway() || trainMode!=="strength";   // cardio/activity logs don't use the plan
   b.onclick=()=>{ renderPlanList(); openSheet("Plans"); };
 }
@@ -6308,17 +6307,17 @@ function renderTravelSeg(){
   const m = settings.travelMode || "off";
   document.querySelectorAll("#travelSeg .s").forEach(s=> s.classList.toggle("active", s.dataset.tv===m));
 }
-// the Workout-header ✈ lights up while travel mode is on (the only travel indicator — workout page only)
+// a small ✈ rides on the Workout mode button while travel mode is on (the only travel indicator — workout page only).
+// Runs at boot before trainMode exists, so it reads the button's own label rather than the mode.
 const TRAVEL_FAB_LBL={ gym:"full gym", nogym:"no gym", partial:"partial gym" };
 function renderTravelFab(){
-  const m=settings.travelMode||"off", on=m!=="off";
-  const q=$("travelQuick"); if(q){ q.classList.toggle("on", on);
-    q.setAttribute("aria-label", on ? "Travel mode on — "+(TRAVEL_FAB_LBL[m]||"")+" — tap to switch or end" : "Travel mode"); }
+  const m=settings.travelMode||"off", on=m!=="off", b=$("wkModeBtn"); if(!b) return;
+  b.classList.toggle("tv", on);
+  b.setAttribute("aria-label", $("wkModeLbl").textContent+", change mode"+(on ? " (travel mode on, "+(TRAVEL_FAB_LBL[m]||"")+")" : ""));
 }
 // kept as an alias so older call sites stay valid
 function renderTravelBanner(){ renderTravelFab(); }
-// quick travel control — its own bottom sheet, reachable in one tap from the Workout header (✈),
-// the global ✈ badge, or Settings; no more digging through Settings.
+// quick travel control — its own bottom sheet, reachable from the Workout mode menu or Settings.
 function openTravel(){ renderTravel(); openSheet("Travel"); }
 // ===== travel-consistency tracking =====
 // We bank the real time spent in each context (home / travel+gym / travel-no-gym) so we can later
@@ -6349,7 +6348,6 @@ function renderTravelBreakdown(){
   box.innerHTML=h;
 }
 function renderTravel(){ renderTravelSeg(); renderTravelFab(); renderTravelBreakdown(); }
-if($("travelQuick")) $("travelQuick").onclick=()=> openTravel();
 if($("openTravelBtn")) $("openTravelBtn").onclick=()=> openTravel();
 // ===== Plan vs Surprise start mode =====
 // Surprise mode: the app proposes a random data-picked session (a bit of a surprise) instead of you
@@ -6380,53 +6378,116 @@ function surpriseShuffle(){
 function startMode(){ return settings.surprise ? "surprise" : (freeMode ? "free" : "plan"); }
 function renderStartMode(){
   const mode=startMode();
-  document.querySelectorAll("#wkMode .s").forEach(t=> t.classList.toggle("active", t.dataset.wm===mode));
   const seg=$("seg"); if(seg) seg.style.display = mode==="plan" ? "" : "none";   // plan-day tabs only mean something in Plan mode
-  const act=$("startAction"); if(!act) return;
-  if(mode==="surprise"){
-    const fd=draft["free"]||{}, nm=fd.name||"Surprise session", nEx=fd.s?Object.keys(fd.s).length:0, L=settings.sponLen||"standard";
-    // the session IS the title (fills the top-left); its shape is the subtitle
-    if($("ltName")) $("ltName").textContent=nm;
-    if($("planSub")) $("planSub").textContent=(nEx?'~'+sponMins(nEx)+' min · '+nEx+' move'+(nEx>1?'s':''):'picked for you')+(nEx?' · picked for you':'');
+  const act=$("startAction");
+  if(act && mode==="surprise"){
+    const L=settings.sponLen||"standard";
     // the session's own controls: its length, and a fresh pick
     act.innerHTML='<div class="surprow"><div class="utabs paneltabs" id="sponLen2">'
       +[["quick","Quick"],["standard","Standard"],["full","Full"]].map(([v,l])=>'<button class="utab'+(L===v?" active":"")+'" data-sl="'+v+'" type="button" aria-pressed="'+(L===v)+'">'+l+'</button>').join('')+'</div>'
       +'<button class="surpnew" id="surpNew" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/><circle cx="15" cy="15" r="1.2" fill="currentColor"/><circle cx="15" cy="9" r="1.2" fill="currentColor"/><circle cx="9" cy="15" r="1.2" fill="currentColor"/></svg>New surprise</button></div>';
     act.querySelectorAll("#sponLen2 .utab").forEach(b=> b.onclick=()=>{ settings.sponLen=b.dataset.sl; sset("settings",settings); relenSurprise(); });
     $("surpNew").onclick=surpriseShuffle;
-  } else if(mode==="plan"){
-    if($("ltName")) $("ltName").textContent="Workout";
-    renderPlanSub();
-    act.innerHTML="";
-  } else {
-    // Free: renderFree() owns the title/subtitle (it knows suggested-session names) — don't clobber it here
-    act.innerHTML="";
-  }
+  } else if(act) act.innerHTML="";
+  renderWkHeader();
 }
-document.querySelectorAll("#wkMode .s").forEach(t=> t.onclick=()=>{
-  const m=t.dataset.wm, cur=startMode();
-  if(m===cur){ if(m==="surprise") surpriseShuffle(); return; }   // re-tapping active Surprise → reshuffle
+// The Workout header: today's workout is the title (the plan day, the surprise session, Free workout, Cardio or
+// Activity), one short line under it, and on the right one button that names the mode and opens the mode menu.
+const WK_MODE_LBL={ plan:"Plan", free:"Free", surprise:"Surprise", cardio:"Cardio", activity:"Activity" };
+function wkModeKey(){ return trainMode!=="strength" ? trainMode : startMode(); }
+function renderWkHeader(){
+  const lt=$("ltName"), sub=$("planSub"); if(!lt || !sub) return;
+  const k=wkModeKey(), fd=draft["free"]||{};
+  if(k==="cardio" || k==="activity"){
+    lt.textContent = k==="cardio" ? "Cardio" : "Activity";
+    sub.textContent = k==="cardio" ? "Log a run, ride or swim" : "Log a sport, climb or class";
+  } else if(k==="plan"){
+    lt.textContent=(activePlan().workouts[curWk]||{}).name || "Workout";
+    renderPlanSub();
+  } else if(k==="surprise"){
+    const nEx=fd.s?Object.keys(fd.s).length:0;
+    lt.textContent=fd.name||"Surprise session";
+    sub.textContent=(nEx?'~'+sponMins(nEx)+' min · '+nEx+' move'+(nEx>1?'s':'')+' · ':'')+'picked for you';
+  } else if(fd.spon){ lt.textContent=fd.name||"Suggested session"; sub.textContent="Suggested session"; }
+  else { lt.textContent="Free workout"; sub.textContent="Choose your exercises"; }
+  $("wkModeLbl").textContent=WK_MODE_LBL[k];
+  renderTravelFab();   // the button's label is in its aria-label, with the travel state
+}
+// Plan · Free · Surprise me (from the mode menu)
+function setStartMode(m){
+  const cur=startMode(); if(m===cur) return;
   if(m!=="surprise" && cur!=="surprise"){
     // Plan ↔ Free: each keeps its own draft, so switching loses nothing — no confirm, timers keep running
     freeMode = m==="free"; swaps={}; renderSeg();
+    draft.__mode = m; sset("draft",draft);   // so a reload comes back in this mode even before a set is typed
     if(freeMode) renderFree(); else renderWorkout();
     return;
   }
   // entering or leaving Surprise replaces/clears the surprise draft, so confirm mid-session
   const apply=()=>{ settings.surprise = m==="surprise"; sset("settings",settings);
     if(m==="surprise"){ loadSurprise(); }
-    else { freeMode = m==="free"; if(draft["free"]&&draft["free"].spon){ delete draft["free"]; sset("draft",draft); } tmrReset(); restStop(); swaps={}; renderSeg(); if(freeMode) renderFree(); else renderWorkout(); }
+    else { freeMode = m==="free"; draft.__mode = m; if(draft["free"]&&draft["free"].spon) delete draft["free"]; sset("draft",draft); tmrReset(); restStop(); swaps={}; renderSeg(); if(freeMode) renderFree(); else renderWorkout(); }
     renderStartMode(); };
   if(sessionUnderway()) confirmAsk("Switch mode? Your current sets will be discarded.", "Switch", apply, "danger");
   else apply();
-});
+}
+// the mode menu: Plan · Free · Surprise me | Cardio · Activity | Travel mode. The exercise ⋮ menu's popover,
+// anchored under the button; a check marks the current mode. Escape closes it and puts focus back on the button.
+(function(){
+  const btn=$("wkModeBtn"), pop=$("wkMenu"); if(!btn || !pop) return; let open=false, builtAt=0;
+  const sv=d=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+d+'</svg>';
+  const IC={
+    plan:sv('<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>'),
+    free:sv('<path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/>'),
+    surprise:sv('<rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/><circle cx="15" cy="15" r="1.2" fill="currentColor"/><circle cx="15" cy="9" r="1.2" fill="currentColor"/><circle cx="9" cy="15" r="1.2" fill="currentColor"/>'),
+    cardio:sv('<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/>'),
+    activity:sv('<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6a9 9 0 0 1 0 12.8M18.4 5.6a9 9 0 0 0 0 12.8"/>'),
+    travel:sv('<path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l5.2 4.2-2 4-2-1-1 1 3 2 2 3 1-1-1-2 4-2 4.2 5.2a.5.5 0 0 0 .8-.4z"/>'),
+    check:'<svg class="mck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>'
+  };
+  const ROWS=[["plan","Plan"],["free","Free"],["surprise","Surprise me"],null,["cardio","Cardio"],["activity","Activity"],null,["travel","Travel mode"]];
+  const close=refocus=>{ if(!open) return; open=false; pop.classList.remove("show"); pop.innerHTML=""; btn.setAttribute("aria-expanded","false");
+    if(refocus) btn.focus({preventScroll:true}); };
+  window.closeWkMenu=close;
+  function pick(k){
+    if(k==="travel"){ openTravel(); const f=document.querySelector("#travelSeg .s.active") || $("travelClose"); if(f) f.focus({preventScroll:true}); return; }
+    if(k==="cardio" || k==="activity"){ if(k!==trainMode) setTrainMode(k); return; }
+    if(trainMode!=="strength") setTrainMode("strength");
+    setStartMode(k);
+  }
+  function build(){
+    const k=wkModeKey(), tvOn=(settings.travelMode||"off")!=="off";
+    pop.innerHTML=ROWS.map(r=> !r ? '<div class="mdiv" role="separator"></div>'
+      : r[0]==="travel" ? '<button type="button" class="mi" role="menuitem" data-k="travel">'+IC.travel+'<span>'+r[1]+'</span><span class="mstate">'+(tvOn?"On":"Off")+'</span></button>'
+      : '<button type="button" class="mi" role="menuitemradio" aria-checked="'+(r[0]===k)+'" data-k="'+r[0]+'">'+IC[r[0]]+'<span>'+r[1]+'</span>'+(r[0]===k?IC.check:'')+'</button>').join("");
+    pop.querySelectorAll(".mi").forEach(el=> el.onclick=()=>{ const v=el.dataset.k; close(v!=="travel"); if(v!==k || v==="travel") pick(v); });
+    // measure off-screen, then anchor the right edge to the button
+    pop.style.visibility="hidden"; pop.classList.add("show"); open=true; builtAt=Date.now(); btn.setAttribute("aria-expanded","true");
+    const r=btn.getBoundingClientRect(), mw=pop.offsetWidth, mh=pop.offsetHeight;
+    let top=r.bottom+6; if(top+mh > window.innerHeight-8) top=Math.max(8, r.top-mh-6);
+    pop.style.left=Math.max(8, r.right-mw)+"px"; pop.style.top=top+"px"; pop.style.visibility="";
+    (pop.querySelector('.mi[aria-checked="true"]') || pop.querySelector(".mi")).focus({preventScroll:true});
+  }
+  btn.onclick=e=>{ e.stopPropagation(); open ? close(true) : build(); };
+  pop.addEventListener("keydown", e=>{
+    const items=[...pop.querySelectorAll(".mi")], n=items.length, i=items.indexOf(document.activeElement);
+    if(e.key==="Tab"){ e.preventDefault(); close(true); return; }
+    const j = e.key==="ArrowDown" ? (i+1)%n : e.key==="ArrowUp" ? (i-1+n)%n : e.key==="Home" ? 0 : e.key==="End" ? n-1 : -1;
+    if(j>=0){ e.preventDefault(); items[j].focus({preventScroll:true}); }
+  });
+  document.addEventListener("keydown", e=>{ if(open && e.key==="Escape"){ e.preventDefault(); close(true); } });
+  document.addEventListener("click", e=>{ if(open && !e.target.closest("#wkMenu") && !e.target.closest("#wkModeBtn")) close(false); });
+  // any scroll dismisses it, except the one that focusing the button can set off just as the menu opens;
+  // if focus is in the menu, it goes back to the button
+  document.addEventListener("scroll", ()=>{ if(open && Date.now()-builtAt>150) close(pop.contains(document.activeElement)); }, true);
+})();
 document.querySelectorAll("#travelSeg .s").forEach(s=>{
   s.onclick=async()=>{ if(s.dataset.tv===(settings.travelMode||"off")) return;   // no change → don't reset the clock
     travelAccrue();                       // bank the time spent in the context you're leaving
     settings.travelMode=s.dataset.tv; await sset("settings",settings); renderTravel();
-    toast(settings.travelMode==="off" ? "Back home — sessions log as normal." : "Travel mode on — "+TRAVEL_LBL[settings.travelMode].toLowerCase()+". An ✈ badge stays on every page until you switch back."); };
+    toast(settings.travelMode==="off" ? "Back home — sessions log as normal." : "Travel mode on — "+TRAVEL_LBL[settings.travelMode].toLowerCase()+"."); };
 });
-renderTravel();   // boot: reflect any saved travel mode in the badge + header button immediately
+renderTravel();   // boot: reflect any saved travel mode on the Workout mode button immediately
 
 // ================= free workout =================
 // Alternate spellings of a movement the picker already lists under another name. They stay valid
@@ -6578,13 +6639,11 @@ function buildFreeGroup(name){
 function renderFree(){
   if(typeof renderTravelBanner==="function") renderTravelBanner();
   const _fd=draft["free"], spon=!!(_fd && _fd.spon);
-  if(spon){ $("ltName").textContent=_fd.name||"Suggested session"; $("planSub").textContent="Suggested session"; }
-  else { $("ltName").textContent="Free workout"; $("planSub").textContent="Free workout — choose your exercises"; }
   const list=$("exlist"); list.innerHTML=""; list.classList.toggle("norise", _noRise); _noRise=false;
   const hint=document.createElement("p"); hint.className="freehint";
   hint.textContent = spon
     ? "Suggested session — picked from your recent training. Tweak anything, then log your sets."
-    : "A one-off session. Add any exercises you like — grouped by muscle, logged to history just like a plan workout.";
+    : "Grouped by muscle and saved to history like a plan workout.";
   list.appendChild(hint);
   const addBtn=document.createElement("button"); addBtn.className="btn tinted wide"; addBtn.id="addExBtn";
   addBtn.innerHTML=ICON.plus+"Add exercise"; addBtn.onclick=()=>openAdd("free"); list.appendChild(addBtn);
@@ -7672,8 +7731,8 @@ function renderCardioChips(){
   const imp=$("cdImport"); if(imp) imp.style.display = cdCat==="cardio" ? "" : "none";
   if(cdCat!=="cardio" && cdRoute) clearCardioRoute();
   const intro=$("cdIntro"); if(intro) intro.innerHTML = cdCat==="cardio"
-    ? "Log cardio &amp; conditioning. Tracked on its own — by minutes and effort zone — separate from your muscle-volume balance."
-    : "Log a sport or activity. It counts toward your weekly cardio by how aerobic it is; the strength-y ones (climbing, martial arts) also add a little to your muscle balance.";
+    ? "Tracked by minutes and effort zone, apart from your muscle balance."
+    : "Counts toward cardio by how aerobic it is. Climbing and martial arts add some muscle work.";
   const zw=$("cdZoneChips"); zw.innerHTML="";
   CZONES.forEach(z=>{ const c=document.createElement("button"); c.className="chip"+(cdZone===z.z?" on":"");
     c.innerHTML=z.lbl+' <small class="chipsub">'+z.sub+'</small>';
@@ -7699,20 +7758,16 @@ function renderCardioLog(){
   });
 }
 function renderCardio(){ renderCardioChips(); updateCardioPreview(); renderActCite(); renderCardioLog(); }
-const TRAIN_MODES=["strength","cardio","activity"];
 function setTrainMode(m){ trainMode=m;
-  document.querySelectorAll("#trainTabs .utab").forEach(t=>{ const on=t.dataset.tm===m; t.classList.toggle("active", on); t.setAttribute("aria-pressed", on); });
   const strength = m==="strength";
   $("strengthWrap").style.display = strength ? "" : "none";
   $("cardioPanel").style.display  = strength ? "none" : "";
-  if(startMode()==="plan") renderPlanSub();
+  renderWkHeader();
   if(!strength){ cdCat = (m==="activity") ? "activity" : "cardio";
     if(!actsInCat(cdCat).some(a=>a.n===cdActSel)) cdActSel=actsInCat(cdCat)[0].n;   // keep the picked activity valid for the category
     renderCardio();
   }
 }
-// the tab row under the title: Strength · Cardio · Activity
-document.querySelectorAll("#trainTabs .utab").forEach(t=> t.onclick=()=>{ if(TRAIN_MODES.includes(t.dataset.tm) && t.dataset.tm!==trainMode) setTrainMode(t.dataset.tm); });
 ["cdDist","cdTime","cdPace"].forEach(id=> $(id).addEventListener("input", cdRunCalc));
 $("cdMin").addEventListener("input", updateCardioPreview);
 $("cdLog").onclick=()=>{
@@ -10544,7 +10599,7 @@ function segPick(row, tgt){
     || document.querySelectorAll(SEG_ROW)[at] || null;
   if(!r2) return;
   segSync(r2);   // now, not on the observer's next tick, so the option is focusable before it is focused
-  if($("confirmWrap").classList.contains("show")){ $("cYes").focus(); return; }   // the pick asked first (#wkMode mid-session): the question has focus
+  if($("confirmWrap").classList.contains("show")){ $("cYes").focus(); return; }   // the pick asked first: the question has focus
   const now = tgt.isConnected ? tgt : r2.children[k]; if(now) now.focus();
 }
 document.addEventListener("keydown", e=>{
@@ -10556,7 +10611,7 @@ document.addEventListener("keydown", e=>{
     : e.key==="Home" ? 0 : e.key==="End" ? n-1 : -1;
   if(j<0 || j===i) return;
   e.preventDefault(); const tgt=opts[j];
-  if(tgt.classList.contains("active")){ segSync(row); tgt.focus(); return; }   // never re-click a picked option (#wkMode's Surprise reshuffles)
+  if(tgt.classList.contains("active")){ segSync(row); tgt.focus(); return; }   // never re-click a picked option
   segPick(row, tgt);
 });
 

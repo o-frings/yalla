@@ -19,7 +19,7 @@
     /* thin fills with no label (progress bars, the tab underline, dots): --accent → its second hue at text strength */
     --accent-b:#e0245a;
     --grad-line:linear-gradient(90deg,var(--accent) 0%,var(--accent) var(--grad-hold),var(--grad-mid),var(--accent-b) 100%);
-    /* the page glow (body::before): three pools in the accent's two hues. It is stronger than the button tints, so
+    /* the page glow (body::before, light only): three pools in the accent's two hues. It is stronger than the button tints, so
        secondary text that sits on the page takes --l2-page (a step darker than --l2, light only) to keep ≥4.5:1 */
     --glow-a:color-mix(in srgb, var(--grad-a) 21%, transparent);
     --glow-b:color-mix(in srgb, var(--grad-b) 16%, transparent);
@@ -34,7 +34,7 @@
     --tint:linear-gradient(135deg, var(--tint-a), var(--tint-b));
     --tint-line:color-mix(in srgb, var(--grad-a) calc(var(--tint-p) * 1.6), transparent);
     /* surfaces that carry the colour now that titles, numbers and labels are ink: --wash on the hero cards and the Me
-       stats band, --disc behind chevrons and header/tile icons (an accent glyph on it, ≥3:1) */
+       stats band, --disc behind tile icons (an accent glyph on it, ≥3:1) */
     --wash:linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 14%, transparent), color-mix(in srgb, var(--grad-b) 10%, transparent));
     --disc-p:var(--tint-p);
     --disc:color-mix(in srgb, var(--grad-a) var(--disc-p), var(--card));
@@ -44,7 +44,7 @@
     --track-tint:color-mix(in srgb, var(--grad-a) 16%, var(--track));   /* progress tracks carry a little of the accent */
     --grad-bar:linear-gradient(90deg, var(--grad-a), var(--grad-b));   /* progress fills, day dots, the tab underline: the fill's two hues */
     --l2-tint:#55555a;   /* secondary text on a tinted button or option card (--l2 drops under 4.5:1 there) */
-    /* the frosted bars (status, sticky timers, tab bar) pick up the glow's hue, so they don't read as a grey band */
+    /* the frosted bars (status, sticky timers, tab bar) pick up the glow's hue, so they don't read as a grey band (neutral in dark) */
     --bar-top:color-mix(in srgb, color-mix(in srgb, var(--grad-a) 8%, var(--bg)) 88%, transparent);
     --bar-bottom:color-mix(in srgb, color-mix(in srgb, var(--grad-b) 5%, var(--bg)) 88%, transparent);
     --accent-hi:#ff7a3a;     /* accent on the always-dark toast (the reduced-motion ✦) */
@@ -98,10 +98,13 @@
     --sep:rgba(84,84,88,.45);
     --accent:#ff7a3a; --accent-soft:rgba(255,122,58,.16);
     --accent-fill:#e8551c; --accent-b:#ff5a84;
-    --glow-a:color-mix(in srgb, var(--grad-a) 30%, transparent);
-    --glow-b:color-mix(in srgb, var(--grad-b) 22%, transparent);
-    --glow-c:color-mix(in srgb, var(--grad-a) 14%, transparent);
     --l2-page:var(--l2); --red-page:var(--red);
+    /* no page glow in dark: only the title area carries a faint wash of the accent's two hues (.largeTitle::before),
+       and the status, sticky timer and tab bars stay neutral */
+    --hdr-a:color-mix(in srgb, var(--grad-a) 13%, transparent);
+    --hdr-b:color-mix(in srgb, var(--grad-b) 10%, transparent);
+    --bar-top:color-mix(in srgb, var(--bg) 88%, transparent);
+    --bar-bottom:color-mix(in srgb, var(--bg) 88%, transparent);
     --tint-p:30%; --disc-p:22%;   /* a lighter disc in dark, so it reads as a glow, not a brown dot */
     --seg-line:color-mix(in srgb, var(--grad-a) 30%, transparent);
     --track-tint:color-mix(in srgb, var(--grad-a) 22%, var(--track)); --l2-tint:#b8b8bd;   /* 4.7:1 or more on the 30% tint over --row and --card */
@@ -144,7 +147,6 @@
     --accent:#ff80b8; --accent-soft:rgba(244,55,154,.20); --accent-glow:rgba(255,128,184,.42); --accent-fill:#e63b96;
     --accent-b:#ff8f6b; --grad-read-a:var(--grad-a); --grad-read-b:var(--grad-b);
     --grad-line:linear-gradient(90deg,var(--accent) 0%,var(--accent) var(--grad-hold),var(--grad-mid),var(--accent-b) 100%);
-    --glow-a:rgba(244,55,154,.28); --glow-b:rgba(255,128,96,.20); --glow-c:rgba(177,136,223,.16);
     --glit-1:#ff80b8; --glit-2:#ff8f6b; --glit-3:#d8bcfa; --glit-4:#ffe9f3; --glit-5:#eebeae; --glit-6:#ffa9cc;
     --cel-1:#ff80b8; --cel-2:#ff8f6b; --cel-3:#ffc2df; --cel-4:#f4379a; --cel-5:#d8bcfa; --cel-6:#eebeae;
     --spark-1:#ffffff; --spark-2:#f2c0a8; --spark-3:#ffe9f3;   /* white, rose gold, pearl */
@@ -190,8 +192,7 @@
     --grad-a:#f2f2f7; --grad-b:#c4ccd8;   /* light button, dark label */
     --accent-b:#b4c0d0;
     --on-accent:#1c1c1e;
-    --glow-a:color-mix(in srgb, var(--grad-a) 10%, transparent); --glow-b:color-mix(in srgb, var(--grad-b) 8%, transparent);
-    --glow-c:color-mix(in srgb, var(--grad-a) 5%, transparent);
+    --hdr-a:color-mix(in srgb, var(--grad-a) 7%, transparent); --hdr-b:color-mix(in srgb, var(--grad-b) 6%, transparent);   /* near-white hues: a lighter touch */
     --tint-p:20%;
     --l2-tint:#c7c7cc;   /* its light 18% tint brightens the surface: secondary text needs a lighter grey for 4.5:1 */
     --cel-1:#d1d1d6; --cel-2:#b4c0d0; --cel-3:#efeff1; --cel-4:#8e9bb0; --cel-5:#ffd60a; --cel-6:#fff8e7; }
@@ -218,6 +219,16 @@
       radial-gradient(90% 34% at 30% 78%, var(--glow-c) 0%, transparent 70%),
       var(--bg);
     transition:background .25s ease; }
+  html.dark body::before{ background:var(--bg); }
+  /* dark: the title area's wash. Flat from above the top (so a pull-down shows no edge) to just under the title's
+     first line, then a fade to nothing at the title's foot, before the first card */
+  html.dark .largeTitle{ position:relative; }
+  html.dark .largeTitle::before{ content:""; position:absolute; z-index:-1; left:-16px; right:-16px; top:-120px; bottom:-8px; pointer-events:none;
+    background:linear-gradient(100deg, var(--hdr-a) 0%, var(--hdr-a) 25%, var(--hdr-b) 100%);
+    -webkit-mask-image:linear-gradient(180deg, #000 0, #000 calc(120px + env(safe-area-inset-top) + 28px), transparent 100%);
+    mask-image:linear-gradient(180deg, #000 0, #000 calc(120px + env(safe-area-inset-top) + 28px), transparent 100%); }
+  /* mid-session the title shrinks to the plan line under the neutral sticky timer bar: no wash, so no tinted band */
+  html.dark body.training .largeTitle::before{ display:none; }
 
   /* ===== card system: the only place card chrome is declared, so later modifiers win ===== */
   .sheet{ --surface:var(--row); --surface-line:transparent; --surface-shadow:none; --surface-r:var(--r-md); }
@@ -369,11 +380,6 @@
   .gymnew{ flex:0 0 auto; width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; border-radius:var(--r-sm); border:none; background:var(--tint), var(--surface); color:var(--ink); cursor:pointer; }
   .gymnew svg{ width:18px; height:18px; }
   .gymnew:active{ transform:scale(.92); }
-  /* header controls: plain accent glyphs, no disc or pill (iOS nav-bar style); 44px hit boxes */
-  .modebtn{ flex:0 0 auto; align-self:center; display:inline-flex; align-items:center; justify-content:center; gap:0; background:none; color:var(--disc-ink); border:none; font-family:inherit; padding:4px; border-radius:var(--r-sm); cursor:pointer; line-height:1; transition:transform .12s, opacity .12s; -webkit-tap-highlight-color:transparent; }
-  .modebtn:active{ transform:scale(.86); opacity:.7; }
-  .modebtn .mic{ width:23px; height:23px; flex:0 0 auto; }
-  .travelbtn.on .mic{ fill:currentColor; }   /* travel mode on: the plane fills in */
   .ic{ width:16px; height:16px; vertical-align:-3px; }
   .btn .ic{ margin-right:8px; }
   .swapnote .ic{ width:13px; height:13px; vertical-align:-2px; margin-right:4px; }
@@ -383,31 +389,38 @@
  .largeTitle{ font-size:var(--t-xxl); font-weight:var(--w-bold); letter-spacing:-1px; padding: calc(env(safe-area-inset-top) + 12px) 0 16px; }
   .largeTitle .ltmain{ display:flex; align-items:center; gap:12px; }
   .largeTitle .ltmain .titleBtn{ flex:1; min-width:0; line-height:1.08; }
-  /* Workout is a working screen — the training leads, not the program name. Demote the plan title to a
-     quiet label (still tappable to open Plans) and tighten the header so the first set sits higher. */
-  /* the current session lives in the day toggle below, so the top needs no title: a slim bar of just
-     the travel + mode controls, right-aligned. */
-  /* the session is the title (fills the top-left); mins·moves the subtitle; controls sit on the right */
+  /* Workout: today's workout is the title (top-left), one short line under it, the mode button on the right */
   #largeTitle{ padding: calc(env(safe-area-inset-top) + 12px) 0 16px; }
   #largeTitle .wktitle{ display:block; font-weight:var(--w-bold); color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #largeTitle small{ display:block; font-size:var(--t-sm); margin-top:4px; }
   #largeTitle .ltmain{ gap:12px; align-items:center; }
+  /* the one mode button (Plan ⌄ · Free ⌄ · Surprise ⌄ · Cardio ⌄ · Activity ⌄): a tinted pill, ink label, accent chevron.
+     32px to the eye; the ::before makes a 44px tap box. A small ✈ leads the label while travel mode is on */
+  .wkmodebtn{ position:relative; z-index:1; flex:0 0 auto; align-self:center; display:inline-flex; align-items:center; gap:4px; height:32px; padding:0 10px 0 12px;
+    border:0; border-radius:var(--r-pill); background:var(--tint), var(--surface); color:var(--ink); font:inherit; font-size:var(--t-sm); font-weight:var(--w-semi); letter-spacing:0;
+    line-height:1; white-space:nowrap; cursor:pointer; -webkit-appearance:none; appearance:none; -webkit-tap-highlight-color:transparent; transition:opacity .12s; }
+  .wkmodebtn::before{ content:""; position:absolute; inset:-6px -4px; }
+  .wkmodebtn:active{ opacity:.6; }
+  .wkm-chev{ width:13px; height:13px; flex:0 0 auto; color:var(--disc-ink); }
+  .wkm-tv{ display:none; width:14px; height:14px; flex:0 0 auto; margin-right:1px; color:var(--disc-ink); }
+  .wkmodebtn.tv .wkm-tv{ display:block; }
+  /* the mode menu: the ⋮ menu's popover, with dividers between start modes, logs and travel */
+  .wkmenu{ min-width:208px; transform-origin:top right; }
+  .wkmenu .mdiv{ height:.5px; margin:4px 12px; background:var(--sep); }
+  .wkmenu .mi span{ flex:1; }
+  .wkmenu .mi .mck{ width:17px; height:17px; }
+  .wkmenu .mi .mstate{ flex:0 0 auto; font-size:var(--t-sm); font-weight:var(--w-med); color:var(--l2); }
+  .wkmenu .mi:focus-visible{ outline:2px solid var(--disc-ink); outline-offset:-2px; }
   /* Plan mode: the plan's name opens the Plans sheet (ink name + accent chevron; 44px tap box around the line) */
   .plansw{ position:relative; display:inline-flex; align-items:center; gap:3px; max-width:100%; vertical-align:bottom; background:none; border:0; padding:0; font:inherit; font-weight:var(--w-semi); color:var(--ink); cursor:pointer; -webkit-appearance:none; appearance:none; -webkit-tap-highlight-color:transparent; }
-  .plansw::before{ content:""; position:absolute; inset:-18px -8px -10px; }   /* grows up into the title's gap, clear of the tab row below */
+  .plansw::before{ content:""; position:absolute; inset:-24px -8px -5px; }   /* 44px: grows up into the title's line, clear of the day tabs' tap boxes below (the mode button sits above it) */
   .plansw:active{ opacity:.55; }
   .plansw-nm{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .plansw-chev{ width:14px; height:14px; flex:0 0 auto; color:var(--disc-ink); }
   .plansw:disabled{ cursor:default; opacity:1; color:inherit; font-weight:inherit; }   /* mid-session it's plain text */
   .plansw:disabled .plansw-chev{ display:none; }
-  /* Strength · Cardio · Activity: the page's top tabs, on a hairline so they read apart from the day tabs below */
-  #trainTabs{ flex-wrap:nowrap; gap:var(--s5); margin:0 0 var(--s4); border-bottom:.5px solid var(--sep); }
-  #trainTabs .utab{ font-size:var(--t-md); padding-bottom:8px; }
-  #trainTabs .utab::before{ top:-6px; }   /* still a 44px+ box; leaves room for the plan name's tap box above */
-  /* 44px hit boxes, same glyph spacing; the last glyph lands on the 16px gutter */
-  #largeTitle .modebtn{ padding:11px; margin:-7px; } #largeTitle .ltmain > .modebtn:last-child{ margin-right:-11px; }
   .largeTitle .ltmain .wktitle{ flex:1; min-width:0; line-height:1.12; }
-  #strengthWrap > #seg{ margin:-11px 0 3px; }   /* same spot as before (the top margin collapses with #wkMode's 15px); the 11px padding keeps the tabs' tap boxes inside the scroller's clip */
+  #strengthWrap > #seg{ margin:-11px 0 3px; }   /* the 11px padding keeps the tabs' tap boxes inside the scroller's clip; the negative margin gives it back */
   /* Two ways to start the workout, as a pair: Suggest (primary) + Choose a plan (secondary) */
   .startrow{ display:flex; gap:10px; margin:0 0 16px; }
   .startrow .btn{ flex:1; display:flex; align-items:center; justify-content:center; gap:8px; font-size:var(--t-md); font-weight:var(--w-semi); padding-left:10px; padding-right:10px; min-width:0; }
@@ -417,8 +430,6 @@
   body.training #largeTitle{ padding-bottom:0; }
   body.training #largeTitle .ltmain{ display:none; }
   body.training #pageWorkout .startrow,
-  body.training #pageWorkout #trainTabs,
-  body.training #pageWorkout #wkMode,
   body.training #pageWorkout #startAction,
   body.training #pageWorkout #seg{ display:none; }
   /* the day / length tabs underneath are the second tier — keep them close so the two read as one block */
@@ -431,9 +442,9 @@
   .surprow{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--s2) var(--s4); margin:2px 0 14px; }
   #pageWorkout .surprow #sponLen2{ margin:0; }
   .surpnew{ position:relative; font-family:inherit; -webkit-tap-highlight-color:transparent; }
-  .plansw-part{ white-space:nowrap; } .plansw-part::before{ content:" · "; }   /* "3 days" never splits; the separator rides with its part */
   .surpnew::before{ content:""; position:absolute; inset:-6px 0; }   /* 44px tap box */
   .surpnew{ display:inline-flex; align-items:center; gap:6px; } .surpnew svg{ width:15px; height:15px; flex:0 0 auto; }
+  @media (max-width:359px){ .surprow{ gap:var(--s2) var(--s3); } .surpnew svg{ display:none; } }   /* keep length tabs + New surprise on one row at 320 */
   /* plan mode's secondary action, kept as light as surprise mode's controls */
   .planlink{ display:inline-flex; align-items:center; gap:7px; background:none; border:none; font:inherit; font-size:var(--t-md); font-weight:var(--w-semi); color:var(--ink); padding:10px 2px 4px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
   .planlink svg{ width:16px; height:16px; flex:0 0 auto; }
@@ -463,7 +474,6 @@
   .navlink{ display:flex; align-items:center; justify-content:space-between; width:100%; background:var(--tint), var(--row); border:none; color:var(--ink); cursor:pointer; padding:14px 16px; border-radius:var(--r-md); font-size:var(--t-md); font-weight:var(--w-semi); transition:opacity .12s; }
   .navlink:active{ opacity:.6; }
   .navlink .nlsub{ color:var(--l2-tint); font-weight:var(--w-med); font-size:var(--t-sm); margin-left:8px; }
-  .navlink .ovchev{ color:var(--accent); }
   /* ===== social layer: avatars, presence rail, profiles ===== */
   .avatar{ position:relative; flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; overflow:hidden; color:#fff; font-weight:var(--w-bold); line-height:1; letter-spacing:.3px; box-shadow:inset 0 0 0 .5px rgba(255,255,255,.22); user-select:none; }
   .avatar svg{ display:block; }
@@ -481,7 +491,7 @@
   .railhdr{ display:flex; justify-content:space-between; align-items:center; margin:2px 0 10px; }
   .railall{ font-size:var(--t-sm); font-weight:var(--w-semi); color:var(--ink); cursor:pointer; position:relative; -webkit-tap-highlight-color:transparent;
     background:var(--tint), var(--surface); border-radius:var(--r-pill); padding:4px 8px 4px 10px; margin:-4px -2px; }   /* a tinted pill: the colour is the surface */
-  .railall .ovchev{ width:14px; height:20px; margin-left:2px; background:none; color:var(--disc-ink); }
+  .railall .ovchev:not(.lnkchev){ width:14px; height:20px; margin-left:2px; background:none; color:var(--disc-ink); }   /* beats the card-chevron rule below */
   .railall:active{ opacity:.6; }
   .railcta{ display:inline-flex; align-items:center; gap:4px; position:relative; font-size:var(--t-md); font-weight:var(--w-semi); color:var(--ink); cursor:pointer; padding:6px 4px 16px; }
   .pr-av, .av-st{ position:relative; display:inline-flex; flex:0 0 auto; }
@@ -619,8 +629,8 @@
   .ovchev,.tsum-chev,.injchev{ font-size:0; display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; width:14px; height:20px; vertical-align:middle; color:var(--l3); }
   .ovchev::before,.tsum-chev::before,.injchev::before{ content:""; width:8px; height:8px; border:solid currentColor; border-width:2px 2px 0 0; transform:translateX(-2px) rotate(45deg); }
   .ovchev{ margin-left:8px; }
-  /* a card or tile that opens something: the accent chevron sits on a tinted disc (the colour is the surface) */
-  .ovchev:not(.lnkchev), .metile.tap .tsum-chev, #ovStars .tsum-chev{ width:26px; height:26px; border-radius:50%; background:var(--disc); color:var(--disc-ink); }
+  /* a card or tile that opens something: a plain grey chevron (iOS list style) in a 26px box, so it keeps its place */
+  .ovchev:not(.lnkchev), .metile.tap .tsum-chev, #ovStars .tsum-chev{ width:26px; height:26px; color:var(--l3); }
   .ovchev:not(.lnkchev)::before, .metile.tap .tsum-chev::before, #ovStars .tsum-chev::before{ transform:translateX(-1px) rotate(45deg); }
   .lnkchev{ width:10px; height:14px; margin-left:3px; color:var(--accent); vertical-align:-1px; } .lnkchev::before{ width:6px; height:6px; border-width:1.75px 1.75px 0 0; }   /* small drawn chevron that ends a text link: the link's one accent mark */
   .ovtodo li.ovtap .ovchev{ position:absolute; right:0; top:50%; transform:translateY(-50%); }
@@ -1069,15 +1079,6 @@
   .seg.appearance{ margin:8px 0 4px; }
   .setcard .seg, .bopt[data-k=freq], .sttarget{ gap:6px; }
   .seg[hidden]{ display:none; }
-  /* How you start (Free · Plan · Surprise me): on the page, so the idle label takes --l2-page. 38px to the eye, a 44px
-     tap box; a glyph per option (dumbbell, calendar, die) in ink, the picked one in the accent */
-  #wkMode{ margin:var(--s1) 0 15px; }   /* 15: the day tabs' tap boxes reach 11px up; this keeps both 44px boxes clear */
-  #wkMode > .s{ min-height:38px; color:var(--l2-page); }
-  #wkMode > .s::before{ content:""; position:absolute; inset:-3px 0; }
-  #wkMode > .s svg{ color:var(--ink); transition:color .18s ease; }
-  #wkMode > .s.active{ color:var(--ink); }
-  #wkMode > .s.active svg{ color:var(--disc-ink); }
-  @media (max-width:359px){ #wkMode > .s{ flex-basis:auto; padding:0 6px; gap:5px; } }   /* 320px: "Surprise me" takes the room it needs */
   /* inline in a settings row (Sex, Lifting experience): sized to the label, 32px to the eye */
   .sexseg{ gap:6px; }
   .sexseg > .s{ flex:0 0 auto; min-height:32px; padding:0 14px; }

@@ -61,18 +61,15 @@
 <div class="largeTitle" id="largeTitle">
   <div class="ltmain">
     <span class="wktitle"><span id="ltName">Workout</span></span>
-    <!-- travel mode quick-access — one tap to tag sessions when you're away from your usual gym -->
-    <button class="modebtn travelbtn" id="travelQuick" type="button" aria-label="Travel mode">
-      <svg class="mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l5.2 4.2-2 4-2-1-1 1 3 2 2 3 1-1-1-2 4-2 4.2 5.2a.5.5 0 0 0 .8-.4z"/></svg>
+    <!-- one mode button: shows what you're doing (Plan · Free · Surprise · Cardio · Activity) and opens the mode menu,
+         which also holds Travel mode. A small ✈ rides on it while travel mode is on. -->
+    <button class="wkmodebtn" id="wkModeBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="wkMenu">
+      <svg class="wkm-tv" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l5.2 4.2-2 4-2-1-1 1 3 2 2 3 1-1-1-2 4-2 4.2 5.2a.5.5 0 0 0 .8-.4z"/></svg>
+      <span id="wkModeLbl">Plan</span>
+      <svg class="wkm-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
     </button>
   </div>
   <small id="planSub"></small>
-</div>
-<!-- what you're training: strength (plan / free / surprise) or a cardio / activity log -->
-<div class="utabs" id="trainTabs" role="group" aria-label="Training type">
-  <button class="utab active" data-tm="strength" type="button" aria-pressed="true">Strength</button>
-  <button class="utab" data-tm="cardio" type="button" aria-pressed="false">Cardio</button>
-  <button class="utab" data-tm="activity" type="button" aria-pressed="false">Activity</button>
 </div>
 
 <!-- DELOAD (only when due) -->
@@ -86,13 +83,6 @@
 
 <div id="strengthWrap">
 <!-- WORKOUT -->
-<!-- Two ways to start: a data-picked session (leads), or switch the program you're on. -->
-<!-- how you start: a segmented switch — let the app surprise you, or follow your plan -->
-<div class="seg wkseg" id="wkMode" aria-label="How to start">
-  <div class="s" data-wm="free"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/></svg>Free</div>
-  <div class="s" data-wm="plan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Plan</div>
-  <div class="s" data-wm="surprise"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/><circle cx="15" cy="15" r="1.2" fill="currentColor"/><circle cx="15" cy="9" r="1.2" fill="currentColor"/><circle cx="9" cy="15" r="1.2" fill="currentColor"/></svg>Surprise me</div>
-</div>
 <div class="utabs" id="seg"></div>
 <div id="startAction"></div>
 <!-- session timer + rest ("pause") timer: pinned to the top of the page once a workout's underway.
@@ -170,7 +160,7 @@
 
 <!-- CARDIO PANEL — logged here, tracked on its own minutes/zone axis (not muscle volume) -->
 <div id="cardioPanel" style="display:none;">
-  <p class="levelcap" id="cdIntro" style="margin:0 0 12px;">Log cardio &amp; conditioning. Tracked on its own — by minutes and effort zone — and kept separate from your muscle-volume balance.</p>
+  <p class="levelcap" id="cdIntro" style="margin:0 0 12px;">Tracked by minutes and effort zone, apart from your muscle balance.</p>
   <button class="btn tinted wide" id="cdImport" type="button" style="margin-bottom:12px;"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M8 8l4-4 4 4M5 20h14"/></svg>Import route (GPX)</button>
   <input type="file" id="cdGpx" accept=".gpx,application/gpx+xml,application/octet-stream" style="display:none;">
   <div id="cdRoutePrev" style="display:none;margin-bottom:4px;"></div>
@@ -207,6 +197,7 @@
 </div><!-- /pageWorkout -->
 
 <div class="exmenu-pop" id="exMenu"></div>
+<div class="exmenu-pop wkmenu" id="wkMenu" role="menu" aria-label="Workout mode"></div>
 <div class="toast" id="toast"></div>
 <div class="notif" id="msgNotif"></div><!-- sleek in-app message banner (slides from top); built by showMsgNotif() -->
 <label id="hapticL" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;"><input type="checkbox" id="hapticS" switch tabindex="-1"></label><!-- iOS 17.4+ best-effort haptic: toggling a switch buzzes (no web Vibration API on iOS) -->
@@ -490,7 +481,7 @@
         </div>
 
         <div class="ed-label">Travel mode</div>
-        <p class="levelcap" style="margin:0 0 8px;">Tag sessions while you're away so you can see how travel shifts your training. Quickest from the ✈ in the Workout header; while it's on, an ✈ badge stays pinned to every page.</p>
+        <p class="levelcap" style="margin:0 0 8px;">Tag sessions while you're away so you can see how travel shifts your training. Quickest from the mode button at the top of Workout; while it's on, an ✈ shows on that button.</p>
         <button class="btn tinted wide" id="openTravelBtn" type="button">Manage travel mode</button>
       </div>
     </details>
@@ -1120,13 +1111,13 @@
   </div>
 </div>
 
-<!-- TRAVEL MODE QUICK SHEET — one tap from the Workout header or the ✈ badge -->
+<!-- TRAVEL MODE QUICK SHEET — from the Workout mode menu or Settings -->
 <div class="scrim" id="scrimTravel"></div>
 <div class="sheet" id="sheetTravel">
   <div class="grabber"></div>
   <div class="sheethdr"><span class="t">Travel mode</span><button class="btn plain sm" id="travelClose">Done</button></div>
   <div class="sheetbody">
-    <p class="sheetintro">Away from your usual gym? Tag your sessions so you can see how travel shifts your training. An ✈ badge stays pinned to every page while it's on — tap it to come back here.</p>
+    <p class="sheetintro">Away from your usual gym? Tag your sessions so you can see how travel shifts your training. While it's on, an ✈ shows on the Workout mode button.</p>
     <div class="seg appearance" id="travelSeg" aria-label="Where you are training">
       <div class="s" data-tv="off">Home</div>
       <div class="s" data-tv="gym">Full gym</div>
