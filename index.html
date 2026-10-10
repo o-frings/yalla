@@ -23,6 +23,15 @@
   var a=localStorage.getItem('yallaAccent');   // accent picker: set before first paint so there is no orange flash
   if(a==='pink'||a==='blue'||a==='teal'||a==='graphite') de.setAttribute('data-accent', a);
   // status-bar colour is handled by the media-query theme-color metas above (iOS reads those at launch)
+  // a fresh, loose scatter of 4–6 faint glows on each launch: one per cell of a jittered 2×3 grid (so they never
+  // pile up), a few cells left empty, each an ellipse in one of the accent's two hues
+  var g=[], cells=[0,1,2,3,4,5].sort(function(){ return Math.random()-.5; }).slice(0, 4+Math.floor(Math.random()*3));
+  cells.forEach(function(c){
+    var x=(c%2)*50+8+Math.random()*34, y=Math.floor(c/2)*33+6+Math.random()*24;
+    var w=42+Math.random()*30, h=22+Math.random()*16, p=(6+Math.random()*6).toFixed(1), hue=Math.random()<.5?'a':'b';
+    g.push('radial-gradient('+w.toFixed(0)+'% '+h.toFixed(0)+'% at '+x.toFixed(0)+'% '+y.toFixed(0)+'%, color-mix(in srgb, var(--grad-'+hue+') calc('+p+'% * var(--glow-k)), transparent), transparent 70%)');
+  });
+  de.style.setProperty('--glow', g.join(', '));
 }catch(e){}})();
 (function(){try{
   // native-app feel: block pinch-zoom gestures even in Safari (double-tap zoom handled by touch-action:manipulation)

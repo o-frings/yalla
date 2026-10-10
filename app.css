@@ -44,15 +44,17 @@
     --track-tint:color-mix(in srgb, var(--grad-a) 16%, var(--track));   /* progress tracks carry a little of the accent */
     --grad-bar:linear-gradient(90deg, var(--grad-a), var(--grad-b));   /* progress fills, day dots, the tab underline: the fill's two hues */
     --l2-tint:#55555a;   /* secondary text on a tinted button or option card (--l2 drops under 4.5:1 there) */
-    /* the frosted bars (status, sticky timers, tab bar) are one colour in every scheme: the page background, translucent
-       and blurred, fading into the page at their inner edge instead of ending in a line */
-    /* the page glow: a soft tint of the accent's two hues along the left and right edges, the same top to bottom
-       (no centre spot), so the bars can carry exactly the same gradient and blend in */
-    --side-a:color-mix(in srgb, var(--grad-a) 11%, var(--bg)); --side-b:color-mix(in srgb, var(--grad-b) 9%, var(--bg));
-    --page:linear-gradient(90deg, var(--side-a) 0%, var(--bg) 40%, var(--bg) 60%, var(--side-b) 100%);
-    --bar:linear-gradient(90deg, color-mix(in srgb, var(--side-a) 86%, transparent) 0%, color-mix(in srgb, var(--bg) 86%, transparent) 40%,
-      color-mix(in srgb, var(--bg) 86%, transparent) 60%, color-mix(in srgb, var(--side-b) 86%, transparent) 100%);
-    --bar-top:var(--bar); --bar-bottom:var(--bar);
+    /* the frosted bars (status, sticky timers, tab bar): the page background, translucent and blurred, fading into the
+       page at their inner edge instead of ending in a line */
+    /* the page glow: a loose scatter of soft patches in the accent's two hues, faint, behind everything. The head
+       script draws a fresh scatter on each launch (--glow); this is the fallback. --glow-k scales it per theme.
+       The status and tab bars paint the same scatter, sized to the viewport, so they blend into the page. */
+    --glow-k:1;
+    --glow:radial-gradient(60% 34% at 18% 22%, color-mix(in srgb, var(--grad-a) calc(10% * var(--glow-k)), transparent), transparent 70%),
+      radial-gradient(52% 30% at 84% 46%, color-mix(in srgb, var(--grad-b) calc(9% * var(--glow-k)), transparent), transparent 70%),
+      radial-gradient(64% 32% at 30% 80%, color-mix(in srgb, var(--grad-b) calc(8% * var(--glow-k)), transparent), transparent 70%);
+    --bar-base:color-mix(in srgb, var(--bg) 86%, transparent);
+    --bar-top:var(--glow), var(--bar-base); --bar-bottom:var(--glow), var(--bar-base);
     --bar-fade:16px;
     --accent-hi:#ff7a3a;     /* accent on the always-dark toast (the reduced-motion ✦) */
     --accent-hi-b:#ff5a68;   /* its second hue: the star sky and the coach card */
@@ -101,7 +103,7 @@
   html.dark{
     color-scheme: dark;
     --bg:#121214; --bg2:#0e0e10; --card:#1f1f22; --row:#2b2b2f; --field:#2e2e32;   /* soft charcoal page, not black; cards a step lighter */
-    --side-a:color-mix(in srgb, var(--grad-a) 7%, var(--bg)); --side-b:color-mix(in srgb, var(--grad-b) 6%, var(--bg));   /* a quieter edge glow on charcoal */
+    --glow-k:.75;   /* a quieter glow on charcoal */
     --ink:#ffffff; --l2:#98989e; --l3:#636366;
     --sep:rgba(84,84,88,.45);
     --accent:#ff7a3a; --accent-soft:rgba(255,122,58,.16);
@@ -213,9 +215,9 @@
   /* Full-window app background. Use top:0 + height:100vh (NOT inset:0) — inset:0's bottom anchors to the
      DYNAMIC viewport, which is briefly short on a standalone cold launch, so the bg would flash short for a
      frame before settling. 100vh (static large viewport) covers the full height from the very first paint.
-     The glow: --page, a soft tint of the accent's two hues along the left and right edges (see :root). */
+     The glow: --glow, a faint scatter of soft patches in the accent's two hues (see :root). */
   body::before{ content:""; position:fixed; top:0; left:0; right:0; height:100vh; z-index:-1; pointer-events:none;
-    background:var(--page);
+    background:var(--glow), var(--bg);
     transition:background .25s ease; }
 
   /* ===== card system: the only place card chrome is declared, so later modifiers win ===== */
@@ -280,7 +282,7 @@
      when active) makes it a sticky, full-bleed frosted bar matching the status/tab bars — applied
      unconditionally so the background can never flicker to transparent over content scrolling under. */
   .timersbar{ margin:-2px 0 16px; }
-  .timersbar.stick{ position:sticky; top:env(safe-area-inset-top); z-index:25; margin:-2px -16px 16px; padding:6px 16px; background:var(--bar-top); box-shadow:0 .5px 0 var(--sep); }
+  .timersbar.stick{ position:sticky; top:env(safe-area-inset-top); z-index:25; margin:-2px -16px 16px; padding:6px 16px; background:var(--bar-base); -webkit-backdrop-filter:blur(24px); backdrop-filter:blur(24px); box-shadow:0 .5px 0 var(--sep); }
   .timerbar{ display:flex; align-items:center; gap:10px; padding:2px 0; margin:0; background:transparent; border:none; box-shadow:none; }
   .tmrbtn{ width:40px; height:40px; flex:0 0 auto; border-radius:50%; border:none; cursor:pointer; background:var(--tint), var(--surface); color:var(--ink); display:inline-flex; align-items:center; justify-content:center; transition:transform .12s; }
   .tmrbtn svg{ width:18px; height:18px; }
@@ -553,7 +555,8 @@
   .artbtn.sel{ border-radius:50%; box-shadow:0 0 0 2.5px var(--card), 0 0 0 5px var(--accent); }
   /* backdrop behind the status-bar clock — slightly translucent (no blur, to match the tab bar and avoid scroll flicker) */
  .statusbar-bg{ position:fixed; top:0; left:0; right:0; height:calc(env(safe-area-inset-top) + var(--bar-fade)); z-index:40; pointer-events:none;
-    background:var(--bar-top); backdrop-filter:blur(24px) saturate(1.4); -webkit-backdrop-filter:blur(24px) saturate(1.4);
+    background:var(--bar-top); background-size:100vw 100vh; background-position:0 0; background-repeat:no-repeat;
+    backdrop-filter:blur(24px) saturate(1.4); -webkit-backdrop-filter:blur(24px) saturate(1.4);
     -webkit-mask-image:linear-gradient(#000 calc(100% - var(--bar-fade)), transparent); mask-image:linear-gradient(#000 calc(100% - var(--bar-fade)), transparent); }
   /* ===== pages + bottom tab bar ===== */
   .page{ display:none; }
@@ -587,7 +590,8 @@
        (iOS HIG pattern). Pre-cold-launch-fix the shell didn't reach the screen bottom so the inset read 0;
        now it reports the real ~34px and the icons clear the home indicator instead of crowding it. */
     padding:calc(12px + var(--bar-fade)) 8px calc(12px + env(safe-area-inset-bottom));
-    background:var(--bar-bottom); backdrop-filter:blur(24px) saturate(1.4); -webkit-backdrop-filter:blur(24px) saturate(1.4);
+    background:var(--bar-bottom); background-size:100vw 100vh; background-position:0 100%; background-repeat:no-repeat;
+    backdrop-filter:blur(24px) saturate(1.4); -webkit-backdrop-filter:blur(24px) saturate(1.4);
     -webkit-mask-image:linear-gradient(transparent, #000 var(--bar-fade)); mask-image:linear-gradient(transparent, #000 var(--bar-fade));
     transition:transform .3s cubic-bezier(.4,0,.2,1); will-change:transform; }
   /* hide/show is scroll-linked from JS (inline transform); see the scroll-linked tab bar IIFE */
