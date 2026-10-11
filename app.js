@@ -191,6 +191,8 @@ const ICON={
   key:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 20 3M16 7l3 3M13.5 9.5l2.5 2.5"/></svg>',
   chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16"/><path d="M7 14l3-3 3 2 4-6"/></svg>',
   play:'<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5.5v13l11-6.5z"/></svg>',
+  up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
+  down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>',
   more:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>',
   info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11.5v4.5"/><path d="M12 8h.01"/></svg>',
   warn:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
@@ -1481,6 +1483,7 @@ async function cloudPublish(session){
   const summary={ name:session.name, sub:session.sub, sets:session.sets, mins:session.mins||0,
     prs:session.beaten||0, mtot:session.mtot||{}, vol:Math.round(session.totalVol||0), exN:ex.length, lvl:eff };
   if(session.top) summary.top = eff>=3 ? {name:session.top.name, w:session.top.w, r:session.top.r} : {name:session.top.name};
+  if(session.cardio && session.cardio.length) summary.cd = session.cardio;   // [{name, mins, dist, end}] — activity and minutes, at every level
   if(eff>=2) summary.ex = ex.map(e=>({ name:e.name, sets:(e.sets||[]).map(s=> eff>=3 ? {w:s.w, r:s.r} : {r:s.r}) }));
   const row={ user_id:cloudUser.id, kind:"workout", summary };
   if(dbHardened) row.level=eff;     // the level column only exists post-migration
@@ -2581,11 +2584,12 @@ async function renderFeed(){
     const isStars=s.stars!=null;   // a completed constellation / star milestone: a mini sky, no stats line
     const stats=isStars ? "" : [ s.exN?s.exN+" ex":null, s.sets!=null?s.sets+" sets":null, s.vol?fmtKg(s.vol):null,
       s.mins?Math.round(s.mins)+" min":null, s.prs?s.prs+" PR"+(s.prs>1?"s":""):null ].filter(Boolean).join(" · ");
-    const t=s.top, topLine = t&&t.name ? ("Top · "+t.name + (viewLvl>=3 && t.w>0 ? " · "+t.w+"kg×"+t.r : "")) : "";
+    const t=s.top, topLine = t&&t.name ? ("Top · "+t.name + (viewLvl>=3 && t.w>0 ? " · "+t.w+"kg×"+t.r : "")) : "", cdLine=cdText(s.cd);
     const mt=s.mtot||{}, hl=muscleLegend(mt, 3);
     const canOpen = viewLvl>=2 && s.ex && s.ex.length;
     txt.innerHTML='<div style="font-weight:600;">'+esc(who)+' · '+esc(s.name||"Workout")+'</div>'+
       (stats?'<div class="levelcap" style="margin:4px 0 0;">'+esc(stats)+'</div>':'')+
+      (cdLine?'<div class="levelcap" style="margin:2px 0 0;">'+esc("Cardio · "+cdLine)+'</div>':'')+
       (topLine?'<div class="levelcap" style="margin:2px 0 0;">'+esc(topLine)+'</div>':'')+
       (hl?'<div class="levelcap" style="margin:3px 0 0; opacity:.9;">'+hl+'</div>':'')+
       '<div class="levelcap" style="margin:2px 0 0; opacity:.7;">'+esc(agoStr(Date.parse(r.created_at)))+(canOpen?' · tap for detail<span class="ovchev lnkchev">›</span>':'')+'</div>';
@@ -2642,6 +2646,10 @@ function openWorkoutDetail(r, who, viewLvl){
       return '<div class="wo-mrow"><span class="wo-mlab"><i class="wo-mdot" style="background:'+col+'"></i>'+esc(MSHORT[g]||g)+'</span><span class="wo-mtrack"><i class="wo-mbar" style="width:'+pct+'%;background:'+col+'"></i></span></div>'; }).join('');
     h+='</div>';
   }
+  const cdl=(s.cd||[]).filter(c=>c && (c.mins>0 || c.dist>0));
+  if(cdl.length){   // warm-ups and finishers, at every share level: activity, minutes, km
+    h+='<div class="ed-label">Cardio</div><div class="wo-exlist">'+cdl.map(c=>'<div class="wo-ex"><span class="wo-exdot" style="background:'+CD_COL+'"></span><div><div class="wo-exn">'+esc(c.name)+'</div>'
+      +'<div class="wo-exs">'+esc([c.mins ? c.mins+" min" : "", c.dist ? c.dist+" km" : "", c.end ? "finisher" : "warm-up"].filter(Boolean).join(" · "))+'</div></div></div>').join('')+'</div>'; }
   if(viewLvl>=2 && s.ex && s.ex.length){
     h+='<div class="ed-label">Exercises</div><div class="wo-exlist">';
     h+=s.ex.map(e=>{
@@ -4586,7 +4594,7 @@ function captureDraft(){
     map[name]=arr;
     const bar=g.querySelector(".efbar"); if(bar){ efmap[name]=+bar.dataset.ef; efauto[name]=bar.dataset.auto==="1"?1:0; }
   });
-  const cg=document.querySelector("#exlist .cdgroup"), cd=cg ? cdRead(cg) : null;
+  const cc=cdCards(), cd=cc.length ? cc.map(cdRead) : null;
   if(Object.keys(map).length===0 && !cd) return; // nothing on screen (e.g. mid-unload) — don't clobber a saved draft
   const prev=draft[sig];
   draft[sig]={ t:Date.now(), s:map, ef:efmap, efa:efauto, tm:{e:timer.elapsed, sa:timer.startedAt, rn:timer.running}, le:_lastSetEl, la:_lastSetAt, gy:sessGym,
@@ -4643,7 +4651,8 @@ function renderWorkout(){
   renderWkHeader();
   renderInjuryBanner();
   const injRes=resolveInjuryNames(w); let shown=0;
-  if(w.cardio && w.cardio.n) list.appendChild(buildCardioCard(w.cardio.n));   // the warm-up leads
+  const cdl=sessCardio();
+  cdl.forEach((c,ci)=>{ if(!c.end) list.appendChild(buildCardioCard(c.n, ci, 0)); });   // warm-ups lead
   w.ex.forEach((e,xi)=>{
     const r=injRes[xi];
     if(r.drop) return;                                        // severe: this body part is off-limits — omit the move
@@ -4701,6 +4710,7 @@ function renderWorkout(){
     card.innerHTML=h; list.appendChild(card);
     card.querySelectorAll(".injfill-add").forEach(b=> b.onclick=()=> addToCurrentWorkout(b.dataset.add));
   }
+  cdl.forEach((c,ci)=>{ if(c.end) list.appendChild(buildCardioCard(c.n, ci, 1)); });   // finishers close the lifts
   const addBtn=document.createElement("button"); addBtn.className="btn tinted wide";
   addBtn.innerHTML=ICON.plus+"Add exercise"; addBtn.onclick=()=>openAdd("plan"); list.appendChild(addBtn);
   applyDraft();
@@ -4782,8 +4792,8 @@ function workoutEntries(){
   const names=[...document.querySelectorAll("#exlist .group[data-ex]")].map(g=>g.dataset.ex);
   const ex=!freeMode ? 0 : orig ? names.filter(n=>!orig.includes(n)).length : names.length;   // a suggestion's own exercises stay
   const sets=[...document.querySelectorAll("#exlist .setrow")].filter(r=> [...r.querySelectorAll(".w,.r")].some(i=> i.value.trim()!=="")).length;
-  const sw=freeMode ? 0 : Object.keys(swaps).length, cg=document.querySelector("#exlist .cdgroup");
-  const cd = !!cg && (freeMode || [...cg.querySelectorAll(".cm,.ck")].some(i=> i.value.trim()!==""));   // Free: the card goes; a plan's stays, emptied
+  const sw=freeMode ? 0 : Object.keys(swaps).length, cc=cdCards();
+  const cd = cc.length>0 && (freeMode || cc.some(g=>[...g.querySelectorAll(".cm,.ck")].some(i=> i.value.trim()!=="")));   // Free: the cards go; a plan's stay, emptied
   return { ex, sets, sw, cd, timer:sessionUnderway() };
 }
 function workoutHasEntries(){ const e=workoutEntries(); return !!(e.ex || e.sets || e.sw || e.cd || e.timer); }
@@ -4853,12 +4863,13 @@ $("saveBtn").onclick=async()=>{
       if(sessGym) he.gy=sessGym;   // absent = primary gym, same optional-field idiom as tv/ef
       (hist[name]=hist[name]||[]).push(he); }
   });
-  const cde=sessCardioEntry();   // the cardio card, as its own cardio log entry
-  if(!logged && cde) return finishCardioOnly(cde, savedSig);
+  const cdes=sessCardioEntries();   // the cardio cards, each its own cardio log entry
+  if(!logged && cdes.length) return finishCardioOnly(cdes, savedSig);
   if(!logged){ toast(freeMode?"Add an exercise and log a set":"Log at least one set first"); return; }
   await sset("lastsets",last);
   await sset("history",hist);
-  if(cde){ extlog.push(cde); await sset("extlog",extlog); session.cardio={ name:cde.name, mins:cde.mins }; if(cde.dist) session.cardio.dist=cde.dist; }
+  if(cdes.length){ extlog.push(...cdes); await sset("extlog",extlog);
+    session.cardio=cdes.map(e=>{ const c={ name:e.name, mins:e.mins }; if(e.dist) c.dist=e.dist; if(e.end) c.end=1; return c; }); }
   _repDenom=null;   // new Max sets may shift the self-calibrated effort denominator
   await ledgerTick(true);   // score matured forecasts, update the posterior, emit this week's predictions
   // Session length runs to the LAST SET COMPLETED, not to the moment Finish was tapped — packing up,
@@ -4924,10 +4935,10 @@ $("saveBtn").onclick=async()=>{
   cloudTouchWorkout();     // reset the 2-day "train at home" reminder timer (any movement counts)
 };
 
-// Finish with only the cardio card filled in: it is logged like a Cardio-tab entry, and lifts typed but not
-// completed stay in the draft
-async function finishCardioOnly(cde, sig){
-  extlog.push(cde); await sset("extlog",extlog);
+// Finish with only cardio filled in: it is logged like Cardio-tab entries, and lifts typed but not completed stay
+// in the draft
+async function finishCardioOnly(cdes, sig){
+  extlog.push(...cdes); await sset("extlog",extlog);
   tmrReset(); restStop(); endLive(true);
   const sr=checkStars(), sm=starMoment(sr), fresh=checkAchievements(), cp=consistPost(sr);
   await sset("settings",settings);
@@ -4935,7 +4946,7 @@ async function finishCardioOnly(cde, sig){
   _noRise=true;
   if(freeMode) renderFree(); else renderWorkout();
   renderDash(); cloudTouchWorkout();
-  celebrateMoment(Object.assign({ achIds:fresh, shared:cp.star, logged:"Logged "+cde.name+(cde.mins?" — "+cde.mins+" min":"")+(cde.dist?" · "+cde.dist+" km":""),
+  celebrateMoment(Object.assign({ achIds:fresh, shared:cp.star, logged:"Logged "+cdText(cdes),
     lead:[$("saveBtn")] }, sm));
   logStarShare(sr); ringsSharedToast(cp);
 }
@@ -6789,7 +6800,9 @@ function renderFree(){
   addBtn.innerHTML=ICON.plus+"Add exercise"; addBtn.onclick=()=>openAdd("free"); list.appendChild(addBtn);
   const fd=draft["free"];
   if(fd && fd.s && (Date.now()-(fd.t||0) <= 20*3600*1000)){
-    if(fd.cd && fd.cd.n) list.insertBefore(buildCardioCard(fd.cd.n), addBtn);   // the warm-up leads; the muscle sections go below it
+    const cdl=sessCardio();   // warm-ups lead, finishers close; freeSection slots the muscle sections between them
+    cdl.forEach((c,ci)=>{ if(!c.end) list.insertBefore(buildCardioCard(c.n, ci, 0), addBtn); });
+    cdl.forEach((c,ci)=>{ if(c.end) list.insertBefore(buildCardioCard(c.n, ci, 1), addBtn); });
     Object.keys(fd.s).forEach(name=>{ freeSection(sectionKeyFor(name)).appendChild(buildFreeGroup(name)); });
     applyDraft();
   } else if(fd){ delete draft["free"]; sset("draft", draft); }
@@ -6808,7 +6821,8 @@ function freeSection(key){
   const order=sectionOrder(), idx=order.indexOf(key)<0?999:order.indexOf(key), addBtn=$("addExBtn");
   let placed=false;
   list.querySelectorAll(".secgrp").forEach(s=>{ const oi=order.indexOf(s.dataset.sec); if(!placed && (oi<0?999:oi)>idx){ list.insertBefore(sec,s); placed=true; } });
-  if(!placed){ if(addBtn) list.insertBefore(sec,addBtn); else list.appendChild(sec); }
+  const fin=list.querySelector(".cdgroup.cdend")||addBtn;   // above the finishers
+  if(!placed){ if(fin) list.insertBefore(sec,fin); else list.appendChild(sec); }
   return sec;
 }
 function addFreeExercise(name){
@@ -6848,7 +6862,7 @@ function toggleExSort(){ exSort = exSort==="score"?"az":"score"; syncSortBtns();
 document.querySelectorAll(".sortbtn").forEach(b=> b.onclick=toggleExSort);
 syncSortBtns();
 document.querySelectorAll("#addLevelSeg .s").forEach(s=> s.onclick=()=>{ equipLevel=s.dataset.lv; addFilter=null; syncLevelSeg(); renderAddList($("addSearch").value); });
-function openAdd(target, filter){ addTarget=target||"free"; addFilter=filter||null; $("addSearch").value=""; syncLevelSeg(); renderAddList(""); openSheet("Add"); }
+function openAdd(target, filter, cdReplace){ addTarget=target||"free"; addFilter=filter||null; _cdReplace=cdReplace!=null ? cdReplace : null; $("addSearch").value=""; syncLevelSeg(); renderAddList(""); openSheet("Add"); }
 function chooseAdd(name){ if(addTarget==="plan") addPlanExercise(name); else addFreeExercise(name); }
 function renderAddChips(order){
   const wrap=$("addChips"); wrap.innerHTML="";
@@ -6927,27 +6941,39 @@ function buildExRow(name, opts){
   return row;
 }
 
-// ---- cardio inside a strength session: a warm-up (or a finisher) ----
-// Added from Add exercise → Cardio. In a plan it belongs to the workout day (w.cardio = {n}), the way an added lift
-// does, so it comes back every time; in Free mode it lives in the draft (draft.free.cd). One card at the top of the
-// list: minutes (and km for runs and walks) with last time's numbers in grey (10 min the first time), and an effort-zone chip (a warm-up starts
-// Easy). Logging it before the first set starts the session clock already that many minutes in, since the warm-up was
-// part of the session. On Finish it is saved as its own cardio entry (src:"session"), so it counts toward the weekly
-// cardio goal and the stars like any other cardio. The typed values ride in the draft (draft[sig].cd).
+// ---- cardio inside a strength session: warm-ups and finishers ----
+// Added from Add exercise → Cardio, as many as you like. The first goes above the lifts (a warm-up), later ones below
+// them (a finisher); the card's menu moves one across, changes its activity or removes it. In a plan they belong to
+// the workout day (w.cardio = [{n, end}]), the way an added lift does, so they come back every time; in Free mode
+// they live in the draft (draft.free.cd). Each card: minutes (and km for runs and walks) with last time's numbers
+// in grey (10 min the first time), and an effort-zone chip (Easy to start). Logging one before the first set starts
+// the session clock that many minutes in, since the warm-up was part of the session; a finisher logged after the
+// lifts stretches the session to that moment. On Finish each one is saved as its own cardio entry (src:"session"),
+// so it counts toward the weekly cardio goal and the stars like any other cardio, and the share image and the feed
+// post name it. The typed values ride in the draft (draft[sig].cd, in list order).
 const CD_COL="#9775fa", CD_GYM=["Cycling","Running","Rowing","Elliptical","Stair Climber","Walking","Jump Rope"];
 // a pulse line, not a heart: in the Add list a heart is the favourite button
 const CD_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6 5 12 2.5-6h4"/></svg>';
 const CD_ZONES=()=>CZONES.map(z=>({ lbl:z.lbl, tip:z.sub.charAt(0).toUpperCase()+z.sub.slice(1) }));
+let _cdReplace=null;   // Change activity: the card whose activity the Add sheet's pick replaces
 // the cardio choices, gym machines first
 function cardioActs(){ const all=actsInCat("cardio").map(a=>a.n); return CD_GYM.filter(n=>all.includes(n)).concat(all.filter(n=>!CD_GYM.includes(n))); }
-// the cardio in the workout on screen, or null
-function sessCardioName(){
-  if(freeMode){ const d=draft["free"]; return (d && d.cd && d.cd.n) || null; }
-  const w=activePlan().workouts[curWk]; return (w && w.cardio && w.cardio.n) || null; }
+// a stored cardio list (the first release kept one {n} object)
+function cdArr(v){ return Array.isArray(v) ? v : v && v.n ? [v] : []; }
+// the cardio of the workout on screen, [{n, end}] in list order — the live array, so edits to it stick
+function sessCardio(){
+  if(freeMode){ const d=draft["free"]; if(!d) return []; d.cd=cdArr(d.cd); return d.cd; }
+  const w=activePlan().workouts[curWk]; if(!w) return []; if(w.cardio && !Array.isArray(w.cardio)) w.cardio=cdArr(w.cardio); return w.cardio||[]; }
+// "Cycling 12 min + Running 8 min, 1.6 km" (short: "20 min cardio") from [{name, mins, dist}]
+function cdText(list, short){ list=(list||[]).filter(c=>c && (c.mins>0 || c.dist>0)); if(!list.length) return "";
+  if(short){ const m=list.reduce((a,c)=>a+(c.mins||0),0); return m ? m+" min cardio" : list.map(c=>c.name).join(" + "); }
+  return list.map(c=>c.name+(c.mins ? " "+c.mins+" min" : "")+(c.dist ? (c.mins ? ", " : " ")+c.dist+" km" : "")).join(" + "); }
 // the last time this activity was logged inside a session: the grey hints and the starting zone
 function cdLast(n){ let b=null; (extlog||[]).forEach(e=>{ if(e.kind==="cardio" && e.src==="session" && e.name===n && (!b || e.d>b.d)) b=e; }); return b; }
 function cdRead(g){ const v=c=>{ const el=g.querySelector(c); return el ? el.value.trim() : ""; }, f=g.querySelector(".cdfoot");
-  return { n:g.dataset.cd, m:v(".cm"), k:v(".ck"), z:f ? f.dataset.z : "z1", za:f && f.dataset.auto==="0" ? 0 : 1 }; }
+  return { n:g.dataset.cd, end:g.classList.contains("cdend") ? 1 : 0, m:v(".cm"), k:v(".ck"), z:f ? f.dataset.z : "z1", za:f && f.dataset.auto==="0" ? 0 : 1 }; }
+// the cards on screen in list order (data-ci), not screen order
+function cdCards(){ return [...document.querySelectorAll("#exlist .cdgroup")].sort((a,b)=>+a.dataset.ci-+b.dataset.ci); }
 function cdRefresh(g){ const row=g.querySelector(".cdrow"); if(!row) return; const v=cdRead(g), was=row.classList.contains("done"),
     ok=(parseFloat(v.m)||0)>0 || (parseFloat(v.k)||0)>0, sn=row.querySelector(".sn");
   row.classList.toggle("done", ok);
@@ -6956,11 +6982,11 @@ function cdRefresh(g){ const row=g.querySelector(".cdrow"); if(!row) return; con
   row.dataset.seen="1"; }
 function cdSetZone(g, z){ const f=g.querySelector(".cdfoot"), zd=CZONES.find(x=>x.z===z)||CZONES[0]; if(!f) return;
   f.dataset.z=zd.z; const c=f.querySelector(".efchip"); c.querySelector(".eflbl").textContent=zd.lbl; c.setAttribute("aria-label","Effort: "+zd.lbl); }
-function buildCardioCard(n){
+function buildCardioCard(n, ci, end){
   const act=actByName(n), lt=cdLast(n), z=(lt && lt.zone) || "z1";
-  const g=document.createElement("div"); g.className="group cdgroup"; g.dataset.cd=n;
+  const g=document.createElement("div"); g.className="group cdgroup"+(end ? " cdend" : ""); g.dataset.cd=n; g.dataset.ci=ci;
   g.innerHTML='<div class="pad" style="padding-bottom:0"><div class="exhead"><span class="eqic tinted" style="background:'+hexAlpha(CD_COL,.15)+';color:'+CD_COL+'" title="Cardio">'+CD_ICON+'</span>'
-    +'<span class="nm">'+esc(n)+'</span><button class="lnkic menubtn" data-cd="1" aria-label="More actions">'+ICON.more+'</button></div></div>'
+    +'<span class="nm">'+esc(n)+'</span><button class="lnkic menubtn" data-cd="1" data-ci="'+ci+'" aria-label="More actions">'+ICON.more+'</button></div></div>'
     +'<div class="cdrow"><span class="sn" aria-label="Cardio">'+CD_ICON+'</span>'
     +'<input class="cm" type="text" inputmode="numeric" autocomplete="off" placeholder="'+(lt && lt.mins ? lt.mins : 10)+'" aria-label="Minutes"><span class="unit">min</span>'
     +(act.run ? '<input class="ck" type="text" inputmode="decimal" autocomplete="off" placeholder="'+(lt && lt.dist ? lt.dist : '–')+'" aria-label="Kilometres"><span class="unit">km</span>' : '')
@@ -6975,6 +7001,8 @@ function buildCardioCard(n){
     el.addEventListener("blur", ()=>{ const m=parseFloat(g.querySelector(".cm").value)||0;
       // logged before the first set: the session clock starts already m minutes in
       if(m>0 && !timer.running && timer.elapsed===0){ timer.elapsed=Math.min(m,180)*60; tmrStart(); _lastSetEl=tmrElapsed(); _lastSetAt=Date.now(); }
+      // a finisher logged after the lifts: the session ran until now
+      else if(m>0 && end && timer.running){ _lastSetEl=Math.max(_lastSetEl, tmrElapsed()); _lastSetAt=Date.now(); }
       captureDraft(); });
   });
   const chip=g.querySelector(".efchip");
@@ -6982,47 +7010,63 @@ function buildCardioCard(n){
     openEffortMenu(chip, Math.max(0, CZONES.findIndex(x=>x.z===f.dataset.z)), i=>{ f.dataset.auto="0"; cdSetZone(g, CZONES[i].z); captureDraft(); }, CD_ZONES()); };
   return g;
 }
-// put the typed values back after a render
-function cdApply(d){ const g=document.querySelector("#exlist .cdgroup"); if(!g || !d || !d.cd) return;
-  const set=(c,v)=>{ const el=g.querySelector(c); if(el && v) el.value=v; };
-  set(".cm", d.cd.m); set(".ck", d.cd.k);
-  if(d.cd.za===0 && d.cd.z){ cdSetZone(g, d.cd.z); g.querySelector(".cdfoot").dataset.auto="0"; }
-  cdRefresh(g); }
-// the card as a cardio log entry on Finish, or null when nothing was entered
-function sessCardioEntry(){
-  const g=document.querySelector("#exlist .cdgroup"); if(!g) return null;
-  const v=cdRead(g), act=actByName(v.n), mins=Math.round(parseFloat(v.m)||0), dist=parseFloat(v.k)||0;
-  if(!(mins>0) && !(dist>0)) return null;
-  const zd=CZONES.find(z=>z.z===v.z)||CZONES[0], bw=bwNow();
-  const e={ d:Date.now(), kind:"cardio", name:act.n, cat:act.cat||"cardio", zone:zd.z, mins, muscles:act.muscles.slice(), src:"session" };
-  e.vol = Math.round(act.run && dist ? bw*dist*(act.k||7)*zd.f : bw*mins*(act.rate||0.5)*zd.f);   // the rough load, as the Cardio log has it
-  e.cf = act.cf!=null ? act.cf : 1;
-  if(dist){ e.dist=round1(dist); if(mins) e.pace=round1(mins/dist); }
-  return e;
+// put the typed values back after a render (by list position, while it still holds the same activity)
+function cdApply(d){ const vs=cdArr(d && d.cd); if(!vs.length) return;
+  cdCards().forEach(g=>{ const v=vs[+g.dataset.ci]; if(!v || v.n!==g.dataset.cd) return;
+    const set=(c,x)=>{ const el=g.querySelector(c); if(el && x) el.value=x; };
+    set(".cm", v.m); set(".ck", v.k);
+    if(v.za===0 && v.z){ cdSetZone(g, v.z); g.querySelector(".cdfoot").dataset.auto="0"; }
+    cdRefresh(g); }); }
+// the cards as cardio log entries on Finish, in screen order (warm-ups first; each its own timestamp), [] when empty
+function sessCardioEntries(){
+  const t0=Date.now(), out=[];
+  document.querySelectorAll("#exlist .cdgroup").forEach(g=>{
+    const v=cdRead(g), act=actByName(v.n), mins=Math.round(parseFloat(v.m)||0), dist=parseFloat(v.k)||0;
+    if(!(mins>0) && !(dist>0)) return;
+    const zd=CZONES.find(z=>z.z===v.z)||CZONES[0], bw=bwNow();
+    const e={ d:t0+out.length, kind:"cardio", name:act.n, cat:act.cat||"cardio", zone:zd.z, mins, muscles:act.muscles.slice(), src:"session" };
+    e.vol = Math.round(act.run && dist ? bw*dist*(act.k||7)*zd.f : bw*mins*(act.rate||0.5)*zd.f);   // the rough load, as the Cardio log has it
+    e.cf = act.cf!=null ? act.cf : 1;
+    if(dist){ e.dist=round1(dist); if(mins) e.pace=round1(mins/dist); }
+    if(v.end) e.end=1;
+    out.push(e); });
+  return out;
 }
-// Add exercise → Cardio: one per workout, so picking another swaps the activity and keeps what was typed
+// one cardio list change, in the plan (saved) or the Free draft, with the typed values kept in step; then re-render
+function cdEdit(fn){
+  captureDraft();
+  const sig=draftSig(), w=freeMode ? null : activePlan().workouts[curWk], L=w ? (w.cardio=cdArr(w.cardio)) : null;
+  if(freeMode && !draft["free"]) draft["free"]={ t:Date.now(), s:{} };
+  const d=draft[sig]; const vals = d ? (d.cd=cdArr(d.cd)) : [];
+  fn(freeMode ? vals : L, vals);
+  if(freeMode){ draft["free"].t=Date.now(); if(!vals.length && !Object.keys(draft["free"].s||{}).length) delete draft["free"]; }
+  else { if(!L.length) delete w.cardio; sset("plans",plans); if(d && !vals.length) delete d.cd; }
+  sset("draft",draft);
+  if(freeMode) renderFree(); else renderWorkout();
+}
+// Add exercise → Cardio: a new card (a warm-up unless one is there, then a finisher), or Change activity's new pick
 function chooseCardio(n){
-  const had=sessCardioName();
-  if(!freeMode){ const w=activePlan().workouts[curWk]; w.cardio={n}; sset("plans",plans); closeSheet("Add"); renderWorkout();
-    toast(had ? "Cardio: "+n : "Added "+n+" to "+w.name); }
-  else { captureDraft(); const d=draft["free"]||(draft["free"]={ t:Date.now(), s:{} }); d.cd=Object.assign({}, d.cd||{}, {n}); d.t=Date.now();
-    sset("draft",draft); closeSheet("Add"); renderFree(); toast(had ? "Cardio: "+n : "Added "+n); }
-  const g=document.querySelector("#exlist .cdgroup"); if(g && g.scrollIntoView) g.scrollIntoView({ block:"center", behavior:"smooth" });
+  const ci=_cdReplace, L0=sessCardio(), wn=freeMode ? "" : activePlan().workouts[curWk].name; _cdReplace=null;
+  let at=-1;
+  cdEdit((L, vals)=>{
+    if(ci!=null && L[ci]){ L[ci].n=n; if(vals[ci]) vals[ci].n=n; at=ci; return; }   // what was typed stays
+    const end = L0.some(c=>!c.end) ? 1 : 0; L.push({ n, end }); at=L.length-1;
+    if(!freeMode && vals.length && vals.length<L.length) vals.length=L.length; });
+  closeSheet("Add");
+  toast(ci!=null ? "Cardio: "+n : "Added "+n+(wn ? " to "+wn : ""));
+  const g=document.querySelector('#exlist .cdgroup[data-ci="'+at+'"]'); if(g && g.scrollIntoView) g.scrollIntoView({ block:"center", behavior:"smooth" });
 }
-function removeSessCardio(){
-  const n=sessCardioName(); if(!n) return;
+function moveSessCardio(ci){ cdEdit((L, vals)=>{ if(!L[ci]) return; L[ci].end = L[ci].end ? 0 : 1; if(vals[ci] && vals!==L) vals[ci].end=L[ci].end; }); }
+function removeSessCardio(ci){
+  const L=sessCardio(), c=L[ci]; if(!c) return;
   const w=freeMode ? null : activePlan().workouts[curWk];
-  confirmAsk("Remove "+n+(w ? " from "+w.name : "")+"?", "Remove", ()=>{
-    const d=draft[draftSig()]; if(d) delete d.cd;
-    if(w){ delete w.cardio; sset("plans",plans); }
-    if(d && freeMode && !Object.keys(d.s||{}).length) delete draft[draftSig()];
-    sset("draft",draft);
-    if(freeMode) renderFree(); else renderWorkout(); });
+  confirmAsk("Remove "+c.n+(w ? " from "+w.name : "")+"?", "Remove", ()=> cdEdit((L, vals)=>{ L.splice(ci,1); if(vals!==L) vals.splice(ci,1); }));
 }
 function cardioAddRow(n){
+  const L=sessCardio(), rep=_cdReplace!=null && L[_cdReplace] ? L[_cdReplace].n : null;
   const row=document.createElement("div"); row.className="planrow exrow pick";
   row.innerHTML='<span class="eqic sm cd" style="color:'+CD_COL+'">'+CD_ICON+'</span><div class="info"><div class="nm">'+esc(n)+'</div><div class="meta">'
-    +(sessCardioName()===n ? "In this workout" : actByName(n).run ? "Minutes and km" : "Minutes")+'</div></div>';
+    +(rep===n ? "Current" : rep==null && L.some(c=>c.n===n) ? "In this workout · add again" : actByName(n).run ? "Minutes and km" : "Minutes")+'</div></div>';
   row.querySelector(".info").onclick=()=>chooseCardio(n);
   return row;
 }
@@ -7040,9 +7084,10 @@ $("exlist").addEventListener("click", e=>{ const a=e.target.closest(".rem"); if(
   function build(btn){
     const xi=+btn.dataset.i, name=btn.dataset.ex, free=btn.dataset.free==="1", canSwap=free||btn.dataset.swap==="1";
     const items=[];
-    if(btn.dataset.cd==="1"){
-      items.push({c:"swap", ic:ICON.swap, t:"Change activity", fn:()=>openAdd(freeMode?"free":"plan", "__cardio")});
-      items.push({c:"rem danger", ic:ICON.trash, t:"Remove", fn:removeSessCardio}); }
+    if(btn.dataset.cd==="1"){ const ci=+btn.dataset.ci, end=!!(sessCardio()[ci]||{}).end;
+      items.push({c:"swap", ic:ICON.swap, t:"Change activity", fn:()=>openAdd(freeMode?"free":"plan", "__cardio", ci)});
+      items.push({c:"move", ic:end ? ICON.up : ICON.down, t:end ? "Move above the lifts" : "Move below the lifts", fn:()=>moveSessCardio(ci)});
+      items.push({c:"rem danger", ic:ICON.trash, t:"Remove", fn:()=>removeSessCardio(ci)}); }
     else if(canSwap) items.push({c:"swap", ic:ICON.swap, t:"Swap exercise", fn:()=> free ? openSwapFree(name) : openSwap(xi)});
     if(btn.dataset.cd!=="1"){
       items.push({c:"info", ic:ICON.info, t:"Info & demo", fn:()=>openInfo(name)});
@@ -7235,7 +7280,7 @@ function openTargetEditor(xi){
 function removeFreeExercise(g){
   if(!g) return; const name=g.dataset.ex;
   confirmAsk("Remove "+name+"?", "Remove", ()=>{ const sec=g.closest(".secgrp"); g.remove(); if(sec && !sec.querySelector(".group")) sec.remove();
-    if(!document.querySelector("#exlist .group[data-ex]")){ delete draft[draftSig()]; sset("draft",draft); updateClearBtn(); } else captureDraft(); });   // captureDraft skips an empty screen, so the last card would come back
+    if(!document.querySelector("#exlist .group[data-ex], #exlist .cdgroup")){ delete draft[draftSig()]; sset("draft",draft); updateClearBtn(); } else captureDraft(); });   // captureDraft skips an empty screen, so the last card would come back
 }
 function removePlanExercise(xi){
   const p=activePlan(), w=p.workouts[curWk], e=w.ex[xi]; if(!e) return;
@@ -10403,7 +10448,8 @@ async function openProfile(uid, name){
     const stats=[ s.exN?s.exN+" ex":null, s.sets!=null?s.sets+" sets":null, s.vol?fmtKg(s.vol):null, s.mins?Math.round(s.mins)+" min":null ].filter(Boolean).join(" · ");
     return '<div class="profwo" data-id="'+esc(r.id)+'" style="padding:10px 4px; border-bottom:.5px solid var(--line); cursor:'+(can?"pointer":"default")+';">'
       +'<div style="font-weight:600;">'+esc(s.name||"Workout")+(can?' <span class="levelcap" style="font-weight:500;">· tap<span class="ovchev lnkchev">›</span></span>':'')+'</div>'
-      +'<div class="levelcap" style="margin-top:3px;">'+esc(stats)+' · '+esc(agoStr(Date.parse(r.created_at)))+'</div></div>'; }).join('');
+      +'<div class="levelcap" style="margin-top:3px;">'+esc(stats)+' · '+esc(agoStr(Date.parse(r.created_at)))+'</div>'
+      +(cdText(s.cd)?'<div class="levelcap" style="margin-top:2px;">'+esc("Cardio · "+cdText(s.cd))+'</div>':'')+'</div>'; }).join('');
   av.querySelectorAll(".profwo").forEach(el=>{ const r=rows.find(x=>String(x.id)===el.dataset.id); if(!r) return; const s=r.summary||{}, lvl=s.lvl||1;
     if(lvl>=2 && s.ex && s.ex.length) el.onclick=()=>openWorkoutDetail(r, name, lvl); });
 }
@@ -10654,7 +10700,10 @@ function renderShareTile(s){
   x.font="600 32px -apple-system,system-ui,sans-serif"; x.textAlign="right"; x.fillStyle="rgba(255,255,255,.82)";
   x.fillText(new Date(s.date||Date.now()).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}), W-70, 122);
   x.textAlign="left"; x.fillStyle="#fff"; x.font="800 76px -apple-system,system-ui,sans-serif"; x.fillText(s.name, 70, 236);
-  x.font="600 36px -apple-system,system-ui,sans-serif"; x.fillStyle="rgba(255,255,255,.9)"; x.fillText(s.sub, 70, 292);
+  x.font="600 36px -apple-system,system-ui,sans-serif"; x.fillStyle="rgba(255,255,255,.9)";
+  let sub=s.sub; const cdl=s.cardio||[];   // the cardio rides on the sub line: named in full when it fits, else its minutes
+  if(cdl.length){ sub=s.sub+" + "+cdText(cdl); if(x.measureText(sub).width>W-140) sub=s.sub+" + "+cdText(cdl, true); }
+  x.fillText(sub, 70, 292);
   tileRadar(x, W/2, 600, 250, s.mtot||{});
   const stats=[["VOLUME", fmtKgShort(s.totalVol)],["SETS", ""+s.sets],["TIME", (s.mins||0)+" min"],["PRS", ""+(s.beaten||0)]];
   const n=stats.length, pad=70, gap=20, bw=(W-2*pad-(n-1)*gap)/n, by=968, bh=150;
