@@ -4851,13 +4851,13 @@ $("saveBtn").onclick=async()=>{
       if(rv!=="") sets.push({w:wv,r:rv}); });
     if(sets.length){ logged++; const nt=topSet(sets);
       // "beaten" by effective volume so timed holds (more seconds) and bodyweight moves (more reps) count too, not just added kg
-      if(pt&&nt&&setVol(name, nt.w, nt.r)>setVol(name, pt.w, pt.r)) beaten++; last[name]=sets;
+      const pr=!!(pt&&nt&&setVol(name, nt.w, nt.r)>setVol(name, pt.w, pt.r)); if(pr) beaten++; last[name]=sets;
       const vol=sets.reduce((a,s)=>a+setVol(name, s.w, s.r),0);
       session.totalVol+=vol; session.sets+=sets.length;
       const tw=parseFloat(nt.w)||0, tr=parseInt(nt.r)||0;
       if(!session.top || tw>session.top.w) session.top={name, w:tw, r:tr};
       muscleFor(name).forEach((grp,gi)=> session.mtot[grp]=(session.mtot[grp]||0)+vol*(gi===0?1:0.5));
-      session.exercises.push({ name, sets: sets.map(s=>({w:s.w, r:s.r})) });
+      session.exercises.push({ name, sets: sets.map(s=>({w:s.w, r:s.r})), pr:pr?1:0 });   // pr: marked on the share image
       const he={d:Date.now(), w:nt.w, r:nt.r, n:sets.length, v:Math.round(vol)}; if(tvCode) he.tv=tvCode;
       if(ef!==1) he.ef=ef;   // store only non-default effort (Hard=1 is the implied baseline for older logs)
       if(sessGym) he.gy=sessGym;   // absent = primary gym, same optional-field idiom as tv/ef
@@ -10689,29 +10689,77 @@ function tileRadar(x,cx,cy,R,tot){
 // app URL shown on the share tile — derived from the live location so it stays right under any
 // host (GitHub Pages subpath or a custom domain), minus protocol, trailing file, and trailing slash.
 const SHARE_URL=(()=>{ try{ const p=location.pathname.replace(/\/[^/]*\.[^/]*$/,"/").replace(/\/$/,""); return (location.host+p)||"o-frings.github.io/yalla"; }catch(_){ return "o-frings.github.io/yalla"; } })();
+// The workout share image, 1080×1350 (4:5). On the accent's fade: the wordmark and date; the workout's name with
+// the muscles it hit most, beside a small rose of the session's muscle split; four stat tiles (time, volume, sets,
+// PRs); then a white card listing what was done, in order — warm-up cardio, each lift with its sets and best set
+// (a PR pill on the lifts that beat their best), finisher cardio — so the image says what the workout was, not
+// only how big. A long session's list ends with "+N more".
+function tileBest(name, sets){
+  if(isTimed(name)){ let b=null; sets.forEach(t=>{ if(!b || (parseInt(t.r)||0)>(parseInt(b.r)||0)) b=t; });
+    const w=parseFloat(b&&b.w)||0; return (w>0 ? "+"+w+" kg · " : "")+(parseInt(b&&b.r)||0)+" s"; }
+  const b=topSet(sets)||{}, w=parseFloat(b.w)||0, r=parseInt(b.r)||0;
+  if(isBW(name)){ if(w>0) return "+"+w+" kg × "+r; let m=0; sets.forEach(t=>{ m=Math.max(m, parseInt(t.r)||0); }); return m+" reps"; }
+  return w>0 ? w+" kg × "+r : r+" reps";
+}
+function tileFit(x, t, maxW){ if(x.measureText(t).width<=maxW) return t;
+  while(t.length>1 && x.measureText(t+"…").width>maxW) t=t.slice(0,-1); return t.trimEnd()+"…"; }
 function renderShareTile(s){
-  const W=1080,H=1350,c=document.createElement("canvas"); c.width=W; c.height=H; const x=c.getContext("2d");
+  const W=1080,H=1350,c=document.createElement("canvas"); c.width=W; c.height=H; const x=c.getContext("2d"), F=" -apple-system,system-ui,sans-serif", M=64;
   // the accent's tile fade (ACCENTS tile; Orange: #ee6010 → #ff2f3d), diagonal top-left → bottom-right; canvas has no
   // colour hint, so the 50/50 blend is a stop at the hint
   const ts=ACCENTS[accentId()].tile, g=x.createLinearGradient(0,0,W,H); g.addColorStop(0,ts[0]); g.addColorStop(ts[2],ts[0]);
   g.addColorStop(ts[3],mixHex(ts[0],ts[1],.5)); g.addColorStop(1,ts[1]); x.fillStyle=g; x.fillRect(0,0,W,H);
-  x.fillStyle="#fff"; x.font="800 50px -apple-system,system-ui,sans-serif"; x.textAlign="left"; x.textBaseline="alphabetic";
-  x.fillText("yalla", 70, 122); const ww=x.measureText("yalla").width; x.fillStyle="rgba(255,255,255,.7)"; x.fillText(".", 72+ww, 122);
-  x.font="600 32px -apple-system,system-ui,sans-serif"; x.textAlign="right"; x.fillStyle="rgba(255,255,255,.82)";
-  x.fillText(new Date(s.date||Date.now()).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}), W-70, 122);
-  x.textAlign="left"; x.fillStyle="#fff"; x.font="800 76px -apple-system,system-ui,sans-serif"; x.fillText(s.name, 70, 236);
-  x.font="600 36px -apple-system,system-ui,sans-serif"; x.fillStyle="rgba(255,255,255,.9)";
-  let sub=s.sub; const cdl=s.cardio||[];   // the cardio rides on the sub line: named in full when it fits, else its minutes
-  if(cdl.length){ sub=s.sub+" + "+cdText(cdl); if(x.measureText(sub).width>W-140) sub=s.sub+" + "+cdText(cdl, true); }
-  x.fillText(sub, 70, 292);
-  tileRadar(x, W/2, 600, 250, s.mtot||{});
-  const stats=[["VOLUME", fmtKgShort(s.totalVol)],["SETS", ""+s.sets],["TIME", (s.mins||0)+" min"],["PRS", ""+(s.beaten||0)]];
-  const n=stats.length, pad=70, gap=20, bw=(W-2*pad-(n-1)*gap)/n, by=968, bh=150;
-  stats.forEach((st,i)=>{ const bx=pad+i*(bw+gap); rrect(x,bx,by,bw,bh,22); x.fillStyle="rgba(255,255,255,.16)"; x.fill();
-    x.textAlign="center"; x.fillStyle="#fff"; x.font="800 46px -apple-system,system-ui,sans-serif"; x.fillText(st[1], bx+bw/2, by+74);
-    x.font="700 23px -apple-system,system-ui,sans-serif"; x.fillStyle="rgba(255,255,255,.95)"; x.fillText(st[0], bx+bw/2, by+118); });
-  if(s.top && s.top.w>0){ x.textAlign="center"; x.fillStyle="rgba(255,255,255,.96)"; x.font="700 33px -apple-system,system-ui,sans-serif";
-    let t="Top set · "+s.top.name+" · "+s.top.w+"kg × "+s.top.r; if(t.length>46) t="Top · "+s.top.name; x.fillText(t, W/2, 1205); }
+  // a soft light from the top left, so the fade has depth behind the card
+  const lg=x.createRadialGradient(180,120,0,180,120,760); lg.addColorStop(0,"rgba(255,255,255,.16)"); lg.addColorStop(1,"rgba(255,255,255,0)"); x.fillStyle=lg; x.fillRect(0,0,W,H);
+  x.textBaseline="alphabetic";
+  x.fillStyle="#fff"; x.font="800 48px"+F; x.textAlign="left"; x.fillText("yalla", M, 112); const ww=x.measureText("yalla").width; x.fillStyle="rgba(255,255,255,.7)"; x.fillText(".", M+2+ww, 112);
+  x.font="600 30px"+F; x.textAlign="right"; x.fillStyle="rgba(255,255,255,.85)";
+  x.fillText(new Date(s.date||Date.now()).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric",year:"numeric"}), W-M, 112);
+  // the muscle rose, small, on a frosted disc to the right of the title
+  const RC={x:W-M-96, y:236}, RR=84, tot=roseTotals(s.mtot||{});
+  x.fillStyle="rgba(255,255,255,.14)"; x.beginPath(); x.arc(RC.x, RC.y, RR+12, 0, Math.PI*2); x.fill();
+  drawRose(x, RC.x, RC.y, RR, roseGroups(), tot, { color:gr=>MCOLOR[gr]||"#f08020", alpha:.95, stroke:"rgba(255,255,255,.9)", strokeW:2, gap:.1, rings:[1], grid:"rgba(255,255,255,.28)", gridW:2, labels:false });
+  // title, shrunk to fit beside the rose; under it the three muscles worked most
+  const tw=RC.x-RR-36-M; let fs=74; x.textAlign="left"; x.fillStyle="#fff";
+  do{ x.font="800 "+fs+"px"+F; } while(x.measureText(s.name).width>tw && (fs-=4)>=50);
+  x.fillText(tileFit(x, s.name, tw), M, 232);
+  const top=roseGroups().filter(k=>(tot[k]||0)>0).sort((a,b)=>tot[b]-tot[a]).slice(0,3).map(k=>k==="Shoulders" ? "Delts" : k);
+  x.font="600 32px"+F; x.fillStyle="rgba(255,255,255,.88)"; x.fillText(tileFit(x, top.length ? top.join(" · ") : s.sub, tw), M, 286);
+  // stat tiles
+  const stats=[["TIME",(s.mins||0)+" min"],["VOLUME",fmtKgShort(s.totalVol)],["SETS",""+s.sets],["PRS",""+(s.beaten||0)]];
+  const gap=18, bw=(W-2*M-3*gap)/4, by=356, bh=128;
+  stats.forEach((st,i)=>{ const bx=M+i*(bw+gap); rrect(x,bx,by,bw,bh,26); x.fillStyle = i===3 && s.beaten ? "rgba(255,255,255,.28)" : "rgba(255,255,255,.16)"; x.fill();
+    x.textAlign="center"; x.fillStyle="#fff"; x.font="800 46px"+F; x.fillText(st[1], bx+bw/2, by+66);
+    x.font="700 21px"+F; x.fillStyle="rgba(255,255,255,.9)"; x.fillText(st[0], bx+bw/2, by+104); });
+  // the list card
+  const cdl=(s.cardio||[]).filter(cd=>cd && (cd.mins>0 || cd.dist>0));
+  const rows=[].concat(cdl.filter(cd=>!cd.end).map(cd=>({cd})), (s.exercises||[]).map(e=>({e})), cdl.filter(cd=>cd.end).map(cd=>({cd})));
+  const cy0=520, cx0=M, cx1=W-M, pad=30, avail=1196-cy0-2*pad, rh0=Math.min(100, avail/Math.max(1,rows.length));
+  let rh=rh0, shown=rows.length; if(rh0<66){ rh=66; shown=Math.floor(avail/rh)-1; }   // too many: a "+N more" row closes the list
+  const cy1=cy0+2*pad+rh*(shown<rows.length ? shown+1 : shown);   // a short list: the card ends with it
+  x.save(); x.shadowColor="rgba(0,0,0,.18)"; x.shadowBlur=40; x.shadowOffsetY=12; rrect(x,cx0,cy0,cx1-cx0,cy1-cy0,40); x.fillStyle="#fff"; x.fill(); x.restore();
+  const L=cx0+46, R=cx1-40, INK="#1c1c1e", GREY="#8a8a8e";
+  rows.slice(0,shown).forEach((row,i)=>{
+    const yc=cy0+pad+i*rh+rh/2;
+    if(i){ x.fillStyle="rgba(0,0,0,.07)"; x.fillRect(L+30, cy0+pad+i*rh-1, R-L-30, 2); }
+    let name, best, meta, col, pr=false;
+    if(row.cd){ const cd=row.cd; name=cd.name; best=cd.mins ? cd.mins+" min" : cd.dist+" km"; meta = cd.mins && cd.dist ? cd.dist+" km" : cd.end ? "finisher" : "warm-up"; col=CD_COL; }
+    else { const e=row.e, m=muscleFor(e.name)[0]; name=e.name; best=tileBest(e.name, e.sets||[]); meta=(e.sets||[]).length+" set"+((e.sets||[]).length===1?"":"s"); col=MCOLOR[AGG[m]||m]||"#888"; pr=!!e.pr; }
+    // marker: the muscle's dot, or the cardio pulse line
+    if(row.cd){ x.strokeStyle=col; x.lineWidth=4; x.lineCap="round"; x.lineJoin="round"; x.beginPath();
+      const px=L-6, py=yc; x.moveTo(px,py); x.lineTo(px+6,py); x.lineTo(px+10,py-9); x.lineTo(px+17,py+9); x.lineTo(px+21,py); x.lineTo(px+26,py); x.stroke(); }
+    else { x.fillStyle=col; x.beginPath(); x.arc(L+8, yc, 9, 0, Math.PI*2); x.fill(); }
+    x.textBaseline="middle";
+    x.font="700 34px"+F; x.textAlign="right"; x.fillStyle=INK; x.fillText(best, R, yc+1); const bwid=x.measureText(best).width;
+    x.font="500 26px"+F; x.fillStyle=GREY; x.fillText(meta, R-bwid-18, yc+2); const mwid=x.measureText(meta).width;
+    const pillW=pr ? 66 : 0, nameMax=R-bwid-18-mwid-28-(L+34)-(pr ? pillW+14 : 0);
+    x.font="600 33px"+F; x.textAlign="left"; x.fillStyle=INK; const nt=tileFit(x, name, nameMax); x.fillText(nt, L+34, yc+1);
+    if(pr){ const px=L+34+x.measureText(nt).width+14, ph=34, pg=x.createLinearGradient(px,0,px+pillW,0); pg.addColorStop(0,ts[0]); pg.addColorStop(1,ts[1]);
+      rrect(x,px,yc-ph/2,pillW,ph,ph/2); x.fillStyle=pg; x.fill(); x.fillStyle="#fff"; x.font="800 20px"+F; x.textAlign="center"; x.fillText("PR", px+pillW/2, yc+1); }
+    x.textBaseline="alphabetic";
+  });
+  if(shown<rows.length){ const yc=cy0+pad+shown*rh+rh/2; x.fillStyle="rgba(0,0,0,.07)"; x.fillRect(L+30, yc-rh/2-1, R-L-30, 2);
+    x.textBaseline="middle"; x.font="600 28px"+F; x.textAlign="left"; x.fillStyle=GREY; x.fillText("+"+(rows.length-shown)+" more", L+34, yc+1); x.textBaseline="alphabetic"; }
   tileFooter(x, W);
   return c;
 }
