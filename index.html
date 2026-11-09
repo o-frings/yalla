@@ -174,7 +174,23 @@
 <!-- CARDIO PANEL — logged here, tracked on its own minutes/zone axis (not muscle volume) -->
 <div id="cardioPanel" style="display:none;">
   <p class="levelcap" id="cdIntro" style="margin:0 0 12px;">Tracked by minutes and effort zone, apart from your muscle balance.</p>
-  <button class="btn tinted wide" id="cdImport" type="button" style="margin-bottom:12px;"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M8 8l4-4 4 4M5 20h14"/></svg>Import route (GPX)</button>
+  <div class="cdimports">
+    <button class="btn tinted" id="cdImport" type="button"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M8 8l4-4 4 4M5 20h14"/></svg>Route (GPX)</button>
+    <button class="btn tinted" id="cdWatchBtn" type="button"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="3.5"/><path d="M9 6l.6-3h4.8l.6 3M9 18l.6 3h4.8l.6-3"/></svg>Apple Watch</button>
+  </div>
+  <!-- Apple Watch import: how to set up the Shortcut, shown when there's nothing on the clipboard to paste -->
+  <div class="watchhelp" id="cdWatchHelp" hidden>
+    <p><b>Bring Apple Watch workouts in.</b> A Shortcut on your iPhone copies the workout, and the Apple Watch button pastes it here.</p>
+    <ol>
+      <li>In the Shortcuts app, make a shortcut that reads your latest workout from Health.</li>
+      <li>Have it put your numbers into a line like this one and copy it to the clipboard:<code id="cdWatchTpl"></code><a class="lnk" id="cdWatchCopy" role="button">Copy example</a></li>
+      <li>Optional: under Automation, run the shortcut whenever an Apple Watch workout ends.</li>
+      <li>After a workout, open yalla, go to Cardio and tap Apple Watch.</li>
+    </ol>
+    <label for="cdWatchPaste">Or paste the line here</label>
+    <textarea id="cdWatchPaste" rows="2" placeholder="…#watch?type=Running&amp;min=32…"></textarea>
+  </div>
+  <div id="cdWatchNote" style="display:none;"></div>
   <input type="file" id="cdGpx" accept=".gpx,application/gpx+xml,application/octet-stream" style="display:none;">
   <div id="cdRoutePrev" style="display:none;margin-bottom:4px;"></div>
   <div class="ed-label">Activity</div>

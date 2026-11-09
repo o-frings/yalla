@@ -3191,6 +3191,7 @@ async function init(){
     if(window.requestIdleCallback) requestIdleCallback(seed, {timeout:2000}); else setTimeout(seed, 300); }
   if(!settings.objective){ const ob=$("onboardWrap"); if(ob) ob.classList.add("show"); }   // ask the objective up front
   try{ if(location.hash && location.hash.indexOf("LIFTLOG1:")>=0){ openImport(decodeURIComponent(location.hash.slice(1))); } }catch(e){}
+  watchFromHash(300);   // an Apple Watch workout link
   maybeBackupNudge();
   _booting=false;
 }
@@ -8101,17 +8102,19 @@ $("cdLog").onclick=()=>{
   const pv=updateCardioPreview(); if(!pv.ok){ toast("Add a duration or distance, or import a route, first"); return; }
   const act=cdAct(); let mins=pv.mins; const dist = cdRoute ? cdRoute.dist : pv.dist;
   if(cdRoute && !mins) mins=cdRoute.mins||0;
-  const entry={ d:Date.now(), kind:"cardio", name:act.n, cat:act.cat||"cardio", zone:cdZone, mins, vol:cardioVol(), muscles:act.muscles.slice(), src: cdRoute?"gpx":"manual" };
+  const entry={ d: cdWatch && cdWatch.start ? cdWatch.start : Date.now(), kind:"cardio", name:act.n, cat:act.cat||"cardio", zone:cdZone, mins, vol:cardioVol(), muscles:act.muscles.slice(), src: cdRoute?"gpx": cdWatch?"watch":"manual" };
   entry.cf = act.cf!=null ? act.cf : 1;                       // cardio-credit fraction (frozen at log time)
   if(act.mf && entry.vol) entry.mvol = Math.round(entry.vol*act.mf);   // partial muscle-volume for strength-y activities (feeds the radar)
   if(dist){ entry.dist=round1(dist); if(mins) entry.pace=round1(mins/dist); }
   if(cdRoute){ if(cdRoute.ascent) entry.ascent=cdRoute.ascent; entry.route=decimatePts(cdRoute.pts,80); if(cdRoute.name) entry.routeName=cdRoute.name; }
+  if(cdWatch){ if(cdWatch.key) entry.hk=cdWatch.key;   // the Watch workout's start minute: a second import of it is skipped
+    if(!entry.dist && cdWatch.km){ entry.dist=cdWatch.km; if(mins) entry.pace=round1(mins/cdWatch.km); } }   // a ride's distance, which the form has no field for
   const hr=parseFloat($("cdHr").value)||0; if(hr) entry.avgHr=Math.round(hr);
   const rpe=parseFloat($("cdRpe").value)||0; if(rpe) entry.rpe=Math.min(10,Math.max(1,Math.round(rpe)));
   extlog.push(entry); sset("extlog",extlog);
   const sr=checkStars(), sm=starMoment(sr), fresh=checkAchievements(), cp=consistPost(sr); sset("settings",settings);
   ["cdDist","cdTime","cdPace","cdMin","cdHr","cdRpe"].forEach(id=>{ $(id).value=""; });
-  clearCardioRoute();
+  clearCardioRoute(); clearWatch();
   renderCardioLog(); updateCardioPreview(); renderDash();
   cloudTouchWorkout();
   // one toast: a star or an unlock stands in for "Logged"; a completed figure opens the Star card (a plain week star opens nothing)
@@ -8191,6 +8194,109 @@ if($("cdGpx")) $("cdGpx").onchange=ev=>{ const file=ev.target.files&&ev.target.f
     if(!r){ toast("Couldn't read that GPX — is it a valid route file?"); return; }
     setCardioRoute(r); toast("Imported "+(r.name||"route")+" — "+round1(r.dist)+" km"); };
   fr.onerror=()=>{ toast("Couldn't read that file"); }; fr.readAsText(file); };
+
+// ===== Apple Watch import. A Shortcut on the iPhone hands over one workout as a single line:
+//   https://<yalla>/#watch?type=Running&min=32&km=5.2&hr=148&start=2026-11-09T07:30:00+01:00
+// Opened as a link, it fills the Cardio form (for yalla in a browser). The home-screen app can't be opened with
+// data by Shortcuts, so there the Shortcut copies the line and the "Apple Watch" button pastes it. Nothing is
+// logged until Log cardio is tapped; the entry keeps the workout's own start time, and a workout whose start
+// minute is already in the log is skipped. Strength workouts are left out: yalla logs lifting itself.
+let cdWatch=null;   // the pending import: {start: ms or 0, key: start minute or 0, km}
+const WATCH_TYPES=[[/table\s*tennis|ping\s*pong/,"Table Tennis"],[/cross\s*country|nordic\s*ski|\bxc\b/,"XC Skiing"],
+  [/strength|weight|core\s*training/,null],[/run|jog/,"Running"],[/cycl|bike|biking|spin/,"Cycling"],[/swim/,"Swimming"],
+  [/rowing|\brow\b/,"Rowing"],[/hik/,"Hiking"],[/walk/,"Walking"],[/ellipt/,"Elliptical"],[/stair/,"Stair Climber"],
+  [/jump\s*rope|skipping/,"Jump Rope"],[/skat/,"Skating"],[/ski|snowboard/,"Skiing"],[/box/,"Boxing"],[/martial|mma/,"MMA"],
+  [/wrestl|grappl/,"Grappling"],[/soccer|football/,"Football"],[/basketball/,"Basketball"],[/padel/,"Padel"],[/squash/,"Squash"],
+  [/badminton/,"Badminton"],[/tennis|pickleball/,"Tennis"],[/volleyball/,"Volleyball"],[/kettlebell/,"Kettlebell"],
+  [/hiit|high\s*intensity|cross\s*training|crossfit|mixed\s*cardio/,"CrossFit"],[/boulder/,"Bouldering"],[/climb/,"Climbing"],
+  [/surf/,"Surfing"],[/paddl|kayak|\bsup\b|canoe/,"Kayak / SUP"],[/danc/,"Dancing"],[/golf/,"Golf"],[/pilates/,"Pilates"],[/yoga/,"Yoga"]];
+// Health's workout name → a yalla activity; {strength:true} for lifting; null when nothing matches
+function watchActivity(t){
+  t=String(t||"").toLowerCase(); if(!t) return null;
+  for(const [re,name] of WATCH_TYPES) if(re.test(t)) return name ? (ACTIVITIES.find(a=>a.n===name)||null) : {strength:true};
+  return null;
+}
+// minutes from "32", "32.5", "32,5", "32 min" or "0:32:10"
+function watchMinutes(v){
+  v=String(v||"").trim(); if(!v) return 0;
+  if(/^\d+:\d{1,2}(:\d{1,2})?$/.test(v)){ const p=v.split(":").map(Number); return p.length===3 ? p[0]*60+p[1]+p[2]/60 : p[0]+p[1]/60; }
+  const n=parseFloat(v.replace(",",".")); return isFinite(n)&&n>0 ? n : 0;
+}
+// one workout line (a link, or the same text from the clipboard) → {type, min, km, hr, start}, or null
+function parseWatchLine(s){
+  s=String(s||""); const i=s.search(/watch\?/i); if(i<0) return null;
+  // up to the end of its line: a type like "Outdoor Run" may arrive with a plain space (URLSearchParams decodes %20 and +)
+  let q; try{ q=new URLSearchParams(s.slice(i+6).split(/[\r\n]/)[0].trim()); }catch(e){ return null; }
+  const num=k=>{ const v=parseFloat(String(q.get(k)||"").replace(",",".")); return isFinite(v)&&v>0 ? v : 0; };
+  const min=watchMinutes(q.get("min")) || num("sec")/60, km=num("km") || num("mi")*1.609344 || num("m")/1000;
+  if(!(min>0) && !(km>0)) return null;
+  const st=Date.parse(q.get("start")||"");
+  return { type:(q.get("type")||"").trim(), min:Math.round(min), km:km ? round1(km) : 0, hr:Math.round(num("hr")),
+    start: isFinite(st) && st<=Date.now()+5*60000 ? st : 0 };
+}
+// effort zone from average heart rate as a share of max HR (Tanaka: 208 − 0.7 × age); null without an age
+function zoneFromHr(hr){
+  const age=+settings.age||0; if(!(hr>0) || !age) return null;
+  const p=hr/(208-0.7*age); return p<.6 ? "z1" : p<.7 ? "z2" : p<.8 ? "z3" : p<.9 ? "z4" : "z5";
+}
+function renderWatchNote(w, unknown){
+  const box=$("cdWatchNote"); if(!box) return;
+  if(!w){ box.style.display="none"; box.innerHTML=""; return; }
+  const when = w.start ? new Date(w.start).toLocaleString([], {weekday:"short", hour:"2-digit", minute:"2-digit"}) : "";
+  const bits=[w.type||"Workout"]; if(w.min) bits.push(w.min+" min"); if(w.km) bits.push(w.km+" km"); if(w.hr) bits.push(w.hr+" bpm"); if(when) bits.push(when);
+  box.style.display="";
+  box.innerHTML='<div class="watchnote"><span class="watchnote-ic" aria-hidden="true">'+WATCH_ICON+'</span><div><b>From Apple Watch</b> · '+esc(bits.join(" · "))
+    +'<div>'+(unknown ? 'Pick the activity, then tap Log cardio.' : 'Check it, then tap Log cardio.')+'</div></div>'
+    +'<a class="lnkic" id="cdWatchClear" role="button" aria-label="Discard the Apple Watch workout">'+ICON.trash+'</a></div>';
+  $("cdWatchClear").onclick=()=>{ clearWatch(); ["cdDist","cdTime","cdPace","cdMin","cdHr"].forEach(id=>{ $(id).value=""; }); updateCardioPreview(); };
+}
+function clearWatch(){ cdWatch=null; renderWatchNote(null); }
+// a #watch?… link: read it raw (URLSearchParams decodes it), drop it from the address bar, fill the form
+function watchFromHash(delay){
+  try{ if(!location.hash || !/watch\?/i.test(location.hash)) return;
+    const w=parseWatchLine(location.hash); history.replaceState(null,"", location.pathname+location.search);
+    if(w) setTimeout(()=>applyWatch(w), delay||0); }catch(e){}
+}
+window.addEventListener("hashchange", ()=>watchFromHash(0));   // a link opened while yalla is already open
+// fill the Cardio form from one workout; returns true when the line was handled (filled, skipped or refused)
+function applyWatch(w){
+  if(!w) return false;
+  const m=watchActivity(w.type);
+  if(m && m.strength){ toast("Strength workouts stay out: log your lifting in yalla's Workout tab."); return true; }
+  const key = w.start ? Math.round(w.start/60000) : 0;
+  if(key && cardioList().some(e=>e.hk===key)){ toast("This Apple Watch workout is already in your log."); return true; }
+  showTab("workout");
+  setTrainMode(m && m.cat==="activity" ? "activity" : "cardio");
+  if(m) cdActSel=m.n;
+  clearCardioRoute();
+  ["cdDist","cdTime","cdPace","cdMin","cdHr","cdRpe"].forEach(id=>{ $(id).value=""; });
+  const z=zoneFromHr(w.hr); if(z) cdZone=z;
+  renderCardio();
+  if(cdAct().run){ if(w.km) $("cdDist").value=w.km; if(w.min) $("cdTime").value=w.min; cdRunCalc(); }
+  else if(w.min) $("cdMin").value=w.min;
+  if(w.hr) $("cdHr").value=w.hr;
+  cdWatch={ start:w.start||0, key, km:w.km||0 };
+  renderWatchNote(w, !m); updateCardioPreview();
+  const help=$("cdWatchHelp"); if(help) help.hidden=true;
+  // bring the form up by scrolling its page only (scrollIntoView would also slide the sideways page carousel)
+  setTimeout(()=>{ const pn=$("cardioPanel"), pg=pn && pn.closest(".page"); if(!pg) return;
+    pg.scrollTo({ top: pg.scrollTop + pn.getBoundingClientRect().top - pg.getBoundingClientRect().top - 80, behavior:"smooth" }); }, 60);
+  return true;
+}
+const WATCH_ICON='<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="3.5"/><path d="M9 6l.6-3h4.8l.6 3M9 18l.6 3h4.8l.6-3"/></svg>';
+// the button: paste the line the Shortcut copied; with nothing to paste, show how to set the Shortcut up
+if($("cdWatchBtn")) $("cdWatchBtn").onclick=async()=>{
+  let txt=""; try{ if(navigator.clipboard && navigator.clipboard.readText) txt=await navigator.clipboard.readText(); }catch(e){}
+  const w=parseWatchLine(txt);
+  if(w){ applyWatch(w); return; }
+  const help=$("cdWatchHelp"); if(!help) return;
+  const tpl=$("cdWatchTpl"); if(tpl) tpl.textContent=location.origin+location.pathname.replace(/[^/]*$/,"")+"#watch?type=Running&min=32&km=5.2&hr=148&start=2026-11-09T07:30";
+  help.hidden=!help.hidden;
+  if(!help.hidden && txt) toast("The clipboard has no Apple Watch workout. Run the Shortcut first.");
+};
+if($("cdWatchCopy")) $("cdWatchCopy").onclick=()=>{ const t=($("cdWatchTpl")||{}).textContent||"";
+  try{ navigator.clipboard.writeText(t).then(()=>toast("Copied the example line"), ()=>toast("Couldn't copy, select it instead")); }catch(e){ toast("Couldn't copy, select it instead"); } };
+if($("cdWatchPaste")) $("cdWatchPaste").addEventListener("input", e=>{ const w=parseWatchLine(e.target.value); if(w && applyWatch(w)) e.target.value=""; });
 
 // ===== cardio dose: weekly aerobic minutes + zone mix, a SEPARATE axis from muscle volume =====
 // (also folds in pre-Phase-1 kind:"activity" logs so old runs/rides still count toward the cardio picture)
