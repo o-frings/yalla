@@ -727,6 +727,18 @@
       <button class="btn wide" id="shareImgBtn">Share image</button>
       <button class="btn tinted wide" id="saveImgBtn">Save image</button>
     </div>
+    <!-- Apple Health: hands this session (start and length only) to the "yalla to Health" Shortcut, which logs it as a
+         strength workout. iPhone and iPad only; the first tap shows how to set the Shortcut up (see sendToHealth). -->
+    <button class="btn tinted wide" id="shareHealthBtn" type="button" hidden style="margin-top:8px;"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/></svg><span id="shareHealthLbl">Add to Apple Health</span></button>
+    <div class="watchhelp healthhelp" id="shareHealthHelp" hidden>
+      <p><b>Add yalla workouts to Apple Health.</b> A Shortcut, set up once, logs each session you send.</p>
+      <ol>
+        <li>In the Shortcuts app, make a shortcut named <b>yalla to Health</b>.</li>
+        <li>Add <b>Get Dictionary from Input</b> and read <b>start</b> and <b>minutes</b> from it.</li>
+        <li>Add <b>Log Workout</b>: Traditional Strength Training, starting at <b>start</b>, lasting <b>minutes</b>.</li>
+      </ol>
+      <button class="btn wide" id="shareHealthGo" type="button">It's set up: add this workout</button>
+    </div>
   </div>
 </div>
 

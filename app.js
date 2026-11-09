@@ -10975,6 +10975,7 @@ function showShareCard(){
   sr.hidden=!(star && S.star.kind==="week"); $("shareSess").checked=S.sess;
   t.textContent = star ? (S.star.kind==="sky" ? STAR_COPY.tileSkyT : S.star.kind==="const" ? starCopy("tileConstT",{name:S.star.fig.name}) : STAR_COPY.tileWeekT)
     : S.session ? "Workout complete" : "";   // the title names the card being shown
+  updateHealthBtn();
 }
 if($("shareKind")) $("shareKind").querySelectorAll(".s").forEach(el=>{ const go=()=>{ if(!_shareSt || _shareSt.k===el.dataset.k) return; _shareSt.k=el.dataset.k; haptic(8); showShareCard(); };
   el.onclick=go; });   // Space / Enter / arrows: the shared picker helper (segSync)
@@ -10988,6 +10989,38 @@ function shareImage(save){
   }, "image/png");
 }
 $("shareImgBtn").onclick=()=>shareImage(false);
+// ===== Apple Health export. A web app can't write to Health, so "Add to Apple Health" hands the finished session to
+// the Shortcut "yalla to Health" as JSON (start, end and minutes only) and the Shortcut logs a strength workout.
+// The first tap shows how to set the Shortcut up; settings.healthShortcut remembers it's done. Each session goes once.
+const HEALTH_SHORTCUT="yalla to Health";
+const canHealth=()=>/iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints>1);   // iPadOS reports a Mac
+const _healthSent=new Set();   // session dates already handed over
+// local time with its offset ("2026-11-09T18:30:00+01:00"), which Shortcuts reads as a date
+function isoLocal(ms){ const d=new Date(ms), p=n=>String(Math.abs(n)).padStart(2,"0"), o=-d.getTimezoneOffset();
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes())+":"+p(d.getSeconds())+(o<0?"-":"+")+p(Math.floor(Math.abs(o)/60))+":"+p(Math.abs(o)%60); }
+function healthPayload(s){ const end=s.date||Date.now(), minutes=Math.max(1, Math.round(s.mins||0));
+  return JSON.stringify({ type:"Traditional Strength Training", start:isoLocal(end-minutes*60000), end:isoLocal(end), minutes }); }
+function openShortcut(url){ location.href=url; }
+function updateHealthBtn(){
+  const b=$("shareHealthBtn"), S=_shareSt; if(!b) return;
+  const show=canHealth() && !!(S && S.session) && S.k!=="star"; b.hidden=!show;
+  if(!show){ const h=$("shareHealthHelp"); if(h) h.hidden=true; return; }
+  const sent=_healthSent.has(S.session.date); b.disabled=sent;
+  $("shareHealthLbl").textContent = sent ? "Sent to Apple Health" : "Add to Apple Health";
+}
+function sendToHealth(){
+  const S=_shareSt, s=S && S.session; if(!s || _healthSent.has(s.date)) return;
+  _healthSent.add(s.date);
+  if(!settings.healthShortcut){ settings.healthShortcut=true; sset("settings",settings); }
+  const h=$("shareHealthHelp"); if(h) h.hidden=true;
+  updateHealthBtn();
+  openShortcut("shortcuts://run-shortcut?name="+encodeURIComponent(HEALTH_SHORTCUT)+"&input=text&text="+encodeURIComponent(healthPayload(s)));
+}
+if($("shareHealthBtn")) $("shareHealthBtn").onclick=()=>{
+  if(settings.healthShortcut) return sendToHealth();
+  const h=$("shareHealthHelp"); if(h) h.hidden=!h.hidden;   // first time: how to set the Shortcut up
+};
+if($("shareHealthGo")) $("shareHealthGo").onclick=sendToHealth;
 $("saveImgBtn").onclick=()=>shareImage(true);
 $("shareClose").onclick=()=>closeSheet("Share");
 $("scrimShare").onclick=()=>closeSheet("Share");
