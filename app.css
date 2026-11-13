@@ -58,6 +58,7 @@
     --bar-base:color-mix(in srgb, var(--bg) 86%, transparent);
     --bar-top:var(--glow), var(--bar-base); --bar-bottom:var(--glow), var(--bar-base);
     --bar-fade:16px;
+    --pad-x:max(16px, calc(50vw - 254px));   /* the pages' side padding: 16px on a phone; on a wider screen (landscape, iPad) it keeps the content a centred 508px column while the bars run edge to edge */
     --accent-hi:#ff7a3a;     /* accent on the always-dark toast (the reduced-motion ✦) */
     --accent-hi-b:#ff5a68;   /* its second hue: the star sky and the coach card */
     --grad-hi:linear-gradient(135deg,var(--accent-hi) 0%,var(--accent-hi) var(--grad-hold),var(--grad-mid),var(--accent-hi-b) 100%);
@@ -280,23 +281,32 @@
   .calcrow .cv small{ font-size:var(--t-sm); font-weight:var(--w-med); color:var(--l2); margin-left:8px; }
   .calc .empty{ font-size:var(--t-sm); color:var(--l2); padding:8px 2px; line-height:1.45; }
   .titleBtn{ cursor:pointer; -webkit-tap-highlight-color:transparent; }
-  /* session + rest timers pin to the top of the workout page once a session is underway. .stick (JS,
-     when active) makes it a sticky, full-bleed frosted bar matching the status/tab bars — applied
-     unconditionally so the background can never flicker to transparent over content scrolling under. */
-  .timersbar{ margin:-2px 0 16px; }
-  .timersbar.stick{ position:sticky; top:env(safe-area-inset-top); z-index:25; margin:-2px -16px 16px; padding:6px 16px; background:var(--bar-base); -webkit-backdrop-filter:blur(24px); backdrop-filter:blur(24px); box-shadow:0 .5px 0 var(--sep); }
-  .timerbar{ display:flex; align-items:center; gap:10px; padding:2px 0; margin:0; background:transparent; border:none; box-shadow:none; }
-  .tmrbtn{ width:40px; height:40px; flex:0 0 auto; border-radius:50%; border:none; cursor:pointer; background:var(--tint), var(--surface); color:var(--ink); display:inline-flex; align-items:center; justify-content:center; transition:transform .12s; }
-  .tmrbtn svg{ width:18px; height:18px; }
-  .tmrtime{ font-size:var(--t-lg); font-weight:var(--w-bold); font-variant-numeric:tabular-nums; letter-spacing:.5px; min-width:52px; }
-  .timerbar.run .tmrtime{ color:var(--ink); }   /* the bar sits on the glow: the label ink keeps ≥4.5:1 */
-  .tmrlbl{ font-size:var(--t-xs); color:var(--l2-page); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  /* idle (not yet started): hide the 0:00 + reset so it reads as a single small "Start" affordance */
-  .timerbar.idle .tmrtime{ display:none; }
-  .timerbar.idle .tmrreset{ display:none; }
-  html.dark .timerbar.run .tmrlbl{ color:var(--l2-tint); }
-  .timerbar.idle .tmrlbl{ font-size:var(--t-sm); font-weight:var(--w-med); color:var(--l2-page); }
-  .tmrreset{ background:none; border:none; color:var(--ink); font-size:var(--t-sm); font-weight:var(--w-semi); cursor:pointer; padding:12px 8px; margin:-4px -4px; }
+  /* the session timer sits in the Workout title row, in the mode button's place: the same 32px tinted pill, with the
+     pause/play glyph and the running clock. The whole pill is the button (its ::after is the tap box). Paused, the
+     clock greys and "reset" shows beside it. */
+  .timersbar{ flex:0 0 auto; display:flex; align-items:center; gap:4px; margin-left:auto; }
+  .timerbar{ position:relative; display:inline-flex; align-items:center; gap:5px; height:32px; padding:0 13px 0 9px; border-radius:var(--r-pill);
+    background:var(--tint), var(--surface); font-size:var(--t-md); line-height:1; letter-spacing:0; transition:opacity .12s; }
+  .timerbar:active{ opacity:.6; }
+  .tmrbtn{ width:18px; height:18px; flex:0 0 auto; padding:0; border:none; background:none; color:var(--disc-ink); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent; }
+  .tmrbtn::after{ content:""; position:absolute; inset:-6px -4px; }
+  .tmrbtn svg{ width:15px; height:15px; }
+  .tmrtime{ min-width:2.9em; font-weight:var(--w-semi); font-variant-numeric:tabular-nums; color:var(--ink); }
+  .timerbar:not(.run) .tmrtime{ color:var(--l2-tint); }
+  .tmrlbl{ position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }   /* "paused", for screen readers; the glyph shows it */
+  .tmrreset{ position:relative; background:none; border:none; color:var(--ink); font:inherit; font-size:var(--t-sm); font-weight:var(--w-semi); letter-spacing:0; cursor:pointer; padding:0 8px; height:32px; -webkit-tap-highlight-color:transparent; }
+  .tmrreset::before{ content:""; position:absolute; inset:-6px 0; }
+  /* mid-session the title row pins under the status bar and the page scrolls beneath it. display:contents lets the row
+     stick for the whole page (a sticky box can't leave its parent) and keeps the plan line's inherited styles. Its frosted
+     backdrop is the status bar's material and fades in only once something is underneath. */
+  #largeTitle.stick{ display:contents; }
+  #largeTitle.stick .ltmain{ position:sticky; top:0; z-index:25; margin:0 calc(-1 * var(--pad-x)); padding:calc(env(safe-area-inset-top) + 12px) var(--pad-x) 6px; }
+  #largeTitle.stick .ltmain::before{ content:""; position:absolute; left:0; right:0; top:0; bottom:calc(-1 * var(--bar-fade)); z-index:-1; pointer-events:none; opacity:0; transition:opacity .2s ease;
+    background:var(--bar-top); background-size:100vw 100vh; background-position:0 0; background-repeat:no-repeat;
+    -webkit-backdrop-filter:blur(24px) saturate(1.4); backdrop-filter:blur(24px) saturate(1.4);
+    -webkit-mask-image:linear-gradient(#000 calc(100% - var(--bar-fade)), transparent); mask-image:linear-gradient(#000 calc(100% - var(--bar-fade)), transparent); }
+  #largeTitle.stick.under .ltmain::before{ opacity:1; }
+  #largeTitle.stick small{ margin:-2px 0 12px; }   /* 4px under the title, 12px above the cards, as before the row stuck */
   .tmrrepeat, .surpnew{ background:var(--tint), var(--surface); border:none; color:var(--ink); font-size:var(--t-sm); font-weight:var(--w-semi); cursor:pointer; padding:8px 12px; border-radius:var(--r-pill); flex:0 0 auto; }
   .tmrrepeat:active, .surpnew:active{ opacity:.6; }
   /* rest: a floating pill just above the tab bar (moved into #shell by the pager setup), never in the page flow */
@@ -394,13 +404,13 @@
     border:0; border-radius:var(--r-pill); background:var(--tint), var(--surface); color:var(--ink); font:inherit; font-size:var(--t-sm); font-weight:var(--w-semi); letter-spacing:0;
     line-height:1; white-space:nowrap; cursor:pointer; -webkit-appearance:none; appearance:none; -webkit-tap-highlight-color:transparent; transition:opacity .12s; }
   .wkmodebtn::before{ content:""; position:absolute; inset:-6px -4px; }
-  /* no timer row before a session: the first logged set starts the clock, and the row then pins to the top */
+  /* no timer before a session: the first logged set starts the clock, which then replaces the mode button */
   #timersBar.idle{ display:none; }
   /* the social button sits in the title row as a plain accent glyph, like the other header icons */
   .ltmain .tmrsocial{ margin:0 -4px 0 auto; }
   .ltmain .tsoc-btn{ padding:10px 6px; }
   .ltmain .socialic{ width:24px; height:24px; color:var(--disc-ink); }
-  .ltmain .tmrsocial + .wkmodebtn{ margin-left:-2px; }   /* 16px between the glyph and the pill */
+  .ltmain .tmrsocial + .wkmodebtn, .ltmain .tmrsocial ~ .timersbar{ margin-left:-2px; }   /* 16px between the glyph and the pill */
   .wkmodebtn:active{ opacity:.6; }
   .wkm-chev{ width:13px; height:13px; flex:0 0 auto; color:var(--disc-ink); }
   .wkm-tv{ display:none; width:14px; height:14px; flex:0 0 auto; margin-right:1px; color:var(--disc-ink); }
@@ -565,19 +575,20 @@
   .page.active{ display:block; animation:pagein .26s ease; }
   @keyframes pagein{ from{ opacity:0; transform:translateY(5px); } to{ opacity:1; transform:none; } }
   /* horizontal pager: three panels side-by-side that follow the finger, each scrolling vertically on its own */
-  /* Fixed app shell, full window height. USE 100vh — NOT 100dvh and NOT a JS innerHeight override.
+  /* Fixed app shell, the whole window. Width: the pages centre their own content (--pad-x), so the tab bar and the pinned
+     Workout title reach the screen edges in landscape and on iPad. Height: USE 100vh — NOT 100dvh and NOT a JS innerHeight override.
      The iOS standalone cold-launch "blank strip" bug: the DYNAMIC viewport (100dvh, window.innerHeight,
      visualViewport) is not initialized until a geometry change (device rotation), so on a cold launch it
      reports ~62px short and the shell ends above the screen bottom. 100vh is the STATIC large viewport and
      is correct from cold start; in standalone there's no browser toolbar, so 100vh == the real window height
      in both states. (We previously cascaded 100vh → 100dvh → var(--appH), which meant the broken dynamic
      values always won and 100vh never actually applied — that was the bug. See memory yalla-ios-bottom-blank-space.) */
-  #shell{ position:fixed; top:0; left:0; right:0; height:100vh; max-width:540px; margin:0 auto; overflow:hidden; z-index:1; }
+  #shell{ position:fixed; top:0; left:0; right:0; height:100vh; overflow:hidden; z-index:1; }
   #pager{ position:absolute; inset:0; overflow:hidden; }
   #track{ display:flex; height:100%; }
   #track.anim{ transition:transform .3s cubic-bezier(.22,.61,.36,1); }
   #pager .page, #pager .page.active{ display:block; animation:none; flex:0 0 100%; width:100%; height:100%;
- overflow-y:auto; overflow-x:hidden; overscroll-behavior-y:contain; padding:0 16px calc(72px + var(--bar-fade) + env(safe-area-inset-bottom)); }
+ overflow-y:auto; overflow-x:hidden; overscroll-behavior-y:contain; padding:0 var(--pad-x) calc(72px + var(--bar-fade) + env(safe-area-inset-bottom)); }
   /* hide the scrollbar (still scrollable) */
   #pager .page, .sheetbody{ scrollbar-width:none; -ms-overflow-style:none; }
   #pager .page::-webkit-scrollbar, .sheetbody::-webkit-scrollbar{ width:0; height:0; display:none; }
@@ -591,7 +602,7 @@
     /* ~56px content row (12 + 32px icon + 12, centered) + the home-indicator safe area reserved BELOW it
        (iOS HIG pattern). Pre-cold-launch-fix the shell didn't reach the screen bottom so the inset read 0;
        now it reports the real ~34px and the icons clear the home indicator instead of crowding it. */
-    padding:calc(12px + var(--bar-fade)) 8px calc(12px + env(safe-area-inset-bottom));
+    padding:calc(12px + var(--bar-fade)) max(8px, calc(50vw - 262px)) calc(12px + env(safe-area-inset-bottom));   /* the tabs stay within the 540px column */
     background:var(--bar-bottom); background-size:100vw 100vh; background-position:0 100%; background-repeat:no-repeat;
     backdrop-filter:blur(24px) saturate(1.4); -webkit-backdrop-filter:blur(24px) saturate(1.4);
     -webkit-mask-image:linear-gradient(transparent, #000 var(--bar-fade)); mask-image:linear-gradient(transparent, #000 var(--bar-fade));
@@ -605,6 +616,13 @@
   .tabitem.active::before{ content:""; position:absolute; left:50%; top:50%; width:64px; height:40px; margin:-20px 0 0 -32px; border-radius:20px; background:var(--tint); }   /* a tinted capsule behind the active icon */
   .tabitem:active svg{ transform:scale(.86); }
   body.kb .tabbar{ display:none; }   /* keyboard up → hide the bar so it can't ride up above it (standalone PWA shrinks the viewport) */
+  /* phone landscape: the content stays a centred column (as on iPad), and the bottom gives back height: a slimmer tab
+     bar, with the rest pill and the pages' end padding following it down */
+  @media (orientation:landscape) and (max-height:500px){
+    .tabbar{ padding-top:calc(4px + var(--bar-fade)); padding-bottom:calc(4px + env(safe-area-inset-bottom)); }
+    .restbar{ bottom:calc(68px + var(--bar-fade) + env(safe-area-inset-bottom)); }
+    #pager .page, #pager .page.active{ padding-bottom:calc(56px + var(--bar-fade) + env(safe-area-inset-bottom)); }
+  }
   /* overview / coach cards */
   .ovbig{ font-size:var(--t-xl); font-weight:var(--w-bold); letter-spacing:-.4px; margin-top:4px; line-height:1.1; }
   .ovmeta{ font-size:var(--t-sm); color:var(--l2); margin-top:8px; font-weight:var(--w-med); }
@@ -805,10 +823,11 @@
   .discdot{ width:6px; height:6px; border-radius:50%; background:var(--l3); opacity:.35; transition:opacity .2s, transform .2s, background .2s; }
   .discdot.on{ opacity:1; background:var(--grad-line); transform:scale(1.25); }
   /* onboarding objective picker */
-  #onboardWrap, #nameWrap{ position:fixed; inset:0; z-index:320; display:none; align-items:center; justify-content:center; padding:24px;
+  #onboardWrap, #nameWrap{ position:fixed; inset:0; z-index:320; display:none; align-items:center; justify-content:center;
+    padding:calc(env(safe-area-inset-top) + 16px) 24px calc(env(safe-area-inset-bottom) + 16px); overflow-y:auto; overscroll-behavior:contain;
     background:rgba(0,0,0,.5); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
   #onboardWrap.show, #nameWrap.show{ display:flex; }
-  .obcard{ background:var(--sheetbg); border-radius:22px; max-width:380px; width:100%; padding:24px 24px; box-shadow:0 20px 60px rgba(0,0,0,.45); }
+  .obcard{ background:var(--sheetbg); border-radius:22px; max-width:380px; width:100%; margin:auto; padding:24px 24px; box-shadow:0 20px 60px rgba(0,0,0,.45); }   /* margin:auto: centred when it fits, scrolls from its top when it doesn't (landscape, small phones) */
   .obbrand{ font-size:var(--t-xl); margin-bottom:8px; }
   .obbrand .wordmark{ font-size:var(--t-xl); }
   .obtag{ font-size:var(--t-md); color:var(--l2); line-height:1.45; margin:0 0 20px; }
@@ -1931,7 +1950,7 @@
   html.dark[data-accent="graphite"] input[type=checkbox]{ accent-color:#8e8e93; }   /* white tick on #d1d1d6 is ~1.5:1 */
   .btn{ transition:transform .12s ease, opacity .12s ease, box-shadow .2s; }
   .btn:active{ transform:scale(.975); opacity:.94; }
-  .tmrbtn:active,.restadj button:active{ transform:scale(.9); }
+  .restadj button:active{ transform:scale(.9); }
   .tmrreset:active,.sortbtn:active,.lnk:active,.demo:active{ opacity:.55; }
   .setrow .setdel:active{ filter:brightness(.9); }
   .titleBtn:active{ opacity:.6; }
@@ -1964,13 +1983,3 @@
   .wo-exn{ font-weight:var(--w-semi); font-size:var(--t-md); color:var(--ink); }
   .wo-exs{ margin-top:2px; font-size:var(--t-sm); color:var(--l2); }
 
-  /* Portrait-only guard. Visibility is driven by JS (updateRotateGuard) which sets inline display —
-     the element ships inline display:none so a stale/missing stylesheet can't expose it. These rules
-     only style it for when JS does show it (landscape on a phone-sized screen). */
-  .rotateGuard{ position:fixed; inset:0; z-index:500; flex-direction:column;
-    align-items:center; justify-content:center; gap:10px; text-align:center; padding:24px;
-    background:var(--bg); color:var(--ink); }
-  .rotateGuard svg{ width:46px; height:46px; color:var(--accent); animation:rgturn 2.4s ease-in-out infinite; }
-  .rotateGuard .rgmsg{ font-size:var(--t-lg); font-weight:var(--w-bold); letter-spacing:-.3px; }
-  .rotateGuard .rgsub{ font-size:var(--t-md); color:var(--l2); }
-  @keyframes rgturn{ 0%,55%,100%{ transform:rotate(0deg); } 75%,90%{ transform:rotate(-90deg); } }

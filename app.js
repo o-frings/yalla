@@ -2793,8 +2793,10 @@ function tmrRender(){
   $("timerBar").classList.toggle("run", timer.running);
   $("timerBar").classList.toggle("idle", idle);
   $("tmrToggle").innerHTML = timer.running ? ICON.pause : ICON.play;
-  $("tmrLbl").textContent = !timer.running && timer.elapsed>0 ? "paused" : "";
-  $("tmrReset").style.visibility = (timer.elapsed>0||timer.running) ? "visible" : "hidden";
+  $("tmrToggle").setAttribute("aria-label", timer.running ? "Pause the session timer" : "Resume the session timer");
+  const paused = !timer.running && timer.elapsed>0;
+  $("tmrLbl").textContent = paused ? "paused" : "";
+  $("tmrReset").style.display = paused ? "" : "none";   // reset only once paused: a stray tap mid-set can't end the session
   updateTimerStick();
   updateTrainingState();
 }
@@ -2815,18 +2817,21 @@ function maybeAskFinish(){
              "Finish", ()=>{ try{ Promise.resolve($("saveBtn").onclick()).catch(()=>toast("Couldn't save — your sets are still here.")); }catch(e){} }, "go");
 }
 function updateTrainingState(){ const on=sessionUnderway(); document.body.classList.toggle("training", on);
-  const tb=$("timersBar"); if(tb) tb.classList.toggle("idle", !on);   // no timer row before a session: the first logged set starts it
+  const tb=$("timersBar"); if(tb) tb.classList.toggle("idle", !on);   // no timer before a session: the first logged set starts it
   const ps=$("planSwitch"); if(ps) ps.disabled=on;   // no plan switching mid-session
   updateClearBtn(); }
-// Pin the session + rest timers to the top while a workout's underway (active timer OR a running
-// rest). .stick enables position:sticky; an IntersectionObserver adds .stuck (the backdrop) only once
-// the bar actually reaches the top, so nothing changes visually until you scroll.
+// Pin the Workout title row, with the session timer in it, to the top while a workout's underway (active timer OR a
+// running rest). .stick makes the row sticky; .under fades in its frosted backdrop once the page has scrolled, so at the
+// top of the page nothing changes.
 function updateTimerStick(){
-  const w=$("timersBar"); if(!w) return;
+  const w=$("largeTitle"); if(!w) return;
   const rb=$("restBar");
   const active = timer.running || timer.elapsed>0 || (rb && rb.classList.contains("show"));
   w.classList.toggle("stick", !!active);
 }
+(function(){ const pg=$("pageWorkout"), lt=$("largeTitle"); if(!pg || !lt) return;
+  const under=()=> lt.classList.toggle("under", pg.scrollTop>2);
+  pg.addEventListener("scroll", under, {passive:true}); under(); })();
 function tmrStart(){ if(timer.running) return; timer.startedAt=Date.now(); timer.running=true; timer.iv=setInterval(tmrRender,1000); tmrRender(); acquireWake(); }
 function tmrPause(){ if(!timer.running) return; timer.elapsed=tmrElapsed(); timer.running=false; timer.startedAt=null; if(timer.iv){clearInterval(timer.iv);timer.iv=null;} tmrRender(); if(!(rest.iv&&rest.startedAt)) releaseWake(); }
 function tmrReset(){ timer.elapsed=0; timer.running=false; timer.startedAt=null;
@@ -5438,12 +5443,16 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
   let idx=Math.max(0, ORDER.indexOf(curTab()));
   let tx=0, raf=0;                                                 // tracked horizontal position of the track (px)
   const apply=()=>{ track.style.transform="translateX("+tx+"px)"; };
+  // a settled page is placed in % of the track (the pager's width), so a width change can never leave the view between
+  // two pages: on rotation iOS can fire resize before the new width is laid out, and a px offset measured then was stale
   function place(i, animate, ms){ cancelAnimationFrame(raf); idx=Math.min(2,Math.max(0,i));
     track.style.transition = animate ? ("transform "+(ms||340)+"ms cubic-bezier(.32,.72,0,1)") : "none";
-    tx=-idx*W(); apply(); }
+    tx=-idx*W(); track.style.transform="translateX("+(-idx*100)+"%)"; }
   window.__pageGo=(name)=>{ const i=ORDER.indexOf(name); if(i>=0 && i!==idx) place(i, true); };
   place(idx, false);
-  window.addEventListener("resize", ()=>place(idx,false));
+  // the pager clips its overflow but can still be scrolled sideways from script (scrollIntoView, focus on a page that's
+  // sliding in), which would shift every page; hold it at 0
+  pager.addEventListener("scroll", ()=>{ if(pager.scrollLeft) pager.scrollLeft=0; }, {passive:true});
 
   // don't hijack gestures meant for an input, canvas, button, horizontal strip, drag handle, the tab bar, or an open sheet
   const blocked=el=>{ for(let n=el; n && n!==document.body; n=n.parentElement){
@@ -5451,6 +5460,10 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
     const ox=getComputedStyle(n).overflowX; if((ox==="auto"||ox==="scroll") && n.scrollWidth>n.clientWidth+4) return true;
   } return false; };
   let x0=0, y0=0, armed=false, locked=false, dragging=false, lastX=0, lastT=0, vx=0, fromRow=null;
+  // re-square after a size change (rotation, split view); ResizeObserver reports after layout, with the real width
+  const resquare=()=>{ if(!dragging) place(idx, false); };
+  window.addEventListener("resize", resquare);
+  if(window.ResizeObserver) new ResizeObserver(resquare).observe(pager);
   pager.addEventListener("touchstart",e=>{
     if(e.touches.length!==1 || document.querySelector(".sheet.show, #onboardWrap.show") || blocked(e.target)){ armed=false; return; }
     cancelAnimationFrame(raf);
@@ -11040,20 +11053,6 @@ function coach(id, msg){
   $("coachTxt").textContent=msg; $("coach").classList.add("show");
 }
 $("coachX").onclick=()=>$("coach").classList.remove("show");
-
-// keep the app portrait. The manifest already declares orientation:portrait (honored by installed
-// PWAs / Android); this is a best-effort runtime lock where the API exists. iOS Safari ignores it.
-try{ if(screen.orientation && screen.orientation.lock) screen.orientation.lock("portrait").catch(()=>{}); }catch(e){}
-
-// iOS Safari can't be locked, so show the rotate guard only when actually landscape on a phone-sized
-// screen. JS-driven (sets inline display) so it's robust against a stale stylesheet and never lingers.
-function updateRotateGuard(){ const g=$("rotateGuard"); if(!g) return;
-  // a phone is whatever has a short side ≤ 540px — a Pro Max in landscape is 932px wide, which the old width cap missed
-  const land = !!(window.matchMedia && matchMedia("(orientation:landscape)").matches) && Math.min(window.innerWidth, window.innerHeight)<=540;
-  g.style.display = land ? "flex" : "none"; }
-window.addEventListener("resize", updateRotateGuard);
-window.addEventListener("orientationchange", updateRotateGuard);
-updateRotateGuard();
 
 // Fade out the launch splash. Called when init() finishes; the timeout is a backstop so a thrown
 // init() (or an unexpectedly slow load) can never leave the splash stuck over the app.

@@ -60,15 +60,6 @@
 
 <div class="statusbar-bg"></div>
 
-<!-- ROTATE GUARD: Yalla is portrait-only. iOS Safari ignores the manifest/lock API, so JS shows this
-     overlay only in landscape on phone-sized screens. Hidden by default INLINE so a stale/missing
-     stylesheet can never expose it (updateRotateGuard in app.js drives the show/hide). -->
-<div class="rotateGuard" id="rotateGuard" aria-hidden="true" style="display:none;">
-  <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.4"/><path d="M11 18.5h2"/><path d="M2.5 12a4.5 4.5 0 0 1 4.5-4.5" opacity=".5"/><path d="M5 6.2 7 7.5 5.6 9.6" opacity=".5"/></svg>
-  <div class="rgmsg">Rotate your phone upright</div>
-  <div class="rgsub">Yalla works in portrait.</div>
-</div>
-
 <!-- ===== WORKOUT PAGE ===== -->
 <div class="page" id="pageWorkout" data-tab="workout">
 <div class="largeTitle" id="largeTitle">
@@ -104,6 +95,17 @@
       <span id="wkModeLbl">Plan</span>
       <svg class="wkm-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
     </button>
+    <!-- session timer: the first logged set starts it, and it then takes the mode button's place. The title row pins
+         under the status bar while the page scrolls beneath it (#largeTitle.stick). Reset shows only while paused. -->
+    <div class="timersbar idle" id="timersBar">
+      <button class="tmrreset" id="tmrReset" type="button" title="Reset the session timer">reset</button>
+      <div class="timerbar idle" id="timerBar">
+        <button class="tmrbtn" id="tmrToggle" type="button" aria-label="Pause the session timer"></button>
+        <span class="tmrtime" id="tmrTime">0:00</span>
+        <span class="tmrlbl" id="tmrLbl"></span>
+      </div>
+      <button class="tmrrepeat" id="repeatBtn" type="button" title="Fill in last session" style="display:none;">↻ Last time</button>
+    </div>
   </div>
   <small id="planSub"></small>
 </div>
@@ -121,26 +123,15 @@
 <!-- WORKOUT -->
 <div class="utabs" id="seg"></div>
 <div id="startAction"></div>
-<!-- session timer + rest ("pause") timer: pinned to the top of the page once a workout's underway.
-     Train together + Share live now live as compact icons on the right of this bar (see .tmrsocial);
-     each opens its panel below. Shown only when signed in + the friends schema is live. -->
-<div class="timersbar" id="timersBar">
-  <div class="timerbar" id="timerBar">
-    <button class="tmrbtn" id="tmrToggle" aria-label="Start timer"></button>
-    <span class="tmrtime" id="tmrTime">0:00</span>
-    <span class="tmrlbl" id="tmrLbl">session timer</span>
-    <button class="tmrrepeat" id="repeatBtn" title="Fill in last session" style="display:none;">↻ Last time</button>
-    <button class="tmrreset" id="tmrReset" title="Reset">reset</button>
-  </div>
-  <div class="restbar" id="restBar">
-    <div class="restprog" id="restProg"></div>
-    <button class="restx" id="restSkip" aria-label="Skip rest">✕</button>
-    <span class="restlbl">Rest</span>
-    <span class="resttime" id="restTime">0:00</span>
-    <span class="restadj"><button id="restMinus">−15</button><button id="restPlus">+15</button></span>
-  </div>
+<!-- rest ("pause") timer between sets: the pager setup moves it into #shell, where it floats above the tab bar -->
+<div class="restbar" id="restBar">
+  <div class="restprog" id="restProg"></div>
+  <button class="restx" id="restSkip" aria-label="Skip rest">✕</button>
+  <span class="restlbl">Rest</span>
+  <span class="resttime" id="restTime">0:00</span>
+  <span class="restadj"><button id="restMinus">−15</button><button id="restPlus">+15</button></span>
 </div>
-<!-- social panels drop full-width below the timer bar; each is a dismissable card -->
+<!-- social panels drop full-width at the top of the workout; each is a dismissable card -->
 <div class="spanel livepanel" id="livePanel" hidden>
   <button class="spanel-x" id="livePanelX" type="button" aria-label="Close">✕</button>
   <label class="livestart"><span id="livePanelLbl">Share live</span><input type="checkbox" class="livesw" id="liveToggle" aria-label="Share workout live"><span class="liveswui" aria-hidden="true"></span></label>
