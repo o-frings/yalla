@@ -58,7 +58,9 @@
     --bar-base:color-mix(in srgb, var(--bg) 86%, transparent);
     --bar-top:var(--glow), var(--bar-base); --bar-bottom:var(--glow), var(--bar-base);
     --bar-fade:16px;
-    --pad-x:max(16px, calc(50vw - 254px));   /* the pages' side padding: 16px on a phone; on a wider screen (landscape, iPad) it keeps the content a centred 508px column while the bars run edge to edge */
+    --col:540px;   /* the app's column: the pages' content, sheets and the tabs stay within it */
+    --pad-x:max(16px, calc(50vw - var(--col) / 2 + 16px));   /* the pages' side padding: 16px on a phone; on a wider screen (landscape, iPad) it keeps the content in the centred column while the bars run edge to edge */
+    --tab-pad:12px;   /* the tab bar's padding above and below its 32px icons; the rest pill and the pages' end padding follow it */
     --accent-hi:#ff7a3a;     /* accent on the always-dark toast (the reduced-motion ✦) */
     --accent-hi-b:#ff5a68;   /* its second hue: the star sky and the coach card */
     --grad-hi:linear-gradient(135deg,var(--accent-hi) 0%,var(--accent-hi) var(--grad-hold),var(--grad-mid),var(--accent-hi-b) 100%);
@@ -211,7 +213,7 @@
   b,strong{ font-weight:var(--w-bold); }   /* the default "bolder" turns a 600 parent into 900 */
   small{ font-size:var(--t-xs); }
   html{ background:var(--bg); transition:background .25s ease; }
- body{ max-width:540px; margin:0 auto; padding:0 16px calc(80px + env(safe-area-inset-bottom)); min-height:100vh; }
+ body{ max-width:var(--col); margin:0 auto; padding:0 16px calc(80px + env(safe-area-inset-bottom)); min-height:100vh; }
   /* native feel: a long-press never selects/highlights the UI or pops the iOS callout — except real inputs */
   html, body{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
   input, textarea, select, [contenteditable]{ -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
@@ -254,7 +256,6 @@
  .nav{ padding: calc(6px + env(safe-area-inset-top)) 16px 4px; display:flex; align-items:center; justify-content:flex-end;
     position:sticky; top:0; z-index:30; margin:0 -16px;
     background:color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); }
-  .navleft,.navright{ display:flex; align-items:center; gap:2px; }
   .iconbtn{ background:none; border:none; color:var(--accent); cursor:pointer; padding:12px; display:flex; align-items:center; transition:transform .12s, opacity .12s; }
   .iconbtn:active{ transform:scale(.86); opacity:.7; }
   .iconbtn svg{ width:25px; height:25px; }
@@ -284,7 +285,7 @@
   /* the session timer sits in the Workout title row, in the mode button's place: the same 32px tinted pill, with the
      pause/play glyph and the running clock. The whole pill is the button (its ::after is the tap box). Paused, the
      clock greys and "reset" shows beside it. */
-  .timersbar{ flex:0 0 auto; display:flex; align-items:center; gap:4px; margin-left:auto; }
+  .timersbar{ flex:0 0 auto; display:flex; align-items:center; gap:4px; }
   .timerbar{ position:relative; display:inline-flex; align-items:center; gap:5px; height:32px; padding:0 13px 0 9px; border-radius:var(--r-pill);
     background:var(--tint), var(--surface); font-size:var(--t-md); line-height:1; letter-spacing:0; transition:opacity .12s; }
   .timerbar:active{ opacity:.6; }
@@ -301,16 +302,13 @@
      backdrop is the status bar's material and fades in only once something is underneath. */
   #largeTitle.stick{ display:contents; }
   #largeTitle.stick .ltmain{ position:sticky; top:0; z-index:25; margin:0 calc(-1 * var(--pad-x)); padding:calc(env(safe-area-inset-top) + 12px) var(--pad-x) 6px; }
-  #largeTitle.stick .ltmain::before{ content:""; position:absolute; left:0; right:0; top:0; bottom:calc(-1 * var(--bar-fade)); z-index:-1; pointer-events:none; opacity:0; transition:opacity .2s ease;
-    background:var(--bar-top); background-size:100vw 100vh; background-position:0 0; background-repeat:no-repeat;
-    -webkit-backdrop-filter:blur(24px) saturate(1.4); backdrop-filter:blur(24px) saturate(1.4);
-    -webkit-mask-image:linear-gradient(#000 calc(100% - var(--bar-fade)), transparent); mask-image:linear-gradient(#000 calc(100% - var(--bar-fade)), transparent); }
+  #largeTitle.stick .ltmain::before{ content:""; position:absolute; left:0; right:0; top:0; bottom:calc(-1 * var(--bar-fade)); z-index:-1; pointer-events:none; opacity:0; transition:opacity .2s ease; }   /* material: with .statusbar-bg */
   #largeTitle.stick.under .ltmain::before{ opacity:1; }
   #largeTitle.stick small{ margin:-2px 0 12px; }   /* 4px under the title, 12px above the cards, as before the row stuck */
-  .tmrrepeat, .surpnew{ background:var(--tint), var(--surface); border:none; color:var(--ink); font-size:var(--t-sm); font-weight:var(--w-semi); cursor:pointer; padding:8px 12px; border-radius:var(--r-pill); flex:0 0 auto; }
-  .tmrrepeat:active, .surpnew:active{ opacity:.6; }
+  .surpnew{ background:var(--tint), var(--surface); border:none; color:var(--ink); font-size:var(--t-sm); font-weight:var(--w-semi); cursor:pointer; padding:8px 12px; border-radius:var(--r-pill); flex:0 0 auto; }
+  .surpnew:active{ opacity:.6; }
   /* rest: a floating pill just above the tab bar (moved into #shell by the pager setup), never in the page flow */
-  .restbar{ display:none; position:absolute; z-index:49; left:16px; right:16px; bottom:calc(84px + var(--bar-fade) + env(safe-area-inset-bottom)); max-width:508px; margin:0 auto;
+  .restbar{ display:none; position:absolute; z-index:49; left:16px; right:16px; bottom:calc(60px + 2 * var(--tab-pad) + var(--bar-fade) + env(safe-area-inset-bottom)); max-width:calc(var(--col) - 32px); margin:0 auto;
     align-items:center; gap:9px; padding:10px 16px; border-radius:var(--r-pill); overflow:hidden;
     background:linear-gradient(var(--accent-soft),var(--accent-soft)), var(--surface); border:.5px solid var(--accent-soft); box-shadow:0 8px 24px -10px rgba(0,0,0,.35); }   /* opaque under the tint: its label never depends on the page */
   .restbar.show{ display:flex; }
@@ -371,13 +369,12 @@
      the live ring on the avatar + accent "Watch ›" carry the live cue */
   .livecard{ display:flex; align-items:center; gap:12px; padding:12px 4px; border-bottom:.5px solid var(--sep); cursor:pointer; -webkit-tap-highlight-color:transparent; }
   .livecard:active{ opacity:.6; }
-  .livedot{ width:10px; height:10px; border-radius:50%; background:var(--red); flex:0 0 auto; animation:livepulse 1.6s infinite; }
   .livego{ color:var(--ink); font-weight:var(--w-semi); flex:0 0 auto; font-size:var(--t-sm); }
   @keyframes livepulse{ 0%{ box-shadow:0 0 0 0 rgba(255,55,95,.5);} 70%{ box-shadow:0 0 0 8px rgba(255,55,95,0);} 100%{ box-shadow:0 0 0 0 rgba(255,55,95,0);} }
   /* Train together — bar icon + a face-pile of who's checked in; panel holds the gym-code entry */
-  .tsoc .gym-faces{ display:inline-flex; flex:0 0 auto; min-width:0; }
-  .tsoc .gym-faces .avatar{ margin-left:-7px; box-shadow:0 0 0 2px var(--bg); }
-  .tsoc .gym-faces .avatar:first-child{ margin-left:0; }
+  .gym-faces{ display:inline-flex; flex:0 0 auto; min-width:0; }
+  .gym-faces .avatar{ margin-left:-7px; box-shadow:0 0 0 2px var(--bg); }
+  .gym-faces .avatar:first-child{ margin-left:0; }
   .gymhint{ font-size:var(--t-xs); color:var(--l2); margin:0 0 10px; line-height:1.4; padding-right:20px; }
   .gympanel-row{ display:flex; gap:8px; align-items:center; margin-bottom:10px; }
   .gympanel-row input{ flex:1; min-width:0; height:44px; text-align:center; letter-spacing:3px; font-weight:var(--w-bold); font-size:var(--t-lg); text-transform:uppercase; }
@@ -432,15 +429,8 @@
   .plansw:disabled .plansw-chev{ display:none; }
   .largeTitle .ltmain .wktitle{ flex:1; min-width:0; line-height:1.12; }
   #strengthWrap > #seg{ margin:-11px 0 3px; }   /* the 11px padding keeps the tabs' tap boxes inside the scroller's clip; the negative margin gives it back */
-  /* Two ways to start the workout, as a pair: Suggest (primary) + Choose a plan (secondary) */
-  .startrow{ display:flex; gap:10px; margin:0 0 16px; }
-  .startrow .btn{ flex:1; display:flex; align-items:center; justify-content:center; gap:8px; font-size:var(--t-md); font-weight:var(--w-semi); padding-left:10px; padding-right:10px; min-width:0; }
-  .startrow .btn svg{ width:18px; height:18px; flex:0 0 auto; }
-  /* Set up → Train: once a session is underway, the setup chrome recedes and training fills the screen.
-     Keep #largeTitle for its safe-area top inset, just empty it. */
-  body.training #largeTitle{ padding-bottom:12px; }
+  /* Set up → Train: once a session is underway, the setup chrome recedes and training fills the screen. */
   body.training #wkModeBtn{ display:none; }   /* the mode can't change mid-session; the title and social button stay */
-  body.training #pageWorkout .startrow,
   body.training #pageWorkout #startAction,
   body.training #pageWorkout #seg{ display:none; }
   /* the day / length tabs underneath are the second tier — keep them close so the two read as one block */
@@ -456,14 +446,6 @@
   .surpnew::before{ content:""; position:absolute; inset:-6px 0; }   /* 44px tap box */
   .surpnew{ display:inline-flex; align-items:center; gap:6px; } .surpnew svg{ width:15px; height:15px; flex:0 0 auto; }
   @media (max-width:359px){ .surprow{ gap:var(--s2) var(--s3); } .surpnew svg{ display:none; } }   /* keep length tabs + New surprise on one row at 320 */
-  /* plan mode's secondary action, kept as light as surprise mode's controls */
-  .planlink{ display:inline-flex; align-items:center; gap:7px; background:none; border:none; font:inherit; font-size:var(--t-md); font-weight:var(--w-semi); color:var(--ink); padding:10px 2px 4px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
-  .planlink svg{ width:16px; height:16px; flex:0 0 auto; }
-  .planlink:active{ opacity:.55; }
-  /* the surprise session reads as a plain headline — no box */
-  .sesshead{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin:16px 2px 8px; }
-  .surpname{ font-size:var(--t-xl); font-weight:var(--w-bold); letter-spacing:-.5px; color:var(--ink); line-height:1.15; }
-  .surpsub{ font-size:var(--t-sm); color:var(--l2); margin-top:3px; font-variant-numeric:tabular-nums; }
   /* one underline-tab component: workout day tabs (#seg), detail-sheet toggles, session-length tabs */
   .utabs{ display:flex; flex-wrap:wrap; gap:var(--s4); }
   .utab{ flex:0 0 auto; position:relative; padding:1px 0 6px; background:none; border:0; border-radius:0; font:inherit; font-size:var(--t-sm); font-weight:var(--w-semi); color:var(--l2-page); white-space:nowrap; cursor:pointer; -webkit-appearance:none; appearance:none; -webkit-tap-highlight-color:transparent; transition:color .15s; }
@@ -496,8 +478,6 @@
   .pr-item:active{ transform:scale(.92); opacity:.7; }
   .pr-name{ font-size:var(--t-xs); color:var(--l2); max-width:62px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .pr-live{ font-size:var(--t-xs); font-weight:var(--w-bold); color:var(--ink); text-transform:uppercase; letter-spacing:.4px; }
-  .pr-add .avatar{ background:var(--tint), var(--card); color:var(--ink); box-shadow:none; }
-  .pr-add .avatar svg{ width:24px; height:24px; }
   /* presence-first rail: header + status dots */
   .railhdr{ display:flex; justify-content:space-between; align-items:center; margin:2px 0 10px; }
   .railall{ font-size:var(--t-sm); font-weight:var(--w-semi); color:var(--ink); cursor:pointer; position:relative; -webkit-tap-highlight-color:transparent;
@@ -511,8 +491,6 @@
   .av-st .pr-dot{ right:0; bottom:0; width:12px; height:12px; border-width:2px; border-color:var(--card); }
   .pr-badge{ position:absolute; top:-2px; right:4px; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--red); color:#fff; font-size:var(--t-xs); font-weight:var(--w-bold); line-height:1; display:flex; align-items:center; justify-content:center; box-sizing:border-box; border:2px solid var(--bg); }
   .pr-badge[hidden]{ display:none; }
-  .frow{ display:flex; align-items:center; gap:12px; }
-  .frow .fname{ font-weight:var(--w-semi); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   /* friends hub — one grouped-list system shared by requests / friends / suggested / live-grants */
   .flist{ background:var(--row); border-radius:var(--r-md); overflow:hidden; }
   .fitem{ display:flex; align-items:center; gap:12px; padding:10px 14px; min-height:46px; }
@@ -565,8 +543,9 @@
   .artbtn:active{ transform:scale(.9); }
   .artbtn .avatar{ box-shadow:none; }
   .artbtn.sel{ border-radius:50%; box-shadow:0 0 0 2.5px var(--card), 0 0 0 5px var(--accent); }
-  /* backdrop behind the status-bar clock — slightly translucent (no blur, to match the tab bar and avoid scroll flicker) */
- .statusbar-bg{ position:fixed; top:0; left:0; right:0; height:calc(env(safe-area-inset-top) + var(--bar-fade)); z-index:40; pointer-events:none;
+  /* the frosted backdrop behind the status-bar clock; the pinned Workout title row shares its material */
+ .statusbar-bg{ position:fixed; top:0; left:0; right:0; height:calc(env(safe-area-inset-top) + var(--bar-fade)); z-index:40; pointer-events:none; }
+ .statusbar-bg, #largeTitle.stick .ltmain::before{
     background:var(--bar-top); background-size:100vw 100vh; background-position:0 0; background-repeat:no-repeat;
     backdrop-filter:blur(24px) saturate(1.4); -webkit-backdrop-filter:blur(24px) saturate(1.4);
     -webkit-mask-image:linear-gradient(#000 calc(100% - var(--bar-fade)), transparent); mask-image:linear-gradient(#000 calc(100% - var(--bar-fade)), transparent); }
@@ -586,9 +565,8 @@
   #shell{ position:fixed; top:0; left:0; right:0; height:100vh; overflow:hidden; z-index:1; }
   #pager{ position:absolute; inset:0; overflow:hidden; }
   #track{ display:flex; height:100%; }
-  #track.anim{ transition:transform .3s cubic-bezier(.22,.61,.36,1); }
   #pager .page, #pager .page.active{ display:block; animation:none; flex:0 0 100%; width:100%; height:100%;
- overflow-y:auto; overflow-x:hidden; overscroll-behavior-y:contain; padding:0 var(--pad-x) calc(72px + var(--bar-fade) + env(safe-area-inset-bottom)); }
+ overflow-y:auto; overflow-x:hidden; overscroll-behavior-y:contain; padding:0 var(--pad-x) calc(48px + 2 * var(--tab-pad) + var(--bar-fade) + env(safe-area-inset-bottom)); }
   /* hide the scrollbar (still scrollable) */
   #pager .page, .sheetbody{ scrollbar-width:none; -ms-overflow-style:none; }
   #pager .page::-webkit-scrollbar, .sheetbody::-webkit-scrollbar{ width:0; height:0; display:none; }
@@ -602,7 +580,7 @@
     /* ~56px content row (12 + 32px icon + 12, centered) + the home-indicator safe area reserved BELOW it
        (iOS HIG pattern). Pre-cold-launch-fix the shell didn't reach the screen bottom so the inset read 0;
        now it reports the real ~34px and the icons clear the home indicator instead of crowding it. */
-    padding:calc(12px + var(--bar-fade)) max(8px, calc(50vw - 262px)) calc(12px + env(safe-area-inset-bottom));   /* the tabs stay within the 540px column */
+    padding:calc(var(--tab-pad) + var(--bar-fade)) max(8px, calc(50vw - var(--col) / 2 + 8px)) calc(var(--tab-pad) + env(safe-area-inset-bottom));   /* the tabs stay within the column */
     background:var(--bar-bottom); background-size:100vw 100vh; background-position:0 100%; background-repeat:no-repeat;
     backdrop-filter:blur(24px) saturate(1.4); -webkit-backdrop-filter:blur(24px) saturate(1.4);
     -webkit-mask-image:linear-gradient(transparent, #000 var(--bar-fade)); mask-image:linear-gradient(transparent, #000 var(--bar-fade));
@@ -618,11 +596,7 @@
   body.kb .tabbar{ display:none; }   /* keyboard up → hide the bar so it can't ride up above it (standalone PWA shrinks the viewport) */
   /* phone landscape: the content stays a centred column (as on iPad), and the bottom gives back height: a slimmer tab
      bar, with the rest pill and the pages' end padding following it down */
-  @media (orientation:landscape) and (max-height:500px){
-    .tabbar{ padding-top:calc(4px + var(--bar-fade)); padding-bottom:calc(4px + env(safe-area-inset-bottom)); }
-    .restbar{ bottom:calc(68px + var(--bar-fade) + env(safe-area-inset-bottom)); }
-    #pager .page, #pager .page.active{ padding-bottom:calc(56px + var(--bar-fade) + env(safe-area-inset-bottom)); }
-  }
+  @media (orientation:landscape) and (max-height:500px){ :root{ --tab-pad:4px; } }
   /* overview / coach cards */
   .ovbig{ font-size:var(--t-xl); font-weight:var(--w-bold); letter-spacing:-.4px; margin-top:4px; line-height:1.1; }
   .ovmeta{ font-size:var(--t-sm); color:var(--l2); margin-top:8px; font-weight:var(--w-med); }
@@ -697,12 +671,9 @@
   #settingsBody .setcard[open] + .setcard > summary::before, #settingsBody .setcard[open] + .setcard[style*="none"] + .setcard > summary::before, #setBody:has(> .setcard[open]:last-of-type) + #setMisc > .setcard:first-of-type > summary::before{ left:0; }
   .sheet :is(.setcard,.group,.ed-wk) input:not([type=checkbox]){ background:var(--card); }
   #acctOut .row .btn{ flex:0 0 auto; white-space:nowrap; }
-  .travelbar{ display:flex; align-items:center; gap:10px; margin:6px 0 14px; padding:11px 14px; border-radius:var(--r-md); background:var(--tint), var(--card); color:var(--ink); font-size:var(--t-md); font-weight:var(--w-semi); }
-  .travelbar .tvx{ margin-left:auto; flex:0 0 auto; background:transparent; border:.5px solid currentColor; color:inherit; font:inherit; font-size:var(--t-sm); padding:4px 10px; border-radius:var(--r-sm); cursor:pointer; opacity:.85; }
   .tvbreak{ display:flex; flex-direction:column; gap:7px; margin:10px 0 2px; }
   .tvrow{ display:flex; align-items:center; justify-content:space-between; font-size:var(--t-sm); color:var(--l2); }
   .tvrow b{ color:var(--ink); font-weight:var(--w-semi); }
-  .rglgwrap{ display:flex; flex-direction:column; gap:7px; }
   /* This-week rings detail sheet */
   .ringrow{ padding:13px 0; border-bottom:.5px solid var(--sep); }
   .ringrow:not(:has(~ .ringrow)){ border-bottom:none; }
@@ -718,25 +689,11 @@
   .muschip{ font-size:var(--t-xs); font-weight:var(--w-semi); padding:4px 9px; border-radius:var(--r-sm); background:var(--sep); color:var(--l2); }
   .muschip.on{ background:rgba(81,207,102,.16); color:#237032; }
   html.dark .muschip.on{ color:#69db7c; }
-  .rglg{ display:flex; align-items:center; gap:7px; font-size:var(--t-sm); color:var(--l2); }
-  .rglg i{ width:9px; height:9px; border-radius:50%; flex:0 0 auto; }
-  .rglg b{ color:var(--ink); font-weight:var(--w-bold); margin-left:auto; }
-  .ovdelta{ font-size:var(--t-sm); font-weight:var(--w-semi); margin-top:12px; }
-  .ovdelta.up{ color:#37b24d; } .ovdelta.down{ color:var(--l2); }
-  .ovgoaltop{ display:flex; justify-content:space-between; align-items:baseline; font-size:var(--t-sm); color:var(--l2); margin-bottom:8px; }
-  .ovgoaltop b{ font-size:var(--t-lg); color:var(--ink); font-weight:var(--w-bold); }
-  .ovgoalbar{ height:10px; border-radius:6px; background:var(--track-tint); overflow:hidden; }
-  .ovgoalbar i{ display:block; height:100%; border-radius:6px; background:var(--grad-bar); transition:width .45s ease; }
   /* muscle-balance coach suggestions: a plain card; the options are secondary buttons */
   .sgopts{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
   .sgbtn{ background:var(--tint), var(--surface); border:0; color:var(--ink); border-radius:var(--r-md); min-height:44px; padding:12px 16px; font:inherit; font-size:var(--t-md); font-weight:var(--w-semi); cursor:pointer; transition:transform .1s; }
   .sgbtn:active{ transform:scale(.95); }
   .sgbtn.rm{ background:var(--fill); color:var(--red); }   /* destructive stays red */
-  .ovweek{ display:grid; grid-template-columns:repeat(7,1fr); gap:7px; }
-  .ovd{ text-align:center; font-size:var(--t-xs); font-weight:var(--w-bold); color:var(--l3); }
-  .ovd i{ display:block; height:28px; border-radius:var(--r-sm); background:var(--row); margin-top:8px; }
-  .ovd.on i{ background:var(--grad-bar); }
-  .ovd.today i{ box-shadow:0 0 0 2px var(--accent) inset; }
   /* friends feed — cheer + comment */
   .feedbar{ display:flex; gap:8px; margin-top:12px; }
   .feedbar button{ display:inline-flex; align-items:center; gap:5px; background:var(--tint), var(--surface); border:.5px solid transparent; border-radius:var(--r-pill); padding:8px 12px; font-size:var(--t-sm); font-weight:var(--w-semi); color:var(--ink); cursor:pointer; transition:transform .1s, background .15s; }
@@ -802,14 +759,13 @@
   .msg-compose .comminput{ flex:1; padding:11px 14px; }
   .msg-empty{ text-align:center; color:var(--l2); padding:32px 16px; line-height:1.5; }
   .msg-empty-ic{ font-size:40px; margin-bottom:8px; color:var(--l3); line-height:0; }
-  .msg-foot{ font-size:var(--t-xs); color:var(--l3); line-height:1.5; margin:18px 0 4px; }
   .msg-link{ color:var(--ink); font-weight:var(--w-semi); cursor:pointer; }
   .msg-notif{ display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--accent-soft); border:.5px solid var(--accent-soft); border-radius:var(--r-md); padding:10px 12px; margin-bottom:12px; font-size:var(--t-md); color:var(--ink); }
   .msg-notif-act{ display:flex; align-items:center; gap:6px; flex:0 0 auto; }
   .msg-notif-x{ background:none; border:none; color:var(--ink); font-size:var(--t-xl); line-height:1; cursor:pointer; padding:2px 6px; }
   /* monochrome icons inside the messaging UI (replace the old emoji) */
   .msg-empty-ic svg{ width:38px; height:38px; }
-  .msg-foot svg, .msg-convo-prev svg, .msg-locked svg{ width:13px; height:13px; vertical-align:-2px; }
+  .msg-convo-prev svg, .msg-locked svg{ width:13px; height:13px; vertical-align:-2px; }
   .msg-notif svg{ color:var(--accent); width:17px; height:17px; vertical-align:-4px; }
   /* swipeable discover deck — cards snap, the next one peeks so it reads as swipeable */
   .discwrap{ display:flex; gap:10px; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch;
@@ -840,13 +796,6 @@
   .obopt:active{ transform:scale(.98); background:var(--accent-soft); }
   .obopt b{ display:block; font-size:var(--t-lg); font-weight:var(--w-semi); }
   .obopt span{ display:block; font-size:var(--t-sm); color:var(--l2-tint); margin-top:2px; }
-  /* progress chart — a 5-page metric carousel (Volume/Sets/Sessions/Weight/PRs) the finger drags & snaps.
-     Viewport stretches to the panel edges; each page re-insets the chart by 16px so charts keep a gutter. */
-  .progswipe{ margin:12px 0 6px; overflow:hidden; }
-  .progtrack{ display:block; }
-  .progpage{ display:none; box-sizing:border-box; }
-  .progpage.on{ display:block; }
-  .progpage canvas{ display:block; width:100%; height:auto; aspect-ratio:11/3; outline:none; -webkit-tap-highlight-color:transparent; }
   .progchart{ width:100%; height:auto; aspect-ratio:11/3; display:block; }
   .progcap{ font-size:var(--t-sm); color:var(--l2); margin:8px 0 2px; line-height:1.4; }
   /* legend swatch for a two-line chart — matches the stroke colours in drawProgChart */
@@ -923,12 +872,7 @@
   .fclg i{ width:11px; height:3px; border-radius:2px; display:inline-block; }
   .fclg .fcbandi{ height:10px; border-radius:2px; background:var(--l3); opacity:.28; }
   .fcnote{ font-size:var(--t-xs); color:var(--l2); line-height:1.45; margin:8px 0 0; }
-  /* strength-forecast ledger card rows */
-  .slrow{ font-size:var(--t-md); color:var(--ink); padding:5px 0; border-bottom:.5px solid var(--sep); }
-  .slrow:last-of-type{ border-bottom:none; }
-  .slband{ font-size:var(--t-xs); color:var(--l3); }
   /* strength-progress tile: headline trend + across-exercises rows (each taps through to the full chart) */
-  .exprogsum{ font-size:var(--t-sm); color:var(--l2); font-weight:var(--w-semi); margin:2px 0 6px; }
   .exprogsub{ font-weight:var(--w-med); color:var(--l3); font-size:var(--t-xs); }
   #exProgChart{ display:block; width:100%; height:auto; }
   #slML, #slPA{ display:block; width:100%; height:auto; margin:12px 0 10px; }
@@ -1132,9 +1076,6 @@
   .injsev > .s[data-sev="1"].active{ background:var(--grad-s1); color:#3a2c00; box-shadow:none; }
   .injsev > .s[data-sev="2"].active{ background:var(--grad-s2); color:#2a1200; box-shadow:none; }   /* white on this orange measured 2.6:1 */
   .injsev > .s[data-sev="3"].active{ background:var(--grad-s3); color:#fff; box-shadow:none; }
-  .wkmeta{ display:flex; align-items:center; gap:8px; font-size:var(--t-sm); color:var(--l2-page); font-weight:var(--w-med); margin:-4px 0 16px; }
-  .wkmeta svg{ width:16px; height:16px; color:var(--l3); flex:0 0 auto; }
-  .wkmeta b{ color:var(--ink); font-weight:var(--w-bold); }
   .sslabel{ display:flex; align-items:center; gap:6px; font-size:var(--t-xs); font-weight:var(--w-bold); letter-spacing:.5px; text-transform:uppercase; color:var(--l2); margin:2px 0 8px; }
   .sslabel svg{ width:13px; height:13px; }
   /* a superset reads as one block split by a 2px seam: tight inner corners, the outer ones keep the card radius */
@@ -1355,8 +1296,6 @@
   .infocues li:first-child{ border-top:none; }
   .infocues li::before{ content:"›"; position:absolute; left:2px; top:7px; color:var(--l3); font-weight:var(--w-bold); }
   a.btn{ text-decoration:none; text-align:center; display:block; }
-  /* free-mode muscle sections */
-  .mgsec{ margin-bottom:4px; }
   .beat{ font-size:var(--t-sm); font-weight:var(--w-semi); }
   .beat.has{ color:var(--ink); }
   .beat.none{ color:var(--l3); }
@@ -1387,7 +1326,6 @@
   .injdetail{ margin-bottom:18px; }
   .injdetail .ed-label{ margin-top:0; }
   .injadvice{ background:var(--row); border-radius:var(--r-md); padding:14px 16px; margin-bottom:10px; }
-  .injadv-h{ font-size:var(--t-md); font-weight:var(--w-bold); margin-bottom:6px; }
   .injadvice p{ font-size:var(--t-sm); color:var(--l2); line-height:1.5; margin:0 0 9px; }
   .injadvice .srclink{ display:block; font-size:var(--t-xs); color:var(--l3); line-height:1.45; }
   .injadvice.redflag{ border-left:3px solid var(--sev3); }   /* severe — possible fracture/tear */
@@ -1488,14 +1426,11 @@
   .lnkic svg{ width:18px; height:18px; }
   .lnkic:active{ color:var(--accent); }
   .exhead .menubtn{ margin-right:-14px; }   /* centre ⋮ over the ⊖ column */
+  button.lnk, button.lnkic{ background:none; border:0; font-family:inherit; -webkit-appearance:none; appearance:none; } button.lnkic{ padding:0; }
   .lnk{ font-size:var(--t-sm); color:var(--l2); text-decoration:none; cursor:pointer; display:inline-flex; align-items:center; padding:8px 8px; margin:-8px -2px; }
   .lnk:active{ color:var(--accent); }
   .dot{ color:var(--l3); font-style:normal; margin:0 8px; font-size:var(--t-xs); }
 
-  .savebar{ position:fixed; left:0; right:0; bottom:0; max-width:540px; margin:0 auto;
- padding:12px 16px calc(12px + env(safe-area-inset-bottom));
-    background:linear-gradient(0deg, var(--bg) 62%, transparent);
-    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
 
   .toast{ position:fixed; left:50%; bottom:92px; transform:translate(-50%,16px); z-index:120;
     background:rgba(28,28,30,.94); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
@@ -1545,7 +1480,7 @@
 
   .scrim{ position:fixed; inset:0; background:rgba(0,0,0,.45); opacity:0; pointer-events:none; transition:opacity .3s; z-index:90; }
   .scrim.show{ opacity:1; pointer-events:auto; }
-  .sheet{ position:fixed; left:0; right:0; bottom:0; max-width:540px; margin:0 auto; z-index:100;
+  .sheet{ position:fixed; left:0; right:0; bottom:0; max-width:var(--col); margin:0 auto; z-index:100;
     background:var(--sheetbg); border-radius:22px 22px 0 0; transform:translateY(102%);
     transition:transform .34s cubic-bezier(.2,.8,.2,1); max-height:92vh; display:flex; flex-direction:column; overflow:hidden; }
   .sheet.show{ transform:translateY(0); box-shadow:0 -1px 0 var(--hi), 0 -20px 50px -20px rgba(0,0,0,.4); }
@@ -1649,9 +1584,7 @@
   .gchip.grow{ color:var(--goodtx); border-color:#51cf6655; background:#51cf6618; }
   .gchip.hold{ color:var(--holdtx); border-color:#f59f0055; background:#f59f0018; }
   .gchip.shrink{ color:var(--badtx); border-color:#ff6b6b55; background:#ff6b6b18; }
-  .gchip.bord{ border-style:dashed; }   /* borderline: within input-noise of a decision boundary */
   .gchip.over{ color:var(--l2); border-color:var(--line); background:var(--row); }  /* past the productive range */
-  .gchip .gq{ font-weight:var(--w-bold); opacity:.6; margin-left:-1px; }
   /* ===== calm-pass: summary card (one glanceable line) → opens a detail sheet on tap ===== */
   .tsum{ display:flex; align-items:center; gap:14px; width:100%; padding:2px 0 2px; margin-top:12px; }
   .tsum-mini{ flex:0 0 auto; width:78px; height:52px; margin:0; }
@@ -1749,9 +1682,6 @@
   /* the lifted tile follows the finger (fixed), the placeholder shows the drop slot */
   .editing .metile.dragging{ position:fixed; z-index:200; margin:0; opacity:.97; box-shadow:0 18px 44px rgba(0,0,0,.30); transform:scale(1.03); }
   .tileph{ border:2px dashed var(--accent); border-radius:var(--r-lg); background:var(--accent-soft); opacity:.55; margin:0 0 var(--gap-card); box-sizing:border-box; }
-  /* objective-adherence line moved onto the Progress tile */
-  .progobj{ font-size:var(--t-sm); font-weight:var(--w-semi); color:var(--l2); margin:2px 0 8px; }
-  .progobj.good{ color:var(--goodtx); } .progobj.under{ color:var(--badtx); }
   #buildRadar{ width:100%; max-width:320px; height:auto; aspect-ratio:1/1; display:block; margin:16px auto; }
   #musRadar{ width:100%; max-width:320px; height:auto; aspect-ratio:9/8; display:block; margin:4px auto 0; }
   /* Unified card for the two homogenised panels (Muscle balance + Progress):
@@ -1765,22 +1695,8 @@
   .panelt{ display:inline-flex; align-items:center; gap:6px; }
   .panelt svg{ box-sizing:content-box; width:15px; height:15px; padding:4px; margin:-4px 2px -4px 0; flex:0 0 auto; border-radius:6px; background:var(--disc); color:var(--disc-ink); }   /* the tile's icon carries the accent on a tinted square; its title stays neutral */
   .paneltabs{ margin:9px 0 2px; }
-  /* swipe carousels — clip viewport bleeds to the card edges (negative side margins cancel the padding) */
-  .meRing{ margin:10px -16px 8px; overflow:hidden; touch-action:pan-y;
-    -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
-  .meRingTrack{ display:flex; width:200%; will-change:transform; }
-  .meRingPage{ flex:0 0 50%; width:50%; display:flex; align-items:center; justify-content:center; }
-  #meRadar, #meRadar2{ display:block; width:100%; max-width:300px; aspect-ratio:1/1; height:auto; outline:none; -webkit-tap-highlight-color:transparent; }
-  /* panel footer — balance: stat | cta (row); progress: caption + verdict (stacked via .stack) */
-  .panelfoot{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:4px; }
-  .panelfoot.stack{ display:block; }
-  .mebalstat{ font-size:var(--t-sm); font-weight:var(--w-semi); color:var(--l2); }
-  .mebalstat.under{ color:var(--red); }
-  .mebalstat.good{ color:#2fb463; }
-  .mebalcta{ font-size:var(--t-xs); color:var(--l3); flex:0 0 auto; }
   .emphradar{ max-width:300px!important; margin:8px auto 12px!important; touch-action:none; cursor:grab; -webkit-user-select:none; user-select:none; }
   .emphradar:active{ cursor:grabbing; }
-  .prevhdr{ display:flex; align-items:center; justify-content:space-between; margin:20px 0 0; font-size:var(--t-xs); font-weight:var(--w-bold); letter-spacing:.6px; text-transform:uppercase; color:var(--l2-page); }
 
   #exChart{ width:100%; height:auto; aspect-ratio:1000/587; background:var(--chartbg); border-radius:var(--r-md); display:block; }   /* 210px tall at 358 wide, unstretched text */
   .cmeta{ display:flex; gap:10px; margin:16px 0 8px; }

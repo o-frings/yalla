@@ -899,7 +899,6 @@ function workoutMinutes(w){
   }
   return Math.round(sec/60/5)*5;             // nearest 5 min
 }
-function workoutSupersets(w){ const set=new Set(); (w.ex||[]).forEach(e=>{ if(e.ss) set.add(e.ss); }); return set.size; }
 // a superset must stay in one gym area — group only consecutive isolation accessories that share equipment
 // the physical gym area a move lives in — supersets only pair within the same one (no running across the gym)
 function exArea(name){
@@ -1006,9 +1005,10 @@ const _mem={};
 function hasWS(){ try{ return !!(window.storage && window.storage.get); }catch(e){ return false; } }
 function hasLS(){ try{ return !!window.localStorage; }catch(e){ return false; } }
 async function sget(k){
+  if(k in _mem) return _mem[k];   // a value the browser refused to store (storage full) is newer than the stored one
   if(hasWS()){ try{ const r=await window.storage.get(k); return r?JSON.parse(r.value):null; }catch(e){ return null; } }
   if(hasLS()){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):null; }catch(e){ return null; } }
-  return (k in _mem)?_mem[k]:null;
+  return null;
 }
 async function sset(k,v){
   if(_booting) return ssetQuiet(k,v);   // init's migrations and clocks are bookkeeping, not edits (see ssetQuiet)
@@ -1017,10 +1017,16 @@ async function sset(k,v){
 }
 // Local-only write — used by sset and by the sync layer when adopting cloud data (so it doesn't echo back).
 async function _localSet(k,v){
-  if(hasWS()){ try{ await window.storage.set(k, JSON.stringify(v), false); return; }catch(e){} }
-  if(hasLS()){ try{ localStorage.setItem(k, JSON.stringify(v)); return; }catch(e){} }
+  if(hasWS()){ try{ await window.storage.set(k, JSON.stringify(v), false); delete _mem[k]; return; }catch(e){} }
+  if(hasLS()){ try{ localStorage.setItem(k, JSON.stringify(v)); delete _mem[k]; return; }catch(e){ storageFull(); } }
   _mem[k]=v;
 }
+// The browser refused a write: its storage for yalla is full. The change lives in memory until the app closes, so say
+// so once (signed in, the cloud copy still gets it).
+let _storeFull=false;
+function storageFull(){ if(_storeFull) return; _storeFull=true;
+  setTimeout(()=>toast(cloudUser ? "Yalla's storage on this phone is full. New changes still reach your cloud copy."
+    : "Yalla's storage on this phone is full, so new changes may be lost when the app closes. Sign in to keep a cloud copy.", true), 0); }
 
 // ================= cloud sync (Supabase) =================
 // Feature-flagged: with blank keys the whole layer stays dormant and the app is 100% local.
@@ -1642,8 +1648,7 @@ function updateLiveRow(){
   const _lt = liveOn ? "Sharing live" : "Share live";   // the label exists in two places
   [$("liveLbl"), $("livePanelLbl")].forEach(el=>{ if(el) el.textContent=_lt; });
   updateSocialWrap();
-  if(liveAvailable() && _liveFollowers===null) loadLivePicks();   // know the audience up front (powers the summary)
-  liveAudienceLabel();
+  if(liveAvailable() && _liveFollowers===null) loadLivePicks();   // know the audience up front
 }
 // Inline per-session picker: tick friends to share THIS session with, independently of the start
 // toggle. Always-on grantees (Settings → Friends) are shown locked-on — they always see you live.
@@ -1661,18 +1666,7 @@ async function loadLivePicks(){
   _liveFollowers=followers; recordAvatars(followers);
   // mirror the default: everyone's ticked until you narrow it
   if(!_liveAudienceCustom && !_liveViewers.length) _liveViewers = followers.map(u=>u.user_id);
-  renderLivePicks(); liveAudienceLabel();
-}
-// sleek audience summary on the picker: a face-pile + one marked name ("Lea +2")
-function liveAudienceLabel(){
-  const lbl=$("livePickLbl"), faces=$("lpFaces"); if(!lbl) return;
-  if(_liveFollowers===null){ if(faces) faces.innerHTML=""; lbl.textContent="Choose who can watch"; return; }
-  if(!_liveFollowers.length){ if(faces) faces.innerHTML=""; lbl.textContent="No friends yet"; return; }
-  const sel=_liveFollowers.filter(u=> u.live || _liveViewers.indexOf(u.user_id)>=0);
-  if(faces) faces.innerHTML = sel.slice(0,4).map(u=> avatarHTML(u.display_name,{size:26,uid:u.user_id})).join('');
-  if(!sel.length){ lbl.textContent="No one yet"; return; }
-  const first=(sel[0].display_name||"A friend").split(" ")[0];
-  lbl.textContent = sel.length>1 ? (first+" +"+(sel.length-1)) : first;
+  renderLivePicks();
 }
 function renderLivePicks(){
   const box=$("livePick"); if(!box || _liveFollowers===null) return;
@@ -1686,7 +1680,7 @@ function renderLivePicks(){
     _liveAudienceCustom=true;   // you've taken control of the audience
     const uid=c.dataset.uid, i=_liveViewers.indexOf(uid);
     if(i>=0) _liveViewers.splice(i,1); else _liveViewers.push(uid);
-    c.classList.toggle("on", i<0); liveAudienceLabel();
+    c.classList.toggle("on", i<0);
     if(liveOn) pushLiveViewers();   // already broadcasting → update who can watch + ping the new picks
   });
 }
@@ -1838,7 +1832,7 @@ async function renderLiveCards(){
     const s=r.state||{}, who=names[r.user_id]||"A friend";
     const card=document.createElement("div"); card.className="livecard";
     card.innerHTML=avatarHTML(who,{size:44,live:true,uid:r.user_id})+'<div style="flex:1; min-width:0;"><div style="font-weight:700;">'+esc(who)+' is training live</div>'
-      +'<div class="levelcap" style="margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">'+esc(s.name||"Workout")+(s.exName?' · '+esc(s.exName):'')+' · '+(s.doneSets||0)+' sets</div></div><span class="livego">Watch<span class="ovchev lnkchev">›</span></span>';
+      +'<div class="levelcap" style="margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">'+esc(s.name||"Workout")+(s.exName?' · '+esc(s.exName):'')+' · '+(parseInt(s.doneSets)||0)+' sets</div></div><span class="livego">Watch<span class="ovchev lnkchev">›</span></span>';
     card.onclick=()=>openLiveView(r.user_id, who);
     strip.appendChild(card);
   });
@@ -2079,7 +2073,6 @@ function teardownMessages(){
 }
 function setMsgBadge(n){
   const b=$("msgRailBadge"); if(b){ b.textContent=n>9?"9+":String(n); b.style.display=n>0?"":"none"; }
-  const fb=$("friendsMsgBadge"); if(fb){ fb.textContent=n>9?"9+":String(n); fb.style.display=n>0?"":"none"; }
   const ic=$("ovMessages"); if(ic) ic.classList.toggle("has-unread", n>0);   // a hook for unread styling; the count badge is the cue today
 }
 async function refreshUnread(){
@@ -2788,10 +2781,8 @@ $("cYes").onclick=()=>{ const fn=_confirmYes; confirmClose(); if(fn) fn(); };
 function tmrFmt(s){ s=Math.floor(s); const m=Math.floor(s/60), ss=s%60; return m+":"+(ss<10?"0":"")+ss; }
 function tmrElapsed(){ return timer.elapsed + (timer.running && timer.startedAt ? (Date.now()-timer.startedAt)/1000 : 0); }
 function tmrRender(){
-  const idle = !timer.running && timer.elapsed===0;   // not started yet → collapse to a slim "Start" affordance
   $("tmrTime").textContent=tmrFmt(tmrElapsed());
   $("timerBar").classList.toggle("run", timer.running);
-  $("timerBar").classList.toggle("idle", idle);
   $("tmrToggle").innerHTML = timer.running ? ICON.pause : ICON.play;
   $("tmrToggle").setAttribute("aria-label", timer.running ? "Pause the session timer" : "Resume the session timer");
   const paused = !timer.running && timer.elapsed>0;
@@ -2826,8 +2817,7 @@ function updateTrainingState(){ const on=sessionUnderway(); document.body.classL
 function updateTimerStick(){
   const w=$("largeTitle"); if(!w) return;
   const rb=$("restBar");
-  const active = timer.running || timer.elapsed>0 || (rb && rb.classList.contains("show"));
-  w.classList.toggle("stick", !!active);
+  w.classList.toggle("stick", sessionUnderway() || !!(rb && rb.classList.contains("show")));
 }
 (function(){ const pg=$("pageWorkout"), lt=$("largeTitle"); if(!pg || !lt) return;
   const under=()=> lt.classList.toggle("under", pg.scrollTop>2);
@@ -3196,7 +3186,7 @@ async function init(){
     if(window.requestIdleCallback) requestIdleCallback(seed, {timeout:2000}); else setTimeout(seed, 300); }
   if(!settings.objective){ const ob=$("onboardWrap"); if(ob) ob.classList.add("show"); }   // ask the objective up front
   try{ if(location.hash && location.hash.indexOf("LIFTLOG1:")>=0){ openImport(decodeURIComponent(location.hash.slice(1))); } }catch(e){}
-  watchFromHash(300);   // an Apple Watch workout link
+  if(!watchFromHash(300)) watchPending(300);   // an Apple Watch workout link, or one still pending from before a reload
   maybeBackupNudge();
   _booting=false;
 }
@@ -3226,7 +3216,6 @@ function renderNav(){
 function ovGreetWord(){ const h=new Date().getHours(); return h<5?"Still up":h<12?"Good morning":h<18?"Good afternoon":"Good evening"; }
 // "Good morning, Sam" — the late-night one is a question, so its "?" goes after the name
 function ovGreeting(){ const w=ovGreetWord(), nm=settings.displayName||settings.name; return w+(nm?", "+nm:"")+(w==="Still up"?"?":""); }
-function trainedToday(){ const t=new Date().toDateString(); return Object.keys(hist).some(n=>(hist[n]||[]).some(e=>new Date(e.d).toDateString()===t)); }
 // muscles the active plan actually intends to train (its objective) — so we flag what the plan targets, not what it deliberately skips
 function planScopeMuscles(plan){
   if(!plan) return MGROUPS.slice();                                   // no plan → balanced (all muscles in scope)
@@ -3287,18 +3276,6 @@ function renderMeDiscover(){
     wrap.onscroll=()=>{ let best=0, bd=1e9; cards.forEach((c,i)=>{ const d=Math.abs(c.offsetLeft-wrap.scrollLeft); if(d<bd){bd=d;best=i;} });
       dotsEl.querySelectorAll(".discdot").forEach((el,i)=> el.classList.toggle("on", i===best)); }; }
 }
-// Apple-style activity rings — concentric arcs filling toward each weekly target
-function drawRings(id, rings){
-  const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, cx=W/2, cy=W/2; ctx.clearRect(0,0,W,W);
-  const n=rings.length, thick=W*(n>3?0.10:0.13), gap=W*(n>3?0.022:0.03); let r=W*0.5-thick/2-2;
-  rings.forEach(rg=>{
-    const pct=Math.max(0, Math.min(1, rg.target? rg.val/rg.target : 0));
-    ctx.lineWidth=thick; ctx.lineCap="round";
-    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.strokeStyle=hexAlpha(rg.color,.18); ctx.stroke();   // track
-    if(pct>0){ const a0=-Math.PI/2; ctx.beginPath(); ctx.arc(cx,cy,r,a0,a0+Math.PI*2*pct); ctx.strokeStyle=rg.color; ctx.stroke(); }
-    r-=thick+gap;
-  });
-}
 // ===== "This week" rings detail — tap the overview rings to see what each one means + which muscles
 // you've trained vs the ones your plan targets but you haven't hit yet =====
 function ringRow(color,label,val,target,desc,unit,dec){
@@ -3345,17 +3322,6 @@ function renderRingsDetail(){
   const done=[f7>=sessTarget, setsWk>=setsTarget, musWk.size>=12].concat(cTgt>0?[cardioDoseWeek(7)>=cTgt]:[]), shut=done.filter(Boolean).length;
   const lead=$("ringsLead"); if(lead){ lead.className="lh"+(shut===done.length?" good":""); lead.textContent=shut+" of "+done.length+" rings closed"; }
   const link=$("ringsToMus"); if(link) link.onclick=()=>{ closeSheet("Rings"); openMuscles(); };
-}
-// small weekly-sets sparkline for the overview
-function drawOvSets(id){ const c=$(id); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
-  const data=progWeeklyData("sets"), ac=accentHex(), hi=Math.max(1,...data), base=H-22, top=16, pad=12;
-  const x=i=>pad+i*((W-pad*2)/(data.length-1)), y=v=>base-(v/hi)*(base-top);
-  ctx.strokeStyle=hexAlpha(ac,.18); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad,base+.5); ctx.lineTo(W-pad,base+.5); ctx.stroke();
-  ctx.strokeStyle=ac; ctx.lineWidth=3; ctx.lineJoin="round"; ctx.lineCap="round"; ctx.beginPath();
-  data.forEach((v,i)=>{ i?ctx.lineTo(x(i),y(v)):ctx.moveTo(x(i),y(v)); }); ctx.stroke();
-  data.forEach((v,i)=>{ ctx.beginPath(); ctx.arc(x(i),y(v), i===data.length-1?5:3, 0, 7); ctx.fillStyle=i===data.length-1?ac:hexAlpha(ac,.5); ctx.fill(); });
-  const l3=(getComputedStyle(document.documentElement).getPropertyValue('--l3')||'#888').trim();
-  ctx.fillStyle=l3; ctx.font=cfont(W,"label"); ctx.textAlign="left"; ctx.fillText("10w ago",pad,H-5); ctx.textAlign="right"; ctx.fillText("now",W-pad,H-5);
 }
 function lastWorkoutTs(){ let m=0; Object.keys(hist).forEach(n=>(hist[n]||[]).forEach(e=>{ if(e.d>m) m=e.d; })); return m; }
 // most recent logged rotational / anti-rotation move (0 = never) — drives the weekly rotational nudge
@@ -4252,8 +4218,6 @@ function daySetMap(nDays){
   Object.keys(hist).forEach(n=> (hist[n]||[]).forEach(e=>{ if(e.d>=cutoff){ const k=new Date(e.d).toDateString(); m[k]=(m[k]||0)+(e.n||0); } }));
   return m;
 }
-// distinct days in the last nDays whose total sets clear the session gate
-function sessionDays(nDays){ const m=daySetMap(nDays); return Object.keys(m).filter(k=>m[k]>=QUALIFY_SETS).length; }
 function setsToday(){ const t=new Date().toDateString(); return daySetMap(1)[t]||0; }
 function sessionToday(){ return setsToday()>=QUALIFY_SETS; }
 // ===== session credit: a workout counts toward your weekly Sessions ring and lifetime tally in
@@ -4722,7 +4686,6 @@ function renderWorkout(){
   applyDraft();
   list.querySelectorAll(".group").forEach(refreshSetFocus);   // mark logged sets done (visual only)
   renderStartMode();
-  updateRepeatBtn();
   updateLiveRow();
   updateGymRow();
   renderSessionRose();
@@ -4743,21 +4706,6 @@ function renderSessionRose(){
   const top=G.slice().sort((a,b)=>(agg[b]||0)-(agg[a]||0)).filter(g=>(agg[g]||0)>0).slice(0,3).map(g=>MSHORT[g]||g);
   const sub=$("sessRoseSub"); if(sub) sub.textContent=(st.doneSets||0)+" set"+(st.doneSets===1?"":"s")+" logged · mostly "+top.join(" · ");
 }
-// prefill every set with last session's weights/reps — then the user just confirms or tweaks before Finish
-function repeatLastWorkout(){
-  let filled=0;
-  document.querySelectorAll("#exlist .group").forEach(g=>{
-    const name=g.dataset.ex, prev=name&&last[name]; if(!prev||!prev.length) return;
-    g.querySelectorAll(".setrow").forEach((r,i)=>{ const dv=prev[Math.min(i,prev.length-1)]||{}, w=r.querySelector(".w"), rp=r.querySelector(".r");
-      if(w) w.value=(dv.w!=null?dv.w:""); if(rp) rp.value=(dv.r!=null?dv.r:""); if((w&&w.value)||(rp&&rp.value)){ updateSetVol(r,name); filled++; } });
-    refreshAutoEffort(g);
-  });
-  if(filled){ captureDraft(); toast("Filled in last time — tweak any, then Finish"); }
-  else toast("No previous numbers to copy yet");
-}
-// the whole-workout "Last time" button is retired: last time now shows once, as the grey values in each set row
-function updateRepeatBtn(){ const btn=$("repeatBtn"); if(btn) btn.style.display="none"; }
-$("repeatBtn").onclick=repeatLastWorkout;
 // fill ONE exercise from its own last session (tap the "↻ Last …" chip on that exercise)
 function fillExerciseLast(name){
   const g=[...document.querySelectorAll("#exlist .group")].find(x=>x.dataset.ex===name);
@@ -4885,6 +4833,7 @@ $("saveBtn").onclick=async()=>{
   const mins=Math.max(session.sets>0?1:0, Math.round((_lastSetEl>0 ? _lastSetEl : tmrElapsed())/60));
   if(mins>0){ settings.timeTotal=(settings.timeTotal||0)+mins; }
   session.mins=mins; session.beaten=beaten; session.sub=logged+" exercise"+(logged>1?"s":"");
+  session.end=_lastSetAt||session.date;   // the last set's wall-clock time: where the minutes stop (Finish may come much later)
   tmrReset(); restStop(); endLive(true);   // close any live broadcast; the finished workout posts to the feed below
   // Every workout adds session-equivalents to the lifetime tally in proportion to the work done, so a
   // short "micro session" still counts (see finishCredit). A full-substance session (>= QUALIFY_SETS sets)
@@ -5292,7 +5241,6 @@ function openSheet(s){ $("scrim"+s).classList.add("show"); const sh=$("sheet"+s)
   if(sh && sh.classList.contains("detailsheet")) setTimeout(()=>{ sh.querySelectorAll(".sheetbody canvas").forEach(cv=>{ if(cv.id) animateFig(cv.id); }); }, 170);
 }
 function closeSheet(s){ $("scrim"+s).classList.remove("show"); $("sheet"+s).classList.remove("show"); if(s==="Share"){ clearTimeout(_burstArm); _burstArm=0; } }
-if($("planPick")) $("planPick").onclick=()=>{ renderPlanList(); openSheet("Plans"); };
 $("closePlans").onclick=()=>closeSheet("Plans");
 $("scrimPlans").onclick=()=>closeSheet("Plans");
 // move the "set-once" groups (body details, appearance, account, data) off Me into the Settings sheet
@@ -5441,13 +5389,13 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
   // iOS-style rubber band: progressive resistance, asymptotes to ~the dimension
   const rubber=(over, dim)=> (1 - 1/(Math.abs(over)*0.55/dim + 1)) * dim * (over<0?-1:1);
   let idx=Math.max(0, ORDER.indexOf(curTab()));
-  let tx=0, raf=0;                                                 // tracked horizontal position of the track (px)
+  let tx=0;                                                        // the track's position (px) while a finger drags it
   const apply=()=>{ track.style.transform="translateX("+tx+"px)"; };
-  // a settled page is placed in % of the track (the pager's width), so a width change can never leave the view between
-  // two pages: on rotation iOS can fire resize before the new width is laid out, and a px offset measured then was stale
-  function place(i, animate, ms){ cancelAnimationFrame(raf); idx=Math.min(2,Math.max(0,i));
+  // a settled page is placed in % of the track (the pager's width), so it stays square through any width change with no
+  // resize handling: on rotation iOS can fire resize before the new width is laid out, and a px offset measured then was stale
+  function place(i, animate, ms){ idx=Math.min(2,Math.max(0,i));
     track.style.transition = animate ? ("transform "+(ms||340)+"ms cubic-bezier(.32,.72,0,1)") : "none";
-    tx=-idx*W(); track.style.transform="translateX("+(-idx*100)+"%)"; }
+    track.style.transform="translateX("+(-idx*100)+"%)"; }
   window.__pageGo=(name)=>{ const i=ORDER.indexOf(name); if(i>=0 && i!==idx) place(i, true); };
   place(idx, false);
   // the pager clips its overflow but can still be scrolled sideways from script (scrollIntoView, focus on a page that's
@@ -5456,17 +5404,12 @@ document.querySelectorAll(".tabitem").forEach(t=> t.onclick=()=> showTab(t.datas
 
   // don't hijack gestures meant for an input, canvas, button, horizontal strip, drag handle, the tab bar, or an open sheet
   const blocked=el=>{ for(let n=el; n && n!==document.body; n=n.parentElement){
-    if(n.matches && n.matches('input,textarea,select,canvas,button,[data-act="grip"],.seg,.sexseg,.appearance,.chips,.tabbar,.sheet,.meRing,.progswipe')) return true;
+    if(n.matches && n.matches('input,textarea,select,canvas,button,[data-act="grip"],.seg,.sexseg,.appearance,.chips,.tabbar,.sheet')) return true;
     const ox=getComputedStyle(n).overflowX; if((ox==="auto"||ox==="scroll") && n.scrollWidth>n.clientWidth+4) return true;
   } return false; };
   let x0=0, y0=0, armed=false, locked=false, dragging=false, lastX=0, lastT=0, vx=0, fromRow=null;
-  // re-square after a size change (rotation, split view); ResizeObserver reports after layout, with the real width
-  const resquare=()=>{ if(!dragging) place(idx, false); };
-  window.addEventListener("resize", resquare);
-  if(window.ResizeObserver) new ResizeObserver(resquare).observe(pager);
   pager.addEventListener("touchstart",e=>{
     if(e.touches.length!==1 || document.querySelector(".sheet.show, #onboardWrap.show") || blocked(e.target)){ armed=false; return; }
-    cancelAnimationFrame(raf);
     x0=lastX=e.touches[0].clientX; y0=e.touches[0].clientY; lastT=Date.now(); vx=0; fromRow=e.target.closest(".setrow");
     armed=true; locked=false; dragging=false; track.style.transition="none";
   },{passive:true});
@@ -5705,8 +5648,9 @@ function sanitizePlan(obj){
     name:String(w.name||"Workout").slice(0,40), sub:String(w.sub||"").slice(0,60), rotate:w.rotate!==false,
     ex:(w.ex||[]).filter(e=>e&&e.n).map(e=>({ n:String(e.n).slice(0,60), t:String(e.t||"3 × 8").slice(0,30),
       s:Math.max(1,Math.min(10,parseInt(e.s)||3)),
-      alts:Array.isArray(e.alts)?e.alts.slice(0,8).map(a=>String(a).slice(0,60)):[] }))
-  })).filter(w=>w.ex.length);
+      alts:Array.isArray(e.alts)?e.alts.slice(0,8).map(a=>String(a).slice(0,60)):[] })),
+    cardio:cdArr(w.cardio).filter(c=>c && cardioActs().includes(c.n)).slice(0,6).map(c=>({ n:c.n, end:c.end?1:0 }))
+  })).filter(w=>w.ex.length).map(w=>{ if(!w.cardio.length) delete w.cardio; return w; });
   return { id:"plan"+Date.now()+Math.floor(Math.random()*99), name:String(obj.name||"Imported plan").slice(0,40), workouts:wk };
 }
 let sharePlanRef=null;
@@ -5728,7 +5672,8 @@ function shareCompute(){
   const p=sharePlanRef, ta=$("shareCode");
   const picks=[...document.querySelectorAll('#shareList input:checked')].map(c=>+c.dataset.i);
   if(!picks.length){ ta.value="— select at least one workout —"; ta._msg=""; return; }
-  const sel=picks.map(i=>p.workouts[i]).map(w=>({name:w.name,sub:w.sub,rotate:w.rotate,ex:w.ex}));
+  const sel=picks.map(i=>p.workouts[i]).map(w=>{ const o={name:w.name,sub:w.sub,rotate:w.rotate,ex:w.ex}, cd=cdArr(w.cardio);
+    if(cd.length) o.cardio=cd.map(c=>({ n:c.n, end:c.end?1:0 })); return o; });
   const all = sel.length===p.workouts.length;
   const obj = all ? { t:"plan", name:p.name, workouts:sel }
                   : { t:"workouts", name:p.name+" — "+sel.length+" workout"+(sel.length>1?"s":""), workouts:sel };
@@ -5773,7 +5718,6 @@ const MGROUPS=["Chest","Lats","Upper Back","Lower Back","Front Delts","Side Delt
 const NO_TARGET=new Set(["Neck","Lower Back","Forearms","Adductors","Glute Med"]);
 const MSHORT={Chest:"Chest",Back:"Back",Shoulders:"Delts",Biceps:"Biceps",Triceps:"Triceps",Quads:"Quads",Hamstrings:"Hams",Glutes:"Glute Max","Glute Med":"Glute Med",Calves:"Calves",Core:"Core","Front Delts":"F·Delt","Side Delts":"S·Delt","Rear Delts":"R·Delt",Neck:"Neck",Lats:"Lats","Upper Back":"U·Back","Lower Back":"L·Back",Forearms:"Forearm",Adductors:"Adduct"};
 let musWindow=7, musMetric="sets", musSrc="log", musVolMode="total", musScale="abs";
-let meWindow=7;   // Me-page hero gauge window: 7 (this week) or 30 (this month)
 // Evidence-based weekly volume targets (fractional sets per muscle per week).
 // Dose-response meta-regressions: benefits accrue across ~10+ hard sets/muscle/wk; ~4–6 is a rough
 // lower bound (MEV) below which most trainees under-stimulate growth. One baseline for all groups —
@@ -5831,7 +5775,7 @@ function weeklyEquiv(totals, windowDays){
 }
 // summary cards → open their detail sheet on tap (ignored while editing the layout, so a drag doesn't open one)
 const _editing=()=> $("meTiles")&&$("meTiles").classList.contains("editing");
-$("meBalance").onclick=()=>{ if(_meSwiped){ _meSwiped=false; return; } if(_editing()) return; openMuscles(); };
+$("meBalance").onclick=()=>{ if(_editing()) return; openMuscles(); };
 if($("slCard")) $("slCard").onclick=()=>{ if(_editing()) return; openSheet("Strength"); };
 if($("progPanel")) $("progPanel").onclick=()=>{ if(_editing()) return; openSheet("Vol"); };
 if($("cardioCard")) $("cardioCard").onclick=()=>{ if(_editing()) return; if(cardioList().length) openCardioDetail(); else { showTab("workout"); if(!sessionUnderway()) setTrainMode("cardio"); } };
@@ -5839,45 +5783,7 @@ if($("strengthClose")) $("strengthClose").onclick=()=>closeSheet("Strength");
 if($("scrimStrength")) $("scrimStrength").onclick=()=>closeSheet("Strength");
 if($("volClose")) $("volClose").onclick=()=>closeSheet("Vol");
 if($("scrimVol")) $("scrimVol").onclick=()=>closeSheet("Vol");
-// hero window switch (Week / Month): tappable underline tabs + an iOS-style paged swipe of the gauge.
-let _meSwiped=false, meCache={};
-function meTrackTo(win, animate){ const tr=$("meRingTrack"); if(!tr) return;
-  tr.style.transition = animate ? "transform .34s cubic-bezier(.25,.46,.45,.94)" : "none";
-  tr.style.transform = "translateX("+(win===30 ? -50 : 0)+"%)"; }
-// position the track + refresh the active window's stat/cta (canvases for both pages are pre-drawn by renderMeRadar)
-function applyMeWindow(win, animate){
-  meWindow=win;
-  meTrackTo(win, animate);
-  const st=$("meBalStat"), cta=$("meBalCta");
-  if(st) st.classList.remove("under","good");
-  if(!Object.keys(hist).length){ if(st) st.textContent="No sessions yet"; if(cta) cta.textContent="log a workout ›"; return; }
-  const det=expandLegacyMtot(meCache[win]||{}), under=GAUGE_GROUPS.filter(g=>gaugeVal(det,g)<WEEKLY_SET_MIN).length;
-  if(st){ st.textContent = under ? (under+" muscle"+(under>1?"s":"")+" under target") : "All muscles on target"; st.classList.add(under?"under":"good"); }
-  if(cta) cta.textContent="detail ›";
-}
-// the gauge track follows the finger and snaps to the nearest page on release (pager ignores canvas touches)
-(function(){ const ring=$("meRing"), tr=$("meRingTrack"); if(!ring||!tr) return;
-  let x0=0, y0=0, w=1, startWin=7, active=false, drag=false;
-  ring.addEventListener("touchstart", e=>{ if(e.touches.length!==1) return;
-    x0=e.touches[0].clientX; y0=e.touches[0].clientY; w=ring.clientWidth||1; startWin=meWindow; active=true; drag=false;
-    tr.style.transition="none"; }, {passive:true});
-  ring.addEventListener("touchmove", e=>{ if(!active) return;
-    const dx=e.touches[0].clientX-x0, dy=e.touches[0].clientY-y0;
-    if(!drag){ if(Math.abs(dx)<7 && Math.abs(dy)<7) return;
-      if(Math.abs(dx)<=Math.abs(dy)*1.2){ active=false; return; }     // vertical → let the page scroll
-      drag=true; }
-    e.preventDefault();
-    let pct=(startWin===30 ? -50 : 0) + (dx/w)*50;                     // 50% of the track per page
-    if(pct>0) pct*=0.35; else if(pct<-50) pct=-50+(pct+50)*0.35;       // rubber-band past the ends
-    tr.style.transform="translateX("+pct+"%)"; }, {passive:false});
-  const end=e=>{ if(!active) return; active=false; if(!drag) return; drag=false; _meSwiped=true;
-    const dx=(e.changedTouches?e.changedTouches[0].clientX-x0:0);
-    let win=startWin;
-    if(dx<-w*0.25 && startWin===7) win=30; else if(dx>w*0.25 && startWin===30) win=7;
-    applyMeWindow(win, true); };
-  ring.addEventListener("touchend", end, {passive:true});
-  ring.addEventListener("touchcancel", end, {passive:true});
-})();
+let meCache={};
 $("musClose").onclick=()=>closeSheet("Mus");
 $("scrimMus").onclick=()=>closeSheet("Mus");
 if($("cardioClose")) $("cardioClose").onclick=()=>closeSheet("Cardio");
@@ -6080,29 +5986,6 @@ const GAUGE_GROUPS=["Chest","Back","Shoulders","Biceps","Triceps","Quads","Hamst
 // sheet's expand state, so the hero is always the clean 10-spoke view. `wk` is a per-week sets map.
 const GAUGE_HEADS={ Shoulders:["Front Delts","Side Delts","Rear Delts"], Back:["Lats","Upper Back"] };
 function gaugeVal(det, g){ const h=GAUGE_HEADS[g]; return h ? h.reduce((a,m)=>a+(det[m]||0),0)/h.length : (det[g]||0); }
-function drawSuccessGauge(canvasId, wk){
-  const c=$(canvasId); if(!c) return; const ctx=c.getContext("2d"), W=c.width, H=c.height; ctx.clearRect(0,0,W,H);
-  const det=expandLegacyMtot(wk||{});
-  const lab=(getComputedStyle(document.documentElement).getPropertyValue("--l3")||"#888").trim();
-  const cx=W/2, cy=H/2, R=W*0.30, n=GAUGE_GROUPS.length, half=Math.PI/n-0.06;
-  const val=g=>gaugeVal(det, g);
-  // light mode washes out translucent fills on the pale card, so push alpha up there for legibility
-  const dark=document.documentElement.classList.contains("dark");
-  const slotA=dark?.12:.18, fillHi=dark?.66:.85, fillLo=dark?.46:.66;
-  ctx.strokeStyle="rgba(128,128,128,.25)"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();  // target rim
-  GAUGE_GROUPS.forEach((g,i)=>{
-    const a=(-90+i*360/n)*Math.PI/180, col=MCOLOR[g]||lab, succ=Math.min(1,(val(g)||0)/musTarget(g));
-    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,a-half,a+half); ctx.closePath();        // empty slot → the target
-    ctx.fillStyle=col; ctx.globalAlpha=slotA; ctx.fill(); ctx.globalAlpha=1;
-    const rr=R*succ;
-    if(rr>1){ ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rr,a-half,a+half); ctx.closePath();   // success fill
-      ctx.fillStyle=col; ctx.globalAlpha=succ>=1?fillHi:fillLo; ctx.fill(); ctx.globalAlpha=1; ctx.lineWidth=2.5; ctx.strokeStyle=col; ctx.stroke(); }
-    const x=cx+(R+40)*Math.cos(a), y=cy+(R+40)*Math.sin(a), co=Math.cos(a);
-    ctx.font=cfont(W,"label"); ctx.textBaseline="middle";
-    ctx.textAlign = Math.abs(co)<0.3 ? "center" : (co>0?"left":"right");
-    ctx.fillStyle=col; ctx.fillText(MSHORT[g]||g, x, y);
-  });
-}
 // How much of the objective the user has met over `days` (0–100). Blends signals weighted by the stated
 // objective: lifting-volume adherence on the muscles the plan targets, training consistency (days trained
 // vs the plan's expected sessions for the window), and — for fat-loss / fitness — cardio minutes vs goal.
@@ -6129,8 +6012,7 @@ function meObjectiveScore(days){
 // Balance SUMMARY card: a small week gauge + a one-line verdict. Full per-muscle detail is the Mus sheet (tap).
 function renderMeRadar(){
   const mini=$("meMini"); if(!mini) return;
-  meCache = { 7: weeklyEquiv(muscleVolume(7, "sets", "total").totals, 7),
-              30: weeklyEquiv(muscleVolume(30, "sets", "total").totals, 30) };
+  meCache = { 7: weeklyEquiv(muscleVolume(7, "sets", "total").totals, 7) };
   drawRadar(meCache[7], "meMini", WEEKLY_SET_TARGET, true, false);   // the balance shape at a glance (no labels); full radar is the sheet
   const head=$("meBalHead"), st=$("meBalStat");
   if(!Object.keys(hist).length){ if(head) head.textContent="—"; if(st) st.textContent="No sessions yet — log a workout"; return; }
@@ -6822,7 +6704,6 @@ function renderFree(){
   } else if(fd){ delete draft["free"]; sset("draft", draft); }
   list.querySelectorAll(".group").forEach(refreshSetFocus);   // same done marks as plan sessions
   renderStartMode();
-  updateRepeatBtn();
   renderSessionRose();
   updateClearBtn();
 }
@@ -7008,7 +6889,7 @@ function buildCardioCard(n, ci, end){
     +'<span class="eflbl"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>';
   cdSetZone(g, z);
   g.querySelectorAll(".cm,.ck").forEach(el=>{
-    el.addEventListener("input", ()=>{ cdRefresh(g); captureDraft(); });
+    el.addEventListener("input", ()=>{ if(el.value.indexOf(",")>=0) el.value=el.value.replace(/,/g,"."); cdRefresh(g); captureDraft(); });
     // the grey value is today's target: tapping an empty box takes it, selected, so typing replaces it
     el.addEventListener("focus", ()=>{ if(!el.value && /^\d+(\.\d+)?$/.test(el.placeholder)){ el.value=el.placeholder; cdRefresh(g); captureDraft(); }
       setTimeout(()=>{ try{ el.select(); }catch(_){} }, 0); });
@@ -8101,6 +7982,7 @@ function renderCardioLog(){
 function renderCardio(){ renderCardioChips(); updateCardioPreview(); renderActCite(); renderCardioLog(); }
 function setTrainMode(m){ trainMode=m;
   const strength = m==="strength";
+  if(strength && cdWatch) clearWatch();
   $("strengthWrap").style.display = strength ? "" : "none";
   $("cardioPanel").style.display  = strength ? "none" : "";
   renderWkHeader();
@@ -8115,7 +7997,8 @@ $("cdLog").onclick=()=>{
   const pv=updateCardioPreview(); if(!pv.ok){ toast("Add a duration or distance, or import a route, first"); return; }
   const act=cdAct(); let mins=pv.mins; const dist = cdRoute ? cdRoute.dist : pv.dist;
   if(cdRoute && !mins) mins=cdRoute.mins||0;
-  const entry={ d: cdWatch && cdWatch.start ? cdWatch.start : Date.now(), kind:"cardio", name:act.n, cat:act.cat||"cardio", zone:cdZone, mins, vol:cardioVol(), muscles:act.muscles.slice(), src: cdRoute?"gpx": cdWatch?"watch":"manual" };
+  let d0 = cdWatch && cdWatch.start ? cdWatch.start : Date.now(); while((settings.extlogTomb||[]).indexOf(d0)>=0) d0++;   // a deleted entry's time is a tombstone
+  const entry={ d: d0, kind:"cardio", name:act.n, cat:act.cat||"cardio", zone:cdZone, mins, vol:cardioVol(), muscles:act.muscles.slice(), src: cdRoute?"gpx": cdWatch?"watch":"manual" };
   entry.cf = act.cf!=null ? act.cf : 1;                       // cardio-credit fraction (frozen at log time)
   if(act.mf && entry.vol) entry.mvol = Math.round(entry.vol*act.mf);   // partial muscle-volume for strength-y activities (feeds the radar)
   if(dist){ entry.dist=round1(dist); if(mins) entry.pace=round1(mins/dist); }
@@ -8215,25 +8098,36 @@ if($("cdGpx")) $("cdGpx").onchange=ev=>{ const file=ev.target.files&&ev.target.f
 // logged until Log cardio is tapped; the entry keeps the workout's own start time, and a workout whose start
 // minute is already in the log is skipped. Strength workouts are left out: yalla logs lifting itself.
 let cdWatch=null;   // the pending import: {start: ms or 0, key: start minute or 0, km}
-const WATCH_TYPES=[[/table\s*tennis|ping\s*pong/,"Table Tennis"],[/cross\s*country|nordic\s*ski|\bxc\b/,"XC Skiing"],
-  [/strength|weight|core\s*training/,null],[/run|jog/,"Running"],[/cycl|bike|biking|spin/,"Cycling"],[/swim/,"Swimming"],
-  [/rowing|\brow\b/,"Rowing"],[/hik/,"Hiking"],[/walk/,"Walking"],[/ellipt/,"Elliptical"],[/stair/,"Stair Climber"],
-  [/jump\s*rope|skipping/,"Jump Rope"],[/skat/,"Skating"],[/ski|snowboard/,"Skiing"],[/box/,"Boxing"],[/martial|mma/,"MMA"],
-  [/wrestl|grappl/,"Grappling"],[/soccer|football/,"Football"],[/basketball/,"Basketball"],[/padel/,"Padel"],[/squash/,"Squash"],
+const WATCH_TYPES=[[/table\s*tennis|ping\s*pong|tennis\s*de\s*table|tischtennis/,"Table Tennis"],[/cross\s*country|nordic\s*ski|\bxc\b|ski\s*de\s*fond|langlauf/,"XC Skiing"],
+  [/strength|weight|core\s*training|core-training|renforcement|musculation|kraft/,null],[/stair|escalier|treppe/,"Stair Climber"],
+  [/run|jog|course|laufen|\blauf/,"Running"],[/cycl|bike|biking|spin|v[ée]lo|radfahr/,"Cycling"],[/swim|natation|schwimm/,"Swimming"],
+  [/rowing|\brow\b|aviron|ruder/,"Rowing"],[/hik|randonn|wander/,"Hiking"],[/walk|marche|\bgeh/,"Walking"],[/ellipt|crosstrainer/,"Elliptical"],
+  [/jump\s*rope|skipping|corde|seilspring/,"Jump Rope"],[/skat|patin/,"Skating"],[/ski|snowboard/,"Skiing"],[/box/,"Boxing"],[/martial|mma|kampfsport/,"MMA"],
+  [/wrestl|grappl|lutte|ringen/,"Grappling"],[/soccer|football|fu(ß|ss)ball/,"Football"],[/basketball/,"Basketball"],[/padel/,"Padel"],[/squash/,"Squash"],
   [/badminton/,"Badminton"],[/tennis|pickleball/,"Tennis"],[/volleyball/,"Volleyball"],[/kettlebell/,"Kettlebell"],
-  [/hiit|high\s*intensity|cross\s*training|crossfit|mixed\s*cardio/,"CrossFit"],[/boulder/,"Bouldering"],[/climb/,"Climbing"],
-  [/surf/,"Surfing"],[/paddl|kayak|\bsup\b|canoe/,"Kayak / SUP"],[/danc/,"Dancing"],[/golf/,"Golf"],[/pilates/,"Pilates"],[/yoga/,"Yoga"]];
+  [/hiit|high\s*intensity|cross\s*training|crossfit|mixed\s*cardio|fractionn|intervall/,"CrossFit"],[/boulder/,"Bouldering"],[/climb|escalade|kletter/,"Climbing"],
+  [/surf/,"Surfing"],[/paddl|kayak|\bsup\b|cano[eë]|kanu/,"Kayak / SUP"],[/danc|danse|tanz/,"Dancing"],[/golf/,"Golf"],[/pilates/,"Pilates"],[/yoga/,"Yoga"]];
 // Health's workout name → a yalla activity; {strength:true} for lifting; null when nothing matches
 function watchActivity(t){
   t=String(t||"").toLowerCase(); if(!t) return null;
   for(const [re,name] of WATCH_TYPES) if(re.test(t)) return name ? (ACTIVITIES.find(a=>a.n===name)||null) : {strength:true};
   return null;
 }
-// minutes from "32", "32.5", "32,5", "32 min" or "0:32:10"
+// minutes from "32", "32.5", "32,5", "32 min", "1 hr 5 min", "1h 5m" or "0:32:10"
 function watchMinutes(v){
-  v=String(v||"").trim(); if(!v) return 0;
+  v=String(v||"").trim().toLowerCase(); if(!v) return 0;
   if(/^\d+:\d{1,2}(:\d{1,2})?$/.test(v)){ const p=v.split(":").map(Number); return p.length===3 ? p[0]*60+p[1]+p[2]/60 : p[0]+p[1]/60; }
+  let t=0; v.replace(/(\d+(?:[.,]\d+)?)\s*(hours?|hrs?|h|std|minutes?|mins?|m|seconds?|secs?|s)\b/g, (_,n,u)=>{ n=parseFloat(n.replace(",","."));
+    t += /^(h|hr|hrs|hour|hours|std)$/.test(u) ? n*60 : /^s/.test(u) ? n/60 : n; return ""; });
+  if(t>0) return t;
   const n=parseFloat(v.replace(",",".")); return isFinite(n)&&n>0 ? n : 0;
+}
+// the start time: a "+01:00" offset arrives as " 01:00" (URLSearchParams reads + as a space), and a Shortcut may put a
+// space between date and time or write the offset as +0100
+function watchDate(v){
+  v=String(v||"").trim(); if(!v) return NaN;
+  return Date.parse(v.replace(/^(\d{4}-\d{2}-\d{2})\s+(\d)/, "$1T$2").replace(/\s+(\d{2}:?\d{2})$/, "+$1")
+    .replace(/\s+([+-]\d{2}:?\d{2})$/, "$1").replace(/([+-]\d{2})(\d{2})$/, "$1:$2"));
 }
 // one workout line (a link, or the same text from the clipboard) → {type, min, km, hr, start}, or null
 function parseWatchLine(s){
@@ -8243,7 +8137,7 @@ function parseWatchLine(s){
   const num=k=>{ const v=parseFloat(String(q.get(k)||"").replace(",",".")); return isFinite(v)&&v>0 ? v : 0; };
   const min=watchMinutes(q.get("min")) || num("sec")/60, km=num("km") || num("mi")*1.609344 || num("m")/1000;
   if(!(min>0) && !(km>0)) return null;
-  const st=Date.parse(q.get("start")||"");
+  const st=watchDate(q.get("start"));
   return { type:(q.get("type")||"").trim(), min:Math.round(min), km:km ? round1(km) : 0, hr:Math.round(num("hr")),
     start: isFinite(st) && st<=Date.now()+5*60000 ? st : 0 };
 }
@@ -8260,16 +8154,20 @@ function renderWatchNote(w, unknown){
   box.style.display="";
   box.innerHTML='<div class="watchnote"><span class="watchnote-ic" aria-hidden="true">'+WATCH_ICON+'</span><div><b>From Apple Watch</b> · '+esc(bits.join(" · "))
     +'<div>'+(unknown ? 'Pick the activity, then tap Log cardio.' : 'Check it, then tap Log cardio.')+'</div></div>'
-    +'<a class="lnkic" id="cdWatchClear" role="button" aria-label="Discard the Apple Watch workout">'+ICON.trash+'</a></div>';
+    +'<button type="button" class="lnkic" id="cdWatchClear" aria-label="Discard the Apple Watch workout">'+ICON.trash+'</button></div>';
   $("cdWatchClear").onclick=()=>{ clearWatch(); ["cdDist","cdTime","cdPace","cdMin","cdHr"].forEach(id=>{ $(id).value=""; }); updateCardioPreview(); };
 }
-function clearWatch(){ cdWatch=null; renderWatchNote(null); }
+function clearWatch(){ const back=cdWatch && cdWatch.back; cdWatch=null; renderWatchNote(null); try{ sessionStorage.removeItem("yWatch"); }catch(e){}
+  if(back && trainMode!=="strength") setTimeout(()=>{ if(trainMode!=="strength") setTrainMode("strength"); }, 700); }   // after the Logged toast
 // a #watch?… link: read it raw (URLSearchParams decodes it), drop it from the address bar, fill the form
 function watchFromHash(delay){
-  try{ if(!location.hash || !/watch\?/i.test(location.hash)) return;
+  try{ if(!location.hash || !/watch\?/i.test(location.hash)) return false;
     const w=parseWatchLine(location.hash); history.replaceState(null,"", location.pathname+location.search);
-    if(w) setTimeout(()=>applyWatch(w), delay||0); }catch(e){}
+    if(w) setTimeout(()=>applyWatch(w), delay||0); return true; }catch(e){ return false; }
 }
+// an import that was on screen when the page reloaded (an update taking over reloads once): put it back
+function watchPending(delay){ let w=null; try{ w=JSON.parse(sessionStorage.getItem("yWatch")||"null"); }catch(e){}
+  if(w) setTimeout(()=>applyWatch(w), delay||0); }
 window.addEventListener("hashchange", ()=>watchFromHash(0));   // a link opened while yalla is already open
 // fill the Cardio form from one workout; returns true when the line was handled (filled, skipped or refused)
 function applyWatch(w){
@@ -8278,6 +8176,7 @@ function applyWatch(w){
   if(m && m.strength){ toast("Strength workouts stay out: log your lifting in yalla's Workout tab."); return true; }
   const key = w.start ? Math.round(w.start/60000) : 0;
   if(key && cardioList().some(e=>e.hk===key)){ toast("This Apple Watch workout is already in your log."); return true; }
+  const back = (sessionUnderway() && trainMode==="strength") || !!(cdWatch && cdWatch.back);   // mid-session: return to the lifts afterwards
   showTab("workout");
   setTrainMode(m && m.cat==="activity" ? "activity" : "cardio");
   if(m) cdActSel=m.n;
@@ -8285,10 +8184,12 @@ function applyWatch(w){
   ["cdDist","cdTime","cdPace","cdMin","cdHr","cdRpe"].forEach(id=>{ $(id).value=""; });
   const z=zoneFromHr(w.hr); if(z) cdZone=z;
   renderCardio();
-  if(cdAct().run){ if(w.km) $("cdDist").value=w.km; if(w.min) $("cdTime").value=w.min; cdRunCalc(); }
-  else if(w.min) $("cdMin").value=w.min;
+  if(w.km) $("cdDist").value=w.km;
+  if(w.min){ $("cdTime").value=w.min; $("cdMin").value=w.min; }   // both layouts: an unknown type keeps them when you pick the activity
+  if(cdAct().run) cdRunCalc();
   if(w.hr) $("cdHr").value=w.hr;
-  cdWatch={ start:w.start||0, key, km:w.km||0 };
+  cdWatch={ start:w.start||0, key, km:w.km||0, back };
+  try{ sessionStorage.setItem("yWatch", JSON.stringify(w)); }catch(e){}
   renderWatchNote(w, !m); updateCardioPreview();
   const help=$("cdWatchHelp"); if(help) help.hidden=true;
   // bring the form up by scrolling its page only (scrollIntoView would also slide the sideways page carousel)
@@ -8309,7 +8210,9 @@ if($("cdWatchBtn")) $("cdWatchBtn").onclick=async()=>{
 };
 if($("cdWatchCopy")) $("cdWatchCopy").onclick=()=>{ const t=($("cdWatchTpl")||{}).textContent||"";
   try{ navigator.clipboard.writeText(t).then(()=>toast("Copied the example line"), ()=>toast("Couldn't copy, select it instead")); }catch(e){ toast("Couldn't copy, select it instead"); } };
-if($("cdWatchPaste")) $("cdWatchPaste").addEventListener("input", e=>{ const w=parseWatchLine(e.target.value); if(w && applyWatch(w)) e.target.value=""; });
+if($("cdWatchPaste")){ const pasteIn=e=>{ const w=parseWatchLine(e.target.value); if(w && applyWatch(w)) e.target.value=""; };
+  $("cdWatchPaste").addEventListener("input", e=>{ if(/^insertFrom/.test(e.inputType||"")) pasteIn(e); });   // typing would import a half-written line
+  $("cdWatchPaste").addEventListener("change", pasteIn); }
 
 // ===== cardio dose: weekly aerobic minutes + zone mix, a SEPARATE axis from muscle volume =====
 // (also folds in pre-Phase-1 kind:"activity" logs so old runs/rides still count toward the cardio picture)
@@ -8589,8 +8492,6 @@ function openAchDetail(id){
   $("achBody").classList.add("achd-sheet");
   openSheet("Ach");
 }
-// kept for any caller outside the three log handlers
-function celebrateAch(ids){ if(ids && ids.length) celebrateMoment({ achIds:ids }); }
 
 // ================= week stars: UI =================
 // The "Stars & achievements" fold (sky card, this week, this year), the Stars sheet, the one-time intro, the
@@ -9556,13 +9457,6 @@ function suitsExp(name, exp){
   // simple technique but a real strength prerequisite — pull-ups/chin-ups/dips are intermediate, not beginner moves
   if(exp==="beginner" && /pull-?up|chin-?up|\bdip\b|pistol|muscle-up/.test(name.toLowerCase())) return false;
   return true;
-}
-function accessLevels(access, n){
-  if(access==="park") return Array(n).fill("park");
-  if(access==="home") return Array(n).fill("none");
-  if(access==="mostly_gym"){ const home=Math.max(1,Math.round(n/4)), a=[]; for(let i=0;i<n;i++) a.push(i>=n-home?"none":"gym"); return a; }
-  if(access==="mostly_home"){ const gym=Math.max(1,Math.round(n/4)), a=[]; for(let i=0;i<n;i++) a.push(i>=n-gym?"gym":"none"); return a; }
-  return Array(n).fill("gym");
 }
 const COMPOUND_GROUPS=["chest","upperback","lats","quads","hamstrings","shoulders"];
 // the emphasis radar's spokes — identical to the app-wide analytics groups
@@ -10795,16 +10689,6 @@ $("importFile").onchange=(e)=>{ const f=e.target.files&&e.target.files[0]; if(!f
 // ===== per-workout share tile =====
 function fmtKgShort(v){ v=Math.round(v); return v>=1000 ? (v/1000).toFixed(v>=10000?0:1).replace(/\.0$/,"")+"k kg" : v+" kg"; }
 function rrect(x,X,Y,w,h,r){ x.beginPath(); x.moveTo(X+r,Y); x.arcTo(X+w,Y,X+w,Y+h,r); x.arcTo(X+w,Y+h,X,Y+h,r); x.arcTo(X,Y+h,X,Y,r); x.arcTo(X,Y,X+w,Y,r); x.closePath(); }
-function tileRadar(x,cx,cy,R,tot){
-  // rose: each wedge's area = that muscle's share of the session (see drawRose) — constant total area.
-  // Wedges are colour-coded per muscle (same palette as the in-app radar) with a white rim so the split
-  // reads at a glance on the gradient; only trained muscles get a shadowed white label, keeping the ring clean.
-  drawRose(x, cx, cy, R, roseGroups(), roseTotals(tot), {
-    color:g=>MCOLOR[g]||"#f08020", alpha:.92, stroke:"rgba(255,255,255,.85)", strokeW:2,
-    gap:0.08, rings:[0.5,1], grid:"rgba(255,255,255,.30)", gridW:2,
-    labels:true, labelColor:"rgba(255,255,255,.96)", labelFont:"700 22px -apple-system,system-ui,sans-serif", labelGap:34, labelShadow:true
-  });
-}
 // app URL shown on the share tile — derived from the live location so it stays right under any
 // host (GitHub Pages subpath or a custom domain), minus protocol, trailing file, and trailing slash.
 const SHARE_URL=(()=>{ try{ const p=location.pathname.replace(/\/[^/]*\.[^/]*$/,"/").replace(/\/$/,""); return (location.host+p)||"o-frings.github.io/yalla"; }catch(_){ return "o-frings.github.io/yalla"; } })();
@@ -11008,25 +10892,33 @@ $("shareImgBtn").onclick=()=>shareImage(false);
 const HEALTH_SHORTCUT="yalla to Health";
 const canHealth=()=>/iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints>1);   // iPadOS reports a Mac
 const _healthSent=new Set();   // session dates already handed over
+let _healthPending=null;        // the session being handed over, until Shortcuts opens
 // local time with its offset ("2026-11-09T18:30:00+01:00"), which Shortcuts reads as a date
 function isoLocal(ms){ const d=new Date(ms), p=n=>String(Math.abs(n)).padStart(2,"0"), o=-d.getTimezoneOffset();
   return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes())+":"+p(d.getSeconds())+(o<0?"-":"+")+p(Math.floor(Math.abs(o)/60))+":"+p(Math.abs(o)%60); }
-function healthPayload(s){ const end=s.date||Date.now(), minutes=Math.max(1, Math.round(s.mins||0));
+function healthPayload(s){ const end=s.end||s.date||Date.now(), minutes=Math.max(1, Math.round(s.mins||0));
   return JSON.stringify({ type:"Traditional Strength Training", start:isoLocal(end-minutes*60000), end:isoLocal(end), minutes }); }
 function openShortcut(url){ location.href=url; }
 function updateHealthBtn(){
   const b=$("shareHealthBtn"), S=_shareSt; if(!b) return;
   const show=canHealth() && !!(S && S.session) && S.k!=="star"; b.hidden=!show;
   if(!show){ const h=$("shareHealthHelp"); if(h) h.hidden=true; return; }
-  const sent=_healthSent.has(S.session.date); b.disabled=sent;
-  $("shareHealthLbl").textContent = sent ? "Sent to Apple Health" : "Add to Apple Health";
+  const sent=_healthSent.has(S.session.date), pend=_healthPending===S.session.date; b.disabled=sent||pend;
+  $("shareHealthLbl").textContent = sent ? "Sent to Apple Health" : pend ? "Opening Shortcuts…" : "Add to Apple Health";
 }
+// It counts as sent once Shortcuts takes over (the page hides). iOS may first ask "Open in Shortcuts?", so allow time
+// for that; a cancelled or failed launch leaves the page on screen and brings the setup steps back.
 function sendToHealth(){
-  const S=_shareSt, s=S && S.session; if(!s || _healthSent.has(s.date)) return;
-  _healthSent.add(s.date);
-  if(!settings.healthShortcut){ settings.healthShortcut=true; sset("settings",settings); }
+  const S=_shareSt, s=S && S.session; if(!s || _healthSent.has(s.date) || _healthPending) return;
+  _healthPending=s.date; updateHealthBtn();
+  const done=ok=>{ document.removeEventListener("visibilitychange", away); clearTimeout(wait); _healthPending=null;
+    if(ok){ _healthSent.add(s.date); if(!settings.healthShortcut){ settings.healthShortcut=true; sset("settings",settings); } }
+    else { toast("Shortcuts didn't open. Check that the \""+HEALTH_SHORTCUT+"\" Shortcut is set up."); const h=$("shareHealthHelp"); if(h) h.hidden=false; }
+    updateHealthBtn(); };
+  const away=()=>{ if(document.visibilityState==="hidden") done(true); };
+  document.addEventListener("visibilitychange", away);
+  const wait=setTimeout(()=>done(false), 15000);
   const h=$("shareHealthHelp"); if(h) h.hidden=true;
-  updateHealthBtn();
   openShortcut("shortcuts://run-shortcut?name="+encodeURIComponent(HEALTH_SHORTCUT)+"&input=text&text="+encodeURIComponent(healthPayload(s)));
 }
 if($("shareHealthBtn")) $("shareHealthBtn").onclick=()=>{

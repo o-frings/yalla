@@ -1,3 +1,10 @@
 
 # Supabase CLI local state
 supabase/.temp/
+
+# LaTeX build files of the white paper (the PDF is tracked; these are rebuilt by latexmk)
+growth-model-whitepaper.aux
+growth-model-whitepaper.fdb_latexmk
+growth-model-whitepaper.fls
+growth-model-whitepaper.log
+growth-model-whitepaper.out
