@@ -3527,7 +3527,7 @@ let TIP_DOI = {};     // tip id → study URL
 let SRC_DOI = {};     // study key → study URL  (powers the muscle-balance / progress-insight / injury source links)
 let PROG_SRC = {};    // study key → citation HTML (same surfaces)
 async function loadEvidence(){
-  try{ const r = await fetch("evidence.json"); if(r.ok) EVIDENCE = await r.json(); }   // SW is network-first, so this stays fresh online and works offline
+  try{ const r = await fetch("evidence.json"); if(r.ok) EVIDENCE = await r.json(); }   // sw.js serves it in one set with this app.js, so the two always match, online or offline
   catch(e){ /* offline before precache, or fetch error → tips, library & source links degrade gracefully */ }
   buildTips();
 }
@@ -11045,8 +11045,9 @@ if("serviceWorker" in navigator && location.protocol==="https:"){
     navigator.serviceWorker.register("sw.js").then(reg=>{
       reg.addEventListener("updatefound", ()=>{ const nw=reg.installing; if(nw) nw.addEventListener("statechange", ()=>{
         if(nw.state==="activated" && navigator.serviceWorker.controller) reloadOnce(); }); });
-      reg.update();                                   // check for a newer worker on every launch
-      setInterval(()=>reg.update(), 60*60*1000);      // and hourly while open
+      const check=()=>reg.update().catch(()=>{});    // rejects offline; nothing to do until the next check
+      check();                                        // check for a newer worker on every launch
+      setInterval(check, 60*60*1000);                 // and hourly while open
     }).catch(()=>{});
   });
   // an installed PWA resumes without re-firing "load"; re-check for a new version when it regains focus
